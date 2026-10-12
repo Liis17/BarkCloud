@@ -26,6 +26,7 @@ See also: [[Backend/OriginalLifetime]] · [[Backend/DynamicFolders]] · [[Api/Fi
 | Группа | RPC |
 |---|---|
 | Дерево | `CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `GetPath`, `SearchFiles` |
+| Свойства и видимость | `GetDirectoryProperties`, `SetDirectoryVisibility` |
 | Записи | `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `DeleteFileEntries` |
 | Галерея | `ListUserMedia`, `GetUserMediaStats`, `DeleteUserMedia`, `SetVideoThumbnail` |
 | Корзина | `ListTrash`, `GetTrashSummary`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` |
@@ -35,6 +36,24 @@ See also: [[Backend/OriginalLifetime]] · [[Backend/DynamicFolders]] · [[Api/Fi
 | Доступ пользователям | Файлы: `ShareFileWithUser`, `RevokeUserShare`, `ListMyOutgoingShares`, `ListMyOutgoingSharesAll`, `ListSharedWithMe`, `GetSharedFileDownloadUrl`; папки: `ShareFolderWithUser`, `RevokeFolderUserShare`, `ListMyOutgoingFolderShares`, `ListSharedFoldersWithMe`, `ListSharedDirectory` |
 
 Полный контракт с сообщениями находится в `Shared/BarkCloud.Proto/files_api.proto`. Практические шаги клиента собраны в [[Api/FilesClientGuide]].
+
+### Видимость папок
+
+`CloudDirectory.HideFromGallery` и `HideFromSearch` — собственные настройки папки; `EffectiveHideFromGallery` и `EffectiveHideFromSearch` — итоговые значения с учётом предков. Для каждого признака действует правило:
+
+```text
+effective = (InheritVisibility && ParentId != null) ? parent.effective : own
+```
+
+Корневая папка владельца не материализована и всегда видима. Верхнеуровневая папка (`ParentId=null`) не наследует виртуальный корень. При сохранении её видимости сервер устанавливает `InheritVisibility = !(HideFromGallery || HideFromSearch)`: если включено хотя бы одно скрытие, папка сохранит собственные настройки при переносе; если оба флага выключены, она сможет унаследовать настройки нового родителя.
+
+`SetDirectoryVisibility` и `MoveDirectory` выполняют изменение и пересчёт поддерева сверху вниз под `CloudHierarchyStorage.LockTree`. `CreateDirectory` также использует этот lock и инициализирует итоговые флаги новой папки значениями родителя. `DirectoryVisibility.RecomputeSubtreeAsync` пересчитывает effective-флаги перемещённого поддерева и поддерева после смены настроек.
+
+`GetDirectoryProperties` возвращает собственные и итоговые флаги, наличие родителя, а также количество живых записей, вложенных папок и суммарный размер живых файлов во всём поддереве. Записи корзины в эти счётчики не входят.
+
+`HideFromGallery` исключает файл из `ListUserMedia`, `GetUserMediaStats`, устаревшего `ListUserImages`, `GetMemories`, `ListMediaLocations` и `MusicApi.ListTracks`. `SearchFiles` применяет этот фильтр только при `exclude_hidden_from_gallery=true` (веб передаёт флаг для поиска фото и видео). `SearchApi.Search` использует `HideFromSearch` для принадлежащих владельцу файловых секций и обычных результатов-папок.
+
+Остальные пути сохраняют содержимое: `ListDirectory*`, умные папки, альбомы и их элементы, плейлисты и их треки, `ListSharedDirectory`, корзина и `ResolveHit`. Секция Shared глобального поиска также не использует настройки видимости владельца. В том числе скрытые файлы остаются доступными в альбомах и плейлистах.
 
 ## Ограничения и важные детали
 
