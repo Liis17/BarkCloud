@@ -3,21 +3,43 @@ using Amazon.S3.Model;
 
 using BarkCloud.Files.Configurations;
 using BarkCloud.Files.Infrastructure;
+using BarkCloud.GrpcServer;
+
+using Microsoft.Extensions.Configuration;
+
+using System.Globalization;
 
 namespace BarkCloud.Files.Services;
 
 public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
 {
     private readonly S3BucketRegistry _registry;
+    private readonly IReadOnlyList<StorageQuotaGroupOptions> _groups;
     private readonly StorageStatsCache<S3StorageStats> _cache;
 
     public S3StorageStatsProvider(
         S3BucketRegistry registry,
+        IConfiguration configuration,
         TimeProvider timeProvider,
         ILogger<S3StorageStatsProvider> logger,
         IHostApplicationLifetime? lifetime = null)
     {
         _registry = registry;
+        _groups = configuration.GetSection("StorageQuotaGroups").GetChildren()
+            .Select(section => new StorageQuotaGroupOptions
+            {
+                Id = section.Key,
+                Name = section["Name"] ?? string.Empty,
+                QuotaBytes = long.Parse(section["QuotaBytes"] ?? "0", CultureInfo.InvariantCulture),
+                Buckets = section.GetSection("Buckets").GetChildren()
+                    .Select(bucket => new StorageQuotaGroupBucketOptions
+                    {
+                        ServiceUrl = bucket["ServiceUrl"] ?? string.Empty,
+                        BucketName = bucket["BucketName"] ?? string.Empty
+                    })
+                    .ToList()
+            })
+            .ToArray();
         _cache = new(ReadStatsAsync, timeProvider, logger, lifetime?.ApplicationStopping ?? CancellationToken.None);
     }
 
@@ -41,28 +63,73 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
     private async Task<S3StorageStats> ReadStatsAsync(CancellationToken cancellationToken)
     {
         var buckets = _registry.GetAllProfiles()
-            .Where(item => item.Profile.IsActive && !item.Profile.IsLegacy)
-            .GroupBy(item => new PhysicalBucket(NormalizeEndpoint(item.Profile.ServiceUrl), item.Profile.BucketName))
-            .Select(group => new Bucket(
+            .GroupBy(item => new PhysicalBucket(
+                S3Endpoint.Normalize(item.Profile.ServiceUrl, item.Profile.IsR2), item.Profile.BucketName),
+                PhysicalBucketComparer.Instance)
+            .ToDictionary(group => group.Key, group => new Bucket(
                 group.Key.BucketName,
-                group.Min(item => item.Profile.QuotaBytes),
-                group.Select(item => item.Client).Distinct().ToArray()))
+                group.Any(item => item.Profile.IsActive && !item.Profile.IsLegacy),
+                group.Select(item => item.Client).Distinct().ToArray()),
+                PhysicalBucketComparer.Instance);
+
+        var groups = _groups.Select(group => new ConfiguredGroup(
+                group.Id,
+                group.Name,
+                group.QuotaBytes,
+                group.Buckets.Select(bucket => new PhysicalBucket(
+                    S3Endpoint.Normalize(bucket.ServiceUrl), bucket.BucketName))
+                    .Distinct(PhysicalBucketComparer.Instance)
+                    .ToArray()))
+            .OrderBy(group => group.Name, StringComparer.Ordinal)
+            .ToArray();
+        var groupedBuckets = groups.SelectMany(group => group.Buckets)
+            .ToHashSet(PhysicalBucketComparer.Instance);
+        var ungroupedBuckets = buckets.Where(item => item.Value.IsActive && !groupedBuckets.Contains(item.Key))
+            .Select(item => item.Key)
+            .ToArray();
+        var bucketsToMeasure = groups.SelectMany(group => group.Buckets)
+            .Where(buckets.ContainsKey)
+            .Concat(ungroupedBuckets)
+            .Distinct(PhysicalBucketComparer.Instance)
             .ToArray();
 
-        if (buckets.Length == 0)
+        if (groups.Length == 0 && bucketsToMeasure.Length == 0)
             return S3StorageStats.Unavailable;
 
-        var sizes = await Task.WhenAll(buckets.Select(bucket => GetBucketSizeAsync(bucket, cancellationToken)));
-        long usedBytes = 0;
-        long quotaBytes = 0;
-        for (var index = 0; index < buckets.Length; index++)
+        var measured = await Task.WhenAll(bucketsToMeasure.Select(async key =>
+            (Key: key, UsedBytes: await GetBucketSizeAsync(buckets[key], cancellationToken))));
+        var usedByBucket = measured.ToDictionary(item => item.Key, item => item.UsedBytes, PhysicalBucketComparer.Instance);
+
+        var results = groups.Select(group => new S3QuotaGroupStats(
+                group.Id,
+                group.Name,
+                SumUsedBytes(group.Buckets.Where(usedByBucket.ContainsKey), usedByBucket),
+                group.QuotaBytes,
+                group.Buckets.Count(key => !buckets.ContainsKey(key)),
+                false))
+            .ToList();
+        if (ungroupedBuckets.Length > 0)
         {
-            usedBytes = checked(usedBytes + sizes[index]);
-            quotaBytes = checked(quotaBytes + buckets[index].QuotaBytes);
+            results.Add(new S3QuotaGroupStats(
+                string.Empty,
+                "Без группы",
+                SumUsedBytes(ungroupedBuckets, usedByBucket),
+                0,
+                0,
+                true));
         }
 
-        var hasFiniteQuota = buckets.Length > 0 && buckets.All(bucket => bucket.QuotaBytes > 0);
-        return new S3StorageStats(usedBytes, quotaBytes, hasFiniteQuota, true);
+        return new S3StorageStats(results, true);
+    }
+
+    private static long SumUsedBytes(
+        IEnumerable<PhysicalBucket> buckets,
+        IReadOnlyDictionary<PhysicalBucket, long> usedByBucket)
+    {
+        long total = 0;
+        foreach (var bucket in buckets)
+            total = checked(total + usedByBucket[bucket]);
+        return total;
     }
 
     private static async Task<long> GetBucketSizeAsync(Bucket bucket, CancellationToken cancellationToken)
@@ -120,13 +187,22 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
         return usedBytes;
     }
 
-    private static string NormalizeEndpoint(string endpoint)
-    {
-        var uri = new Uri(endpoint, UriKind.Absolute);
-        return uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
-    }
-
     private readonly record struct PhysicalBucket(string Endpoint, string BucketName);
 
-    private sealed record Bucket(string Name, long QuotaBytes, IReadOnlyList<IAmazonS3> Clients);
+    private sealed record ConfiguredGroup(string Id, string Name, long QuotaBytes, IReadOnlyList<PhysicalBucket> Buckets);
+
+    private sealed record Bucket(string Name, bool IsActive, IReadOnlyList<IAmazonS3> Clients);
+
+    private sealed class PhysicalBucketComparer : IEqualityComparer<PhysicalBucket>
+    {
+        public static PhysicalBucketComparer Instance { get; } = new();
+
+        public bool Equals(PhysicalBucket left, PhysicalBucket right) =>
+            StringComparer.OrdinalIgnoreCase.Equals(left.Endpoint, right.Endpoint)
+            && StringComparer.Ordinal.Equals(left.BucketName, right.BucketName);
+
+        public int GetHashCode(PhysicalBucket bucket) => HashCode.Combine(
+            StringComparer.OrdinalIgnoreCase.GetHashCode(bucket.Endpoint),
+            StringComparer.Ordinal.GetHashCode(bucket.BucketName));
+    }
 }

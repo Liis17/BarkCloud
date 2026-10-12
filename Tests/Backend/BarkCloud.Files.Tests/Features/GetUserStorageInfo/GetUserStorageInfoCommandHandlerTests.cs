@@ -3,6 +3,7 @@ using BarkCloud.Files.Features.GetUserStorageInfo;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.Files.Tests._Helpers;
+using ProtoFiles = BarkCloud.Proto.Files;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Files.Tests.Features.GetUserStorageInfo;
@@ -104,22 +105,31 @@ public class GetUserStorageInfoCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ReturnsAggregateS3StorageAndQuotaState()
+    public async Task Handle_MapsS3QuotaGroupsWithoutExposingBucketDetails()
     {
         _quota.Setup(x => x.GetSnapshotAsync(42, false, default))
             .ReturnsAsync(new StorageQuotaSnapshot(null, 0, 0));
         _files.Setup(s => s.GetUserStorageByType(42)).ReturnsAsync(new Dictionary<UploadFileType, long>());
         _storageStats.Setup(s => s.GetStatsAsync(default)).ReturnsAsync(new PhysicalStorageStats(2_000, 800, 700, 500));
-        _s3StorageStats.Setup(s => s.GetStatsAsync(default)).ReturnsAsync(new S3StorageStats(1_234, 9_876, true, true));
+        _s3StorageStats.Setup(s => s.GetStatsAsync(default)).ReturnsAsync(new S3StorageStats(
+        [
+            new S3QuotaGroupStats("g1", "Archive", 1_234, 9_876, 2, false),
+            new S3QuotaGroupStats("", "Без группы", 42, 0, 0, true)
+        ], true));
 
         var response = await CreateSut().Handle(new GetUserStorageInfoCommand(), default);
 
-        response.AllS3UsedStorage.Should().Be(1_234);
-        response.AllS3QuotaStorage.Should().Be(9_876);
-        response.AllS3HasFiniteQuota.Should().BeTrue();
+        response.S3QuotaGroups.Should().ContainSingle(group => group.Id == "g1"
+            && group.Name == "Archive" && group.UsedBytes == 1_234 && group.QuotaBytes == 9_876
+            && group.UnmeasuredBuckets == 2 && !group.IsUngrouped);
+        response.S3QuotaGroups.Should().ContainSingle(group => group.IsUngrouped
+            && group.Name == "Без группы" && group.UsedBytes == 42 && group.QuotaBytes == 0);
         response.AllS3StatsAvailable.Should().BeTrue();
         response.TotalAvailableStorage.Should().Be(2_000);
         response.DiskUsedStorage.Should().Be(700);
         response.S3UsedStorage.Should().Be(500);
+
+        ProtoFiles.S3QuotaGroupUsage.Descriptor.Fields.InFieldNumberOrder().Select(field => field.Name)
+            .Should().Equal("id", "name", "used_bytes", "quota_bytes", "is_ungrouped", "unmeasured_buckets");
     }
 }
