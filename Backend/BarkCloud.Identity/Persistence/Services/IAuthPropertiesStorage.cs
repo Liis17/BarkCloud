@@ -15,6 +15,8 @@ public interface IAuthPropertiesStorage
     Task DisableOtp(long userId, CancellationToken cancellationToken = default);
     Task DisableEmailOtp(long userId, CancellationToken cancellationToken = default);
     Task<bool> TryIssueEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string code, CancellationToken cancellationToken = default);
+    Task<EmailAuthCodeIssueResult> TryIssueEmailAuthCodeWithSnapshot(long userId, EmailAuthCodePurpose purpose,
+        string code, CancellationToken cancellationToken = default);
     Task<ValidatedEmailAuthCode?> TryValidateAndReserveEmailAuthCode(long userId, EmailAuthCodePurpose purpose, string? code,
         CancellationToken cancellationToken = default);
     Task<bool> TryConsumeValidatedEmailAuthCode(ValidatedEmailAuthCode validatedCode, CancellationToken cancellationToken = default);

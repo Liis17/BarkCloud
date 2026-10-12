@@ -37,6 +37,7 @@ export type TaskStatus =
   | 'checking'
   | 'needs_file'
   | 'uploading'
+  | 'paused'
   | 'processing'
   | 'attaching'
   | 'uploaded_not_attached'
@@ -94,11 +95,15 @@ interface StateValue {
   tasks: UploadTask[];
   summary: UploadSummary;
   hasActive: boolean;
+  isPaused: boolean;
   dupPrompt: DupPromptReq | null;
   retry: (id: string) => void;
   reselect: (id: string) => void;
   dismiss: (id: string) => void;
   clearCompleted: () => void;
+  pauseAll: () => void;
+  resumeAll: () => void;
+  clearAll: () => void;
   cancel: (id: string) => void;
   answerDuplicate: (d: DuplicateDecision) => void;
 }
@@ -109,6 +114,8 @@ const StateCtx = React.createContext<StateValue | null>(null);
 export function UploadManagerProvider({ children }: { children: React.ReactNode }) {
   const tasksRef = React.useRef<UploadTask[]>([]);
   const runningIdsRef = React.useRef(new Set<string>());
+  const pausedRef = React.useRef(false);
+  const restoreGenerationRef = React.useRef(0);
   const [rev, setRev] = React.useState(0);
   const [attachVersion, setAttachVersion] = React.useState(0);
   const [dupPrompt, setDupPrompt] = React.useState<DupPromptReq | null>(null);
@@ -119,6 +126,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
 
   const bump = React.useCallback(() => setRev((value) => value + 1), []);
   const touch = React.useCallback((task: UploadTask, persist = true) => {
+    if (!tasksRef.current.includes(task)) return;
     task.updatedAt = Math.max(Date.now(), task.updatedAt + 1);
     bump();
     if (persist) void saveUploadTask(toPersisted(task)).catch(() => undefined);
@@ -131,6 +139,15 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     const next = dupQueueRef.current.shift() ?? null;
     dupPromptRef.current = next;
     setDupPrompt(next);
+  }, []);
+
+  const clearDuplicatePrompts = React.useCallback(() => {
+    const pending = dupQueueRef.current;
+    if (dupPromptRef.current) pending.push(dupPromptRef.current);
+    dupQueueRef.current = [];
+    dupPromptRef.current = null;
+    setDupPrompt(null);
+    for (const request of pending) request.resolve('skip');
   }, []);
 
   const answerDuplicate = React.useCallback((decision: DuplicateDecision) => {
@@ -184,12 +201,14 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
         if (!(error instanceof ApiError)
             || error.code?.toUpperCase() !== FILE_ALREADY_ATTACHED_CODE) throw error;
       }
+      if (!tasksRef.current.includes(task)) return;
 
       if (task.attachOptions.albumId) {
         await apiPost('/api/albums/items/add', {
           album: task.attachOptions.albumId,
           fileIds: [task.fileId],
         });
+        if (!tasksRef.current.includes(task)) return;
       }
       if (task.attachOptions.playlistId) {
         await apiPost('/api/music/playlists/tracks/add', {
@@ -204,6 +223,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       return;
     }
 
+    if (!tasksRef.current.includes(task)) return;
     task.status = 'done';
     task.progress = 1;
     task.error = null;
@@ -222,6 +242,8 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     });
     task.sessionId = session.sessionId;
     task.fileId = session.fileId;
+    if (!tasksRef.current.includes(task) && session.status === 'uploading')
+      void cancelUploadSession(session.sessionId).catch(() => undefined);
     touchRef.current(task);
     return session;
   }, []);
@@ -239,6 +261,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
 
       if (task.status === 'processing' && task.sessionId) {
         const current = await getUploadSession(task.sessionId);
+        controller.signal.throwIfAborted();
         if (current.status === 'uploading') {
           task.status = 'needs_file';
           task.error = 'Выберите файл повторно, чтобы продолжить загрузку';
@@ -254,6 +277,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
           throw new UploadSessionTerminalError(current);
 
         const ready = await waitForUploadReady(task.sessionId, controller.signal);
+        controller.signal.throwIfAborted();
         task.fileId = ready.fileId;
         await attachTask(task);
         return;
@@ -272,9 +296,11 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
         task.error = null;
         touchRef.current(task);
         const calculated = await hashFile(task.file, (fraction) => {
+          if (controller.signal.aborted) return;
           task.progress = fraction;
           touchRef.current(task, false);
         }, controller.signal);
+        controller.signal.throwIfAborted();
         if (task.sha256 && task.sha256 !== calculated) {
           task.file = null;
           task.status = 'needs_file';
@@ -290,6 +316,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       let session: UploadSession;
       if (task.sessionId) {
         session = await resumeUploadSession(task.sessionId);
+        controller.signal.throwIfAborted();
         if (session.status === 'failed' || session.status === 'expired' || session.status === 'cancelled') {
           task.idempotencyKey = randomId();
           task.sessionId = null;
@@ -300,8 +327,10 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
         task.status = 'checking';
         touchRef.current(task);
         const duplicate = await checkDuplicateHash(task.sha256!);
+        controller.signal.throwIfAborted();
         if (duplicate.exists) {
           const decision = await askDuplicateRef.current(task.batchId, task.fileName, duplicate.locations);
+          controller.signal.throwIfAborted();
           if (decision === 'skip' || decision === 'skip-all') {
             task.status = 'skipped';
             task.progress = 1;
@@ -312,11 +341,13 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
         session = await createSession(task);
       }
 
+      controller.signal.throwIfAborted();
       task.fileId = session.fileId;
       if (session.status === 'uploading') {
         task.status = 'uploading';
         touchRef.current(task);
         await uploadMissingParts(task.file, session, (fraction) => {
+          if (controller.signal.aborted) return;
           task.progress = fraction;
           if (fraction > 0.01 && task.startedAt) {
             const elapsed = (Date.now() - task.startedAt) / 1000;
@@ -324,10 +355,12 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
           }
           touchRef.current(task, false);
         }, controller.signal);
+        controller.signal.throwIfAborted();
         session = await completeUploadWithRecovery(
           task.file,
           session,
           (fraction) => {
+            if (controller.signal.aborted) return;
             task.progress = fraction;
             touchRef.current(task, false);
           },
@@ -338,6 +371,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
             upload: uploadMissingParts,
           },
         );
+        controller.signal.throwIfAborted();
       }
 
       if (session.status !== 'ready') {
@@ -345,17 +379,17 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
         task.progress = 1;
         touchRef.current(task);
         session = await waitForUploadReady(session.sessionId, controller.signal);
+        controller.signal.throwIfAborted();
       }
       task.fileId = session.fileId;
       await attachTask(task);
     } catch (error) {
+      if (controller.signal.aborted || !tasksRef.current.includes(task)) return;
       const terminalNeedsFile = !task.file
         && error instanceof UploadSessionTerminalError
         && (error.status === 'failed' || error.status === 'expired' || error.status === 'cancelled');
       task.status = terminalNeedsFile ? 'needs_file' : 'failed';
-      task.error = controller.signal.aborted
-        ? 'Отменено'
-        : terminalNeedsFile
+      task.error = terminalNeedsFile
           ? `${error.message}. Выберите файл повторно, чтобы начать новую сессию`
           : (error as Error).message || 'Ошибка загрузки';
       if (error instanceof UploadSessionTerminalError
@@ -373,7 +407,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     while (runningIdsRef.current.size < MAX_CONCURRENT) {
       const task = tasksRef.current.find((item) =>
         !runningIdsRef.current.has(item.id)
-        && (item.status === 'hashing' || item.status === 'processing' || item.status === 'attaching'));
+        && ((!pausedRef.current && item.status === 'hashing') || item.status === 'processing' || item.status === 'attaching'));
       if (!task) break;
       runningIdsRef.current.add(task.id);
       void processTask(task).finally(() => {
@@ -386,9 +420,16 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
 
   React.useEffect(() => {
     let disposed = false;
+    const generation = restoreGenerationRef.current;
     void loadUploadTasks().then((stored) => {
       if (disposed) return;
       const existing = new Set(tasksRef.current.map((task) => task.id));
+      if (generation !== restoreGenerationRef.current) {
+        for (const task of stored) {
+          if (!existing.has(task.id)) void deleteUploadTask(task.id).catch(() => undefined);
+        }
+        return;
+      }
       const restored = stored.filter((task) => !existing.has(task.id)).map(fromPersisted);
       tasksRef.current = [...tasksRef.current, ...restored];
       if (restored.length > 0) {
@@ -413,7 +454,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       sha256: null,
       sessionId: null,
       fileId: null,
-      status: 'hashing',
+      status: pausedRef.current ? 'paused' : 'hashing',
       progress: 0,
       error: null,
       attachOptions: { ...attachOptions },
@@ -445,6 +486,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     } else {
       return;
     }
+    if (pausedRef.current && task.status === 'hashing') task.status = 'paused';
     task.error = null;
     touchRef.current(task);
     window.setTimeout(() => tryStartMoreRef.current(), 0);
@@ -457,7 +499,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
 
   async function reselectFile(task: UploadTask): Promise<void> {
     const [file] = await pickFiles({ multiple: false });
-    if (!file) return;
+    if (!file || !tasksRef.current.includes(task)) return;
     if (file.size !== task.fileSize) {
       task.error = 'Размер выбранного файла не совпадает';
       task.status = 'needs_file';
@@ -466,7 +508,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     }
     task.file = file;
     task.hashValidated = false;
-    task.status = 'hashing';
+    task.status = pausedRef.current ? 'paused' : 'hashing';
     task.error = null;
     task.progress = 0;
     touchRef.current(task);
@@ -491,7 +533,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
   const cancel = React.useCallback((id: string) => {
     const task = tasksRef.current.find((item) => item.id === id);
     if (!task) return;
-    if (task.status !== 'hashing' && task.status !== 'checking' && task.status !== 'uploading') return;
+    if (task.status !== 'hashing' && task.status !== 'checking' && task.status !== 'uploading' && task.status !== 'paused') return;
     task.abortCtrl?.abort();
     task.abortCtrl = null;
     if (task.sessionId) void cancelUploadSession(task.sessionId).catch(() => undefined);
@@ -500,9 +542,52 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     touchRef.current(task);
   }, []);
 
+  const pauseAll = React.useCallback(() => {
+    pausedRef.current = true;
+    for (const task of tasksRef.current) {
+      if (task.status !== 'hashing' && task.status !== 'checking' && task.status !== 'uploading') continue;
+      if (task.status === 'checking') task.progress = 0;
+      task.status = 'paused';
+      task.eta = null;
+      task.abortCtrl?.abort();
+      touchRef.current(task);
+    }
+    clearDuplicatePrompts();
+    bump();
+  }, [bump, clearDuplicatePrompts]);
+
+  const resumeAll = React.useCallback(() => {
+    pausedRef.current = false;
+    for (const task of tasksRef.current) {
+      if (task.status !== 'paused') continue;
+      task.status = 'hashing';
+      task.startedAt = null;
+      touchRef.current(task);
+    }
+    bump();
+    tryStartMoreRef.current();
+  }, [bump]);
+
+  const clearAll = React.useCallback(() => {
+    const removed = tasksRef.current;
+    tasksRef.current = [];
+    pausedRef.current = false;
+    restoreGenerationRef.current++;
+    for (const task of removed) {
+      task.abortCtrl?.abort();
+      if (task.sessionId && (task.status === 'hashing' || task.status === 'checking'
+          || task.status === 'uploading' || task.status === 'paused' || task.status === 'needs_file' || task.status === 'failed'))
+        void cancelUploadSession(task.sessionId).catch(() => undefined);
+      void deleteUploadTask(task.id).catch(() => undefined);
+    }
+    clearDuplicatePrompts();
+    batchDecisionsRef.current.clear();
+    bump();
+  }, [bump, clearDuplicatePrompts]);
+
   React.useEffect(() => {
     const transferring = tasksRef.current.some((task) =>
-      task.status === 'hashing' || task.status === 'checking' || task.status === 'uploading');
+      task.status === 'hashing' || task.status === 'checking' || task.status === 'uploading' || task.status === 'paused');
     if (!transferring) return;
     const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     window.addEventListener('beforeunload', handler);
@@ -518,11 +603,15 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     tasks,
     summary,
     hasActive,
+    isPaused: pausedRef.current,
     dupPrompt,
     retry,
     reselect,
     dismiss,
     clearCompleted,
+    pauseAll,
+    resumeAll,
+    clearAll,
     cancel,
     answerDuplicate,
     // tasksRef intentionally publishes through rev.
@@ -551,7 +640,7 @@ function summarize(tasks: UploadTask[]): UploadSummary {
     } else {
       active++;
       if (task.status === 'processing' || task.status === 'attaching') completed++;
-      else if (task.status === 'uploading') completed += task.progress;
+      else if (task.status === 'uploading' || (task.status === 'paused' && task.hashValidated)) completed += task.progress;
     }
   }
   const uploading = tasks.filter((task) => task.status === 'uploading' && task.eta !== null);
@@ -590,7 +679,7 @@ function toPersisted(task: UploadTask): PersistedUploadTask {
 
 function fromPersisted(task: PersistedUploadTask): UploadTask {
   let status: TaskStatus = task.status;
-  if (status === 'hashing' || status === 'checking' || status === 'uploading') status = 'needs_file';
+  if (status === 'hashing' || status === 'checking' || status === 'uploading' || status === 'paused') status = 'needs_file';
   if (status === 'attaching') status = 'uploaded_not_attached';
   return {
     ...task,
@@ -611,6 +700,7 @@ function isActiveTask(task: UploadTask): boolean {
   return task.status === 'hashing'
     || task.status === 'checking'
     || task.status === 'uploading'
+    || task.status === 'paused'
     || task.status === 'processing'
     || task.status === 'attaching';
 }
