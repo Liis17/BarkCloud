@@ -9,6 +9,7 @@ using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 using BarkCloud.Files.Features.Cloud.DeleteUserMedia;
 using BarkCloud.Files.Features.Cloud.EmptyTrash;
 using BarkCloud.Files.Features.Cloud.GetPath;
+using BarkCloud.Files.Features.Cloud.GetDirectoryProperties;
 using BarkCloud.Files.Features.Cloud.CreateShare;
 using BarkCloud.Files.Features.Cloud.CreateFolderShare;
 using BarkCloud.Files.Features.Cloud.ListMyFolderShares;
@@ -45,6 +46,7 @@ using BarkCloud.Files.Features.Cloud.ListMyOutgoingSharesAll;
 using BarkCloud.Files.Features.Cloud.ListSharedWithMe;
 using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
+using BarkCloud.Files.Features.Cloud.SetDirectoryVisibility;
 using BarkCloud.Files.Features.Cloud.GetMemories;
 using BarkCloud.Files.Features.Cloud.GetUserMediaStats;
 using BarkCloud.Files.Features.Cloud.ListMediaLocations;
@@ -85,6 +87,18 @@ public class CloudApiService : CloudApi.CloudApiBase
 
         return _mediator.Send(command);
     }
+
+    public override Task<DirectoryProperties> GetDirectoryProperties(GetDirectoryPropertiesRequest request, ServerCallContext context) =>
+        _mediator.Send(new GetDirectoryPropertiesCommand { DirectoryId = Guid.Parse(request.DirectoryId) });
+
+    public override Task<DirectoryProperties> SetDirectoryVisibility(SetDirectoryVisibilityRequest request, ServerCallContext context) =>
+        _mediator.Send(new SetDirectoryVisibilityCommand
+        {
+            DirectoryId = Guid.Parse(request.DirectoryId),
+            Inherit = request.Inherit,
+            HideFromGallery = request.HideFromGallery,
+            HideFromSearch = request.HideFromSearch
+        });
 
     public override Task<CloudEmpty> RenameDirectory(RenameDirectoryRequest request, ServerCallContext context)
     {
@@ -168,7 +182,8 @@ public class CloudApiService : CloudApi.CloudApiBase
             Limit = request.Limit,
             CursorCreatedAt = cursorCreatedAt,
             CursorEntryId = cursorEntryId,
-            KindFilter = request.KindFilter.Select(k => (BarkCloud.Files.Domain.MediaKind)(int)k).Distinct().ToList()
+            KindFilter = request.KindFilter.Select(k => (BarkCloud.Files.Domain.MediaKind)(int)k).Distinct().ToList(),
+            ExcludeHiddenFromGallery = request.ExcludeHiddenFromGallery
         });
     }
 

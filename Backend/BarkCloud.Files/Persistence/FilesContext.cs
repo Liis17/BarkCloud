@@ -122,6 +122,11 @@ public class FilesContext : DbContext
 
         modelBuilder.Entity<CloudDirectory>(b =>
         {
+            b.Property(x => x.InheritVisibility).HasDefaultValue(true);
+            b.Property(x => x.HideFromGallery).HasDefaultValue(false);
+            b.Property(x => x.HideFromSearch).HasDefaultValue(false);
+            b.Property(x => x.EffectiveHideFromGallery).HasDefaultValue(false);
+            b.Property(x => x.EffectiveHideFromSearch).HasDefaultValue(false);
             // Уникальность имени папки в рамках одного владельца и одного родителя
             b.HasIndex(x => new { x.OwnerId, x.ParentId, x.Name }).IsUnique();
             // NULL в ParentId не участвует в прежней уникальности — корень защищаем отдельно.

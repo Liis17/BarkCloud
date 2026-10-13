@@ -215,6 +215,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     private IQueryable<UploadFile> UserMediaQuery(long ownerId, MediaKind kind) => _context.UploadedFiles
         .AsNoTracking()
         .WhereReady()
+        .WhereNotHiddenFromGallery(_context, ownerId)
         .Where(f => f.Uploaders.Contains(ownerId)
                     && f.Type == UploadFileType.CloudFile
                     && f.MediaKind == kind
@@ -251,6 +252,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
                                  || f.Filename.ToLower().EndsWith(".tiff")
                                  || f.Filename.ToLower().EndsWith(".tif")))
                         ));
+        query = query.WhereNotHiddenFromGallery(_context, ownerId);
 
         if (cursorCreatedAt.HasValue && cursorFileId.HasValue)
         {
@@ -273,7 +275,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
         // Базовый фильтр «живых» медиа владельца (как ListUserMediaPage), плюс join к метаданным
         // по дате съёмки. Сравнение по месяцу/дню Npgsql транслирует в date_part('month'/'day').
         var query =
-            from f in _context.UploadedFiles.AsNoTracking().WhereReady()
+            from f in _context.UploadedFiles.AsNoTracking().WhereReady().WhereNotHiddenFromGallery(_context, ownerId)
             join m in _context.FileMetadata on f.Id equals m.FileId
             where f.Uploaders.Contains(ownerId)
                   && f.Type == UploadFileType.CloudFile
@@ -297,7 +299,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
     public async Task<List<LocatedMediaItem>> ListMediaWithLocationPage(long ownerId, DateTime? cursorCreatedAt, Guid? cursorFileId, int limit, CancellationToken cancellationToken = default)
     {
         var query =
-            from f in _context.UploadedFiles.AsNoTracking().WhereReady()
+            from f in _context.UploadedFiles.AsNoTracking().WhereReady().WhereNotHiddenFromGallery(_context, ownerId)
             join m in _context.FileMetadata on f.Id equals m.FileId
             where f.Uploaders.Contains(ownerId)
                   && f.Type == UploadFileType.CloudFile

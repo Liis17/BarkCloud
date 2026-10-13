@@ -267,6 +267,27 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
         return result;
     }
 
+    public async Task<(long FileCount, long TotalSizeBytes)> GetLiveFileStatsInDirectories(
+        long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken = default)
+    {
+        if (directoryIds.Count == 0)
+            return (0, 0);
+
+        var aggregate = await _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(entry => entry.OwnerId == ownerId && !entry.IsDeleted && directoryIds.Contains(entry.DirectoryId))
+            .Join(_context.UploadedFiles.AsNoTracking(), entry => entry.FileId, file => file.Id, (_, file) => file.Size)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                FileCount = group.LongCount(),
+                TotalSizeBytes = group.Sum(size => (long?)size)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return (aggregate?.FileCount ?? 0, aggregate?.TotalSizeBytes ?? 0);
+    }
+
     public void RemoveDirectories(IEnumerable<CloudDirectory> directories)
     {
         _context.CloudDirectories.RemoveRange(directories);
@@ -377,7 +398,8 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
     /// </summary>
     public async Task<List<CloudFileEntry>> SearchFileEntriesPage(
         long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit,
-        IReadOnlyCollection<MediaKind>? kinds = null, CancellationToken cancellationToken = default)
+        IReadOnlyCollection<MediaKind>? kinds = null, CancellationToken cancellationToken = default,
+        bool excludeHiddenFromGallery = false)
     {
         var pattern = query.Trim().ToLower();
 
@@ -388,6 +410,10 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
         // Фильтр по типу медиа — в SQL до Take(limit+1), чтобы limit/cursor оставались честными.
         if (kinds is { Count: > 0 })
             q = q.Where(x => _context.UploadedFiles.Any(f => f.Id == x.FileId && kinds.Contains(f.MediaKind)));
+
+        if (excludeHiddenFromGallery)
+            q = q.Where(x => !_context.CloudDirectories.Any(directory =>
+                directory.OwnerId == ownerId && directory.Id == x.DirectoryId && directory.EffectiveHideFromGallery));
 
         if (cursorCreatedAt.HasValue && cursorEntryId.HasValue)
         {

@@ -41,9 +41,10 @@ public class CreateDirectoryCommandHandler : IRequestHandler<CreateDirectoryComm
         await using var treeLock = await _storage.LockTree(ownerId, cancellationToken);
 
         // Если указан родитель — он должен существовать и принадлежать пользователю
+        CloudDirectory? parent = null;
         if (request.ParentId.HasValue)
         {
-            var parent = await _storage.GetDirectoryAsNoTracking(request.ParentId.Value, cancellationToken);
+            parent = await _storage.GetDirectoryAsNoTracking(request.ParentId.Value, cancellationToken);
             if (parent is null)
                 throw new DirectoryNotFoundException();
             if (parent.OwnerId != ownerId)
@@ -60,6 +61,8 @@ public class CreateDirectoryCommandHandler : IRequestHandler<CreateDirectoryComm
             OwnerId = ownerId,
             ParentId = request.ParentId,
             Name = name,
+            EffectiveHideFromGallery = parent?.EffectiveHideFromGallery ?? false,
+            EffectiveHideFromSearch = parent?.EffectiveHideFromSearch ?? false,
             CreatedAt = now,
             UpdatedAt = now
         };

@@ -1075,6 +1075,9 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.folder-visibility-list { display: grid; gap: 12px; }
+.folder-visibility-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--md-on-surface); font-size: 14px; }
+.folder-visibility-row .toggle:disabled { opacity: .5; cursor: default; }
 .prop-empty { font-size: 14px; color: var(--md-on-surface-variant); padding: 4px 0 8px; }
 .prop-activity { display: grid; gap: 10px; padding: 4px 0 8px; }
 .prop-activity-row { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; }

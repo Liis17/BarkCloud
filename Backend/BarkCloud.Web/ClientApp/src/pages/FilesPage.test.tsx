@@ -136,6 +136,15 @@ describe('FilesPage directory pagination', () => {
     expect(screen.queryByRole('button', { name: 'Показать ещё' })).toBeNull();
   });
 
+  it('показывает пункт «Свойства» в контекстном меню папки', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+
+    const folderRow = (await screen.findByText('Документы')).closest('tr')!;
+    fireEvent.contextMenu(folderRow);
+
+    expect(await screen.findByText('Свойства')).toBeTruthy();
+  });
+
   it('resets the folder cursor after navigating into a subdirectory', async () => {
     const listUrls: string[] = [];
     mocks.apiGet.mockImplementation((url: string) => {
