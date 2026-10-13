@@ -20,7 +20,7 @@ public class SearchFilesCommandHandlerTests
         var fileId = Guid.NewGuid();
         _hierarchy.Setup(x => x.SearchFileEntriesPage(
                 OwnerId, "draft", It.IsAny<DateTime?>(), It.IsAny<Guid?>(), 50,
-                It.IsAny<IReadOnlyCollection<MediaKind>?>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IReadOnlyCollection<MediaKind>?>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new List<CloudFileEntry>
             {
                 new() { Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = fileId, Name = "draft.jpg" }
@@ -37,8 +37,14 @@ public class SearchFilesCommandHandlerTests
             new RunSettings { Host = "http://localhost", Http1Port = 7026 },
             TestConfiguration.Empty());
 
-        var response = await handler.Handle(new SearchFilesCommand { Query = "draft", Limit = 50 }, default);
+        var response = await handler.Handle(new SearchFilesCommand
+        {
+            Query = "draft", Limit = 50, ExcludeHiddenFromGallery = true
+        }, default);
 
         response.Files.Should().BeEmpty();
+        _hierarchy.Verify(x => x.SearchFileEntriesPage(
+            OwnerId, "draft", null, null, 50, It.IsAny<IReadOnlyCollection<MediaKind>?>(),
+            It.IsAny<CancellationToken>(), true), Times.Once);
     }
 }

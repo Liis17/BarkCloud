@@ -16,4 +16,6 @@ public class SearchFilesCommand : IRequest<SearchFilesResponse>
 
     /// <summary>Пустой список — все типы медиа.</summary>
     public List<Domain.MediaKind> KindFilter { get; set; } = new();
+
+    public bool ExcludeHiddenFromGallery { get; set; }
 }

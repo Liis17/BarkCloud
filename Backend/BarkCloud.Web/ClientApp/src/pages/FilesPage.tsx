@@ -5,8 +5,10 @@ import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { FolderPropertiesModal } from '../components/ui/FolderPropertiesModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
+import { PlaylistPickerModal } from '../components/music/PlaylistPickerModal';
 import { MoveToFolderModal } from '../components/ui/MoveToFolderModal';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { FileDropOverlay } from '../components/ui/FileDropOverlay';
@@ -256,6 +258,8 @@ export function FilesPage() {
   const [name, setName] = React.useState('');
   const [albums, setAlbums] = React.useState<Album[]>([]);
   const [props, setProps] = React.useState<CardFile | null>(null);
+  const [dirProps, setDirProps] = React.useState<DirInfo | null>(null);
+  const [playlistPick, setPlaylistPick] = React.useState<Entry | null>(null);
   const [shareWith, setShareWith] = React.useState<Entry | null>(null);
   const [shareDirWith, setShareDirWith] = React.useState<DirInfo | null>(null);
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
@@ -579,6 +583,8 @@ export function FilesPage() {
       if (present.length)
         out.push({ label: 'Удалить из альбома', icon: 'x', submenu: present.map((a) => ({ label: a.name, onClick: () => removeFromAlbum(entry.fileId, a.id) })) });
     }
+    if (m?.kind === 'audio')
+      out.push({ label: 'Добавить в плейлист…', icon: 'music', onClick: () => setPlaylistPick(entry) });
     if (m) out.push({ label: 'Свойства', icon: 'info', onClick: () => setProps(m) });
     out.push({ divider: true });
     out.push({ label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(entry, false) });
@@ -590,6 +596,7 @@ export function FilesPage() {
       { label: 'Сделать папку публичной', icon: 'share', onClick: () => createFolderShare(dir.id, dir.name, toast) },
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareDirWith(dir) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(dir, true) },
+      { label: 'Свойства', icon: 'info', onClick: () => setDirProps(dir) },
       { divider: true },
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
     ];
@@ -947,6 +954,10 @@ export function FilesPage() {
       )}
 
       {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
+
+      {dirProps && <FolderPropertiesModal directoryId={dirProps.id} onClose={() => setDirProps(null)} toast={toast} />}
+
+      {playlistPick && <PlaylistPickerModal fileId={playlistPick.fileId} onClose={() => setPlaylistPick(null)} toast={toast} />}
 
       {shareWith && (
         <ShareWithUserModal fileId={shareWith.fileId} fileName={shareWith.name} onClose={() => setShareWith(null)} toast={toast} />

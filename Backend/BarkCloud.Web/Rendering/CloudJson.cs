@@ -89,6 +89,23 @@ public static class CloudJson
         updatedAt = Iso(d.UpdatedAt)
     };
 
+    public static object DirProperties(DirectoryProperties p) => new
+    {
+        id = p.Directory.Id,
+        name = p.Directory.Name,
+        createdAt = Iso(p.Directory.CreatedAt),
+        updatedAt = Iso(p.Directory.UpdatedAt),
+        fileCount = p.FileCount,
+        folderCount = p.FolderCount,
+        totalSize = p.TotalSizeBytes,
+        inherit = p.Inherit,
+        hideFromGallery = p.HideFromGallery,
+        hideFromSearch = p.HideFromSearch,
+        effectiveHideFromGallery = p.EffectiveHideFromGallery,
+        effectiveHideFromSearch = p.EffectiveHideFromSearch,
+        hasParent = p.HasParent
+    };
+
     public static object? Placeholder(FilePlaceholderInfo? placeholder) => placeholder is null ? null : new
     {
         colors = placeholder.Colors.ToArray(),
