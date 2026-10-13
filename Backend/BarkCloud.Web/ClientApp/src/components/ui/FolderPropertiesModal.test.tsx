@@ -93,11 +93,42 @@ describe('FolderPropertiesModal', () => {
     expect(toast).toHaveBeenCalledWith('Сервер недоступен', 'err');
   });
 
-  it('не показывает переключатель наследования у папки без родителя', async () => {
-    apiGetMock.mockResolvedValue({ ...directory, hasParent: false });
+  it('оставляет переключатели видимости активными у корневой папки', async () => {
+    const root = {
+      ...directory,
+      inherit: true,
+      hideFromGallery: false,
+      hideFromSearch: false,
+      effectiveHideFromGallery: false,
+      effectiveHideFromSearch: false,
+      hasParent: false,
+    };
+    apiGetMock.mockResolvedValue(root);
+    apiPostMock
+      .mockResolvedValueOnce({ ...root, inherit: false, hideFromGallery: true, effectiveHideFromGallery: true })
+      .mockResolvedValueOnce(root);
     render(<FolderPropertiesModal directoryId="dir-1" onClose={vi.fn()} toast={toast} />);
 
-    expect(await screen.findByRole('switch', { name: 'Скрыть из галереи' })).toBeTruthy();
+    const gallery = await screen.findByRole('switch', { name: 'Скрыть из галереи' });
+    const search = screen.getByRole('switch', { name: 'Скрыть из поиска' });
     expect(screen.queryByRole('switch', { name: 'Наследовать настройки родительской папки' })).toBeNull();
+    expect(gallery).toHaveProperty('disabled', false);
+    expect(search).toHaveProperty('disabled', false);
+
+    fireEvent.click(gallery);
+    expect(apiPostMock).toHaveBeenNthCalledWith(1, '/api/cloud/dir/visibility', {
+      id: 'dir-1', inherit: true, hideFromGallery: true, hideFromSearch: false,
+    });
+    await waitFor(() => expect(gallery.getAttribute('aria-checked')).toBe('true'));
+    expect(gallery).toHaveProperty('disabled', false);
+    expect(search).toHaveProperty('disabled', false);
+
+    fireEvent.click(gallery);
+    expect(apiPostMock).toHaveBeenNthCalledWith(2, '/api/cloud/dir/visibility', {
+      id: 'dir-1', inherit: false, hideFromGallery: false, hideFromSearch: false,
+    });
+    await waitFor(() => expect(gallery.getAttribute('aria-checked')).toBe('false'));
+    expect(gallery).toHaveProperty('disabled', false);
+    expect(search).toHaveProperty('disabled', false);
   });
 });

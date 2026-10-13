@@ -36,8 +36,8 @@ public class SetDirectoryVisibilityCommandHandler : IRequestHandler<SetDirectory
         directory.InheritVisibility = directory.ParentId is null
             ? !(request.HideFromGallery || request.HideFromSearch)
             : request.Inherit;
-        directory.HideFromGallery = request.HideFromGallery;
-        directory.HideFromSearch = request.HideFromSearch;
+        directory.HideFromGallery = directory.InheritVisibility ? false : request.HideFromGallery;
+        directory.HideFromSearch = directory.InheritVisibility ? false : request.HideFromSearch;
 
         await DirectoryVisibility.RecomputeSubtreeAsync(_storage, ownerId, directory, cancellationToken);
         await _storage.SaveChangesAsync(cancellationToken);

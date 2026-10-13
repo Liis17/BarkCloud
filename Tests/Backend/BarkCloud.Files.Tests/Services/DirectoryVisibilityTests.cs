@@ -1,6 +1,7 @@
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.MoveDirectory;
+using BarkCloud.Files.Features.Cloud.SetDirectoryVisibility;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.Files.Tests._Helpers;
@@ -96,6 +97,91 @@ public sealed class DirectoryVisibilityTests
         moved.EffectiveHideFromSearch.Should().BeFalse();
         child.EffectiveHideFromGallery.Should().BeFalse();
         child.EffectiveHideFromSearch.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task MoveDirectory_InheritedFolderRemainsVisibleAfterMovingFromHiddenParentThroughRoot()
+    {
+        using var database = new SqliteFilesContext();
+        var hidden = Directory("hidden", hideFromGallery: true, effectiveHideFromGallery: true);
+        var open = Directory("open");
+        var moved = Directory("moved", parentId: hidden.Id);
+        database.Context.CloudDirectories.AddRange(hidden, open, moved);
+        await database.Context.SaveChangesAsync();
+        var setVisibility = new SetDirectoryVisibilityCommandHandler(
+            new CloudHierarchyStorage(database.Context), UserContextFactory.Create(OwnerId));
+        var move = new MoveDirectoryCommandHandler(
+            new CloudHierarchyStorage(database.Context), UserContextFactory.Create(OwnerId),
+            NullLogger<MoveDirectoryCommandHandler>.Instance);
+
+        await setVisibility.Handle(new SetDirectoryVisibilityCommand
+        {
+            DirectoryId = moved.Id,
+            Inherit = false,
+            HideFromGallery = true
+        }, default);
+        await setVisibility.Handle(new SetDirectoryVisibilityCommand
+        {
+            DirectoryId = moved.Id,
+            Inherit = true,
+            HideFromGallery = true
+        }, default);
+
+        moved.HideFromGallery.Should().BeFalse();
+        moved.InheritVisibility.Should().BeTrue();
+        moved.EffectiveHideFromGallery.Should().BeTrue();
+
+        await move.Handle(new MoveDirectoryCommand { DirectoryId = moved.Id }, default);
+        moved.InheritVisibility.Should().BeTrue();
+        moved.EffectiveHideFromGallery.Should().BeFalse();
+
+        await move.Handle(new MoveDirectoryCommand { DirectoryId = moved.Id, NewParentId = open.Id }, default);
+        moved.EffectiveHideFromGallery.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task MoveDirectory_PreservesOwnVisibilityWhenMovingHiddenFolderToRoot()
+    {
+        using var database = new SqliteFilesContext();
+        var open = Directory("open");
+        var moved = Directory("moved", parentId: open.Id, inherit: false,
+            hideFromGallery: true, effectiveHideFromGallery: true);
+        database.Context.CloudDirectories.AddRange(open, moved);
+        await database.Context.SaveChangesAsync();
+        var move = new MoveDirectoryCommandHandler(
+            new CloudHierarchyStorage(database.Context), UserContextFactory.Create(OwnerId),
+            NullLogger<MoveDirectoryCommandHandler>.Instance);
+
+        await move.Handle(new MoveDirectoryCommand { DirectoryId = moved.Id }, default);
+
+        moved.InheritVisibility.Should().BeFalse();
+        moved.HideFromGallery.Should().BeTrue();
+        moved.EffectiveHideFromGallery.Should().BeTrue();
+
+        await move.Handle(new MoveDirectoryCommand { DirectoryId = moved.Id, NewParentId = open.Id }, default);
+        moved.InheritVisibility.Should().BeFalse();
+        moved.EffectiveHideFromGallery.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MoveDirectory_MovingNonInheritingFolderWithoutFlagsToRootEnablesInheritance()
+    {
+        using var database = new SqliteFilesContext();
+        var open = Directory("open");
+        var moved = Directory("moved", parentId: open.Id, inherit: false);
+        database.Context.CloudDirectories.AddRange(open, moved);
+        await database.Context.SaveChangesAsync();
+        var move = new MoveDirectoryCommandHandler(
+            new CloudHierarchyStorage(database.Context), UserContextFactory.Create(OwnerId),
+            NullLogger<MoveDirectoryCommandHandler>.Instance);
+
+        await move.Handle(new MoveDirectoryCommand { DirectoryId = moved.Id }, default);
+
+        moved.InheritVisibility.Should().BeTrue();
+        moved.HideFromGallery.Should().BeFalse();
+        moved.HideFromSearch.Should().BeFalse();
+        moved.EffectiveHideFromGallery.Should().BeFalse();
+        moved.EffectiveHideFromSearch.Should().BeFalse();
     }
 
     [Fact]

@@ -80,6 +80,33 @@ public sealed class SetDirectoryVisibilityCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_EnablingInheritanceClearsOwnVisibilityFlags()
+    {
+        using var database = new SqliteFilesContext();
+        var parent = Directory("parent", hideFromGallery: true, effectiveHideFromGallery: true);
+        var child = Directory("child", parent.Id, inherit: false,
+            hideFromGallery: true, hideFromSearch: true,
+            effectiveHideFromGallery: true, effectiveHideFromSearch: true);
+        database.Context.CloudDirectories.AddRange(parent, child);
+        await database.Context.SaveChangesAsync();
+        var handler = Handler(database.Context);
+
+        await handler.Handle(new SetDirectoryVisibilityCommand
+        {
+            DirectoryId = child.Id,
+            Inherit = true,
+            HideFromGallery = true,
+            HideFromSearch = true
+        }, default);
+
+        child.InheritVisibility.Should().BeTrue();
+        child.HideFromGallery.Should().BeFalse();
+        child.HideFromSearch.Should().BeFalse();
+        child.EffectiveHideFromGallery.Should().BeTrue();
+        child.EffectiveHideFromSearch.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Handle_TopLevelInheritIsDerivedFromOwnVisibilityFlags()
     {
         using var database = new SqliteFilesContext();

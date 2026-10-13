@@ -1,5 +1,7 @@
 using BarkCloud.Proto.Files;
 using BarkCloud.Web.Rendering;
+using Google.Protobuf.WellKnownTypes;
+using DirectoryInfo = BarkCloud.Proto.Files.DirectoryInfo;
 
 namespace BarkCloud.Web.Tests.Rendering;
 
@@ -84,6 +86,50 @@ public class CloudJsonTests
         ((string[])card["entryNames"]!).Should().Equal("a.jpg", "b.jpg");
         ((string[])card["entryIds"]!).Should().Equal("e1", "e2");
         card["name"].Should().Be("photo.jpg");
+    }
+
+    [Fact]
+    public void DirProperties_MapsDirectoryCountsAndVisibilityFields()
+    {
+        var createdAt = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+        var updatedAt = createdAt.AddDays(1);
+        var properties = new DirectoryProperties
+        {
+            Directory = new DirectoryInfo
+            {
+                Id = "dir-1",
+                Name = "Фотографии",
+                CreatedAt = Timestamp.FromDateTime(createdAt),
+                UpdatedAt = Timestamp.FromDateTime(updatedAt)
+            },
+            FileCount = 3,
+            FolderCount = 2,
+            TotalSizeBytes = 1234,
+            Inherit = true,
+            HideFromGallery = false,
+            HideFromSearch = true,
+            EffectiveHideFromGallery = true,
+            EffectiveHideFromSearch = false,
+            HasParent = true
+        };
+
+        using var json = System.Text.Json.JsonDocument.Parse(
+            System.Text.Json.JsonSerializer.Serialize(CloudJson.DirProperties(properties)));
+        var card = json.RootElement;
+
+        card.GetProperty("id").GetString().Should().Be("dir-1");
+        card.GetProperty("name").GetString().Should().Be("Фотографии");
+        DateTimeOffset.Parse(card.GetProperty("createdAt").GetString()!).Should().Be(new DateTimeOffset(createdAt));
+        DateTimeOffset.Parse(card.GetProperty("updatedAt").GetString()!).Should().Be(new DateTimeOffset(updatedAt));
+        card.GetProperty("fileCount").GetInt64().Should().Be(3);
+        card.GetProperty("folderCount").GetInt64().Should().Be(2);
+        card.GetProperty("totalSize").GetInt64().Should().Be(1234);
+        card.GetProperty("inherit").GetBoolean().Should().BeTrue();
+        card.GetProperty("hideFromGallery").GetBoolean().Should().BeFalse();
+        card.GetProperty("hideFromSearch").GetBoolean().Should().BeTrue();
+        card.GetProperty("effectiveHideFromGallery").GetBoolean().Should().BeTrue();
+        card.GetProperty("effectiveHideFromSearch").GetBoolean().Should().BeFalse();
+        card.GetProperty("hasParent").GetBoolean().Should().BeTrue();
     }
 
     [Theory]

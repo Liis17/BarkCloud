@@ -89,6 +89,7 @@ export function FolderPropertiesModal({ directoryId, onClose, toast }: FolderPro
     ['Папок', String(properties.folderCount)],
     ['Размер', fmtSize(properties.totalSize) || '0 Б'],
   ] : [];
+  const inheriting = properties !== null && properties.hasParent && properties.inherit;
 
   return (
     <Modal title="Свойства папки" onClose={onClose} actions={<button className="btn primary" onClick={onClose}>Закрыть</button>}>
@@ -122,8 +123,8 @@ export function FolderPropertiesModal({ directoryId, onClose, toast }: FolderPro
               <span>Скрыть из галереи</span>
               <Switch
                 label="Скрыть из галереи"
-                on={properties.inherit ? properties.effectiveHideFromGallery : properties.hideFromGallery}
-                disabled={saving || properties.inherit}
+                on={inheriting ? properties.effectiveHideFromGallery : properties.hideFromGallery}
+                disabled={saving || inheriting}
                 onChange={(value) => toggleVisibility('hideFromGallery', value)}
               />
             </div>
@@ -131,8 +132,8 @@ export function FolderPropertiesModal({ directoryId, onClose, toast }: FolderPro
               <span>Скрыть из поиска</span>
               <Switch
                 label="Скрыть из поиска"
-                on={properties.inherit ? properties.effectiveHideFromSearch : properties.hideFromSearch}
-                disabled={saving || properties.inherit}
+                on={inheriting ? properties.effectiveHideFromSearch : properties.hideFromSearch}
+                disabled={saving || inheriting}
                 onChange={(value) => toggleVisibility('hideFromSearch', value)}
               />
             </div>
