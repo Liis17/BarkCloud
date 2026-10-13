@@ -123,6 +123,61 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
     }
 
     [PostgresFact]
+    public async Task Search_HiddenFilesAndFoldersAreExcludedButResolveAndTrashAreNotFiltered()
+    {
+        const string query = "visibilitymarker";
+        var now = DateTime.UtcNow;
+        var hiddenDirectory = new CloudDirectory
+        {
+            Id = Guid.NewGuid(), OwnerId = Catalog.Owner, Name = $"{query} hidden folder",
+            EffectiveHideFromSearch = true, CreatedAt = now, UpdatedAt = now
+        };
+        var hiddenFile = new UploadFile
+        {
+            Id = Guid.NewGuid(), Uploaders = [Catalog.Owner], Type = UploadFileType.CloudFile,
+            MediaKind = MediaKind.Photo, Filename = $"{query}-hidden.jpg", StorageProfileId = "test-profile",
+            Size = 20, CreatedAt = now, UploadedAt = now, Etag = "etag"
+        };
+        var hiddenEntry = new CloudFileEntry
+        {
+            Id = Guid.NewGuid(), OwnerId = Catalog.Owner, DirectoryId = hiddenDirectory.Id,
+            FileId = hiddenFile.Id, Name = $"{query}-hidden.jpg", CreatedAt = now
+        };
+        var trashFile = new UploadFile
+        {
+            Id = Guid.NewGuid(), Uploaders = [Catalog.Owner], Type = UploadFileType.CloudFile,
+            MediaKind = MediaKind.Photo, Filename = $"{query}-hidden-trash.jpg", StorageProfileId = "test-profile",
+            Size = 20, CreatedAt = now.AddSeconds(-1), UploadedAt = now.AddSeconds(-1), Etag = "etag"
+        };
+        var trashEntry = new CloudFileEntry
+        {
+            Id = Guid.NewGuid(), OwnerId = Catalog.Owner, DirectoryId = hiddenDirectory.Id,
+            FileId = trashFile.Id, Name = $"{query}-hidden-trash.jpg", CreatedAt = trashFile.CreatedAt,
+            IsDeleted = true, DeletedAt = now, PurgeAt = now.AddDays(14)
+        };
+        await using (var context = fixture.Database!.CreateContext())
+        {
+            context.CloudDirectories.Add(hiddenDirectory);
+            context.UploadedFiles.AddRange(hiddenFile, trashFile);
+            context.CloudFileEntries.AddRange(hiddenEntry, trashEntry);
+            await context.SaveChangesAsync();
+        }
+
+        var photos = await Find(SearchSection.Photos, query);
+        var folders = await Find(SearchSection.Folders, query);
+        var trash = await Find(SearchSection.Trash, query);
+        var service = CreateService(Catalog.Owner);
+        var resolvedFile = await service.ResolveHit(Ref(SearchHitKind.Photo, hiddenEntry.Id), default);
+        var resolvedFolder = await service.ResolveHit(Ref(SearchHitKind.Folder, hiddenDirectory.Id), default);
+
+        photos.Hits.Select(x => x.Id).Should().NotContain(hiddenEntry.Id.ToString());
+        folders.Hits.Select(x => x.Id).Should().NotContain(hiddenDirectory.Id.ToString());
+        trash.Hits.Select(x => x.Id).Should().Contain(trashEntry.Id.ToString());
+        resolvedFile.Id.Should().Be(hiddenEntry.Id.ToString());
+        resolvedFolder.Id.Should().Be(hiddenDirectory.Id.ToString());
+    }
+
+    [PostgresFact]
     public async Task Search_Trash_UsesLatestDeletedEntryOfFilesWithoutLiveEntry()
     {
         var c = fixture.Catalog;

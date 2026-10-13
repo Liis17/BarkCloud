@@ -76,6 +76,23 @@ export interface DirInfo {
   updatedAt: string | null;
 }
 
+/** Свойства каталога и его собственные/итоговые настройки видимости. */
+export interface DirProperties {
+  id: string;
+  name: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  fileCount: number;
+  folderCount: number;
+  totalSize: number;
+  inherit: boolean;
+  hideFromGallery: boolean;
+  hideFromSearch: boolean;
+  effectiveHideFromGallery: boolean;
+  effectiveHideFromSearch: boolean;
+  hasParent: boolean;
+}
+
 /** Запись каталога: метаданные + вложенная карточка файла (CloudJson.Entry). */
 export interface Entry {
   entryId: string;

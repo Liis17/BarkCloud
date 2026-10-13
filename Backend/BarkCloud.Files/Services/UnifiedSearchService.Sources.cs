@@ -88,6 +88,8 @@ public partial class UnifiedSearchService
         };
 
         var files = OwnedFiles(ownerId, section);
+        if (!trash && !query.IsResolve)
+            files = files.WhereNotHiddenFromSearch(_context, ownerId);
         if (query.ResolveGuid is { } resolveId)
         {
             // Хит открывают по id записи облака или по id файла: сначала точечно находим файл, чтобы БД не просматривала каталог.
@@ -301,7 +303,10 @@ public partial class UnifiedSearchService
 
         if (query.Wants(SearchHitKind.Folder) && !query.NothingToFind)
         {
-            var rows = _context.CloudDirectories.AsNoTracking().Where(x => x.OwnerId == ownerId)
+            var directories = _context.CloudDirectories.AsNoTracking().Where(x => x.OwnerId == ownerId);
+            if (!query.IsResolve)
+                directories = directories.Where(directory => !directory.EffectiveHideFromSearch);
+            var rows = directories
                 .RankedBy(query.Terms, d => d, d => d.Name)
                 .Select(r => new SearchRow<CloudDirectory>
                 {
