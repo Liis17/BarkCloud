@@ -20,10 +20,15 @@ interface SettingRevision {
 interface StorageProfile {
   profileId: string; role: string; version: number; serviceUrl: string;
   hasAccessKey: boolean; hasSecretKey: boolean; bucketName: string; isR2: boolean;
-  isActive: boolean; isLegacy: boolean; quotaBytes?: string;
+  isActive: boolean; isLegacy: boolean;
   editedAt: string | null; editedBy: string; editedFrom: string;
   region?: string; forcePathStyle?: boolean;
 }
+interface StorageBucketRef { serviceUrl: string; bucketName: string }
+interface StorageBucket extends StorageBucketRef {
+  roles: string[]; isActive: boolean; isLegacy: boolean;
+}
+interface StorageGroup { id: string; name: string; quotaBytes: string; buckets: StorageBucketRef[] }
 interface StorageRevision {
   id: number; profileId: string; changedAt: string | null; changedBy: string;
   changedFrom: string; changeKind: string;
@@ -31,14 +36,15 @@ interface StorageRevision {
 interface ServerSettings {
   settings: ServerSetting[]; reservedNames: string[];
   storageProfiles: StorageProfile[]; storageRevisions: StorageRevision[];
+  storageGroups: StorageGroup[]; storageBuckets: StorageBucket[];
 }
 interface MutationResult { success: boolean; message: string; restartTargets: string[] }
 type QuotaUnit = 'gb' | 'tb' | 'pb';
 interface StorageDraft {
   serviceUrl: string; accessKey: string; secretKey: string; bucketName: string; isR2: boolean;
   region: string; forcePathStyle: boolean;
-  quotaValue: string; quotaUnit: QuotaUnit;
 }
+interface StorageGroupDraft { id: string | null; name: string; quotaValue: string; quotaUnit: QuotaUnit; buckets: StorageBucketRef[] }
 interface Confirmation { title: string; lines: string[]; run: () => Promise<void> }
 type Changed = (targets: string[]) => Promise<void>;
 
@@ -54,13 +60,14 @@ const STORAGE_ROLES: Record<string, string> = {
   universal: 'Универсальное', avatars: 'Аватары', images: 'Изображения', videos: 'Видео',
   audio: 'Аудио', documents: 'Документы', other: 'Прочие файлы', previews: 'Превью',
 };
-const STORAGE_FIELD_NAMES = ['Endpoint', 'Bucket', 'Access key Credentials', 'Secret key Credentials', 'Регион Region', 'Адресация ForcePathStyle', 'Квота S3 бакета', 'Cloudflare R2', 'Применить миграцию'];
+const STORAGE_FIELD_NAMES = ['Endpoint', 'Bucket', 'Access key Credentials', 'Secret key Credentials', 'Регион Region', 'Адресация ForcePathStyle', 'Cloudflare R2', 'Применить миграцию'];
 const STORAGE_FIELDS = 'S3 ' + STORAGE_FIELD_NAMES.join(' ');
+const STORAGE_GROUP_FIELDS = 'Группы S3 Квота группы Добавить бакет Название';
 const QUOTA_UNIT_BYTES: Record<QuotaUnit, bigint> = { gb: 1024n ** 3n, tb: 1024n ** 4n, pb: 1024n ** 5n };
 const settingId = (setting: ServerSetting) => setting.serviceId + ':' + setting.section + ':' + setting.key;
 const settingName = (setting: ServerSetting) => setting.section + (setting.key ? ':' + setting.key : '');
 const matches = (value: string, query: string) => !query || value.toLocaleLowerCase('ru-RU').includes(query);
-const EMPTY_DRAFT: StorageDraft = { serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false, region: '', forcePathStyle: true, quotaValue: '0', quotaUnit: 'gb' };
+const EMPTY_DRAFT: StorageDraft = { serviceUrl: '', accessKey: '', secretKey: '', bucketName: '', isR2: false, region: '', forcePathStyle: true };
 
 function quotaInputFromBytes(value = '0'): { value: string; unit: QuotaUnit } {
   try {
@@ -72,16 +79,8 @@ function quotaInputFromBytes(value = '0'): { value: string; unit: QuotaUnit } {
   return { value: '0', unit: 'gb' };
 }
 function profileDraft(profile?: StorageProfile): StorageDraft {
-  const quota = quotaInputFromBytes(profile?.quotaBytes);
   return { ...EMPTY_DRAFT, serviceUrl: profile?.serviceUrl || '', bucketName: profile?.bucketName || '',
-    isR2: profile?.isR2 || false, region: profile?.region || '', forcePathStyle: profile?.forcePathStyle ?? true, quotaValue: quota.value, quotaUnit: quota.unit };
-}
-function quotaLabel(profile?: StorageProfile) {
-  if (!profile?.quotaBytes || profile.quotaBytes === '0') return 'Безлимит';
-  const quota = quotaInputFromBytes(profile.quotaBytes);
-  if (BigInt(quota.value) * QUOTA_UNIT_BYTES[quota.unit] !== BigInt(profile.quotaBytes))
-    return BigInt(profile.quotaBytes).toLocaleString('ru-RU') + ' Б';
-  return quota.value + ' ' + ({ gb: 'ГБ', tb: 'ТБ', pb: 'ПБ' }[quota.unit]);
+    isR2: profile?.isR2 || false, region: profile?.region || '', forcePathStyle: profile?.forcePathStyle ?? true };
 }
 function Highlight({ value, query }: { value: string; query: string }) {
   const index = query ? value.toLocaleLowerCase('ru-RU').indexOf(query) : -1;
@@ -212,16 +211,10 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
     if (!draft.bucketName.trim()) next.bucketName = 'Укажите bucket';
     if (!draft.accessKey && !selected?.hasAccessKey) next.accessKey = 'Укажите access key';
     if (!draft.secretKey && !selected?.hasSecretKey) next.secretKey = 'Укажите secret key';
-    if (!/^\d+$/.test(draft.quotaValue)) next.quotaValue = 'Введите целое число от 0';
-    else if (BigInt(draft.quotaValue) * QUOTA_UNIT_BYTES[draft.quotaUnit] > 9223372036854775807n)
-      next.quotaValue = 'Квота превышает допустимый размер';
     setErrors(next);
     return Object.keys(next).length === 0;
   }
-  const quotaChanged = draft.quotaValue !== initial.quotaValue || draft.quotaUnit !== initial.quotaUnit;
-  const body = { role, ...draft, quotaValue: selected && !quotaChanged ? '' : draft.quotaValue,
-    quotaUnit: selected && !quotaChanged ? '' : draft.quotaUnit,
-    isLegacy: legacy, profileId: selected?.profileId || null, confirmLegacyMutation: legacy };
+  const body = { role, ...draft, isLegacy: legacy, profileId: selected?.profileId || null, confirmLegacyMutation: legacy };
   async function mutate(path: string, payload: unknown, save = true) {
     setBusy(true);
     try {
@@ -245,7 +238,6 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
       !selected || selected.isR2 !== draft.isR2 ? 'Cloudflare R2: ' + (draft.isR2 ? 'да' : 'нет') : '',
       !selected || initial.region !== draft.region ? 'Регион: ' + (draft.region || 'автоматически') : '',
       !selected || initial.forcePathStyle !== draft.forcePathStyle ? 'Адресация: ' + (draft.forcePathStyle ? 'Path style' : 'Virtual host') : '',
-      initial.quotaValue !== draft.quotaValue || initial.quotaUnit !== draft.quotaUnit || !selected ? 'Квота: ' + draft.quotaValue + ' ' + draft.quotaUnit.toUpperCase() + (draft.quotaValue === '0' ? ' (безлимит)' : '') : '',
       draft.accessKey ? 'Access key: заменить' : '', draft.secretKey ? 'Secret key: заменить' : '',
       legacy ? 'Legacy-профиль используется существующими файлами. Изменение требует подтверждения.' : '',
     ].filter(Boolean);
@@ -274,11 +266,6 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
       <label><span><Highlight value="Регион" query={query} /></span><input aria-label="Регион S3" value={draft.region} onChange={(event) => edit('region', event.target.value)} placeholder={draft.isR2 ? 'auto' : 'Автоматически'} /></label>
       <label><span><Highlight value="Адресация бакета" query={query} /></span><Select aria-label="Адресация бакета S3" value={draft.forcePathStyle ? 'path' : 'virtual'} disabled={busy}
         options={[{ value: 'path', label: 'Path style · endpoint/bucket' }, { value: 'virtual', label: 'Virtual host · bucket.endpoint' }]} onChange={(value) => edit('forcePathStyle', value === 'path')} /></label>
-      <label><span><Highlight value="Квота S3 бакета" query={query} /></span><div className="storage-quota-control">
-        <input aria-label="Квота S3 бакета" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue} aria-invalid={!!errors.quotaValue} onChange={(event) => edit('quotaValue', event.target.value)} />
-        <Select<QuotaUnit> aria-label="Единица квоты" value={draft.quotaUnit} onChange={(v) => edit('quotaUnit', v)} options={[{ value: 'gb', label: 'ГБ' }, { value: 'tb', label: 'ТБ' }, { value: 'pb', label: 'ПБ' }]} />
-      </div><small>0 = безлимит. Квота общая для одинаковых endpoint и bucket.</small>
-        {selected?.quotaBytes && selected.quotaBytes !== '0' && initial.quotaValue === '0' && <small>Текущая квота: {quotaLabel(selected)}. Введите целое значение для замены.</small>}{fieldError('quotaValue')}</label>
       <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => edit('isR2', event.target.checked)} /><span><Highlight value="Cloudflare R2" query={query} /></span></label>
     </fieldset>
     <div className="storage-profile-footer"><div className="storage-profile-actions">
@@ -289,7 +276,7 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
     {message && <div className="server-setting-message" role="status">{message}</div>}
     <details className="storage-history"><summary>Версии и история · {ordered.length}</summary>
       {ordered.map((profile) => <div className="storage-version-row" key={profile.profileId}>
-        <div><strong>{profile.profileId}</strong><small>{profile.serviceUrl} · {profile.bucketName} · {quotaLabel(profile)}</small></div>
+        <div><strong>{profile.profileId}</strong><small>{profile.serviceUrl} · {profile.bucketName}</small></div>
         <div className="storage-version-actions"><button className="btn" disabled={busy} onClick={() => onSelect(profile.profileId)}>Редактировать</button>
           {!profile.isLegacy && !profile.isActive && <button className="btn" disabled={busy} onClick={() => setConfirmation({ title: 'Активировать версию?', lines: [profile.profileId, 'Новые файлы роли будут использовать эту версию.'],
             run: () => mutate('/api/settings/server/storage/activate', { profileId: profile.profileId }) })}>Активировать</button>}</div>
@@ -335,7 +322,7 @@ function StorageSection({ profiles, revisions, query, onChanged, onExpired, open
     await onChanged(targets);
   }
   return <details className="set-card server-storage-section" hidden={!visible} open={open} onToggle={onToggle}>
-    <summary className="set-card-head server-group-summary"><div><strong className="ttl">S3-профили</strong><small>Роли для новых файлов, подключение и квоты бакетов</small></div><span className="server-section-count">{profiles.length} профилей{dirtyFields ? ' · ' + dirtyFields + ' изменено' : ''}</span></summary>
+    <summary className="set-card-head server-group-summary"><div><strong className="ttl">S3-профили</strong><small>Роли для новых файлов и подключение</small></div><span className="server-section-count">{profiles.length} профилей{dirtyFields ? ' · ' + dirtyFields + ' изменено' : ''}</span></summary>
     <MigrationApplyPanel active={active && open && visible} onExpired={onExpired} onApplied={() => onChanged([])} />
     <div className={'storage-workspace' + (mobileDetail ? ' show-detail' : '')}>
       <div className="storage-role-list">
@@ -351,7 +338,6 @@ function StorageSection({ profiles, revisions, query, onChanged, onExpired, open
               <div className="storage-role-name"><strong><Highlight value={STORAGE_ROLES[item] || item} query={query} /></strong><small>{item}</small></div>
               <span className={'pill-info ' + (active ? 'ok' : 'warn')}>{active ? 'v' + active.version : legacy ? 'Legacy' : item === 'universal' ? 'Не настроен' : 'Universal'}</span>
               <span className="storage-role-location">{effective ? effective.bucketName : 'Нет подключения'}<small>{effective?.serviceUrl || 'Создайте профиль'}</small></span>
-              <small className="storage-role-quota">{effective ? quotaLabel(effective) : '—'}</small>
             </button>
           </React.Fragment>;
         })}
@@ -364,6 +350,159 @@ function StorageSection({ profiles, revisions, query, onChanged, onExpired, open
           onChanged={changed} onSelect={(id) => { setSelectedId(id); setCreating(false); }} onExpired={onExpired} query={query} />
       </div>
     </div>
+  </details>;
+}
+
+function storageBucketKey(bucket: StorageBucketRef) {
+  return JSON.stringify([bucket.serviceUrl, bucket.bucketName]);
+}
+function groupDraft(group?: StorageGroup): StorageGroupDraft {
+  const quota = quotaInputFromBytes(group?.quotaBytes);
+  return { id: group?.id || null, name: group?.name || '', quotaValue: quota.value, quotaUnit: quota.unit,
+    buckets: group?.buckets.map((bucket) => ({ ...bucket })) || [] };
+}
+function bucketHost(serviceUrl: string) {
+  try { return new URL(serviceUrl).host; } catch { return serviceUrl; }
+}
+function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, open, onToggle }: {
+  groups: StorageGroup[]; buckets: StorageBucket[]; query: string; onChanged: Changed; onExpired: () => void;
+  open: boolean; onToggle: (event: React.SyntheticEvent<HTMLDetailsElement>) => void;
+}) {
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [creating, setCreating] = React.useState(false);
+  const [drafts, setDrafts] = React.useState<Record<string, StorageGroupDraft>>({});
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState('');
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [confirmation, setConfirmation] = React.useState<Confirmation | null>(null);
+  const selected = creating ? undefined : groups.find((group) => group.id === selectedId) || groups[0];
+  const draftKey = creating ? 'new' : selected?.id || 'empty';
+  const initial = groupDraft(selected);
+  const draft = drafts[draftKey] || initial;
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const visible = matches(STORAGE_GROUP_FIELDS + ' ' + groups.map((group) => group.name + ' ' + group.buckets.map((bucket) => bucket.bucketName + ' ' + bucket.serviceUrl).join(' ')).join(' ')
+    + ' ' + buckets.map((bucket) => bucket.bucketName + ' ' + bucket.serviceUrl + ' ' + bucket.roles.join(' ')).join(' '), query);
+  const occupiedByOtherGroup = new Set(groups
+    .filter((group) => group.id !== draft.id)
+    .flatMap((group) => group.buckets.map(storageBucketKey)));
+  const selectedKeys = new Set(draft.buckets.map(storageBucketKey));
+  const availableBuckets = buckets.filter((bucket) => !occupiedByOtherGroup.has(storageBucketKey(bucket))
+    && !selectedKeys.has(storageBucketKey(bucket)));
+  const selectOptions = availableBuckets.map((bucket) => ({
+    value: storageBucketKey(bucket),
+    label: `${bucket.bucketName} · ${bucketHost(bucket.serviceUrl)} · ${bucket.roles.map((role) => STORAGE_ROLES[role] || role).join(', ')}`
+      + (!bucket.isActive ? ' · неактивен' : '') + (bucket.isLegacy ? ' · legacy' : ''),
+  }));
+  function edit(changes: Partial<StorageGroupDraft>) {
+    setDrafts((current) => ({ ...current, [draftKey]: { ...draft, ...changes } }));
+    setErrors({});
+    setMessage('');
+  }
+  function validate() {
+    const next: Record<string, string> = {};
+    if (!draft.name.trim()) next.name = 'Укажите название группы';
+    else if (draft.name.trim().length > 100) next.name = 'Название не должно превышать 100 символов';
+    if (!/^\d+$/.test(draft.quotaValue)) next.quotaValue = 'Введите целое число от 0';
+    else if (BigInt(draft.quotaValue) * QUOTA_UNIT_BYTES[draft.quotaUnit] > 9223372036854775807n)
+      next.quotaValue = 'Квота превышает допустимый размер';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+  async function mutate(path: string, body: unknown, deleting = false) {
+    setBusy(true);
+    try {
+      const response = await request<MutationResult>(path, body);
+      if (response.status === 403) { onExpired(); return; }
+      setMessage(response.data?.message || (response.ok ? 'Сохранено' : 'Не удалось сохранить группу'));
+      setConfirmation(null);
+      if (response.ok) {
+        setDrafts((current) => { const next = { ...current }; delete next[draftKey]; return next; });
+        setCreating(false);
+        if (deleting) setSelectedId(null);
+        await onChanged(response.data?.restartTargets || ['files']);
+      }
+    } finally { setBusy(false); }
+  }
+  function save() {
+    if (!validate()) return;
+    const quota = draft.quotaValue === '0' ? 'безлимит' : `${draft.quotaValue} ${draft.quotaUnit.toUpperCase()}`;
+    const lines = [draft.name.trim(), `Квота: ${quota}`, `Бакетов: ${draft.buckets.length}`];
+    const body = {
+      id: draft.id,
+      name: draft.name.trim(),
+      quotaValue: draft.quotaValue,
+      quotaUnit: draft.quotaUnit,
+      buckets: draft.buckets,
+    };
+    setConfirmation({ title: draft.id ? 'Сохранить группу S3?' : 'Создать группу S3?', lines,
+      run: () => mutate('/api/settings/server/storage/groups/save', body) });
+  }
+  function remove() {
+    if (!selected) return;
+    setConfirmation({ title: 'Удалить группу S3?', lines: [selected.name, 'Бакеты останутся без группы.'],
+      run: () => mutate('/api/settings/server/storage/groups/delete', { id: selected.id }, true) });
+  }
+  const quotaSelectOptions = [
+    { value: 'gb' as const, label: 'ГБ' }, { value: 'tb' as const, label: 'ТБ' }, { value: 'pb' as const, label: 'ПБ' },
+  ];
+  return <details className="set-card server-s3-groups-section" hidden={!visible} open={open} onToggle={onToggle}>
+    <summary className="set-card-head server-group-summary"><div><strong className="ttl"><Highlight value="Группы S3" query={query} /></strong>
+      <small>Квота задаётся группе; изменения применятся после перезапуска Files</small></div>
+      <span className="server-section-count">{groups.length} групп</span></summary>
+    <div className="server-s3-groups-body">
+      <div className="server-s3-group-list">
+        {groups.map((group) => <button type="button" key={group.id}
+          className={'server-s3-group-choice' + (!creating && (selected?.id === group.id) ? ' selected' : '')}
+          aria-pressed={!creating && selected?.id === group.id}
+          onClick={() => { setCreating(false); setSelectedId(group.id); setMessage(''); }}>
+          <strong><Highlight value={group.name} query={query} /></strong><small>{group.buckets.length} {plural(group.buckets.length, 'бакет', 'бакета', 'бакетов')}</small>
+        </button>)}
+        <button type="button" className="btn" onClick={() => { setCreating(true); setSelectedId(null); setMessage(''); }}>Новая группа</button>
+      </div>
+      {(selected || creating) && <article className="server-s3-group-editor">
+        <div className="storage-group-fields">
+          <label><span><Highlight value="Название группы" query={query} /></span>
+            <input aria-label="Название группы S3" value={draft.name} disabled={busy} aria-invalid={!!errors.name}
+              onChange={(event) => edit({ name: event.target.value })} />
+            {errors.name && <small className="field-error" role="alert">{errors.name}</small>}
+          </label>
+          <label><span><Highlight value="Квота группы" query={query} /></span><div className="storage-group-quota-control">
+            <input aria-label="Квота группы S3" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue} disabled={busy}
+              aria-invalid={!!errors.quotaValue} onChange={(event) => edit({ quotaValue: event.target.value })} />
+            <Select<QuotaUnit> aria-label="Единица квоты группы" value={draft.quotaUnit} disabled={busy} onChange={(value) => edit({ quotaUnit: value })} options={quotaSelectOptions} />
+          </div><small>0 = безлимит</small>
+            {errors.quotaValue && <small className="field-error" role="alert">{errors.quotaValue}</small>}
+          </label>
+        </div>
+        <div className="storage-group-members">
+          <strong>Бакеты группы</strong>
+          {draft.buckets.length === 0 ? <p className="sys-note">Бакеты не добавлены.</p> : <div className="storage-group-chips">
+            {draft.buckets.map((bucket) => {
+              const known = buckets.find((item) => storageBucketKey(item) === storageBucketKey(bucket));
+              return <span className="storage-group-chip" key={storageBucketKey(bucket)}>
+                <span><strong>{bucket.bucketName}</strong><small>{known ? `${bucketHost(known.serviceUrl)} · ${known.roles.map((role) => STORAGE_ROLES[role] || role).join(', ')}` : 'нет профиля доступа — не учитывается'}</small></span>
+                <button type="button" aria-label={`Удалить бакет ${bucket.bucketName}`} disabled={busy}
+                  onClick={() => edit({ buckets: draft.buckets.filter((item) => storageBucketKey(item) !== storageBucketKey(bucket)) })}><Icon.x size={16} /></button>
+              </span>;
+            })}
+          </div>}
+          {selectOptions.length > 0 ? <label className="storage-group-add"><span>Добавить бакет</span>
+            <Select<string> aria-label="Добавить бакет" value="" options={selectOptions} disabled={busy} onChange={(value) => {
+              const bucket = availableBuckets.find((item) => storageBucketKey(item) === value);
+              if (bucket) edit({ buckets: [...draft.buckets, { serviceUrl: bucket.serviceUrl, bucketName: bucket.bucketName }] });
+            }} />
+          </label> : <p className="storage-group-add-note">Нет свободных бакетов из профилей.</p>}
+        </div>
+        <div className="storage-profile-actions">
+          <button type="button" className="btn primary" disabled={busy || !dirty} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить группу'}</button>
+          {selected && <button type="button" className="btn text" disabled={busy} onClick={remove}>Удалить группу</button>}
+          {dirty && <button type="button" className="btn text" disabled={busy} onClick={() => { setDrafts((current) => { const next = { ...current }; delete next[draftKey]; return next; }); setErrors({}); }}>Сбросить</button>}
+        </div>
+        {message && <div className="server-setting-message" role="status">{message}</div>}
+      </article>}
+      {!selected && !creating && groups.length === 0 && <p className="server-empty">Групп ещё нет. Создайте группу, чтобы задать общую квоту для бакетов.</p>}
+    </div>
+    {confirmation && <Confirm confirmation={confirmation} onClose={() => setConfirmation(null)} />}
   </details>;
 }
 
@@ -398,8 +537,12 @@ export default function ServerSettingsTab({ active = true, onAccessExpired = () 
   const parameterMatches = (setting: ServerSetting) => matches((SERVICE_LABELS[setting.serviceId] || '') + ' ' + SERVICE_NAMES[setting.serviceId] + ' ' + settingName(setting), query);
   const count = settings.filter(parameterMatches).length;
   const serviceIds = Array.from(new Set(settings.map((setting) => setting.serviceId))).sort((a, b) => a - b);
-  const allKeys = ['s3', 'reserved', ...serviceIds.flatMap((id) => ['service:' + id, ...Array.from(new Set(settings.filter((setting) => setting.serviceId === id).map((setting) => 'section:' + id + ':' + setting.section)))])];
-  const hasS3 = matches(STORAGE_FIELDS, query) || [...Object.keys(STORAGE_ROLES), ...data.storageProfiles.map((profile) => profile.role)].some((role) => matches(role + ' ' + (STORAGE_ROLES[role] || ''), query));
+  const storageGroups = data.storageGroups || [];
+  const storageBuckets = data.storageBuckets || [];
+  const groupSearchFields = STORAGE_GROUP_FIELDS + ' ' + storageGroups.map((group) => group.name + ' ' + group.buckets.map((bucket) => bucket.bucketName + ' ' + bucket.serviceUrl).join(' ')).join(' ')
+    + ' ' + storageBuckets.map((bucket) => bucket.bucketName + ' ' + bucket.serviceUrl + ' ' + bucket.roles.join(' ')).join(' ');
+  const allKeys = ['s3', 's3-groups', 'reserved', ...serviceIds.flatMap((id) => ['service:' + id, ...Array.from(new Set(settings.filter((setting) => setting.serviceId === id).map((setting) => 'section:' + id + ':' + setting.section)))])];
+  const hasS3 = matches(STORAGE_FIELDS, query) || matches(groupSearchFields, query) || [...Object.keys(STORAGE_ROLES), ...data.storageProfiles.map((profile) => profile.role)].some((role) => matches(role + ' ' + (STORAGE_ROLES[role] || ''), query));
   const s3FieldCount = STORAGE_FIELD_NAMES.filter((field) => matches(field, query)).length;
   const s3RoleCount = Array.from(new Set([...Object.keys(STORAGE_ROLES), ...data.storageProfiles.map((profile) => profile.role)]))
     .filter((role) => matches(role + ' ' + (STORAGE_ROLES[role] || ''), query)).length;
@@ -455,6 +598,8 @@ export default function ServerSettingsTab({ active = true, onAccessExpired = () 
     </details>
     <StorageSection profiles={data.storageProfiles} revisions={data.storageRevisions} query={query} onChanged={changed} onExpired={onAccessExpired}
       active={active} open={!!query || expanded.has('s3')} onToggle={(event) => toggle('s3', event)} />
+    <StorageGroupsSection groups={storageGroups} buckets={storageBuckets} query={query} onChanged={changed} onExpired={onAccessExpired}
+      open={!!query || expanded.has('s3-groups')} onToggle={(event) => toggle('s3-groups', event)} />
     {confirmation && <Confirm confirmation={confirmation} onClose={() => setConfirmation(null)} />}
   </div>;
 }

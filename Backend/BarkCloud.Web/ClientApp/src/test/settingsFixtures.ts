@@ -12,11 +12,16 @@ export const storageProfile = {
   profileId: 'universal-v1', role: 'universal', version: 1,
   serviceUrl: 'http://minio:9000', hasAccessKey: true, hasSecretKey: true,
   bucketName: 'cloud-universal', isR2: false, isActive: true, isLegacy: false,
-  quotaBytes: '0', editedAt: null, editedBy: 'seed', editedFrom: 'seed',
+  editedAt: null, editedBy: 'seed', editedFrom: 'seed',
 };
+type StorageGroupFixture = { id: string; name: string; quotaBytes: string; buckets: { serviceUrl: string; bucketName: string }[] };
+type StorageBucketFixture = { serviceUrl: string; bucketName: string; roles: string[]; isActive: boolean; isLegacy: boolean };
 export const serverSettings = {
   settings: [setting, { ...setting, key: 'Audience', value: 'users' }],
   reservedNames: ['admin'], storageProfiles: [storageProfile], storageRevisions: [],
+  storageGroups: [] as StorageGroupFixture[], storageBuckets: [
+    { serviceUrl: 'http://minio:9000', bucketName: 'cloud-universal', roles: ['universal'], isActive: true, isLegacy: false },
+  ] as StorageBucketFixture[],
 };
 export const system = { version: '1.0', edition: 'self-host', emailEnabled: true, registrationEnabled: true };
 export function jsonResponse(data: unknown, status = 200) {

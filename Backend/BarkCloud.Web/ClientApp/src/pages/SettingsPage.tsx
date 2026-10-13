@@ -1502,12 +1502,30 @@ function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
         <StorageStatsStatus state={disk.state} updatedAt={disk.updatedAt} />
       </div>
     </div>
-    {s3 && <div className="set-card" data-setting-label="S3-бакеты">
-      <div className="set-card-head"><h3>S3-бакеты</h3><div className="sub">Все активные уникальные бакеты</div></div>
-      <div className="set-card-body">
-        {s3.allS3StatsAvailable && <><div className="storage-total">{s3.allS3UsedLabel}<span>{s3.allS3HasFiniteQuota ? `из ${s3.allS3QuotaLabel}` : 'безлимит'}</span></div>
-          {s3.allS3HasFiniteQuota && <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={s3.allS3Percent} aria-label="Использование S3-бакетов"><div className="bar-fill" style={{ width: `${s3.allS3Percent}%` }} /></div>}</>}
-        <StorageStatsStatus state={s3.allS3State} updatedAt={s3.allS3UpdatedAt} />
+    {s3 && <div className="set-card" data-setting-label="S3 · группы">
+      <div className="set-card-head"><h3>S3 · группы</h3><div className="sub">Занятое место по группам и бакетам без группы</div></div>
+      <div className="set-card-body storage-groups-usage">
+        {!s3.allS3StatsAvailable ? <div className="storage-breakdown-row"><span>S3</span><strong>
+          {['loading', 'refreshing'].includes(s3.allS3State || '') ? 'Подсчитываем…' : s3.allS3State === 'not_configured' ? 'не настроен' : 'недоступно'}
+        </strong></div> : <>
+          {s3.s3Groups.map((group) => {
+            const name = group.ungrouped ? 'Без группы' : group.name;
+            return <div className="storage-group-usage" key={group.id}>
+              <div className="storage-breakdown-row"><span>{name}</span><strong>
+                {group.ungrouped ? group.usedLabel : group.hasFiniteQuota
+                  ? `${group.usedLabel} / ${group.quotaLabel}` : `${group.usedLabel} · безлимит`}
+              </strong></div>
+              {!group.ungrouped && <div className="bar" role="progressbar" aria-label={`Использование ${name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={group.percent}>
+                <div className="bar-fill" style={{ width: `${group.percent}%` }} />
+              </div>}
+              <div className="storage-group-meta">
+                {!group.ungrouped && <span>{group.hasFiniteQuota ? `${group.percent}% использовано` : 'безлимит'}</span>}
+                {group.unmeasuredBuckets > 0 && <span>учёт неполный: {group.unmeasuredBuckets} {plural(group.unmeasuredBuckets, 'бакет без доступа', 'бакета без доступа', 'бакетов без доступа')}</span>}
+              </div>
+            </div>;
+          })}
+          <StorageStatsStatus state={s3.allS3State} updatedAt={s3.allS3UpdatedAt} />
+        </>}
       </div>
     </div>}
   </div>;
@@ -1684,12 +1702,12 @@ const SEARCH_ITEMS = [
   ['privacy', 'Поиск по имени пользователя', 'Доступность в поиске'],
   ['storage', 'Личное хранилище', 'Использование и лимит аккаунта'],
   ['storage', 'Диск сервера', 'Свободное место, локальный S3'],
-  ['storage', 'S3-бакеты', 'Размер объектов и квота'],
+  ['storage', 'S3 · группы', 'Расход по группам, лимиты и бакеты без группы'],
   ['sessions', 'Устройства и сессии', 'Активные устройства, выход'],
   ['appearance', 'Тема', 'Светлая, тёмная, системная'],
   ['system', 'Обслуживание', 'Контейнеры, обновление, перезапуск, каналы'],
   ['server-settings', 'Параметры сервисов', 'Серверные конфигурации'],
-  ['server-settings', 'S3-профили', 'Endpoint, bucket, credentials, квоты, регион, адресация, применить миграцию'],
+  ['server-settings', 'S3-профили', 'Endpoint, bucket, credentials, регион, адресация, группы квот, применить миграцию'],
   ['server-settings', 'Зарезервированные имена', 'Имена пользователей'],
   ['migration', 'Миграция', 'Копирование бакета S3, перенос, endpoint, credentials, Cloudflare R2, прогресс'],
 ];

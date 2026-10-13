@@ -385,7 +385,7 @@ public sealed class StorageMigrationServiceTests
         }
         private static StorageProfileItem Profile(string id, string role, int version, bool active = false, bool legacy = false) => new()
         { ProfileId = id, Role = role, Version = version, ServiceUrl = "https://source.example", BucketName = "from",
-            AccessKey = "source-access", SecretKey = "source-secret", IsActive = active, IsLegacy = legacy, QuotaBytes = 123 };
+            AccessKey = "source-access", SecretKey = "source-secret", IsActive = active, IsLegacy = legacy };
         public void Dispose() { Service.StopAsync(default).GetAwaiter().GetResult(); Service.Dispose(); }
     }
 }
