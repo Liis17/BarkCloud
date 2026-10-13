@@ -125,8 +125,8 @@ staple). Параметризован env-переменными (`TEAM_ID`/`SIG
   anchor + `signalEnumerator(for:)` для затронутых контейнеров (двух при
   move). Это покрывает «изменения внутри клиента». Пуш-обновления с других
   клиентов потребуют бэкенд-стрим изменений + change log в cache.
-- **`findEntry` после upload.** После `cloud.uploadFile` (= getUploadURL +
-  upload + attachFile) бэкенд не возвращает `entryID`, поэтому делаем
+- **`findEntry` после upload.** После `cloud.uploadFile` (= потоковый Upload 2.0
+  и `AttachFile` с `uploadSessionID`) бэкенд не возвращает `entryID`, поэтому делаем
   `listDirectory(parentDirID)` и ищем по `fileID + name`. Эпизодически
   может быть гонка — мониторить, при необходимости добавить proto-метод
   «attach и верни entryID».

@@ -90,25 +90,31 @@ final class ProfileViewModel {
     }
 
     func setAvatar(data: Data) async {
+        guard !state.isUpdatingAvatar else { return }
         state.isUpdatingAvatar = true
+        defer { state.isUpdatingAvatar = false }
         do {
             try await users.setAvatar(imageData: data, fileName: "avatar.jpg")
             state.user = try await users.getUser()
         } catch {
-            state.snackbar = domainErrorMessage(error)
+            if !Task.isCancelled && !FileTransferService.isCancellationError(error) {
+                state.snackbar = domainErrorMessage(error)
+            }
         }
-        state.isUpdatingAvatar = false
     }
 
     func removeAvatar() async {
+        guard !state.isUpdatingAvatar else { return }
         state.isUpdatingAvatar = true
+        defer { state.isUpdatingAvatar = false }
         do {
             try await users.removeAvatar()
             state.user = try await users.getUser()
         } catch {
-            state.snackbar = domainErrorMessage(error)
+            if !Task.isCancelled && !FileTransferService.isCancellationError(error) {
+                state.snackbar = domainErrorMessage(error)
+            }
         }
-        state.isUpdatingAvatar = false
     }
 
     func snackbarShown() { state.snackbar = nil }
