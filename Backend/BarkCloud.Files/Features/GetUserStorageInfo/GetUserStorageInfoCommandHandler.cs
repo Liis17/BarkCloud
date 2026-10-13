@@ -62,9 +62,6 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
             TotalAvailableStorage = storageStats.TotalBytes,
             DiskUsedStorage = storageStats.DiskUsedWithoutS3Bytes,
             S3UsedStorage = storageStats.S3UsedBytes,
-            AllS3UsedStorage = allS3Stats.UsedBytes,
-            AllS3QuotaStorage = allS3Stats.QuotaBytes,
-            AllS3HasFiniteQuota = allS3Stats.HasFiniteQuota,
             AllS3StatsAvailable = allS3Stats.IsAvailable,
             PhysicalStatsState = storageStats.State,
             PhysicalStatsUpdatedAt = storageStats.UpdatedAt is { } physicalAt
@@ -73,6 +70,15 @@ public class GetUserStorageInfoCommandHandler : IRequestHandler<GetUserStorageIn
             AllS3StatsUpdatedAt = allS3Stats.UpdatedAt is { } s3At
                 ? Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(s3At) : null
         };
+        response.S3QuotaGroups.AddRange(allS3Stats.Groups.Select(group => new S3QuotaGroupUsage
+        {
+            Id = group.Id,
+            Name = group.Name,
+            UsedBytes = group.UsedBytes,
+            QuotaBytes = group.QuotaBytes,
+            IsUngrouped = group.IsUngrouped,
+            UnmeasuredBuckets = group.UnmeasuredBuckets
+        }));
 
         // Добавляем информацию по типам файлов
         foreach (var (fileType, size) in storageByType)

@@ -69,41 +69,6 @@ public sealed class StorageProfileStorageTests : IDisposable
     }
 
     [Fact]
-    public async Task Save_DefaultQuotaIsUnlimited()
-    {
-        var saved = await _storage.SaveAsync(Input("audio", "https://s3.example", "audio"), "admin", "web");
-
-        saved.QuotaBytes.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task Save_QuotaChangeCreatesRevisionAndSynchronizesProfilesForTheSameBucket()
-    {
-        const long firstQuota = 10L * 1024 * 1024 * 1024;
-        const long secondQuota = 20L * 1024 * 1024 * 1024;
-        await _storage.SaveAsync(Input("images", "https://s3.example", "shared", firstQuota), "admin", "web");
-        await _storage.SaveAsync(Input("previews", "https://s3.example/", "shared", firstQuota), "admin", "web");
-        await _storage.SaveAsync(Input("videos", "https://s3.example", "other", 7), "admin", "web");
-
-        await _storage.SaveAsync(Input("images", "https://s3.example", "shared", secondQuota), "admin", "web");
-
-        (await _storage.GetAllAsync()).Where(profile => profile.BucketName == "shared")
-            .Should().OnlyContain(profile => profile.QuotaBytes == secondQuota);
-        (await _storage.GetAllAsync()).Single(profile => profile.BucketName == "other")
-            .QuotaBytes.Should().Be(7);
-        foreach (var profileId in new[] { "images-v1", "previews-v1" })
-            (await _storage.GetHistoryAsync(profileId, 10)).Should().ContainSingle(revision => revision.ChangeKind == "QuotaChange");
-    }
-
-    [Fact]
-    public async Task Save_NegativeQuotaIsRejected()
-    {
-        var act = () => _storage.SaveAsync(Input("audio", "https://s3.example", "audio", -1), "admin", "web");
-
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*quota*");
-    }
-
-    [Fact]
     public async Task Save_PartialNewProfile_IsRejected()
     {
         var act = () => _storage.SaveAsync(Input("previews", "https://s3.example", ""), "admin", "web");
@@ -166,9 +131,9 @@ public sealed class StorageProfileStorageTests : IDisposable
     [Fact]
     public async Task Relocate_PreservesExistingFileProfileIdsIncludingLegacyAndInactiveVersions()
     {
-        await _storage.SaveAsync(Input("images", "https://source.example", "shared", 123), "admin", "web");
+        await _storage.SaveAsync(Input("images", "https://source.example", "shared"), "admin", "web");
         await _storage.SaveAsync(Input("images", "https://elsewhere.example", "elsewhere"), "admin", "web");
-        await _storage.SaveAsync(Input("cloud-files-old", "https://source.example", "shared", 123) with
+        await _storage.SaveAsync(Input("cloud-files-old", "https://source.example", "shared") with
         { IsLegacy = true, ConfirmLegacyMutation = true }, "admin", "web");
 
         await _storage.RelocateAsync("https://source.example", "shared", ["images-v1", "cloud-files-old-v1"],
@@ -177,7 +142,7 @@ public sealed class StorageProfileStorageTests : IDisposable
 
         var profiles = await _storage.GetAllAsync();
         profiles.Should().ContainSingle(x => x.ProfileId == "images-v1" && !x.IsActive && x.Version == 1
-            && x.QuotaBytes == 123 && x.ServiceUrl == "https://destination.example" && x.BucketName == "copy"
+            && x.ServiceUrl == "https://destination.example" && x.BucketName == "copy"
             && x.Region == "eu-central-1" && !x.ForcePathStyle);
         profiles.Should().ContainSingle(x => x.ProfileId == "cloud-files-old-v1" && x.IsLegacy && !x.IsActive
             && x.ServiceUrl == "https://destination.example");
@@ -235,7 +200,7 @@ public sealed class StorageProfileStorageTests : IDisposable
         updated.ForcePathStyle.Should().BeFalse();
     }
 
-    private static StorageProfileInput Input(string role, string serviceUrl, string bucket, long quotaBytes = 0) => new(
+    private static StorageProfileInput Input(string role, string serviceUrl, string bucket) => new(
         role,
         serviceUrl,
         "access",
@@ -244,8 +209,7 @@ public sealed class StorageProfileStorageTests : IDisposable
         false,
         false,
         null,
-        false,
-        quotaBytes);
+        false);
 
     public void Dispose()
     {

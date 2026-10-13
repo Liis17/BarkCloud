@@ -7,13 +7,19 @@ public interface IS3StorageStatsProvider
 }
 
 public sealed record S3StorageStats(
-    long UsedBytes,
-    long QuotaBytes,
-    bool HasFiniteQuota,
+    IReadOnlyList<S3QuotaGroupStats> Groups,
     bool IsAvailable)
 {
     public string State { get; init; } = "ready";
     public DateTimeOffset? UpdatedAt { get; init; }
 
-    public static S3StorageStats Unavailable { get; } = new(0, 0, false, false);
+    public static S3StorageStats Unavailable { get; } = new(Array.Empty<S3QuotaGroupStats>(), false);
 }
+
+public sealed record S3QuotaGroupStats(
+    string Id,
+    string Name,
+    long UsedBytes,
+    long QuotaBytes,
+    int UnmeasuredBuckets,
+    bool IsUngrouped);

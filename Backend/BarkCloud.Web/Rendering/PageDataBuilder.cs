@@ -73,10 +73,6 @@ public sealed class PageDataBuilder
             ["storage.percent"] = "0",
             ["storage.other_pct"] = "0",
             ["storage.s3_pct"] = "0",
-            ["storage.all_s3_used_label"] = "0 Б",
-            ["storage.all_s3_quota_label"] = "0 Б",
-            ["storage.all_s3_percent"] = "0",
-            ["storage.all_s3_has_finite_quota"] = "false",
             ["storage.all_s3_stats_available"] = "false",
             // навигационные счётчики опускаем — пустые значения скрывают бейджи
             ["nav.photos_count"] = "",
@@ -128,12 +124,6 @@ public sealed class PageDataBuilder
             vars["storage.percent"] = Format.Percent(diskUsed, diskTotal).ToString();
             vars["storage.other_pct"] = PctOf(storage.DiskUsedStorage, diskTotal).ToString(CultureInfo.InvariantCulture);
             vars["storage.s3_pct"] = PctOf(storage.S3UsedStorage, diskTotal).ToString(CultureInfo.InvariantCulture);
-            vars["storage.all_s3_used_label"] = Format.Size(storage.AllS3UsedStorage);
-            vars["storage.all_s3_quota_label"] = Format.Size(storage.AllS3QuotaStorage);
-            vars["storage.all_s3_percent"] = storage.AllS3HasFiniteQuota
-                ? Format.Percent(storage.AllS3UsedStorage, storage.AllS3QuotaStorage).ToString(CultureInfo.InvariantCulture)
-                : "100";
-            vars["storage.all_s3_has_finite_quota"] = storage.AllS3HasFiniteQuota.ToString().ToLowerInvariant();
             vars["storage.all_s3_stats_available"] = storage.AllS3StatsAvailable.ToString().ToLowerInvariant();
         }
         catch (RpcException ex)
@@ -167,11 +157,21 @@ public sealed class PageDataBuilder
             otherPct = PctOf(storage.DiskUsedStorage, diskTotal), s3Pct = PctOf(storage.S3UsedStorage, diskTotal),
             state = string.IsNullOrEmpty(storage.PhysicalStatsState) ? "ready" : storage.PhysicalStatsState,
             updatedAt = storage.PhysicalStatsUpdatedAt?.ToDateTimeOffset(),
-            allS3UsedLabel = Format.Size(storage.AllS3UsedStorage),
-            allS3QuotaLabel = Format.Size(storage.AllS3QuotaStorage),
-            allS3Percent = !storage.AllS3StatsAvailable ? 0 : storage.AllS3HasFiniteQuota
-                ? Format.Percent(storage.AllS3UsedStorage, storage.AllS3QuotaStorage) : 100,
-            allS3HasFiniteQuota = storage.AllS3HasFiniteQuota,
+            s3Groups = storage.S3QuotaGroups.Select(group =>
+            {
+                var hasFiniteQuota = !group.IsUngrouped && group.QuotaBytes > 0;
+                return new
+                {
+                    id = group.Id,
+                    name = group.Name,
+                    usedLabel = Format.Size(group.UsedBytes),
+                    quotaLabel = Format.Size(group.QuotaBytes),
+                    percent = hasFiniteQuota ? Format.Percent(group.UsedBytes, group.QuotaBytes) : 100,
+                    hasFiniteQuota,
+                    ungrouped = group.IsUngrouped,
+                    unmeasuredBuckets = group.UnmeasuredBuckets
+                };
+            }).ToArray(),
             allS3StatsAvailable = storage.AllS3StatsAvailable,
             allS3State = string.IsNullOrEmpty(storage.AllS3StatsState)
                 ? storage.AllS3StatsAvailable ? "ready" : "error" : storage.AllS3StatsState,

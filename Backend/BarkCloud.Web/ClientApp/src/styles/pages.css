@@ -984,6 +984,9 @@ tr.selected .row-actions { opacity: 1; }
 .storage-breakdown-row strong { font-weight: 500; }
 .settings-storage-grid .stor-legend { flex-direction: column; gap: 8px; margin-top: 0; }
 .settings-storage-grid .stor-legend .v { margin-left: auto; }
+.storage-groups-usage { display: flex; flex-direction: column; gap: 14px; }
+.storage-group-usage { display: flex; flex-direction: column; gap: 6px; }
+.storage-group-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 11px; line-height: 16px; color: var(--md-on-surface-variant); }
 .storage-stats-status { display: block; font-size: 11px; line-height: 16px; color: var(--md-on-surface-variant); }
 .storage-stats-status.error { color: var(--md-error); }
 .settings-shell mark { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); border-radius: var(--r-xs); padding-inline: 1px; }
@@ -1038,7 +1041,6 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .storage-role-name small { display: block; font-size: 11px; margin-top: 2px; opacity: .7; }
 .storage-role-location { min-width: 0; font-size: 12px; overflow-wrap: anywhere; }
 .storage-role-location small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: .7; margin-top: 3px; }
-.storage-role-quota { align-self: end; font-size: 11px; text-align: right; opacity: .8; }
 .storage-role-group { padding: 16px 12px 8px; font-size: 11px; color: var(--md-on-surface-variant); }
 .storage-role-detail { min-width: 0; padding: 0 20px 20px; border-left: 1px solid var(--md-outline-variant); }
 .storage-back { display: none; }
@@ -1050,7 +1052,6 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .storage-profile-grid { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
 .storage-profile-grid legend { padding: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--md-on-surface); }
 .storage-profile-grid label { display: flex; min-width: 0; flex-direction: column; gap: 6px; font-size: 12px; color: var(--md-on-surface-variant); }
-.storage-quota-control .m3-select { width: 100%; }
 .storage-profile-grid input { width: 100%; min-width: 0; height: 40px; margin: 0; padding: 8px 12px; border: 1px solid var(--md-outline); border-radius: var(--r-sm); background: var(--md-surface-container); color: var(--md-on-surface); font: inherit; font-size: 14px; }
 .storage-profile-grid small { font-size: 11px; line-height: 16px; }
 .storage-profile-grid [aria-invalid=true] { border-color: var(--md-error); }
@@ -1060,7 +1061,6 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .credential-input .icon-btn { flex-shrink: 0; margin-left: -40px; }
 .credential-set { color: var(--md-primary); }
 .storage-credentials-help { grid-column: 1 / -1; font-size: 11px; line-height: 17px; color: var(--md-on-surface-variant); margin: 0; }
-.storage-quota-control { display: grid; grid-template-columns: minmax(0, 1fr) 80px; gap: 6px; }
 .storage-profile-grid .server-check { flex-direction: row; align-items: center; gap: 8px; }
 .storage-profile-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--md-outline-variant); }
 .storage-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1071,6 +1071,34 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .storage-version-row small { display: block; margin-top: 3px; font-size: 11px; }
 .storage-version-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .storage-revision-row { margin-top: 8px; font-size: 11px; overflow-wrap: anywhere; }
+.server-s3-groups-section { container: s3-groups / inline-size; }
+.server-s3-groups-body { display: grid; grid-template-columns: minmax(180px, .45fr) minmax(0, 1fr); }
+.server-s3-group-list { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 0 12px 16px 20px; }
+.server-s3-group-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--md-on-surface); text-align: left; font: inherit; cursor: pointer; }
+.server-s3-group-choice:hover { background: var(--md-surface-container); }
+.server-s3-group-choice.selected { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.server-s3-group-choice strong { font-size: 14px; font-weight: 500; }
+.server-s3-group-choice small { font-size: 11px; opacity: .75; }
+.server-s3-group-editor { min-width: 0; padding: 0 20px 20px; border-left: 1px solid var(--md-outline-variant); }
+.storage-group-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+.storage-group-fields label, .storage-group-add { display: flex; min-width: 0; flex-direction: column; gap: 6px; color: var(--md-on-surface-variant); font-size: 12px; }
+.storage-group-fields input { width: 100%; min-width: 0; height: 40px; margin: 0; padding: 8px 12px; border: 1px solid var(--md-outline); border-radius: var(--r-sm); background: var(--md-surface-container); color: var(--md-on-surface); font: inherit; font-size: 14px; }
+.storage-group-fields [aria-invalid=true] { border-color: var(--md-error); }
+.storage-group-quota-control { display: grid; grid-template-columns: minmax(0, 1fr) 80px; gap: 6px; }
+.storage-group-quota-control .m3-select { width: 100%; }
+.storage-group-members { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.storage-group-members > strong { font-size: 13px; font-weight: 500; color: var(--md-on-surface); }
+.storage-group-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.storage-group-chip { display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--md-outline-variant); border-radius: var(--r-md); background: var(--md-surface-container-low); color: var(--md-on-surface); }
+.storage-group-chip > span { min-width: 0; overflow-wrap: anywhere; }
+.storage-group-chip strong, .storage-group-chip small { display: block; }
+.storage-group-chip strong { font-size: 12px; font-weight: 500; }
+.storage-group-chip small { margin-top: 2px; font-size: 10px; color: var(--md-on-surface-variant); }
+.storage-group-chip button { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.storage-group-chip button:hover { background: var(--md-surface-container-highest); }
+.storage-group-add { margin-top: 4px; }
+.storage-group-add .m3-select { width: 100%; }
+.storage-group-add-note { margin: 0; font-size: 11px; color: var(--md-on-surface-variant); }
 .reserved-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; max-width: 600px; }
 .reserved-add label { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--md-on-surface-variant); }
 .reserved-add input { height: 40px; width: 100%; padding: 8px 12px; background: var(--md-surface-container); color: var(--md-on-surface); border: 1px solid var(--md-outline); border-radius: var(--r-sm); font: inherit; }
@@ -1086,6 +1114,12 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .svc-more-menu { position: absolute; z-index: 5; right: 0; top: 100%; padding: 8px; background: var(--md-surface-container-highest); border-radius: var(--r-md); box-shadow: var(--el-2); }
 .svc-more-menu .iconb { width: auto; padding-inline: 12px; font-size: 13px; gap: 8px; }
 @container profile (max-width: 480px) { .storage-profile-grid { grid-template-columns: minmax(0, 1fr); } }
+@container s3-groups (max-width: 640px) {
+  .server-s3-groups-body { grid-template-columns: minmax(0, 1fr); }
+  .server-s3-group-list { padding-inline: 16px; }
+  .server-s3-group-editor { padding-inline: 16px; border-left: 0; }
+  .storage-group-fields { grid-template-columns: minmax(0, 1fr); }
+}
 @container storage (max-width: 800px) {
   .storage-workspace { grid-template-columns: minmax(0, 1fr); }
   .storage-role-list { padding-inline: 12px; }

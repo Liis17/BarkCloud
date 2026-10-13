@@ -133,9 +133,6 @@ namespace BarkCloud.Configuration.Persistence.Migrations
                     b.Property<bool>("IsR2")
                         .HasColumnType("boolean");
 
-                    b.Property<long>("QuotaBytes")
-                        .HasColumnType("bigint");
-
                     b.Property<string>("Region")
                         .IsRequired()
                         .HasColumnType("text");
@@ -211,6 +208,63 @@ namespace BarkCloud.Configuration.Persistence.Migrations
                         .IsDescending(false, true, true);
 
                     b.ToTable("StorageProfileRevisions", (string)null);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageQuotaGroup", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EditedFrom")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("QuotaBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("StorageQuotaGroups", (string)null);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageQuotaGroupBucket", b =>
+                {
+                    b.Property<string>("GroupId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ServiceUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BucketName")
+                        .HasColumnType("text");
+
+                    b.HasKey("GroupId", "ServiceUrl", "BucketName");
+
+                    b.HasIndex("ServiceUrl", "BucketName")
+                        .IsUnique();
+
+                    b.ToTable("StorageQuotaGroupBuckets", (string)null);
                 });
 
             modelBuilder.Entity("FilesSettings", b =>
@@ -380,6 +434,20 @@ namespace BarkCloud.Configuration.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("SourceRevisionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageQuotaGroupBucket", b =>
+                {
+                    b.HasOne("BarkCloud.Configuration.Domain.StorageQuotaGroup", null)
+                        .WithMany("Buckets")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BarkCloud.Configuration.Domain.StorageQuotaGroup", b =>
+                {
+                    b.Navigation("Buckets");
                 });
 #pragma warning restore 612, 618
         }

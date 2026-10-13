@@ -22,6 +22,7 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | `Backend/BarkCloud.Files/Services/UnifiedSearchService.Sources.cs` | источники секций | SQL-выборки файлов, альбомов, плейлистов, папок и shared-объектов |
 | `Backend/BarkCloud.Files/Services/PreviewPersistenceService.cs` | сохранение превью | отдельные блобы и связи превью |
 | `Backend/BarkCloud.Files/Infrastructure/S3Uploader.cs` | `S3Uploader` | чтение, запись и удаление объектов |
+| `Backend/BarkCloud.Files/Services/S3StorageStatsProvider.cs` | `S3StorageStatsProvider` | Статистика использования S3 по группам квот |
 | `Shared/BarkCloud.Proto/files_api.proto` | Files-сервисы | публичные контракты |
 
 ## Публичные контракты
@@ -38,7 +39,9 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 
 Для клиентского сценария сессий см. [[Backend/ResumableUpload]] и [[Api/FilesClientGuide]]. Контракты объявлены в `Shared/BarkCloud.Proto/files_api.proto`.
 
-`GetTempDownloadUrl` возвращает временные ссылки по `file_id`. `CheckFileHash`/`CheckFileHashes` проверяют наличие SHA-256; `GetFileMetadata` возвращает извлечённые EXIF, видео, аудио и документные поля; `GetUserStorageInfo` включает квоту и активный резерв загрузки.
+`GetTempDownloadUrl` возвращает временные ссылки по `file_id`. `CheckFileHash`/`CheckFileHashes` проверяют наличие SHA-256; `GetFileMetadata` возвращает извлечённые EXIF, видео, аудио и документные поля; `GetUserStorageInfo` включает квоту аккаунта и активный резерв загрузки, а также `s3_quota_groups` со статистикой групп S3.
+
+`GetUserStorageInfoResponse.s3_quota_groups` содержит для каждой группы `id`, `name`, `used_bytes`, `quota_bytes`, `is_ungrouped` и `unmeasured_buckets`. Квота задаётся группой в Configuration; квот у S3-профилей нет. `S3StorageStatsProvider` сопоставляет членство с физическими бакетами через нормализованный endpoint и имя бакета, измеряет бакет один раз любым доступным профилем этой локации и суммирует расход группы. Член без профиля доступа увеличивает `unmeasured_buckets`, но не мешает учитывать остальные члены. Если у члена есть только неактивные или legacy-профили и измерение завершается ошибкой, он также увеличивает `unmeasured_buckets` с warning в журнале; ошибка активного не-legacy бакета оставляет снимок недоступным. Бакеты без группы учитываются только если у них есть активный не-legacy профиль; они объединяются в строку «Без группы» без квоты. Состояние и время обновления общей статистики S3 передаются отдельно от списка групп.
 
 | HTTP-маршрут | Поведение |
 |---|---|

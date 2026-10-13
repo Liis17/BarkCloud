@@ -34,28 +34,45 @@ public class ConfigurationContextModelTests
             "SettingsHistory",
             "ReservedNames",
             "StorageProfiles",
-            "StorageProfileRevisions"
+            "StorageProfileRevisions",
+            "StorageQuotaGroups",
+            "StorageQuotaGroupBuckets"
         ]);
         tables.Should().NotContain("Configurations");
 
         context.Model.FindEntityType(typeof(StorageProfile))!
-            .FindProperty(nameof(StorageProfile.QuotaBytes))!.ClrType.Should().Be(typeof(long));
+            .FindProperty("QuotaBytes").Should().BeNull();
+
+        var group = context.Model.FindEntityType(typeof(StorageQuotaGroup))!;
+        group.GetIndexes().Should().ContainSingle(index => index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual(new[] { nameof(StorageQuotaGroup.Name) }));
+
+        var bucket = context.Model.FindEntityType(typeof(StorageQuotaGroupBucket))!;
+        bucket.GetIndexes().Should().ContainSingle(index => index.IsUnique
+            && index.Properties.Select(property => property.Name)
+                .SequenceEqual(new[] { nameof(StorageQuotaGroupBucket.ServiceUrl), nameof(StorageQuotaGroupBucket.BucketName) }));
+        bucket.GetForeignKeys().Should().ContainSingle(foreignKey => foreignKey.DeleteBehavior == DeleteBehavior.Cascade
+            && foreignKey.Properties.Select(property => property.Name).SequenceEqual(new[] { nameof(StorageQuotaGroupBucket.GroupId) }));
     }
 
     [Fact]
-    public void QuotaMigration_AddsNonNullableColumnWithUnlimitedDefault()
+    public void StorageQuotaGroupsMigration_CreatesGroupsAndRemovesProfileQuota()
     {
         var options = new DbContextOptionsBuilder<ConfigurationContext>()
             .UseNpgsql("Host=localhost;Database=configuration;Username=postgres;Password=postgres")
             .Options;
         using var context = new ConfigurationContext(options);
         var migrations = context.GetService<IMigrationsAssembly>();
-        var migrationType = migrations.Migrations["20260925080545_AddStorageProfileQuota"];
+        var migrationType = migrations.Migrations.Single(migration => migration.Key.EndsWith("_StorageQuotaGroups")).Value;
         var migration = migrations.CreateMigration(migrationType, context.Database.ProviderName!);
-        var quota = migration.UpOperations.OfType<AddColumnOperation>().Single(operation => operation.Name == "QuotaBytes");
+        migration.UpOperations.OfType<DropColumnOperation>().Single(operation => operation.Name == "QuotaBytes")
+            .Table.Should().Be("StorageProfiles");
 
-        quota.Table.Should().Be("StorageProfiles");
-        quota.IsNullable.Should().BeFalse();
-        quota.DefaultValue.Should().Be(0L);
+        migration.UpOperations.OfType<CreateTableOperation>().Select(operation => operation.Name)
+            .Should().Contain(["StorageQuotaGroups", "StorageQuotaGroupBuckets"]);
+        migration.UpOperations.OfType<CreateIndexOperation>().Should().Contain(index => index.IsUnique
+            && index.Table == "StorageQuotaGroups" && index.Columns.SequenceEqual(new[] { "Name" }));
+        migration.UpOperations.OfType<CreateIndexOperation>().Should().Contain(index => index.IsUnique
+            && index.Table == "StorageQuotaGroupBuckets" && index.Columns.SequenceEqual(new[] { "ServiceUrl", "BucketName" }));
     }
 }

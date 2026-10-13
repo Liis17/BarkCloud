@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Configuration;
 
 using Grpc.Core;
@@ -47,9 +48,23 @@ public sealed record ServerStorageProfileDto(
     DateTimeOffset? EditedAt,
     string EditedBy,
     string EditedFrom,
-    string QuotaBytes,
     string Region = "",
     bool ForcePathStyle = true);
+
+public sealed record ServerStorageBucketDto(
+    string ServiceUrl,
+    string BucketName,
+    IReadOnlyList<string> Roles,
+    bool IsActive,
+    bool IsLegacy);
+
+public sealed record ServerStorageGroupBucketDto(string ServiceUrl, string BucketName);
+
+public sealed record ServerStorageGroupDto(
+    string Id,
+    string Name,
+    string QuotaBytes,
+    IReadOnlyList<ServerStorageGroupBucketDto> Buckets);
 
 public sealed record ServerStorageRevisionDto(
     long Id,
@@ -64,7 +79,9 @@ public sealed record ServerSettingsDto(
     IReadOnlyList<ServerSettingDto> Settings,
     IReadOnlyList<string> ReservedNames,
     IReadOnlyList<ServerStorageProfileDto> StorageProfiles,
-    IReadOnlyList<ServerStorageRevisionDto> StorageRevisions);
+    IReadOnlyList<ServerStorageRevisionDto> StorageRevisions,
+    IReadOnlyList<ServerStorageGroupDto> StorageGroups,
+    IReadOnlyList<ServerStorageBucketDto> StorageBuckets);
 
 public sealed record ConfigurationMutationResult(
     bool Success,
@@ -81,10 +98,17 @@ public sealed record StorageProfileEdit(
     bool IsLegacy,
     string? ProfileId,
     bool ConfirmLegacyMutation,
-    string QuotaValue = "0",
-    string QuotaUnit = "gb",
     string? Region = null,
     bool? ForcePathStyle = null);
+
+public sealed record StorageGroupBucketEdit(string ServiceUrl, string BucketName);
+
+public sealed record StorageGroupEdit(
+    string? Id,
+    string Name,
+    string QuotaValue,
+    string QuotaUnit,
+    IReadOnlyList<StorageGroupBucketEdit> Buckets);
 
 public sealed class ConfigurationManagementGateway(
     ConfigurationApi.ConfigurationApiClient configuration,
@@ -103,13 +127,28 @@ public sealed class ConfigurationManagementGateway(
             new GetStorageProfilesRequest { IncludeRevisions = true }, _headers, cancellationToken: cancellationToken).ResponseAsync;
         await Task.WhenAll(allTask, reservedTask, profilesTask);
 
+        var profiles = profilesTask.Result.Profiles;
+        var storageBuckets = profiles
+            .GroupBy(profile => new
+            {
+                ServiceUrl = S3Endpoint.Normalize(profile.ServiceUrl, profile.IsR2),
+                profile.BucketName
+            })
+            .Select(group => new ServerStorageBucketDto(
+                group.Key.ServiceUrl,
+                group.Key.BucketName,
+                group.Select(profile => profile.Role).Distinct(StringComparer.Ordinal).Order().ToArray(),
+                group.Any(profile => profile.IsActive && !profile.IsLegacy),
+                group.All(profile => profile.IsLegacy)))
+            .ToArray();
+
         return new ServerSettingsDto(
             allTask.Result.Configurations
                 .Where(configuration => !IsTokenSetting(configuration))
                 .Select(Mask)
                 .ToArray(),
             reservedTask.Result.Names.ToArray(),
-            profilesTask.Result.Profiles.Select(Mask).ToArray(),
+            profiles.Select(Mask).ToArray(),
             profilesTask.Result.Revisions.Select(revision => new ServerStorageRevisionDto(
                 revision.Id,
                 revision.ProfileId,
@@ -117,7 +156,13 @@ public sealed class ConfigurationManagementGateway(
                 revision.ChangedBy,
                 revision.ChangedFrom,
                 revision.ChangeKind,
-                revision.HasSourceRevision ? revision.SourceRevisionId : null)).ToArray());
+                revision.HasSourceRevision ? revision.SourceRevisionId : null)).ToArray(),
+            profilesTask.Result.QuotaGroups.Select(group => new ServerStorageGroupDto(
+                group.Id,
+                group.Name,
+                group.QuotaBytes.ToString(CultureInfo.InvariantCulture),
+                group.Buckets.Select(bucket => new ServerStorageGroupBucketDto(bucket.ServiceUrl, bucket.BucketName)).ToArray())).ToArray(),
+            storageBuckets);
     }
 
     public async Task<ConfigurationMutationResult> SaveValueAsync(
@@ -223,13 +268,47 @@ public sealed class ConfigurationManagementGateway(
             ProfileId = edit.ProfileId ?? string.Empty,
             ConfirmLegacyMutation = edit.ConfirmLegacyMutation,
             EditedBy = actor,
-            EditedFrom = "web-settings",
-            QuotaValue = edit.QuotaValue,
-            QuotaUnit = edit.QuotaUnit
+            EditedFrom = "web-settings"
         };
         if (edit.Region is not null) request.Region = edit.Region;
         if (edit.ForcePathStyle is not null) request.ForcePathStyle = edit.ForcePathStyle.Value;
         var response = await configuration.SaveStorageProfileAsync(request, _headers, cancellationToken: cancellationToken);
+        return new ConfigurationMutationResult(response.Success, response.Message, ["files"]);
+    }
+
+    public async Task<ConfigurationMutationResult> SaveStorageGroupAsync(
+        StorageGroupEdit edit,
+        string actor,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new SaveStorageQuotaGroupRequest
+        {
+            Id = edit.Id ?? string.Empty,
+            Name = edit.Name,
+            QuotaValue = edit.QuotaValue,
+            QuotaUnit = edit.QuotaUnit,
+            EditedBy = actor,
+            EditedFrom = "web-settings"
+        };
+        request.Buckets.AddRange(edit.Buckets.Select(bucket => new StorageBucketRef
+        {
+            ServiceUrl = bucket.ServiceUrl,
+            BucketName = bucket.BucketName
+        }));
+        var response = await configuration.SaveStorageQuotaGroupAsync(request, _headers, cancellationToken: cancellationToken);
+        return new ConfigurationMutationResult(response.Success, response.Message, ["files"]);
+    }
+
+    public async Task<ConfigurationMutationResult> DeleteStorageGroupAsync(
+        string id,
+        string actor,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await configuration.DeleteStorageQuotaGroupAsync(new DeleteStorageQuotaGroupRequest
+        {
+            Id = id,
+            EditedBy = actor
+        }, _headers, cancellationToken: cancellationToken);
         return new ConfigurationMutationResult(response.Success, response.Message, ["files"]);
     }
 
@@ -339,7 +418,7 @@ public sealed class ConfigurationManagementGateway(
         profile.EditedAt?.ToDateTimeOffset(),
         profile.EditedBy,
         profile.EditedFrom,
-        profile.QuotaBytes.ToString(CultureInfo.InvariantCulture), profile.Region,
+        profile.Region,
         !profile.HasForcePathStyle || profile.ForcePathStyle);
 
     public async Task<IReadOnlyList<StorageProfileItem>> GetStorageConnectionsAsync(CancellationToken cancellationToken = default)

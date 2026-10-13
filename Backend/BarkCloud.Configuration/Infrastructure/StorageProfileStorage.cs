@@ -18,7 +18,6 @@ public sealed record StorageProfileInput(
     bool IsLegacy,
     string? ProfileId,
     bool ConfirmLegacyMutation,
-    long QuotaBytes = 0,
     string? Region = null,
     bool? ForcePathStyle = null);
 
@@ -72,8 +71,6 @@ public sealed class StorageProfileStorage
         ValidateRole(input.Role);
         if (input.IsLegacy != StorageProfileRoles.IsCompatibility(input.Role))
             throw new InvalidOperationException("Legacy flag is allowed only for compatibility storage roles.");
-        if (input.QuotaBytes < 0)
-            throw new InvalidOperationException("Storage profile quota cannot be negative.");
         var actor = NormalizeActor(editedBy);
         var source = editedFrom ?? string.Empty;
 
@@ -159,8 +156,6 @@ public sealed class StorageProfileStorage
                 AddRevision(profile.ProfileId, before, profile, "CredentialsRotation", actor, source);
             }
         }
-
-        SynchronizeQuota(profiles, saved, input.QuotaBytes, actor, source);
 
         await _context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -331,7 +326,6 @@ public sealed class StorageProfileStorage
             AccessKey = input.AccessKey.Trim(),
             SecretKey = secret,
             BucketName = input.BucketName.Trim(),
-            QuotaBytes = input.QuotaBytes,
             IsR2 = input.IsR2,
             Region = input.Region ?? string.Empty,
             ForcePathStyle = input.ForcePathStyle ?? true,
@@ -385,29 +379,6 @@ public sealed class StorageProfileStorage
         });
     }
 
-    private void SynchronizeQuota(
-        IEnumerable<StorageProfile> profiles,
-        StorageProfile saved,
-        long quotaBytes,
-        string actor,
-        string source)
-    {
-        foreach (var profile in profiles.Append(saved)
-                     .DistinctBy(profile => profile.ProfileId)
-                     .Where(profile => SamePhysicalBucket(profile, saved)))
-        {
-            if (profile.QuotaBytes == quotaBytes)
-                continue;
-
-            var before = Snapshot(profile);
-            profile.QuotaBytes = quotaBytes;
-            profile.EditedAt = DateTime.UtcNow;
-            profile.EditedBy = actor;
-            profile.EditedFrom = source;
-            AddRevision(profile.ProfileId, before, profile, "QuotaChange", actor, source);
-        }
-    }
-
     private static string Snapshot(StorageProfile profile) => JsonSerializer.Serialize(new
     {
         profile.ProfileId,
@@ -417,7 +388,6 @@ public sealed class StorageProfileStorage
         profile.AccessKey,
         profile.SecretKey,
         profile.BucketName,
-        profile.QuotaBytes,
         profile.IsR2,
         profile.Region,
         profile.ForcePathStyle,

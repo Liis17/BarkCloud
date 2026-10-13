@@ -26,18 +26,21 @@ Parent: [[Web/WebApp]] · See also: [[Backend/Configuration]] · [[Backend/Ident
 | `/api/settings/security/*`, `GET /api/settings/sessions`, `POST /api/settings/sessions/revoke*` | Пароль, 2FA, WebAuthn, список сессий и отзыв сессий |
 | `POST /api/settings/system/registration` | Включить или отключить регистрацию; требуется AdminGate |
 | `/api/settings/server/*` | Чтение и изменение серверной конфигурации, версий настроек, storage-профилей и зарезервированных имён |
+| `POST /api/settings/server/storage/groups/save` | Создать или изменить группу: `{id?, name, quotaValue, quotaUnit, buckets[{serviceUrl, bucketName}]}` |
+| `POST /api/settings/server/storage/groups/delete` | Удалить группу: `{id}`; её бакеты остаются без группы |
 | `POST /api/settings/account/delete`, `POST /api/settings/avatar`, `POST /api/settings/avatar/remove` | Удаление аккаунта и операции с аватаром |
 
 API миграции S3 принадлежит [[Web/S3Migration]]. API обслуживания контейнеров описан в [[Web/SystemUpdates]].
 
 ## Зависимости и взаимодействия
 
-- Профиль, приватность, устройства, удаление аккаунта и аватар используют Users; пароль, 2FA, WebAuthn и сессии используют Identity; конфигурационные значения и S3-профили — Configuration.
+- Профиль, приватность, устройства, удаление аккаунта и аватар используют Users; пароль, 2FA, WebAuthn и сессии используют Identity; конфигурационные значения, S3-профили и группы квот — Configuration.
 - `/api/settings/server/*` требует обычную сессию и открытую AdminGate-сессию. Сама AdminGate управляет отдельной cookie и не заменяет пользовательскую аутентификацию.
 - Данные для страницы собирает `PageDataBuilder`; файловая статистика и сведения о сервере доступны отдельными запросами.
+- `GET /api/settings/server` возвращает `storageGroups` с квотой в байтах и членами, а также `storageBuckets` — уникальные нормализованные endpoint/bucket с ролями и статусами. Credentials не возвращаются. В «Группах S3» квота задаётся в ГБ, ТБ или ПБ; новые бакеты выбираются из доступных профилей, а сохранение и удаление группы требуют перезапуска Files.
 
 ## Ограничения и важные детали
 
 Административные маршруты не становятся публичными после разблокировки: каждый запрос по-прежнему проходит проверку обычной пользовательской сессии.
 
-`ConfigurationManagementGateway` не возвращает браузеру значения чувствительных параметров или S3-ключи: для профилей доступны только признаки `HasAccessKey` и `HasSecretKey`.
+`ConfigurationManagementGateway` не возвращает браузеру значения чувствительных параметров или S3-ключи: для профилей доступны только признаки `HasAccessKey` и `HasSecretKey`. Квота хранится у группы, а не у профиля.

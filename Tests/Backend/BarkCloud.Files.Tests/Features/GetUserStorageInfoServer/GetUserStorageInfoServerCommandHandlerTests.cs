@@ -58,19 +58,20 @@ public class GetUserStorageInfoServerCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ReturnsAggregateS3StorageForServerApi()
+    public async Task Handle_MapsS3QuotaGroupsForServerApi()
     {
         _quota.Setup(x => x.GetSnapshotAsync(7, false, default))
             .ReturnsAsync(new StorageQuotaSnapshot(null, 0, 0));
         _files.Setup(s => s.GetUserStorageByType(7)).ReturnsAsync(new Dictionary<UploadFileType, long>());
         _storageStats.Setup(s => s.GetStatsAsync(default)).ReturnsAsync(new PhysicalStorageStats(5_000, 2_000, 1_000, 2_000));
-        _s3StorageStats.Setup(s => s.GetStatsAsync(default)).ReturnsAsync(new S3StorageStats(321, 654, false, true));
+        _s3StorageStats.Setup(s => s.GetStatsAsync(default)).ReturnsAsync(new S3StorageStats(
+            [new S3QuotaGroupStats("g1", "Archive", 321, 654, 1, false)], true));
 
         var response = await CreateSut().Handle(new GetUserStorageInfoServerCommand { UserId = 7 }, default);
 
-        response.AllS3UsedStorage.Should().Be(321);
-        response.AllS3QuotaStorage.Should().Be(654);
-        response.AllS3HasFiniteQuota.Should().BeFalse();
+        response.S3QuotaGroups.Should().ContainSingle(group => group.Id == "g1"
+            && group.Name == "Archive" && group.UsedBytes == 321 && group.QuotaBytes == 654
+            && group.UnmeasuredBuckets == 1 && !group.IsUngrouped);
         response.AllS3StatsAvailable.Should().BeTrue();
     }
 }
