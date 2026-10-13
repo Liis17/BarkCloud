@@ -53,5 +53,13 @@ public func domainErrorMessage(_ error: Error) -> String {
             return rpc.message
         }
     }
+    if let transfer = error as? FileTransferError {
+        if let mapped = DomainErrorCodes.localizedMessage(for: transfer.serverErrorCode) {
+            return mapped
+        }
+        if let message = transfer.errorDescription {
+            return message
+        }
+    }
     return String(localized: "error_generic")
 }

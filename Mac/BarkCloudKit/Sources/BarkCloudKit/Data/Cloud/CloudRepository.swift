@@ -22,20 +22,37 @@ private struct GrpcCloudAttachTransport: CloudAttachTransport {
 /// загрузка файлов (через `FileTransferService`). Доменные ошибки пробрасываются
 /// как `RPCError`; UI маппит их через `domainErrorMessage(_:)`.
 public final class CloudRepository: Sendable {
+    static let uploadAttachDeadline: Duration = .seconds(15)
+
     let grpc: GrpcManager
     public let transfer: FileTransferService
     private let attachTransport: any CloudAttachTransport
+    private let uploadAttachDeadline: Duration
 
     public init(grpc: GrpcManager, transfer: FileTransferService) {
         self.grpc = grpc
         self.transfer = transfer
         self.attachTransport = GrpcCloudAttachTransport(grpc: grpc)
+        self.uploadAttachDeadline = Self.uploadAttachDeadline
     }
 
-    init(grpc: GrpcManager, transfer: FileTransferService, attachTransport: any CloudAttachTransport) {
+    init(grpc: GrpcManager, transfer: FileTransferService, uploadAttachDeadline: Duration) {
+        self.grpc = grpc
+        self.transfer = transfer
+        self.attachTransport = GrpcCloudAttachTransport(grpc: grpc)
+        self.uploadAttachDeadline = uploadAttachDeadline
+    }
+
+    init(
+        grpc: GrpcManager,
+        transfer: FileTransferService,
+        attachTransport: any CloudAttachTransport,
+        uploadAttachDeadline: Duration = CloudRepository.uploadAttachDeadline
+    ) {
         self.grpc = grpc
         self.transfer = transfer
         self.attachTransport = attachTransport
+        self.uploadAttachDeadline = uploadAttachDeadline
     }
 
     // MARK: - Галерея
@@ -643,7 +660,7 @@ public final class CloudRepository: Sendable {
                 name: fileName,
                 routeByMediaKind: true,
                 uploadSessionID: uploaded.sessionID,
-                timeout: .seconds(15)
+                timeout: uploadAttachDeadline
             )
         } else if let directoryID {
             try await attachFile(
@@ -651,7 +668,7 @@ public final class CloudRepository: Sendable {
                 directoryID: directoryID,
                 name: fileName,
                 uploadSessionID: uploaded.sessionID,
-                timeout: .seconds(15)
+                timeout: uploadAttachDeadline
             )
         }
         return uploaded.fileID
@@ -681,7 +698,7 @@ public final class CloudRepository: Sendable {
                 name: name,
                 routeByMediaKind: true,
                 uploadSessionID: uploaded.sessionID,
-                timeout: .seconds(15)
+                timeout: uploadAttachDeadline
             )
         } else if let directoryID {
             try await attachFile(
@@ -689,7 +706,7 @@ public final class CloudRepository: Sendable {
                 directoryID: directoryID,
                 name: name,
                 uploadSessionID: uploaded.sessionID,
-                timeout: .seconds(15)
+                timeout: uploadAttachDeadline
             )
         }
         return uploaded.fileID

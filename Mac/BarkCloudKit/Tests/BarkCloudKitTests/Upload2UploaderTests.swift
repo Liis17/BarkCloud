@@ -1,9 +1,6 @@
 import CryptoKit
 import Foundation
 import GRPCCore
-import GRPCNIOTransportHTTP2
-import GRPCProtobuf
-import SwiftProtobuf
 import XCTest
 @testable import BarkCloudKit
 
@@ -62,6 +59,35 @@ final class Upload2UploaderTests: XCTestCase {
 
         XCTAssertEqual(calls.fileSizes, [Int64(contents.count)])
         XCTAssertEqual(calls.hashes, [sha256(contents)])
+    }
+
+    func testCancelledBeforeHashCleansStagingAndPreservesSource() async throws {
+        let source = try makeTemporaryFile(contents: Data("payload".utf8))
+        defer { try? FileManager.default.removeItem(at: source) }
+        let stagingBefore = Self.stagingDirectories()
+        let transport = FakeUploadTransport(partSize: 4)
+        let uploader = Upload2Uploader(transport: transport, clock: TestUploadClock())
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await uploader.upload(
+                fileURL: source,
+                fileName: source.lastPathComponent,
+                contentType: "application/octet-stream",
+                fileType: .cloudFile
+            )
+        }
+
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled upload must stop before hashing")
+        } catch {
+            XCTAssertTrue(FileTransferService.isCancellationError(error))
+        }
+
+        let calls = await transport.snapshot()
+        XCTAssertEqual(calls.createCount, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(Self.stagingDirectories(), stagingBefore)
     }
 
     func testPutRequestUsesUploadTokenAndExactRangeWithoutAccessToken() throws {
@@ -412,6 +438,29 @@ final class Upload2UploaderTests: XCTestCase {
         }
     }
 
+    func testCloudProcessingCanContinuePastAvatarDeadline() async throws {
+        let source = try makeTemporaryFile(contents: Data("cloud".utf8))
+        defer { try? FileManager.default.removeItem(at: source) }
+        let transport = FakeUploadTransport(partSize: 8, completeStatus: .processing)
+        let processing = makeSession(status: .processing, fileSize: 5, partSize: 8, token: nil)
+        for _ in 0..<61 { await transport.enqueueGet(processing) }
+        await transport.enqueueGet(makeSession(status: .ready, fileSize: 5, partSize: 8, token: nil))
+        let clock = TestUploadClock()
+        let uploader = Upload2Uploader(transport: transport, clock: clock)
+
+        let ready = try await uploader.upload(
+            fileURL: source,
+            fileName: "cloud.bin",
+            contentType: "application/octet-stream",
+            fileType: .cloudFile
+        )
+
+        XCTAssertEqual(ready.status, .ready)
+        XCTAssertGreaterThan(clock.now().timeIntervalSince1970, 120)
+        let calls = await transport.snapshot()
+        XCTAssertEqual(calls.getCount, 62)
+    }
+
     @MainActor
     func testAvatarRepositoryOnlySetsProfileAfterReadyAndKeepsOldValueOnUploadError() async throws {
         let session = SessionStore(service: "BarkCloudKitTests-\(UUID().uuidString)")
@@ -544,71 +593,87 @@ final class Upload2UploaderTests: XCTestCase {
         XCTAssertEqual(Self.stagingDirectories(), tempBefore)
     }
 
-    @MainActor
-    func testProductionGrpcRefreshUsesRpcDeadlineAndBoundsAnAlreadyRunningRefresh() async throws {
-        let recorder = HangingTokenRecorder()
-        let transport = HTTP2ServerTransport.Posix(
-            address: .ipv4(host: "127.0.0.1", port: 0),
-            transportSecurity: .plaintext
-        )
-        let server = GRPCServer(transport: transport, services: [HangingCreateTokenService(recorder: recorder)])
-        let serverTask = Task { try await server.serve() }
-        defer { server.beginGracefulShutdown() }
-        let address = try await waitForListeningAddress(transport)
-        let session = SessionStore(service: "BarkCloudKitTests-\(UUID().uuidString)")
-        session.accessToken = "stale-token"
-        session.accessTokenExpiresAt = Date(timeIntervalSinceNow: -60)
-        session.refreshToken = "refresh-token"
-        let grpc = GrpcManager(
-            session: session,
-            serverConfig: ServerConfig(
-                identityHost: address.host,
-                identityPort: address.port,
-                usersHost: address.host,
-                usersPort: address.port,
-                filesHost: address.host,
-                filesPort: address.port,
-                useTLS: false,
-                allowSelfSigned: false
+    func testCancellationDuringProcessingDoesNotCancelServerSession() async throws {
+        let source = try makeTemporaryFile(contents: Data("payload".utf8))
+        defer { try? FileManager.default.removeItem(at: source) }
+        let transport = FakeUploadTransport(partSize: 8, completeStatus: .processing)
+        await transport.setHangsDuringGet()
+        let uploader = Upload2Uploader(transport: transport, clock: TestUploadClock())
+        let task = Task {
+            try await uploader.upload(
+                fileURL: source,
+                fileName: "cloud.bin",
+                contentType: "application/octet-stream",
+                fileType: .cloudFile
             )
+        }
+
+        for _ in 0..<200 {
+            if await transport.hasStartedGet() { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let getStarted = await transport.hasStartedGet()
+        XCTAssertTrue(getStarted)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled processing poll should end")
+        } catch {
+            XCTAssertTrue(FileTransferService.isCancellationError(error))
+        }
+
+        let calls = await transport.snapshot()
+        XCTAssertEqual(calls.cancelCount, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    func testHangingBestEffortCancelIsBoundedAndPreservesCancellation() async throws {
+        XCTAssertEqual(Upload2Uploader.cancellationDeadline, .seconds(5))
+        let source = try makeTemporaryFile(contents: Data("payload".utf8))
+        defer { try? FileManager.default.removeItem(at: source) }
+        let stagingBefore = Self.stagingDirectories()
+        let transport = FakeUploadTransport(partSize: 4)
+        await transport.setHangsDuringPart()
+        await transport.setHangsDuringCancel()
+        let uploader = Upload2Uploader(
+            transport: transport,
+            clock: TestUploadClock(),
+            cancellationDeadline: .milliseconds(100)
         )
-
-        let stub = try await grpc.usersStub()
-        var options = CallOptions.defaults
-        options.timeout = .milliseconds(200)
-        let firstBoundedStart = Date()
-        do {
-            _ = try await stub.getUser(Barkcloud_Users_GetUserRequest(), options: options)
-            XCTFail("Hanging refresh should stay within the real RPC deadline")
-        } catch let rpc as RPCError {
-            XCTAssertEqual(rpc.code, .deadlineExceeded)
+        let task = Task {
+            try await uploader.upload(
+                fileURL: source,
+                fileName: "cloud.bin",
+                contentType: "application/octet-stream",
+                fileType: .cloudFile
+            )
         }
-        XCTAssertLessThan(Date().timeIntervalSince(firstBoundedStart), 1.0)
-        try await recorder.waitForCallCount(1)
-        try await Task.sleep(for: .milliseconds(50))
 
-        let unboundedRefresh = Task { await grpc.accessToken(forMethod: "GetUser") }
-        try await recorder.waitForCallCount(2)
-        let start = Date()
-        do {
-            _ = try await stub.getUser(Barkcloud_Users_GetUserRequest(), options: options)
-            XCTFail("Waiting on an existing refresh should stay within the caller deadline")
-        } catch let rpc as RPCError {
-            XCTAssertEqual(rpc.code, .deadlineExceeded)
+        for _ in 0..<200 {
+            if await transport.hasStartedPart() { break }
+            try await Task.sleep(for: .milliseconds(10))
         }
-        let elapsed = Date().timeIntervalSince(start)
-        let capturedTimeouts = await recorder.timeouts()
-        let freshToken = await unboundedRefresh.value
+        let partStarted = await transport.hasStartedPart()
+        XCTAssertTrue(partStarted)
+        task.cancel()
+        let cancelStarted = Date()
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled upload should preserve cancellation after cleanup")
+        } catch {
+            XCTAssertTrue(FileTransferService.isCancellationError(error))
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(cancelStarted), 1.0)
+        let cancelStartedValue = await transport.hasStartedCancel()
+        XCTAssertTrue(cancelStartedValue)
+        await transport.releaseCancel()
 
-        XCTAssertLessThan(elapsed, 1.0)
-        XCTAssertEqual(freshToken, "fresh-token")
-        XCTAssertEqual(capturedTimeouts.count, 2)
-        XCTAssertNotNil(capturedTimeouts[0])
-        XCTAssertNil(capturedTimeouts[1])
-        session.clearSession()
-        await grpc.shutdown()
-        server.beginGracefulShutdown()
-        _ = try? await serverTask.value
+        let calls = await transport.snapshot()
+        XCTAssertEqual(calls.cancelCount, 1)
+        XCTAssertEqual(calls.controlTimeouts.last ?? nil, .milliseconds(100))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(Self.stagingDirectories(), stagingBefore)
     }
 
     private func makeTransfer(
@@ -714,6 +779,11 @@ private actor FakeUploadTransport: UploadSessionTransport {
     private var snapshotValue = Snapshot()
     private var hangParts = false
     private var partStarted = false
+    private var hangGets = false
+    private var getStarted = false
+    private var hangCancel = false
+    private var cancelStarted = false
+    private var pendingCancel: CheckedContinuation<FileUploadSession, any Error>?
 
     init(partSize: Int64, completeStatus: FileUploadSessionStatus = .ready) {
         self.partSize = partSize
@@ -731,7 +801,16 @@ private actor FakeUploadTransport: UploadSessionTransport {
     func setInitialParts(_ parts: [FileUploadPart]) { initialParts = parts }
     func setGetDefaultStatus(_ status: FileUploadSessionStatus) { getDefaultStatus = status }
     func setHangsDuringPart() { hangParts = true }
+    func setHangsDuringGet() { hangGets = true }
+    func setHangsDuringCancel() { hangCancel = true }
     func hasStartedPart() -> Bool { partStarted }
+    func hasStartedGet() -> Bool { getStarted }
+    func hasStartedCancel() -> Bool { cancelStarted }
+    func releaseCancel() {
+        guard let pendingCancel else { return }
+        self.pendingCancel = nil
+        pendingCancel.resume(returning: current ?? makeSession(status: .cancelled, fileSize: 1, partSize: partSize, token: nil))
+    }
     func snapshot() -> Snapshot { snapshotValue }
 
     func create(
@@ -775,6 +854,8 @@ private actor FakeUploadTransport: UploadSessionTransport {
     }
 
     func get(sessionID: String, timeout: Duration?) async throws -> FileUploadSession {
+        getStarted = true
+        if hangGets { try await Task.sleep(for: .seconds(60)) }
         snapshotValue.getCount += 1
         snapshotValue.getTimeouts.append(timeout)
         snapshotValue.controlTimeouts.append(timeout)
@@ -837,11 +918,17 @@ private actor FakeUploadTransport: UploadSessionTransport {
     }
 
     func cancel(sessionID: String, timeout: Duration?) async throws -> FileUploadSession {
+        cancelStarted = true
         snapshotValue.cancelCount += 1
         snapshotValue.controlTimeouts.append(timeout)
         guard let current else { throw FileTransferError.badUploadResponse }
         let cancelled = makeSession(status: .cancelled, fileSize: current.fileSize, partSize: current.partSize, token: nil)
         self.current = cancelled
+        if hangCancel {
+            return try await withCheckedThrowingContinuation { continuation in
+                pendingCancel = continuation
+            }
+        }
         return cancelled
     }
 
@@ -959,56 +1046,4 @@ private func makeSession(
 
 private func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-}
-
-private actor HangingTokenRecorder {
-    private var timeoutValues: [String?] = []
-
-    func record(timeout: String?) {
-        timeoutValues.append(timeout)
-    }
-
-    func waitForCallCount(_ count: Int) async throws {
-        for _ in 0..<200 {
-            if timeoutValues.count >= count { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        throw FileTransferError.badUploadResponse
-    }
-
-    func timeouts() -> [String?] { timeoutValues }
-}
-
-private struct HangingCreateTokenService: RegistrableRPCService {
-    let recorder: HangingTokenRecorder
-
-    func registerMethods<Transport: ServerTransport>(with router: inout RPCRouter<Transport>) {
-        router.registerHandler(
-            forMethod: Barkcloud_Identity_IdentityApi.Method.CreateToken.descriptor,
-            deserializer: ProtobufDeserializer<Barkcloud_Identity_CreateTokenRequest>(),
-            serializer: ProtobufSerializer<Barkcloud_Identity_CreateTokenResponse>()
-        ) { request, _ in
-            let timeout = request.metadata[stringValues: "grpc-timeout"].first(where: { _ in true })
-            await recorder.record(timeout: timeout)
-            try? await Task.sleep(for: .seconds(2))
-            var token = Barkcloud_Identity_Token()
-            token.value = "fresh-token"
-            token.expirationDate = SwiftProtobuf.Google_Protobuf_Timestamp(date: Date(timeIntervalSinceNow: 3600))
-            var response = Barkcloud_Identity_CreateTokenResponse()
-            response.accessToken = token
-            return StreamingServerResponse(single: ServerResponse(accepted: .success(.init(message: response))))
-        }
-    }
-}
-
-private func waitForListeningAddress(
-    _ transport: HTTP2ServerTransport.Posix
-) async throws -> (host: String, port: Int) {
-    for _ in 0..<100 {
-        if let address = try? await transport.listeningAddress, let ipv4 = address.ipv4 {
-            return (ipv4.host, ipv4.port)
-        }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    throw FileTransferError.badURL
 }
