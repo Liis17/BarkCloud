@@ -120,7 +120,7 @@ public enum GrpcEndpoint {
 
     private static var scheme: String { useTLS ? "https" : "http" }
 
-    /// База HTTP-раздачи файлов через nginx (`/web/download/{id}`, `/web/upload/{id}`).
+    /// База HTTP-раздачи файлов через nginx (`/web/download/{id}`).
     public static var filesWebBase: String { "\(scheme)://\(filesHost):\(filesPort)/web" }
 
     /// Адрес веб-UI (порт 443) — туда ведут публичные share-ссылки `/s/{token}`.
@@ -176,6 +176,7 @@ public actor GrpcManager {
     public typealias DynamicFolderClient = Barkcloud_Files_DynamicFolderApi.Client<Transport>
 
     private let session: SessionStore
+    private let serverConfigOverride: ServerConfig?
     private var clients: [String: GRPCClient<Transport>] = [:]
     private var runTasks: [String: Task<Void, Error>] = [:]
 
@@ -189,41 +190,79 @@ public actor GrpcManager {
 
     public init(session: SessionStore) {
         self.session = session
+        self.serverConfigOverride = nil
     }
 
+    init(session: SessionStore, serverConfig: ServerConfig) {
+        self.session = session
+        self.serverConfigOverride = serverConfig
+    }
+
+    private var serverConfig: ServerConfig { serverConfigOverride ?? .current }
+
     public func identityStub() async throws -> IdentityClient {
-        IdentityClient(wrapping: try await client(host: GrpcEndpoint.identityHost, port: GrpcEndpoint.identityPort))
+        let config = serverConfig
+        return IdentityClient(wrapping: try await client(
+            host: config.identityHost,
+            port: config.identityPort,
+            config: config
+        ))
     }
 
     public func usersStub() async throws -> UsersClient {
-        UsersClient(wrapping: try await client(host: GrpcEndpoint.usersHost, port: GrpcEndpoint.usersPort))
+        let config = serverConfig
+        return UsersClient(wrapping: try await client(
+            host: config.usersHost,
+            port: config.usersPort,
+            config: config
+        ))
     }
 
     public func filesStub() async throws -> FilesClient {
-        FilesClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
+        let config = serverConfig
+        return FilesClient(wrapping: try await client(
+            host: config.filesHost,
+            port: config.filesPort,
+            config: config
+        ))
     }
 
     public func cloudStub() async throws -> CloudClient {
-        CloudClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
+        let config = serverConfig
+        return CloudClient(wrapping: try await client(
+            host: config.filesHost,
+            port: config.filesPort,
+            config: config
+        ))
     }
 
     public func albumStub() async throws -> AlbumClient {
-        AlbumClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
+        let config = serverConfig
+        return AlbumClient(wrapping: try await client(
+            host: config.filesHost,
+            port: config.filesPort,
+            config: config
+        ))
     }
 
     public func dynamicFolderStub() async throws -> DynamicFolderClient {
-        DynamicFolderClient(wrapping: try await client(host: GrpcEndpoint.filesHost, port: GrpcEndpoint.filesPort))
+        let config = serverConfig
+        return DynamicFolderClient(wrapping: try await client(
+            host: config.filesHost,
+            port: config.filesPort,
+            config: config
+        ))
     }
 
-    private func client(host: String, port: Int) async throws -> GRPCClient<Transport> {
-        let key = "\(host):\(port)"
+    private func client(host: String, port: Int, config: ServerConfig) async throws -> GRPCClient<Transport> {
+        let key = "\(host):\(port):\(config.useTLS):\(config.allowSelfSigned)"
         if let existing = clients[key] { return existing }
 
         let transportSecurity: Transport.TransportSecurity
-        if GrpcEndpoint.useTLS {
-            transportSecurity = .tls { config in
-                if GrpcEndpoint.allowSelfSigned {
-                    config.serverCertificateVerification = .noVerification
+        if config.useTLS {
+            transportSecurity = .tls { tlsConfig in
+                if config.allowSelfSigned {
+                    tlsConfig.serverCertificateVerification = .noVerification
                 }
             }
         } else {
@@ -236,8 +275,12 @@ public actor GrpcManager {
         )
 
         let interceptors: [any ClientInterceptor] = [
-            AuthInterceptor(accessTokenForMethod: { [weak self] method in
-                await self?.accessToken(forMethod: method)
+            AuthInterceptor(accessTokenForMethod: { [weak self] method, timeout in
+                guard let self else { return nil }
+                if let timeout {
+                    return try await self.accessToken(forMethod: method, boundedBy: timeout)
+                }
+                return await self.accessToken(forMethod: method)
             }),
             XDeviceInterceptor(),
             XOsInterceptor(),
@@ -275,6 +318,15 @@ public actor GrpcManager {
     public func accessToken(forMethod method: String) async -> String? {
         if Self.unauthenticatedMethods.contains(method) { return nil }
         return await validAccessToken()
+    }
+
+    /// Токен для RPC с ограниченным deadline. Ожидание существующего общего
+    /// refresh тоже ограничено, но сама задача refresh остаётся общей для других RPC.
+    func accessToken(forMethod method: String, boundedBy timeout: Duration) async throws -> String? {
+        if Self.unauthenticatedMethods.contains(method) { return nil }
+        return try await AsyncDeadline.withTimeout(timeout) {
+            await self.validAccessToken()
+        }
     }
 
     /// Возвращает действующий access-токен, обновив его при необходимости.

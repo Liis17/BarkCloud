@@ -2762,6 +2762,19 @@ public enum Barkcloud_Files_CloudApi: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "GetUserMediaStats" metadata.
+        public enum GetUserMediaStats: Sendable {
+            /// Request type for "GetUserMediaStats".
+            public typealias Input = Barkcloud_Files_GetUserMediaStatsRequest
+            /// Response type for "GetUserMediaStats".
+            public typealias Output = Barkcloud_Files_GetUserMediaStatsResponse
+            /// Descriptor for "GetUserMediaStats".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.CloudApi"),
+                method: "GetUserMediaStats",
+                type: .unary
+            )
+        }
         /// Namespace for "DeleteUserMedia" metadata.
         public enum DeleteUserMedia: Sendable {
             /// Request type for "DeleteUserMedia".
@@ -3221,6 +3234,7 @@ public enum Barkcloud_Files_CloudApi: Sendable {
             CreateArchive.descriptor,
             ListUserImages.descriptor,
             ListUserMedia.descriptor,
+            GetUserMediaStats.descriptor,
             DeleteUserMedia.descriptor,
             GetPath.descriptor,
             ListFileActivity.descriptor,
@@ -3549,6 +3563,24 @@ extension Barkcloud_Files_CloudApi {
             request: GRPCCore.StreamingServerRequest<Barkcloud_Files_ListUserMediaRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse>
+
+        /// Handle the "GetUserMediaStats" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Полное количество и размер фото или видео в галерее
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_GetUserMediaStatsRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_GetUserMediaStatsResponse` messages.
+        func getUserMediaStats(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUserMediaStatsResponse>
 
         /// Handle the "DeleteUserMedia" method.
         ///
@@ -4441,6 +4473,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse>
 
+        /// Handle the "GetUserMediaStats" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Полное количество и размер фото или видео в галерее
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetUserMediaStatsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_GetUserMediaStatsResponse` message.
+        func getUserMediaStats(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUserMediaStatsResponse>
+
         /// Handle the "DeleteUserMedia" method.
         ///
         /// > Source IDL Documentation:
@@ -5330,6 +5380,24 @@ extension Barkcloud_Files_CloudApi {
             context: GRPCCore.ServerContext
         ) async throws -> Barkcloud_Files_ListUserMediaResponse
 
+        /// Handle the "GetUserMediaStats" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Полное количество и размер фото или видео в галерее
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_GetUserMediaStatsRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_GetUserMediaStatsResponse` to respond with.
+        func getUserMediaStats(
+            request: Barkcloud_Files_GetUserMediaStatsRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_GetUserMediaStatsResponse
+
         /// Handle the "DeleteUserMedia" method.
         ///
         /// > Source IDL Documentation:
@@ -6114,6 +6182,17 @@ extension Barkcloud_Files_CloudApi.StreamingServiceProtocol {
             }
         )
         router.registerHandler(
+            forMethod: Barkcloud_Files_CloudApi.Method.GetUserMediaStats.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetUserMediaStatsRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetUserMediaStatsResponse>(),
+            handler: { request, context in
+                try await self.getUserMediaStats(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_CloudApi.Method.DeleteUserMedia.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_DeleteUserMediaRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_CloudEmpty>(),
@@ -6652,6 +6731,17 @@ extension Barkcloud_Files_CloudApi.ServiceProtocol {
         context: GRPCCore.ServerContext
     ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_ListUserMediaResponse> {
         let response = try await self.listUserMedia(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func getUserMediaStats(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_GetUserMediaStatsResponse> {
+        let response = try await self.getUserMediaStats(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
         )
@@ -7224,6 +7314,19 @@ extension Barkcloud_Files_CloudApi.SimpleServiceProtocol {
     ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse> {
         return GRPCCore.ServerResponse<Barkcloud_Files_ListUserMediaResponse>(
             message: try await self.listUserMedia(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func getUserMediaStats(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_GetUserMediaStatsResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_GetUserMediaStatsResponse>(
+            message: try await self.getUserMediaStats(
                 request: request.message,
                 context: context
             ),
@@ -8026,6 +8129,29 @@ extension Barkcloud_Files_CloudApi {
             deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_ListUserMediaResponse>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_ListUserMediaResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetUserMediaStats" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Полное количество и размер фото или видео в галерее
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetUserMediaStatsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetUserMediaStatsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetUserMediaStatsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getUserMediaStats<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetUserMediaStatsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUserMediaStatsResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserMediaStatsResponse>) async throws -> Result
         ) async throws -> Result where Result: Sendable
 
         /// Call the "DeleteUserMedia" method.
@@ -9330,6 +9456,40 @@ extension Barkcloud_Files_CloudApi {
             try await self.client.unary(
                 request: request,
                 descriptor: Barkcloud_Files_CloudApi.Method.ListUserMedia.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetUserMediaStats" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Полное количество и размер фото или видео в галерее
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_GetUserMediaStatsRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_GetUserMediaStatsRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_GetUserMediaStatsResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getUserMediaStats<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_GetUserMediaStatsRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_GetUserMediaStatsResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserMediaStatsResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_CloudApi.Method.GetUserMediaStats.descriptor,
                 serializer: serializer,
                 deserializer: deserializer,
                 options: options,
@@ -10933,6 +11093,35 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "GetUserMediaStats" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Полное количество и размер фото или видео в галерее
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_GetUserMediaStatsRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getUserMediaStats<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_GetUserMediaStatsRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserMediaStatsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getUserMediaStats(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetUserMediaStatsRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetUserMediaStatsResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "DeleteUserMedia" method.
     ///
     /// > Source IDL Documentation:
@@ -12418,6 +12607,39 @@ extension Barkcloud_Files_CloudApi.ClientProtocol {
         )
     }
 
+    /// Call the "GetUserMediaStats" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Полное количество и размер фото или видео в галерее
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getUserMediaStats<Result>(
+        _ message: Barkcloud_Files_GetUserMediaStatsRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_GetUserMediaStatsResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_GetUserMediaStatsRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getUserMediaStats(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "DeleteUserMedia" method.
     ///
     /// > Source IDL Documentation:
@@ -13550,6 +13772,71 @@ public enum Barkcloud_Files_FilesServerApi: Sendable {
     public static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi")
     /// Namespace for method metadata.
     public enum Method: Sendable {
+        /// Namespace for "BeginStorageCutover" metadata.
+        public enum BeginStorageCutover: Sendable {
+            /// Request type for "BeginStorageCutover".
+            public typealias Input = Barkcloud_Files_StorageCutoverRequest
+            /// Response type for "BeginStorageCutover".
+            public typealias Output = Barkcloud_Files_StorageCutoverStatus
+            /// Descriptor for "BeginStorageCutover".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "BeginStorageCutover",
+                type: .unary
+            )
+        }
+        /// Namespace for "FreezeStorageCutover" metadata.
+        public enum FreezeStorageCutover: Sendable {
+            /// Request type for "FreezeStorageCutover".
+            public typealias Input = Barkcloud_Files_StorageCutoverIdRequest
+            /// Response type for "FreezeStorageCutover".
+            public typealias Output = Barkcloud_Files_StorageCutoverStatus
+            /// Descriptor for "FreezeStorageCutover".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "FreezeStorageCutover",
+                type: .unary
+            )
+        }
+        /// Namespace for "MarkStorageCutoverApplying" metadata.
+        public enum MarkStorageCutoverApplying: Sendable {
+            /// Request type for "MarkStorageCutoverApplying".
+            public typealias Input = Barkcloud_Files_StorageCutoverIdRequest
+            /// Response type for "MarkStorageCutoverApplying".
+            public typealias Output = Barkcloud_Files_StorageCutoverStatus
+            /// Descriptor for "MarkStorageCutoverApplying".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "MarkStorageCutoverApplying",
+                type: .unary
+            )
+        }
+        /// Namespace for "CancelStorageCutover" metadata.
+        public enum CancelStorageCutover: Sendable {
+            /// Request type for "CancelStorageCutover".
+            public typealias Input = Barkcloud_Files_StorageCutoverIdRequest
+            /// Response type for "CancelStorageCutover".
+            public typealias Output = Barkcloud_Files_StorageCutoverStatus
+            /// Descriptor for "CancelStorageCutover".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "CancelStorageCutover",
+                type: .unary
+            )
+        }
+        /// Namespace for "GetStorageCutovers" metadata.
+        public enum GetStorageCutovers: Sendable {
+            /// Request type for "GetStorageCutovers".
+            public typealias Input = Barkcloud_Files_StorageCutoverIdRequest
+            /// Response type for "GetStorageCutovers".
+            public typealias Output = Barkcloud_Files_StorageCutoversResponse
+            /// Descriptor for "GetStorageCutovers".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "barkcloud.files.FilesServerApi"),
+                method: "GetStorageCutovers",
+                type: .unary
+            )
+        }
         /// Namespace for "GetFileData" metadata.
         public enum GetFileData: Sendable {
             /// Request type for "GetFileData".
@@ -13656,6 +13943,11 @@ public enum Barkcloud_Files_FilesServerApi: Sendable {
         }
         /// Descriptors for all methods in the "barkcloud.files.FilesServerApi" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
+            BeginStorageCutover.descriptor,
+            FreezeStorageCutover.descriptor,
+            MarkStorageCutoverApplying.descriptor,
+            CancelStorageCutover.descriptor,
+            GetStorageCutovers.descriptor,
             GetFileData.descriptor,
             GetFilesData.descriptor,
             GetUserStorageInfoServer.descriptor,
@@ -13689,6 +13981,76 @@ extension Barkcloud_Files_FilesServerApi {
     /// Where possible, prefer using the stricter, less-verbose ``ServiceProtocol``
     /// or ``SimpleServiceProtocol`` instead.
     public protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {
+        /// Handle the "BeginStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_StorageCutoverRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_StorageCutoverStatus` messages.
+        func beginStorageCutover(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "FreezeStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_StorageCutoverStatus` messages.
+        func freezeStorageCutover(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "MarkStorageCutoverApplying" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_StorageCutoverStatus` messages.
+        func markStorageCutoverApplying(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "CancelStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_StorageCutoverStatus` messages.
+        func cancelStorageCutover(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "GetStorageCutovers" method.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `Barkcloud_Files_StorageCutoversResponse` messages.
+        func getStorageCutovers(
+            request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoversResponse>
+
         /// Handle the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -13842,6 +14204,76 @@ extension Barkcloud_Files_FilesServerApi {
     /// the ``SimpleServiceProtocol``. If you need fine grained control over your RPCs then
     /// use ``StreamingServiceProtocol``.
     public protocol ServiceProtocol: Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
+        /// Handle the "BeginStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_StorageCutoverStatus` message.
+        func beginStorageCutover(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "FreezeStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_StorageCutoverStatus` message.
+        func freezeStorageCutover(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "MarkStorageCutoverApplying" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_StorageCutoverStatus` message.
+        func markStorageCutoverApplying(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "CancelStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_StorageCutoverStatus` message.
+        func cancelStorageCutover(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>
+
+        /// Handle the "GetStorageCutovers" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `Barkcloud_Files_StorageCutoversResponse` message.
+        func getStorageCutovers(
+            request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoversResponse>
+
         /// Handle the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -13993,6 +14425,76 @@ extension Barkcloud_Files_FilesServerApi {
     /// doesn't provide access to request or response metadata. If you need access to these
     /// then use ``ServiceProtocol`` instead.
     public protocol SimpleServiceProtocol: Barkcloud_Files_FilesServerApi.ServiceProtocol {
+        /// Handle the "BeginStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_StorageCutoverRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_StorageCutoverStatus` to respond with.
+        func beginStorageCutover(
+            request: Barkcloud_Files_StorageCutoverRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_StorageCutoverStatus
+
+        /// Handle the "FreezeStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_StorageCutoverStatus` to respond with.
+        func freezeStorageCutover(
+            request: Barkcloud_Files_StorageCutoverIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_StorageCutoverStatus
+
+        /// Handle the "MarkStorageCutoverApplying" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_StorageCutoverStatus` to respond with.
+        func markStorageCutoverApplying(
+            request: Barkcloud_Files_StorageCutoverIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_StorageCutoverStatus
+
+        /// Handle the "CancelStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_StorageCutoverStatus` to respond with.
+        func cancelStorageCutover(
+            request: Barkcloud_Files_StorageCutoverIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_StorageCutoverStatus
+
+        /// Handle the "GetStorageCutovers" method.
+        ///
+        /// - Parameters:
+        ///   - request: A `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `Barkcloud_Files_StorageCutoversResponse` to respond with.
+        func getStorageCutovers(
+            request: Barkcloud_Files_StorageCutoverIdRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> Barkcloud_Files_StorageCutoversResponse
+
         /// Handle the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -14144,6 +14646,61 @@ extension Barkcloud_Files_FilesServerApi {
 extension Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
     public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {
         router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.BeginStorageCutover.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverStatus>(),
+            handler: { request, context in
+                try await self.beginStorageCutover(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.FreezeStorageCutover.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverStatus>(),
+            handler: { request, context in
+                try await self.freezeStorageCutover(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.MarkStorageCutoverApplying.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverStatus>(),
+            handler: { request, context in
+                try await self.markStorageCutoverApplying(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.CancelStorageCutover.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverStatus>(),
+            handler: { request, context in
+                try await self.cancelStorageCutover(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: Barkcloud_Files_FilesServerApi.Method.GetStorageCutovers.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoversResponse>(),
+            handler: { request, context in
+                try await self.getStorageCutovers(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
             forMethod: Barkcloud_Files_FilesServerApi.Method.GetFileData.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_GetFileDataRequest>(),
             serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_GetFileDataResponse>(),
@@ -14237,6 +14794,61 @@ extension Barkcloud_Files_FilesServerApi.StreamingServiceProtocol {
 // Default implementation of streaming methods from 'StreamingServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
+    public func beginStorageCutover(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        let response = try await self.beginStorageCutover(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func freezeStorageCutover(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        let response = try await self.freezeStorageCutover(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func markStorageCutoverApplying(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        let response = try await self.markStorageCutoverApplying(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func cancelStorageCutover(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        let response = try await self.cancelStorageCutover(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func getStorageCutovers(
+        request: GRPCCore.StreamingServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<Barkcloud_Files_StorageCutoversResponse> {
+        let response = try await self.getStorageCutovers(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
     public func getFileData(
         request: GRPCCore.StreamingServerRequest<Barkcloud_Files_GetFileDataRequest>,
         context: GRPCCore.ServerContext
@@ -14329,6 +14941,71 @@ extension Barkcloud_Files_FilesServerApi.ServiceProtocol {
 // Default implementation of methods from 'ServiceProtocol'.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.SimpleServiceProtocol {
+    public func beginStorageCutover(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>(
+            message: try await self.beginStorageCutover(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func freezeStorageCutover(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>(
+            message: try await self.freezeStorageCutover(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func markStorageCutoverApplying(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>(
+            message: try await self.markStorageCutoverApplying(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func cancelStorageCutover(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoverStatus>(
+            message: try await self.cancelStorageCutover(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func getStorageCutovers(
+        request: GRPCCore.ServerRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoversResponse> {
+        return GRPCCore.ServerResponse<Barkcloud_Files_StorageCutoversResponse>(
+            message: try await self.getStorageCutovers(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
     public func getFileData(
         request: GRPCCore.ServerRequest<Barkcloud_Files_GetFileDataRequest>,
         context: GRPCCore.ServerContext
@@ -14443,6 +15120,101 @@ extension Barkcloud_Files_FilesServerApi {
     /// You don't need to implement this protocol directly, use the generated
     /// implementation, ``Client``.
     public protocol ClientProtocol: Sendable {
+        /// Call the "BeginStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func beginStorageCutover<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "FreezeStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func freezeStorageCutover<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "MarkStorageCutoverApplying" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func markStorageCutoverApplying<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "CancelStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func cancelStorageCutover<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetStorageCutovers" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoversResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getStorageCutovers<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoversResponse>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoversResponse>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
         /// Call the "GetFileData" method.
         ///
         /// > Source IDL Documentation:
@@ -14642,6 +15414,156 @@ extension Barkcloud_Files_FilesServerApi {
         ///   - client: A `GRPCCore.GRPCClient` providing a communication channel to the service.
         public init(wrapping client: GRPCCore.GRPCClient<Transport>) {
             self.client = client
+        }
+
+        /// Call the "BeginStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func beginStorageCutover<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.BeginStorageCutover.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "FreezeStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func freezeStorageCutover<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.FreezeStorageCutover.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "MarkStorageCutoverApplying" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func markStorageCutoverApplying<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.MarkStorageCutoverApplying.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "CancelStorageCutover" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoverStatus` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func cancelStorageCutover<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoverStatus>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.CancelStorageCutover.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "GetStorageCutovers" method.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+        ///   - serializer: A serializer for `Barkcloud_Files_StorageCutoverIdRequest` messages.
+        ///   - deserializer: A deserializer for `Barkcloud_Files_StorageCutoversResponse` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getStorageCutovers<Result>(
+            request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+            serializer: some GRPCCore.MessageSerializer<Barkcloud_Files_StorageCutoverIdRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<Barkcloud_Files_StorageCutoversResponse>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoversResponse>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Barkcloud_Files_FilesServerApi.Method.GetStorageCutovers.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
         }
 
         /// Call the "GetFileData" method.
@@ -14921,6 +15843,131 @@ extension Barkcloud_Files_FilesServerApi {
 // Helpers providing default arguments to 'ClientProtocol' methods.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.ClientProtocol {
+    /// Call the "BeginStorageCutover" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func beginStorageCutover<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.beginStorageCutover(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverStatus>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "FreezeStorageCutover" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func freezeStorageCutover<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.freezeStorageCutover(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverStatus>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "MarkStorageCutoverApplying" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func markStorageCutoverApplying<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.markStorageCutoverApplying(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverStatus>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CancelStorageCutover" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func cancelStorageCutover<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.cancelStorageCutover(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoverStatus>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetStorageCutovers" method.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `Barkcloud_Files_StorageCutoverIdRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getStorageCutovers<Result>(
+        request: GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoversResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getStorageCutovers(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<Barkcloud_Files_StorageCutoverIdRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Barkcloud_Files_StorageCutoversResponse>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "GetFileData" method.
     ///
     /// > Source IDL Documentation:
@@ -15157,6 +16204,151 @@ extension Barkcloud_Files_FilesServerApi.ClientProtocol {
 // Helpers providing sugared APIs for 'ClientProtocol' methods.
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
 extension Barkcloud_Files_FilesServerApi.ClientProtocol {
+    /// Call the "BeginStorageCutover" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func beginStorageCutover<Result>(
+        _ message: Barkcloud_Files_StorageCutoverRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.beginStorageCutover(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "FreezeStorageCutover" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func freezeStorageCutover<Result>(
+        _ message: Barkcloud_Files_StorageCutoverIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.freezeStorageCutover(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "MarkStorageCutoverApplying" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func markStorageCutoverApplying<Result>(
+        _ message: Barkcloud_Files_StorageCutoverIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.markStorageCutoverApplying(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "CancelStorageCutover" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func cancelStorageCutover<Result>(
+        _ message: Barkcloud_Files_StorageCutoverIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoverStatus>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.cancelStorageCutover(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetStorageCutovers" method.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getStorageCutovers<Result>(
+        _ message: Barkcloud_Files_StorageCutoverIdRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Barkcloud_Files_StorageCutoversResponse>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<Barkcloud_Files_StorageCutoverIdRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getStorageCutovers(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
     /// Call the "GetFileData" method.
     ///
     /// > Source IDL Documentation:
