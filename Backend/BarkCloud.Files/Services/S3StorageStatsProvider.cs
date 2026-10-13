@@ -16,6 +16,7 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
     private readonly S3BucketRegistry _registry;
     private readonly IReadOnlyList<StorageQuotaGroupOptions> _groups;
     private readonly StorageStatsCache<S3StorageStats> _cache;
+    private readonly ILogger<S3StorageStatsProvider> _logger;
 
     public S3StorageStatsProvider(
         S3BucketRegistry registry,
@@ -25,6 +26,7 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
         IHostApplicationLifetime? lifetime = null)
     {
         _registry = registry;
+        _logger = logger;
         _groups = configuration.GetSection("StorageQuotaGroups").GetChildren()
             .Select(section => new StorageQuotaGroupOptions
             {
@@ -97,15 +99,32 @@ public sealed class S3StorageStatsProvider : IS3StorageStatsProvider
             return S3StorageStats.Unavailable;
 
         var measured = await Task.WhenAll(bucketsToMeasure.Select(async key =>
-            (Key: key, UsedBytes: await GetBucketSizeAsync(buckets[key], cancellationToken))));
-        var usedByBucket = measured.ToDictionary(item => item.Key, item => item.UsedBytes, PhysicalBucketComparer.Instance);
+        {
+            try
+            {
+                return (Key: key, UsedBytes: (long?)await GetBucketSizeAsync(buckets[key], cancellationToken));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (!buckets[key].IsActive && groupedBuckets.Contains(key))
+            {
+                _logger.LogWarning(exception,
+                    "Не удалось измерить S3-бакет {BucketName} без активного не-legacy профиля; учёт группы будет неполным.",
+                    buckets[key].Name);
+                return (Key: key, UsedBytes: (long?)null);
+            }
+        }));
+        var usedByBucket = measured.Where(item => item.UsedBytes.HasValue)
+            .ToDictionary(item => item.Key, item => item.UsedBytes!.Value, PhysicalBucketComparer.Instance);
 
         var results = groups.Select(group => new S3QuotaGroupStats(
                 group.Id,
                 group.Name,
                 SumUsedBytes(group.Buckets.Where(usedByBucket.ContainsKey), usedByBucket),
                 group.QuotaBytes,
-                group.Buckets.Count(key => !buckets.ContainsKey(key)),
+                group.Buckets.Count(key => !buckets.ContainsKey(key) || !usedByBucket.ContainsKey(key)),
                 false))
             .ToList();
         if (ungroupedBuckets.Length > 0)

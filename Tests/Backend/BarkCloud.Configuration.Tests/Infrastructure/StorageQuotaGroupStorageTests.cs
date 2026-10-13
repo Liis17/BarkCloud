@@ -97,6 +97,50 @@ public sealed class StorageQuotaGroupStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_RejectsNameLongerThan100Characters()
+    {
+        var act = () => _storage.SaveAsync(null, new string('a', 101), 0, [], "admin", "web");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Название группы не должно превышать 100 символов.");
+    }
+
+    [Fact]
+    public async Task Save_RejectsNegativeQuota()
+    {
+        var act = () => _storage.SaveAsync(null, "Archive", -1, [], "admin", "web");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Квота группы не может быть отрицательной.");
+    }
+
+    [Fact]
+    public async Task Save_RejectsDuplicateBucketInRequest()
+    {
+        await _profiles.SaveAsync(Profile("images", "https://s3.example", "photos"), "admin", "web");
+        var bucket = Bucket("https://s3.example", "photos");
+
+        var act = () => _storage.SaveAsync(null, "Archive", 0, [bucket, bucket], "admin", "web");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Бакет photos указан несколько раз.");
+    }
+
+    [Fact]
+    public async Task Save_AllowsMovingBucketAfterRemovingItFromPreviousGroup()
+    {
+        await _profiles.SaveAsync(Profile("images", "https://s3.example", "photos"), "admin", "web");
+        var bucket = Bucket("https://s3.example", "photos");
+        var firstGroup = await _storage.SaveAsync(null, "Primary", 0, [bucket], "admin", "web");
+        await _storage.SaveAsync(firstGroup.Id, "Primary", 0, [], "admin", "web");
+
+        var secondGroup = await _storage.SaveAsync(null, "Secondary", 0, [bucket], "admin", "web");
+
+        secondGroup.Buckets.Should().ContainSingle(item => item.BucketName == "photos");
+        (await _storage.GetAllAsync()).Should().ContainSingle(group => group.Name == "Secondary");
+    }
+
+    [Fact]
     public async Task Delete_CascadesToBuckets()
     {
         await _profiles.SaveAsync(Profile("images", "https://s3.example", "photos"), "admin", "web");

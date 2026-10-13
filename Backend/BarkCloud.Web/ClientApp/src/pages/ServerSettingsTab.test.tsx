@@ -67,6 +67,14 @@ describe('ServerSettingsTab', () => {
       storageGroups: [{ id: 'grp-used', name: 'Уже занята', quotaBytes: '0', buckets: [{ serviceUrl: 'http://minio:9000', bucketName: 'cloud-universal' }] }],
     };
     const fetchMock = mockServer(data);
+    fetchMock.mockImplementation((path, init) => {
+      if (path.endsWith('/storage/groups/save')) {
+        const body = JSON.parse(init!.body as string) as { name: string; buckets: { serviceUrl: string; bucketName: string }[] };
+        data.storageGroups.push({ id: 'grp-new', name: body.name, quotaBytes: '3221225472', buckets: body.buckets });
+      }
+      return Promise.resolve(jsonResponse(path === '/api/settings/server' ? structuredClone(data)
+        : { success: true, message: 'Сохранено', restartTargets: ['files'] }));
+    });
     render(<ServerSettingsTab />);
     await expandAll();
     expect(screen.queryByLabelText('Квота S3 бакета')).toBeNull();
@@ -75,7 +83,7 @@ describe('ServerSettingsTab', () => {
     fireEvent.change(screen.getByLabelText('Квота группы S3'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('combobox', { name: 'Добавить бакет' }));
     expect(screen.queryByRole('option', { name: /cloud-universal/ })).toBeNull();
-    const freeBucket = screen.getByRole('option', { name: /free-bucket · s3.example · Изображения · неактивен · legacy/ });
+    const freeBucket = screen.getByRole('option', { name: /free-bucket · s3.example · Изображения · legacy/ });
     expect(freeBucket).toBeTruthy();
     fireEvent.click(freeBucket);
     expect(screen.getByText('free-bucket')).toBeTruthy();
@@ -86,6 +94,7 @@ describe('ServerSettingsTab', () => {
     const call = fetchMock.mock.calls.find(([path]) => path.endsWith('/storage/groups/save'));
     expect(JSON.parse(call?.[1]?.body as string)).toMatchObject({ id: null, name: 'Фото', quotaValue: '3', quotaUnit: 'gb',
       buckets: [{ serviceUrl: 'https://s3.example', bucketName: 'free-bucket' }] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /Фото/ }).getAttribute('aria-pressed')).toBe('true'));
     expect(screen.getByText(/Требуется перезапуск: files/)).toBeTruthy();
   });
   it('сворачивает группы, раскрывает совпадения и восстанавливает прежнее раскрытие и черновики', async () => {

@@ -103,7 +103,7 @@ export function Sidebar({ profileError = false, storageError = false, statistics
             {s3Pending ? 'Подсчитываем…' : s3State === 'not_configured' ? 'не настроен' : 'недоступно'}
           </span></div>
         </div> : <>
-          {storage.s3Groups.map((group) => {
+          {(storage.s3Groups ?? []).map((group) => {
             const name = group.ungrouped ? 'Без группы' : group.name;
             const used = group.ungrouped ? group.usedLabel : group.hasFiniteQuota
               ? `${group.usedLabel} / ${group.quotaLabel}` : `${group.usedLabel} · безлимит`;

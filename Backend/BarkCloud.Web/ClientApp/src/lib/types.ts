@@ -281,7 +281,7 @@ export interface S3GroupUsage {
 }
 export interface SidebarStorage {
   usedLabel: string; totalLabel: string; percent: number; otherPct: number; s3Pct: number;
-  s3Groups: S3GroupUsage[]; allS3StatsAvailable: boolean;
+  s3Groups?: S3GroupUsage[]; allS3StatsAvailable: boolean;
   state?: StatsState; updatedAt?: string | null;
   allS3State?: StatsState; allS3UpdatedAt?: string | null;
 }

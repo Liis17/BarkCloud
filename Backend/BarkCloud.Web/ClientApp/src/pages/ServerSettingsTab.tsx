@@ -375,6 +375,7 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
   const [message, setMessage] = React.useState('');
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [confirmation, setConfirmation] = React.useState<Confirmation | null>(null);
+  const [pendingSelectedGroupName, setPendingSelectedGroupName] = React.useState<string | null>(null);
   const selected = creating ? undefined : groups.find((group) => group.id === selectedId) || groups[0];
   const draftKey = creating ? 'new' : selected?.id || 'empty';
   const initial = groupDraft(selected);
@@ -391,8 +392,15 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
   const selectOptions = availableBuckets.map((bucket) => ({
     value: storageBucketKey(bucket),
     label: `${bucket.bucketName} · ${bucketHost(bucket.serviceUrl)} · ${bucket.roles.map((role) => STORAGE_ROLES[role] || role).join(', ')}`
-      + (!bucket.isActive ? ' · неактивен' : '') + (bucket.isLegacy ? ' · legacy' : ''),
+      + (bucket.isLegacy ? ' · legacy' : !bucket.isActive ? ' · неактивен' : ''),
   }));
+  React.useEffect(() => {
+    if (!pendingSelectedGroupName) return;
+    const group = groups.find((item) => item.name === pendingSelectedGroupName);
+    if (!group) return;
+    setSelectedId(group.id);
+    setPendingSelectedGroupName(null);
+  }, [groups, pendingSelectedGroupName]);
   function edit(changes: Partial<StorageGroupDraft>) {
     setDrafts((current) => ({ ...current, [draftKey]: { ...draft, ...changes } }));
     setErrors({});
@@ -408,7 +416,7 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
     setErrors(next);
     return Object.keys(next).length === 0;
   }
-  async function mutate(path: string, body: unknown, deleting = false) {
+  async function mutate(path: string, body: unknown, deleting = false, selectGroupName?: string) {
     setBusy(true);
     try {
       const response = await request<MutationResult>(path, body);
@@ -419,6 +427,7 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
         setDrafts((current) => { const next = { ...current }; delete next[draftKey]; return next; });
         setCreating(false);
         if (deleting) setSelectedId(null);
+        else if (selectGroupName) setPendingSelectedGroupName(selectGroupName);
         await onChanged(response.data?.restartTargets || ['files']);
       }
     } finally { setBusy(false); }
@@ -435,7 +444,7 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
       buckets: draft.buckets,
     };
     setConfirmation({ title: draft.id ? 'Сохранить группу S3?' : 'Создать группу S3?', lines,
-      run: () => mutate('/api/settings/server/storage/groups/save', body) });
+      run: () => mutate('/api/settings/server/storage/groups/save', body, false, draft.id ? undefined : draft.name.trim()) });
   }
   function remove() {
     if (!selected) return;
@@ -454,10 +463,10 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
         {groups.map((group) => <button type="button" key={group.id}
           className={'server-s3-group-choice' + (!creating && (selected?.id === group.id) ? ' selected' : '')}
           aria-pressed={!creating && selected?.id === group.id}
-          onClick={() => { setCreating(false); setSelectedId(group.id); setMessage(''); }}>
+          onClick={() => { setCreating(false); setSelectedId(group.id); setPendingSelectedGroupName(null); setMessage(''); }}>
           <strong><Highlight value={group.name} query={query} /></strong><small>{group.buckets.length} {plural(group.buckets.length, 'бакет', 'бакета', 'бакетов')}</small>
         </button>)}
-        <button type="button" className="btn" onClick={() => { setCreating(true); setSelectedId(null); setMessage(''); }}>Новая группа</button>
+        <button type="button" className="btn" onClick={() => { setCreating(true); setSelectedId(null); setPendingSelectedGroupName(null); setMessage(''); }}>Новая группа</button>
       </div>
       {(selected || creating) && <article className="server-s3-group-editor">
         <div className="storage-group-fields">
