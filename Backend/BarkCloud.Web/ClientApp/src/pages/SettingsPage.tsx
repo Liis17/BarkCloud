@@ -1508,14 +1508,14 @@ function StorageTab({ storage }: { storage: SettingsState['storage'] }) {
         {!s3.allS3StatsAvailable ? <div className="storage-breakdown-row"><span>S3</span><strong>
           {['loading', 'refreshing'].includes(s3.allS3State || '') ? 'Подсчитываем…' : s3.allS3State === 'not_configured' ? 'не настроен' : 'недоступно'}
         </strong></div> : <>
-          {s3.s3Groups.map((group) => {
+          {(s3.s3Groups ?? []).map((group) => {
             const name = group.ungrouped ? 'Без группы' : group.name;
             return <div className="storage-group-usage" key={group.id}>
               <div className="storage-breakdown-row"><span>{name}</span><strong>
                 {group.ungrouped ? group.usedLabel : group.hasFiniteQuota
                   ? `${group.usedLabel} / ${group.quotaLabel}` : `${group.usedLabel} · безлимит`}
               </strong></div>
-              {!group.ungrouped && <div className="bar" role="progressbar" aria-label={`Использование ${name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={group.percent}>
+              {!group.ungrouped && group.hasFiniteQuota && <div className="bar" role="progressbar" aria-label={`Использование ${name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={group.percent}>
                 <div className="bar-fill" style={{ width: `${group.percent}%` }} />
               </div>}
               <div className="storage-group-meta">

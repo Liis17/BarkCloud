@@ -152,6 +152,49 @@ public sealed class S3StorageStatsProviderTests
     }
 
     [Fact]
+    public async Task GetStatsAsync_ReportsFailedLegacyGroupBucketAsUnmeasuredAndKeepsOtherGroupsAvailable()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "legacy-member"), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("unavailable"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "measured-member"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(23, "object"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "second-group"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(40, "object"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "ungrouped"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(50, "object"));
+        var profiles = new[]
+        {
+            (Profile("images-v1", "measured-member", active: true), client.Object),
+            (Profile("images-old-v1", "legacy-member", active: true, legacy: true), client.Object),
+            (Profile("documents-v1", "legacy-member", active: false), client.Object),
+            (Profile("videos-v1", "second-group", active: true), client.Object),
+            (Profile("other-v1", "ungrouped", active: true), client.Object)
+        };
+        var groups = new[]
+        {
+            Group("g1", "Group A", 100, Ref("https://s3.example", "measured-member"), Ref("https://s3.example", "legacy-member")),
+            Group("g2", "Group B", 200, Ref("https://s3.example", "second-group"))
+        };
+
+        var stats = await CreateProvider(profiles, groups).GetStatsAsync();
+
+        stats.IsAvailable.Should().BeTrue();
+        stats.Groups.Should().HaveCount(3);
+        stats.Groups.Should().Contain(group => group.Name == "Group A"
+            && group.UsedBytes == 23 && group.UnmeasuredBuckets == 1);
+        stats.Groups.Should().Contain(group => group.Name == "Group B"
+            && group.UsedBytes == 40 && group.UnmeasuredBuckets == 0);
+        stats.Groups.Should().Contain(group => group.IsUngrouped && group.UsedBytes == 50);
+        client.Verify(s3 => s3.ListObjectsV2Async(
+            It.Is<ListObjectsV2Request>(request => request.BucketName == "legacy-member"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task GetStatsAsync_PreservesZeroQuotaAsUnlimited()
     {
         var client = new Mock<IAmazonS3>();
@@ -195,6 +238,21 @@ public sealed class S3StorageStatsProviderTests
             .ThrowsAsync(new AmazonS3Exception("unreachable"));
 
         var stats = await CreateProvider([(Profile("universal-v1", "shared", active: true), client.Object)]).GetStatsAsync();
+
+        stats.IsAvailable.Should().BeFalse();
+        stats.Groups.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_ReportsUnavailableWhenActiveGroupBucketCannotBeListed()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("unreachable"));
+        var profiles = new[] { (Profile("universal-v1", "active-group", active: true), client.Object) };
+
+        var stats = await CreateProvider(profiles,
+            [Group("g1", "Group", 100, Ref("https://s3.example", "active-group"))]).GetStatsAsync();
 
         stats.IsAvailable.Should().BeFalse();
         stats.Groups.Should().BeEmpty();

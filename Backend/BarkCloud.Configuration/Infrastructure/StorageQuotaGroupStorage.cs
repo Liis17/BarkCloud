@@ -3,6 +3,8 @@ using BarkCloud.GrpcServer;
 
 using Microsoft.EntityFrameworkCore;
 
+using Npgsql;
+
 namespace BarkCloud.Configuration.Infrastructure;
 
 public sealed record StorageQuotaGroupBucketInput(string ServiceUrl, string BucketName);
@@ -121,7 +123,16 @@ public sealed class StorageQuotaGroupStorage
             });
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            exception.GetBaseException() is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            throw new InvalidOperationException(
+                "Группа или бакет уже изменены другим сохранением, обновите страницу", exception);
+        }
         await transaction.CommitAsync(cancellationToken);
         return group;
     }
