@@ -5,7 +5,7 @@ See also: [[Ios/Widgets]], [[Backend/ResumableUpload]], [[Backend/Files]]
 
 ## Назначение
 
-Файловые загрузки приложения, автозагрузка PhotoKit и Share Extension проходят через один resumable-процесс: состояние задания сохраняется в App Group, управляющие вызовы идут по gRPC, части файла отправляются через background `URLSession`.
+Ручные файловые загрузки, автозагрузка PhotoKit и Share Extension используют resumable-очередь: состояние задания сохраняется в App Group, управляющие вызовы идут по gRPC, части файла отправляются через background `URLSession`. Смена аватара — отдельная foreground-операция через общий Upload 2.0 в `BarkCloudKit`; она не ставится в эту очередь.
 
 ## Источники
 
@@ -14,7 +14,7 @@ See also: [[Ios/Widgets]], [[Backend/ResumableUpload]], [[Backend/Files]]
 | `Ios/BarkCloud/BarkCloud/Networking/BackgroundUploadCoordinator.swift` | `BackgroundUploadCoordinator` | Координация очереди, сессий и передачи частей |
 | `Ios/BarkCloud/BarkCloud/Data/Cache/UploadJob.swift`, `Ios/BarkCloud/BarkCloud/Data/Cache/UploadQueueStore.swift` | `UploadSessionJob`, `UploadQueueStore` | Модель и персистентное состояние заданий |
 | `Ios/BarkCloud/BarkCloud/Networking/UploadConstants.swift` | `UploadConstants`, очистка артефактов | App Group, URLSession, staging и миграция очереди |
-| `Mac/BarkCloudKit/Sources/BarkCloudKit/Networking/FileTransferService.swift` | `FileTransferService` | gRPC control plane и построение HTTP URL частей |
+| `Mac/BarkCloudKit/Sources/BarkCloudKit/Networking/FileTransferService.swift` | `FileTransferService` | Общие control RPC Upload 2.0 и foreground API; iOS background coordinator использует свои задания и URLSession |
 | `Ios/BarkCloud/ShareExtension/ShareViewController.swift` | `ShareViewController` | Выбор папки и постановка вложений в очередь |
 | `Ios/BarkCloud/BarkCloud/Features/Gallery/Backup/BackupManager.swift` | `BackupManager` | Автозагрузка медиатеки устройства |
 | `Ios/BarkCloud/BarkCloud/App/AppDelegate.swift`, `Ios/BarkCloud/BarkCloud/Networking/UploadLiveActivityController.swift`, `Ios/BarkCloud/BarkCloud/Networking/UploadProgressObserver.swift` | восстановление задач и состояние UI | Подхват URLSession-событий, retry и отображение прогресса |
@@ -30,6 +30,7 @@ See also: [[Ios/Widgets]], [[Backend/ResumableUpload]], [[Backend/Files]]
 
 - `UploadQueueStore` хранит задания в `UploadSessionQueue.sqlite` внутри App Group. Исходные файлы и временные файлы частей находятся в `UploadStaging`; копирование и SHA-256 используют буфер до 4 МиБ.
 - `FileTransferService` выполняет управляющие операции с upload-сессией по gRPC; части передаются обычным HTTP через фоновую `URLSession`. Серверные ограничения и формат сессии описаны в [[Backend/ResumableUpload]].
+- Foreground-аватар использует `Mac/BarkCloudKit/Sources/BarkCloudKit/Networking/Upload2Uploader.swift`: размер и SHA-256 считаются потоково, части отправляются последовательно через временные файлы и обычный `URLSession.upload(fromFile:)`. Его токен сессии живёт только в памяти.
 - Share Extension использует тот же App Group, Keychain-сессию, очередь и идентификатор background `URLSession`. После выбора папки она ставит вложения в очередь; закрытие расширения не отменяет уже отправленные задачи.
 - До завершения одноразовой миграции старой очереди расширение сохраняет вложения в `ShareInbox`; приложение позднее забирает их и ставит в новую очередь.
 - `AppDelegate` принимает системный completion handler background URLSession и регистрирует `BGProcessingTask` для повторов. При старте и возвращении приложения в активное состояние координатор связывается с незавершёнными передачами.

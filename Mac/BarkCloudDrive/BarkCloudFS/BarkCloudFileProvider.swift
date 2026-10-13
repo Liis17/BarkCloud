@@ -191,8 +191,7 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                         completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                         return
                     }
-                    let data = try Data(contentsOf: src)
-                    let fileID = try await services.cloud.uploadFile(data: data,
+                    let fileID = try await services.cloud.uploadFile(fileURL: src,
                                                                      fileName: name,
                                                                      toDirectory: parentDirID)
                     // entryID назад не возвращается — резолвим листингом. Имя могло
@@ -273,10 +272,9 @@ final class BarkCloudFileProvider: NSObject, NSFileProviderReplicatedExtension {
                             completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                             return
                         }
-                        let data = try Data(contentsOf: src)
                         try? await services.cloud.deleteFileEntry(file.entryID)
                         do {
-                            let fileID = try await services.cloud.uploadFile(data: data,
+                            let fileID = try await services.cloud.uploadFile(fileURL: src,
                                                                              fileName: newName,
                                                                              toDirectory: newParentDirID)
                             guard let entry = try await Self.findEntry(in: services.cloud,

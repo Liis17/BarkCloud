@@ -55,10 +55,8 @@ Web предоставляет соответствующие маршруты: 
   `CompleteUploadSession`. Импорт Torrent использует этот путь и ждёт Ready перед
   AttachFile; подробности внутреннего адреса и таймаутов — [[Backend/Torrent]].
 - Android-клиент загружает аватар как `USER_AVATAR` foreground-потоком и вызывает `UsersApi.SetProfilePicture` только после `READY`; детали ограничения времени и отмены — [[Android/ResumableUpload]].
-  `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Users/UserRepository.swift` также пока использует
-  `GetUploadUrl` для смены аватара и получает HTTP 418.
-  `Mac/BarkCloudKit/Sources/BarkCloudKit/Data/Cloud/CloudRepository.swift` (`uploadFile`)
-  также использует старый маршрут и получает HTTP 418 до миграции.
+- iOS `UserRepository.setAvatar(imageData:fileName:)` использует общий `BarkCloudKit` `Upload2Uploader` с типом `USER_AVATAR`; `SetProfilePicture` вызывается только после `READY`, без `AttachFile`. Foreground-загрузка облачных файлов через `CloudRepository.uploadFile` также использует общий загрузчик; фоновая очередь остаётся отдельным механизмом: [[Ios/IosApp]], [[Ios/BackgroundUpload]].
+- macOS Finder передаёт URL файла в `CloudRepository.uploadFile(fileURL:)`; общий загрузчик потоково считает хеш и отправляет временные файлы частей, после чего прикрепляет файл только со статусом `READY` и `uploadSessionID`. Постоянной очереди Finder нет, поэтому повтор операции начинает новую загрузку: [[Desktop/MacDrive]].
 
 ## Зависимости и взаимодействия
 

@@ -25,8 +25,8 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 Для resumable-передачи вызовите `FilesApi.CreateUploadSession` с уникальным для операции `idempotency_key`, именем, размером, MIME-типом и SHA-256. `file_type` необязателен и по умолчанию равен `CLOUD_FILE`; для аватара передайте `USER_AVATAR`. Сервер вернёт `session_id`, `file_id`, состояние и размер части.
 
 1. Отправляйте части по `PUT /file-upload/{session_id}/parts/{part_number}`.
-2. Для каждой части передайте `Content-Type: application/octet-stream`, точный `Content-Range: bytes start-end/total` и `X-Upload-Token` из ответа.
-3. При прерывании вызовите `ResumeUploadSession`: используйте новый токен и список `uploaded_parts`; отсутствующие части и части с `has_etag=false` отправьте повторно.
+2. Для каждой части передайте `Content-Type: application/octet-stream`, точный `Content-Range: bytes start-end/total`, соответствующий диапазону `Content-Length` и `X-Upload-Token` из ответа. В запрос части не передавайте access token.
+3. При прерывании вызовите `ResumeUploadSession`: используйте новый токен и список `uploaded_parts`; пропускайте только части с `has_etag=true` и ожидаемым размером, остальные отправьте повторно.
 4. Вызовите `CompleteUploadSession`, затем опрашивайте `GetUploadSession`, пока статус не станет `READY`.
 5. Для появления файла в облачной папке вызовите `CloudApi.AttachFile` с `file_id`.
 
