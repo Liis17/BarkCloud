@@ -15,6 +15,8 @@ Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/upload/UploadModels.kt` | `UploadJob`, `UploadPhase` | Модель задачи и состояние процесса |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/upload/UploadScheduler.kt` | `UploadScheduler` | Уникальная WorkManager-задача очереди |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/net/FileTransferService.kt` | upload-session и part методы | gRPC control plane и HTTP передача частей |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/users/UserRepository.kt` | `setAvatar`, `removeAvatar` | Установка профиля после готовности файла |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/ui/settings/ProfileViewModel.kt` | avatar actions | Foreground-индикатор и защита от параллельных изменений |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/upload/UploadPartMath.kt`, `UploadFileHasher.kt` | `UploadPartMath`, `UploadFileHasher` | Хеш и расчёт диапазонов частей |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/persistence/BarkCloudDatabase.kt`, `UploadDao.kt` | `BarkCloudDatabase`, `UploadDao` | Сохранение очереди в Room |
 
@@ -24,7 +26,7 @@ Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend
 - Control plane использует gRPC Files API; data plane отправляет части через HTTP по базе `fileUploadBase` текущей серверной конфигурации. Точный формат серверного API описан в [[Backend/ResumableUpload]].
 - `UploadJob` хранит источник и назначение, staged path, idempotency key, session ID, размер части, прогресс и целевой каталог/альбом.
 - `UploadDestination.SYSTEM_BY_MEDIA_KIND` передаёт файлы без выбранного каталога на авто-распределение; `DIRECTORY` сохраняет выбранный `directoryId`. Для загрузки в альбом задача хранит `albumId`.
-- Смена аватара в `UserRepository` пока вызывает `FilesApi.GetUploadUrl` и legacy multipart-маршрут, который отвечает HTTP 418. До появления Upload 2.0-пути для аватаров смена аватара не работает.
+- Смена аватара использует `FileTransferService.uploadAvatar` в foreground: URI копируется в уникальный cache-файл, затем отправляется как `USER_AVATAR`. `UserRepository.setAvatar` вызывает `UsersApi.SetProfilePicture` только после состояния `READY`.
 
 ## Зависимости и взаимодействия
 
@@ -35,6 +37,8 @@ Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend
 5. `UploadQueueStore` удаляет staging после завершения. Ошибка после готовности файла сохраняет фазу `UPLOADED_NOT_ATTACHED`; повтор задачи выполняет только привязку.
 6. WorkManager запускает общий foreground data-sync worker при доступной сети. Автозагрузка медиатеки ставит backup-задачи в ту же очередь.
 
+Отдельный foreground-путь аватара не использует Room или WorkManager. Он запрашивает настоящее имя через `OpenableColumns.DISPLAY_NAME`, MIME — через resolver с fallback `application/octet-stream`, считает SHA-256 и размер staged-файла, отклоняет пустой файл и размер свыше 20 MiB, затем передаёт части последовательно. Состояние после `CompleteUploadSession` опрашивается каждые 2 секунды не дольше 120 секунд; профиль меняется только для `READY` с непустым `file_id`. Cache-файл удаляется после успеха, ошибки или отмены. Аватарный upload не восстанавливается после уничтожения процесса; отмена отправляет best-effort cancel только для известной `UPLOADING`-сессии.
+
 ## Ограничения и важные детали
 
 - Состояния Room отражают фазы `QUEUED → HASHING → CREATING_SESSION → UPLOADING → COMPLETING → PROCESSING → ATTACHING → COMPLETED`; ошибки, отмена и `PAUSED` для backup — отдельные состояния.
@@ -42,3 +46,4 @@ Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend
 - Если ответ на завершение потерян, worker сверяет серверное состояние перед повтором; если готовый файл не привязался, повтор не передаёт байты заново.
 - Отмена задачи помечает её в Room и удаляет staging; worker отменяет связанную серверную сессию при следующем наблюдении задачи. Пауза доступна backup-задачам и проверяется между частями.
 - `UploadScheduler` использует уникальную цепочку WorkManager с политикой `KEEP`, поэтому повторные enqueue не создают параллельный worker для очереди.
+- `ProfileViewModel` блокирует перекрывающиеся операции set/remove, держит foreground-индикатор до выхода и не превращает coroutine cancellation в snackbar. Ошибка `SetProfilePicture` оставляет ранее загруженный профильный аватар.

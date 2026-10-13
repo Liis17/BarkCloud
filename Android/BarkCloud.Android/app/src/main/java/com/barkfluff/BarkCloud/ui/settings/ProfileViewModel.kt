@@ -11,6 +11,7 @@ import com.barkfluff.BarkCloud.data.SessionManager
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.widgets.StorageWidgetBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class ProfileUiState(
     val isLoading: Boolean = true,
@@ -45,6 +47,7 @@ class ProfileViewModel(
 
     private val _events = Channel<ProfileEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+    private val avatarUpdateInProgress = AtomicBoolean()
 
     fun load() {
         viewModelScope.launch {
@@ -69,33 +72,34 @@ class ProfileViewModel(
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.update { it.copy(isLoading = false, snackbar = e.message) }
             }
         }
     }
 
-    fun setAvatar(uri: Uri) {
-        viewModelScope.launch {
-            _state.update { it.copy(isUpdatingAvatar = true) }
-            try {
-                userRepository.setAvatar(uri, "avatar.jpg")
-                _state.update { it.copy(isUpdatingAvatar = false) }
-                load()
-            } catch (e: Exception) {
-                _state.update { it.copy(isUpdatingAvatar = false, snackbar = e.message) }
-            }
-        }
+    fun setAvatar(uri: Uri) = updateAvatar {
+        userRepository.setAvatar(uri)
     }
 
-    fun removeAvatar() {
+    fun removeAvatar() = updateAvatar {
+        userRepository.removeAvatar()
+    }
+
+    private fun updateAvatar(update: suspend () -> Unit) {
+        if (!avatarUpdateInProgress.compareAndSet(false, true)) return
+        _state.update { it.copy(isUpdatingAvatar = true) }
         viewModelScope.launch {
-            _state.update { it.copy(isUpdatingAvatar = true) }
             try {
-                userRepository.removeAvatar()
-                _state.update { it.copy(isUpdatingAvatar = false) }
+                update()
                 load()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _state.update { it.copy(isUpdatingAvatar = false, snackbar = e.message) }
+                _state.update { it.copy(snackbar = e.message) }
+            } finally {
+                avatarUpdateInProgress.set(false)
+                _state.update { it.copy(isUpdatingAvatar = false) }
             }
         }
     }

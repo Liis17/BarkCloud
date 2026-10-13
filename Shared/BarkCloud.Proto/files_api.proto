@@ -375,6 +375,7 @@ message CreateUploadSessionRequest {
   int64 file_size = 3;
   string content_type = 4;
   string sha256 = 5;
+  optional UploadFileType file_type = 6;
 }
 
 message UploadSessionIdRequest {

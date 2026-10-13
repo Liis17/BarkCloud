@@ -29,18 +29,21 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
     private readonly SemaphoreSlim _localLock = new(1, 1);
     private static readonly ConcurrentDictionary<string, byte> LocalActivities = new();
 
-    private string[] UploadProfiles(string primary, string fileName, string contentType)
+    private string[] UploadProfiles(UploadFileType fileType, string primary, string fileName, string contentType)
     {
+        if (fileType == UploadFileType.UserAvatar)
+            return [primary];
+
         var mime = string.IsNullOrWhiteSpace(contentType) || contentType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)
             ? fileName.GetContentType() : contentType;
-        return mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
-            || mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)
+        return fileType == UploadFileType.CloudFile && (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+            || mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
             ? [primary, profiles.ResolveWriteProfileId(UploadFileType.CloudFile, fileName.GetMediaKind(), true)] : [primary];
     }
 
-    public async Task<IAsyncDisposable> EnterUploadAdmissionAsync(string primary, string fileName, string contentType, CancellationToken ct)
+    public async Task<IAsyncDisposable> EnterUploadAdmissionAsync(UploadFileType fileType, string primary, string fileName, string contentType, CancellationToken ct)
     {
-        var groups = UploadProfiles(primary, fileName, contentType).Select(profiles.GetProfile)
+        var groups = UploadProfiles(fileType, primary, fileName, contentType).Select(profiles.GetProfile)
             .GroupBy(x => NormalizeEndpoint(x.ServiceUrl, x.IsR2) + "\n" + x.BucketName).OrderBy(x => x.Key);
         var leases = new List<IAsyncDisposable>();
         using var scope = scopes.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<FilesContext>();
@@ -243,7 +246,7 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
         var activities = await db.StorageWriteActivities.AsNoTracking().ToArrayAsync(ct);
         var sessions = await db.UploadSessions.AsNoTracking().Where(x =>
             x.Status == UploadSessionStatus.Uploading || x.Status == UploadSessionStatus.Processing || x.CleanupPending).ToArrayAsync(ct);
-        var activeSessions = sessions.Where(x => UploadProfiles(x.StorageProfileId, x.FileName, x.ContentType).Intersect(ids).Any())
+        var activeSessions = sessions.Where(x => UploadProfiles(x.FileType, x.StorageProfileId, x.FileName, x.ContentType).Intersect(ids).Any())
             .Select(x => x.FileId).ToArray();
         var status = new StorageCutoverStatus
         {

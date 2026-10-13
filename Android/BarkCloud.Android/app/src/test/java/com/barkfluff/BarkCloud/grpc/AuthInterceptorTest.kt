@@ -47,4 +47,21 @@ class AuthInterceptorTest {
         assertNull(setup("STALE", "barkcloud.identity.IdentityApi/Auth").get(authKey))
         assertNull(setup("STALE", "barkcloud.identity.IdentityApi/CreateToken").get(authKey))
     }
+
+    @Test
+    fun `fixed token interceptor sends supplied token without resolving another one`() {
+        val mockCall = mockk<ClientCall<Any, Any>>(relaxed = true)
+        val mockChannel = mockk<Channel>()
+        every { mockChannel.newCall<Any, Any>(any(), any()) } returns mockCall
+        val method = mockk<MethodDescriptor<Any, Any>>()
+        every { method.fullMethodName } returns "barkcloud.users.UsersApi/SetProfilePicture"
+
+        val call = FixedTokenInterceptor("expired-access-token").interceptCall(
+            method, CallOptions.DEFAULT, mockChannel,
+        )
+        val headers = Metadata()
+        call.start(mockk(relaxed = true), headers)
+
+        assertEquals("expired-access-token", headers.get(authKey))
+    }
 }

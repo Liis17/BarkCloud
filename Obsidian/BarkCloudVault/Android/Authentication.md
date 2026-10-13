@@ -17,6 +17,8 @@ Compose-поток первого запуска, выбора сервера, �
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/AuthRepository.kt` | `AuthRepository` | Вход, получение токенов и выход |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/AuthFlowRepository.kt` | `AuthFlowRepository` | Регистрация, подтверждение и сброс пароля |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/TokenStore.kt`, `TokenRefresher.kt` | `TokenStore`, `TokenRefresher` | Шифрование и обновление сессии |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/grpc/GrpcManager.kt` | token-bound `usersStub` / `filesStub` | Стабы с заранее разрешённым access token |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/grpc/AuthInterceptor.kt` | `FixedTokenInterceptor` | Передача fixed token без синхронного refresh |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/PendingRegistrationStore.kt` | `PendingRegistrationStore` | Незавершённая регистрация отдельно от активной сессии |
 
 ## Публичные контракты
@@ -33,6 +35,8 @@ Compose-поток первого запуска, выбора сервера, �
 
 - `AuthRepository` вызывает Identity для входа и выхода; `AuthFlowRepository` обращается к Identity для регистрации/сброса и к Users для проверки доступности username. Ошибки gRPC отображаются по error code и trailer `x-retry-after-seconds`.
 - `ClientMetadataInterceptor` добавляет device/app metadata к gRPC-вызовам; `AuthInterceptor` добавляет актуальный `x-auth-token`, кроме методов `Auth` и `CreateToken`.
+- Avatar control RPC и `SetProfilePicture` сначала асинхронно разрешают access token, затем используют `GrpcManager` stubs с фиксированным токеном и deadline. Общий предел на разрешение токена и один RPC — 15 секунд; этот путь не попадает в синхронный `runBlocking` refresh внутри обычного `AuthInterceptor`.
+- Best-effort отмена avatar-сессии использует последний известный access token (даже если он истёк), fixed-token stub и предел 5 секунд. Она не запускает refresh; сервер может отклонить просроченный токен.
 - `TokenStore` хранит один AES-GCM-шифротекст токенов в credential-protected SharedPreferences; ключ AES-256 создаётся в Android Keystore. При первом чтении переносит старые значения из `EncryptedSharedPreferences`.
 - `TokenRefresher` сериализует параллельное обновление access-token и обновляет его за 60 секунд до истечения. Недействительный refresh очищает сессию.
 - `PendingRegistrationStore` хранит отдельную AES-GCM-запись с ключом сервера, профилем, registration refresh-token и сроком действия. Пароль туда не записывается, а pending-токен не включает основную сессию.
