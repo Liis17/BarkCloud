@@ -158,6 +158,7 @@ struct GrpcUploadSessionTransport: UploadSessionTransport {
 
 struct Upload2Uploader: Sendable {
     static let controlRPCDeadline: Duration = .seconds(15)
+    static let cancellationDeadline: Duration = .seconds(5)
     static let partBufferSize = 4 * 1024 * 1024
     static let invalidUploadTokenCode = "EBCEDE5E-6BC0-44F3-8966-6E71C136CE6B"
     static let incompletePartsCode = "09BF4D7B-7DB9-4284-BDB0-85457B22A589"
@@ -165,10 +166,19 @@ struct Upload2Uploader: Sendable {
 
     private let transport: any UploadSessionTransport
     private let clock: any UploadClock
+    private let rpcDeadline: Duration
+    private let cancelDeadline: Duration
 
-    init(transport: any UploadSessionTransport, clock: any UploadClock = SystemUploadClock()) {
+    init(
+        transport: any UploadSessionTransport,
+        clock: any UploadClock = SystemUploadClock(),
+        controlRPCDeadline: Duration = Self.controlRPCDeadline,
+        cancellationDeadline: Duration = Self.cancellationDeadline
+    ) {
         self.transport = transport
         self.clock = clock
+        self.rpcDeadline = controlRPCDeadline
+        self.cancelDeadline = cancellationDeadline
     }
 
     func upload(
@@ -182,6 +192,7 @@ struct Upload2Uploader: Sendable {
         try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDirectory) }
 
+        try Task.checkCancellation()
         let (size, digest) = try Self.measure(fileURL)
         guard size > 0 else { throw FileTransferError.emptyFile }
         if fileType == .userAvatar, size > Self.maximumAvatarSize {
@@ -314,7 +325,7 @@ struct Upload2Uploader: Sendable {
                     if fileType == .userAvatar, avatarProcessingDeadline == nil {
                         avatarProcessingDeadline = clock.now().addingTimeInterval(120)
                     }
-                    var pollTimeout = Self.controlRPCDeadline
+                    var pollTimeout = rpcDeadline
                     if let deadline = avatarProcessingDeadline {
                         let remaining = deadline.timeIntervalSince(clock.now())
                         guard remaining > 0 else { throw FileTransferError.processingTimedOut }
@@ -329,7 +340,7 @@ struct Upload2Uploader: Sendable {
                         guard remaining > 0 else { throw FileTransferError.processingTimedOut }
                         let remainingNanoseconds = Int64(remaining * 1_000_000_000)
                         guard remainingNanoseconds > 0 else { throw FileTransferError.processingTimedOut }
-                        pollTimeout = min(Self.controlRPCDeadline, .nanoseconds(remainingNanoseconds))
+                        pollTimeout = min(rpcDeadline, .nanoseconds(remainingNanoseconds))
                     }
                     do {
                         let sessionID = session.sessionID
@@ -356,10 +367,11 @@ struct Upload2Uploader: Sendable {
     }
 
     private func control<Value: Sendable>(
-        timeout: Duration = Self.controlRPCDeadline,
+        timeout requestedTimeout: Duration? = nil,
         operation: @escaping @Sendable (Duration?) async throws -> Value
     ) async throws -> Value {
-        try await AsyncDeadline.withTimeout(timeout) {
+        let timeout = requestedTimeout ?? rpcDeadline
+        return try await AsyncDeadline.withTimeout(timeout) {
             try await operation(timeout)
         }
     }
@@ -418,8 +430,8 @@ struct Upload2Uploader: Sendable {
     private func bestEffortCancel(sessionID: String) async {
         let transport = self.transport
         let cleanup = Task.detached(priority: .utility) {
-            try await AsyncDeadline.withTimeout(.seconds(5)) {
-                try await transport.cancel(sessionID: sessionID, timeout: .seconds(5))
+            try await AsyncDeadline.withTimeout(self.cancelDeadline) {
+                try await transport.cancel(sessionID: sessionID, timeout: self.cancelDeadline)
             }
         }
         let _ = try? await cleanup.value
@@ -483,7 +495,9 @@ struct Upload2Uploader: Sendable {
         defer { try? handle.close() }
         var hasher = SHA256()
         var size: Int64 = 0
-        while let data = try handle.read(upToCount: partBufferSize), !data.isEmpty {
+        while true {
+            try Task.checkCancellation()
+            guard let data = try handle.read(upToCount: partBufferSize), !data.isEmpty else { break }
             hasher.update(data: data)
             size += Int64(data.count)
         }
@@ -504,6 +518,7 @@ struct Upload2Uploader: Sendable {
         try input.seek(toOffset: UInt64(offset))
         var remaining = size
         while remaining > 0 {
+            try Task.checkCancellation()
             let readCount = Int(min(Int64(partBufferSize), remaining))
             guard let data = try input.read(upToCount: readCount), !data.isEmpty else {
                 throw FileTransferError.sourceChangedWhileReading

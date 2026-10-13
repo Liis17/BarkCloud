@@ -50,24 +50,37 @@ private struct GrpcProfilePictureTransport: ProfilePictureTransport {
 /// аватара (через `FileTransferService`). Методы пробрасывают `RPCError` —
 /// доменные ошибки маппит UI через `domainErrorMessage(_:)`.
 public final class UserRepository: Sendable {
+    static let avatarDeadline: Duration = .seconds(15)
+
     private let grpc: GrpcManager
     private let avatarUpload: any AvatarUploadTransport
     private let profilePicture: any ProfilePictureTransport
+    private let profilePictureDeadline: Duration
 
     public init(grpc: GrpcManager, transfer: FileTransferService) {
         self.grpc = grpc
         self.avatarUpload = FileTransferAvatarUpload(transfer: transfer)
         self.profilePicture = GrpcProfilePictureTransport(grpc: grpc)
+        self.profilePictureDeadline = Self.avatarDeadline
+    }
+
+    init(grpc: GrpcManager, transfer: FileTransferService, profilePictureDeadline: Duration) {
+        self.grpc = grpc
+        self.avatarUpload = FileTransferAvatarUpload(transfer: transfer)
+        self.profilePicture = GrpcProfilePictureTransport(grpc: grpc)
+        self.profilePictureDeadline = profilePictureDeadline
     }
 
     init(
         grpc: GrpcManager,
         avatarUpload: any AvatarUploadTransport,
-        profilePicture: any ProfilePictureTransport
+        profilePicture: any ProfilePictureTransport,
+        profilePictureDeadline: Duration = UserRepository.avatarDeadline
     ) {
         self.grpc = grpc
         self.avatarUpload = avatarUpload
         self.profilePicture = profilePicture
+        self.profilePictureDeadline = profilePictureDeadline
     }
 
     // MARK: - Профиль
@@ -195,8 +208,8 @@ public final class UserRepository: Sendable {
         guard uploaded.status == .ready, !uploaded.fileID.isEmpty, !uploaded.sessionID.isEmpty else {
             throw FileTransferError.invalidSessionResponse("Аватар можно установить только после готовности upload-сессии")
         }
-        try await AsyncDeadline.withTimeout(.seconds(15)) {
-            try await self.profilePicture.setProfilePicture(fileID: uploaded.fileID, timeout: .seconds(15))
+        try await AsyncDeadline.withTimeout(profilePictureDeadline) {
+            try await self.profilePicture.setProfilePicture(fileID: uploaded.fileID, timeout: self.profilePictureDeadline)
         }
     }
 

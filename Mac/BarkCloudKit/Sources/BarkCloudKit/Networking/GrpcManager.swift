@@ -325,17 +325,13 @@ public actor GrpcManager {
     func accessToken(forMethod method: String, boundedBy timeout: Duration) async throws -> String? {
         if Self.unauthenticatedMethods.contains(method) { return nil }
         return try await AsyncDeadline.withTimeout(timeout) {
-            await self.validAccessToken(timeout: timeout)
+            await self.validAccessToken()
         }
     }
 
     /// Возвращает действующий access-токен, обновив его при необходимости.
     /// Используется интерсептором gRPC и HTTP-загрузкой файлов.
     public func validAccessToken() async -> String? {
-        await validAccessToken(timeout: nil)
-    }
-
-    private func validAccessToken(timeout: Duration?) async -> String? {
         let snap = await session.snapshot()
 
         // Токен ещё свеж — отдаём как есть.
@@ -355,7 +351,7 @@ public actor GrpcManager {
         }
 
         do {
-            return try await refreshAccessToken(refreshToken: refresh, timeout: timeout)
+            return try await refreshAccessToken(refreshToken: refresh)
         } catch {
             // Транзиентная ошибка (нет сети и т.п.) — пробуем со старым токеном.
             return snap.accessToken
@@ -368,13 +364,13 @@ public actor GrpcManager {
     }
 
     /// Сериализованное обновление: первый вызов запускает задачу, остальные ждут её.
-    private func refreshAccessToken(refreshToken: String, timeout: Duration?) async throws -> String {
+    private func refreshAccessToken(refreshToken: String) async throws -> String {
         if let existing = refreshTask {
             return try await existing.value
         }
 
         let task = Task<String, Error> { [session] in
-            let token = try await self.createTokenRaw(refreshToken: refreshToken, timeout: timeout)
+            let token = try await self.createTokenRaw(refreshToken: refreshToken)
             let expiry = token.hasExpirationDate ? Self.date(from: token.expirationDate) : nil
             await session.saveRefreshedAccessToken(token.value, expiresAt: expiry)
             return token.value
@@ -397,13 +393,11 @@ public actor GrpcManager {
 
     /// Вызов `Identity.CreateToken` напрямую. Идёт через обычный identity-клиент,
     /// но его AuthInterceptor для метода `CreateToken` не запускает обновление.
-    private func createTokenRaw(refreshToken: String, timeout: Duration?) async throws -> Barkcloud_Identity_Token {
+    private func createTokenRaw(refreshToken: String) async throws -> Barkcloud_Identity_Token {
         let stub = try await identityStub()
         var req = Barkcloud_Identity_CreateTokenRequest()
         req.refreshToken = refreshToken
-        var options = GRPCCore.CallOptions.defaults
-        options.timeout = timeout
-        let resp = try await stub.createToken(req, options: options)
+        let resp = try await stub.createToken(req)
         return resp.accessToken
     }
 

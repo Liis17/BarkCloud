@@ -13,6 +13,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Directory.Build.props` | общие test properties | .NET 10, xUnit, Moq и FluentAssertions |
 | `Tests/BarkCloud.TestKit/` | общие test helpers | gRPC-контекст, вызовы и логгер для тестов |
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Dokany callbacks, outbox/Upload 2.0, сессия, кеш, TLS, настройки и pipe |
+| `Mac/BarkCloudKit/Tests/BarkCloudKitTests/` | Swift package tests | Upload 2.0, восстановление частей, отмена, токены и реальные gRPC deadline-сценарии для iOS/macOS сетевого слоя |
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
@@ -62,6 +63,20 @@ dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests --filter "Category=WindowsI
 ## Ограничения и важные детали
 
 PostgreSQL-сценарии зависят от отдельной тестовой базы и настройки `BARKCLOUD_TEST_POSTGRES`. В локальном запуске следует передавать строку подключения только к тестовому PostgreSQL; workflow предоставляет её через контейнер `test-postgres`.
+
+## Apple-клиенты и BarkCloudKit
+
+`Mac/BarkCloudKit/Tests/BarkCloudKitTests` проверяет общий сетевой пакет iOS/macOS: потоковый хеш и части Upload 2.0, восстановление сессии, ошибки и отмену, avatar `READY`-поток, привязку файла и gRPC deadlines с авторизацией. Запускать на macOS с установленным Swift и Xcode:
+
+```bash
+swift test --package-path Mac/BarkCloudKit
+xcodebuild test -project Ios/BarkCloud/BarkCloud.xcodeproj -scheme BarkCloud \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
+xcodebuild build -project Mac/BarkCloudDrive/BarkCloudDrive.xcodeproj -scheme BarkCloudDrive \
+  -destination 'platform=macOS'
+xcodebuild build -project Mac/BarkCloudDrive/BarkCloudDrive.xcodeproj -scheme BarkCloudFS \
+  -destination 'platform=macOS'
+```
 
 ## Files: durable upload redelivery
 
