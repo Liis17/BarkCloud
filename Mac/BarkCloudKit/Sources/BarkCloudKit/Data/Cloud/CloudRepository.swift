@@ -1,6 +1,22 @@
 import Foundation
 import GRPCCore
 import SwiftProtobuf
+import UniformTypeIdentifiers
+
+protocol CloudAttachTransport: Sendable {
+    func attach(_ request: Barkcloud_Files_AttachFileRequest, timeout: Duration?) async throws
+}
+
+private struct GrpcCloudAttachTransport: CloudAttachTransport {
+    let grpc: GrpcManager
+
+    func attach(_ request: Barkcloud_Files_AttachFileRequest, timeout: Duration?) async throws {
+        let stub = try await grpc.cloudStub()
+        var options = CallOptions.defaults
+        options.timeout = timeout
+        _ = try await stub.attachFile(request, options: options)
+    }
+}
 
 /// Доступ к сервису Files: галерея (`ListUserMedia`), каталоги (`CloudApi`) и
 /// загрузка файлов (через `FileTransferService`). Доменные ошибки пробрасываются
@@ -8,10 +24,18 @@ import SwiftProtobuf
 public final class CloudRepository: Sendable {
     let grpc: GrpcManager
     public let transfer: FileTransferService
+    private let attachTransport: any CloudAttachTransport
 
     public init(grpc: GrpcManager, transfer: FileTransferService) {
         self.grpc = grpc
         self.transfer = transfer
+        self.attachTransport = GrpcCloudAttachTransport(grpc: grpc)
+    }
+
+    init(grpc: GrpcManager, transfer: FileTransferService, attachTransport: any CloudAttachTransport) {
+        self.grpc = grpc
+        self.transfer = transfer
+        self.attachTransport = attachTransport
     }
 
     // MARK: - Галерея
@@ -490,9 +514,9 @@ public final class CloudRepository: Sendable {
         name: String,
         routeByMediaKind: Bool = false,
         uploadSessionID: String? = nil,
-        isUploadRetry: Bool = false
+        isUploadRetry: Bool = false,
+        timeout: Duration? = nil
     ) async throws {
-        let stub = try await grpc.cloudStub()
         var req = Barkcloud_Files_AttachFileRequest()
         req.fileID = fileID
         req.directoryID = directoryID
@@ -502,7 +526,15 @@ public final class CloudRepository: Sendable {
             req.uploadSessionID = uploadSessionID
         }
         req.isUploadRetry = isUploadRetry
-        _ = try await stub.attachFile(req)
+        if let timeout {
+            let transport = attachTransport
+            let request = req
+            try await AsyncDeadline.withTimeout(timeout) {
+                try await transport.attach(request, timeout: timeout)
+            }
+        } else {
+            try await attachTransport.attach(req, timeout: nil)
+        }
     }
 
     public func renameFileEntry(_ entryID: String, newName: String) async throws {
@@ -587,7 +619,7 @@ public final class CloudRepository: Sendable {
     /// Загрузить файл в облако. Если `routeByMediaKind == true` — сервер сам
     /// разложит файл по системным папкам «Фото»/«Видео»/«Другие документы» по типу
     /// медиа (явный `directoryID` игнорируется). Иначе при заданном `directoryID` —
-    /// привязать к этой папке. Возвращает `file_id` блоба.
+    /// привязать к этой папке. Возвращает `file_id` готового блоба.
     @discardableResult
     public func uploadFile(
         data: Data,
@@ -595,13 +627,76 @@ public final class CloudRepository: Sendable {
         toDirectory directoryID: String? = nil,
         routeByMediaKind: Bool = false
     ) async throws -> String {
-        let upload = try await transfer.getUploadURL(type: .cloudFile)
-        let fileID = try await transfer.upload(data: data, fileName: fileName, to: upload.url)
-        if routeByMediaKind {
-            try await attachFile(fileID: fileID, directoryID: "", name: fileName, routeByMediaKind: true)
-        } else if let directoryID {
-            try await attachFile(fileID: fileID, directoryID: directoryID, name: fileName)
+        let uploaded = try await transfer.uploadFile(
+            data: data,
+            fileName: fileName,
+            contentType: Self.contentType(for: fileName),
+            fileType: .cloudFile
+        )
+        guard uploaded.status == .ready, !uploaded.fileID.isEmpty, !uploaded.sessionID.isEmpty else {
+            throw FileTransferError.invalidSessionResponse("Нельзя привязать файл до готовности upload-сессии")
         }
-        return fileID
+        if routeByMediaKind {
+            try await attachFile(
+                fileID: uploaded.fileID,
+                directoryID: "",
+                name: fileName,
+                routeByMediaKind: true,
+                uploadSessionID: uploaded.sessionID,
+                timeout: .seconds(15)
+            )
+        } else if let directoryID {
+            try await attachFile(
+                fileID: uploaded.fileID,
+                directoryID: directoryID,
+                name: fileName,
+                uploadSessionID: uploaded.sessionID,
+                timeout: .seconds(15)
+            )
+        }
+        return uploaded.fileID
+    }
+
+    @discardableResult
+    public func uploadFile(
+        fileURL: URL,
+        fileName: String? = nil,
+        toDirectory directoryID: String? = nil,
+        routeByMediaKind: Bool = false
+    ) async throws -> String {
+        let name = fileName ?? fileURL.lastPathComponent
+        let uploaded = try await transfer.uploadFile(
+            fileURL: fileURL,
+            fileName: name,
+            contentType: Self.contentType(for: name),
+            fileType: .cloudFile
+        )
+        guard uploaded.status == .ready, !uploaded.fileID.isEmpty, !uploaded.sessionID.isEmpty else {
+            throw FileTransferError.invalidSessionResponse("Нельзя привязать файл до готовности upload-сессии")
+        }
+        if routeByMediaKind {
+            try await attachFile(
+                fileID: uploaded.fileID,
+                directoryID: "",
+                name: name,
+                routeByMediaKind: true,
+                uploadSessionID: uploaded.sessionID,
+                timeout: .seconds(15)
+            )
+        } else if let directoryID {
+            try await attachFile(
+                fileID: uploaded.fileID,
+                directoryID: directoryID,
+                name: name,
+                uploadSessionID: uploaded.sessionID,
+                timeout: .seconds(15)
+            )
+        }
+        return uploaded.fileID
+    }
+
+    private static func contentType(for fileName: String) -> String {
+        UTType(filenameExtension: URL(fileURLWithPath: fileName).pathExtension)?.preferredMIMEType
+            ?? "application/octet-stream"
     }
 }

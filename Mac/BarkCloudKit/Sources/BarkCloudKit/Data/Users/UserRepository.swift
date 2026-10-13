@@ -1,16 +1,73 @@
 import Foundation
 import GRPCCore
+import UniformTypeIdentifiers
+
+protocol AvatarUploadTransport: Sendable {
+    func upload(
+        data: Data,
+        fileName: String,
+        contentType: String,
+        fileType: Barkcloud_Files_UploadFileType
+    ) async throws -> FileUploadSession
+}
+
+protocol ProfilePictureTransport: Sendable {
+    func setProfilePicture(fileID: String, timeout: Duration?) async throws
+}
+
+private struct FileTransferAvatarUpload: AvatarUploadTransport {
+    let transfer: FileTransferService
+
+    func upload(
+        data: Data,
+        fileName: String,
+        contentType: String,
+        fileType: Barkcloud_Files_UploadFileType
+    ) async throws -> FileUploadSession {
+        try await transfer.uploadFile(
+            data: data,
+            fileName: fileName,
+            contentType: contentType,
+            fileType: fileType
+        )
+    }
+}
+
+private struct GrpcProfilePictureTransport: ProfilePictureTransport {
+    let grpc: GrpcManager
+
+    func setProfilePicture(fileID: String, timeout: Duration?) async throws {
+        let stub = try await grpc.usersStub()
+        var request = Barkcloud_Users_SetProfilePictureRequest()
+        request.fileID = fileID
+        var options = CallOptions.defaults
+        options.timeout = timeout
+        _ = try await stub.setProfilePicture(request, options: options)
+    }
+}
 
 /// Доступ к сервису Users (профиль, приватность, устройства, аккаунт) + установка
 /// аватара (через `FileTransferService`). Методы пробрасывают `RPCError` —
 /// доменные ошибки маппит UI через `domainErrorMessage(_:)`.
 public final class UserRepository: Sendable {
     private let grpc: GrpcManager
-    private let transfer: FileTransferService
+    private let avatarUpload: any AvatarUploadTransport
+    private let profilePicture: any ProfilePictureTransport
 
     public init(grpc: GrpcManager, transfer: FileTransferService) {
         self.grpc = grpc
-        self.transfer = transfer
+        self.avatarUpload = FileTransferAvatarUpload(transfer: transfer)
+        self.profilePicture = GrpcProfilePictureTransport(grpc: grpc)
+    }
+
+    init(
+        grpc: GrpcManager,
+        avatarUpload: any AvatarUploadTransport,
+        profilePicture: any ProfilePictureTransport
+    ) {
+        self.grpc = grpc
+        self.avatarUpload = avatarUpload
+        self.profilePicture = profilePicture
     }
 
     // MARK: - Профиль
@@ -123,19 +180,28 @@ public final class UserRepository: Sendable {
 
     /// Загрузить картинку как `USER_AVATAR` и установить аватаром.
     public func setAvatar(imageData: Data, fileName: String) async throws {
-        let upload = try await transfer.getUploadURL(type: .userAvatar)
-        let fileID = try await transfer.upload(data: imageData, fileName: fileName, to: upload.url)
-        let stub = try await grpc.usersStub()
-        var req = Barkcloud_Users_SetProfilePictureRequest()
-        req.fileID = fileID
-        _ = try await stub.setProfilePicture(req)
+        guard !imageData.isEmpty else { throw FileTransferError.emptyFile }
+        guard Int64(imageData.count) <= Upload2Uploader.maximumAvatarSize else {
+            throw FileTransferError.avatarTooLarge
+        }
+        let contentType = UTType(filenameExtension: URL(fileURLWithPath: fileName).pathExtension)?.preferredMIMEType
+            ?? "application/octet-stream"
+        let uploaded = try await avatarUpload.upload(
+            data: imageData,
+            fileName: fileName,
+            contentType: contentType,
+            fileType: .userAvatar
+        )
+        guard uploaded.status == .ready, !uploaded.fileID.isEmpty, !uploaded.sessionID.isEmpty else {
+            throw FileTransferError.invalidSessionResponse("Аватар можно установить только после готовности upload-сессии")
+        }
+        try await AsyncDeadline.withTimeout(.seconds(15)) {
+            try await self.profilePicture.setProfilePicture(fileID: uploaded.fileID, timeout: .seconds(15))
+        }
     }
 
     /// Удалить аватар (`SetProfilePicture("")`).
     public func removeAvatar() async throws {
-        let stub = try await grpc.usersStub()
-        var req = Barkcloud_Users_SetProfilePictureRequest()
-        req.fileID = ""
-        _ = try await stub.setProfilePicture(req)
+        try await profilePicture.setProfilePicture(fileID: "", timeout: nil)
     }
 }

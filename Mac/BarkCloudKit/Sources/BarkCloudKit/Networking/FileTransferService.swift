@@ -1,10 +1,45 @@
 import Foundation
 import GRPCCore
 
-public enum FileTransferError: Error {
+public enum FileTransferError: Error, LocalizedError {
     case badURL
     case badUploadResponse
+    case badPartAcknowledgement
     case downloadFailed
+    case emptyFile
+    case avatarTooLarge
+    case stagingFailed
+    case sourceChangedWhileReading
+    case invalidSessionResponse(String)
+    case recoveryLimitReached
+    case processingTimedOut
+    case server(errorCode: String?, message: String?)
+    case http(status: Int, errorCode: String?, message: String?)
+
+    public var errorDescription: String? {
+        switch self {
+        case .badURL: return "Некорректный адрес файла"
+        case .badUploadResponse: return "Сервер вернул некорректный ответ загрузки"
+        case .badPartAcknowledgement: return "Сервер подтвердил неверный номер или размер части"
+        case .downloadFailed: return "Не удалось скачать файл"
+        case .emptyFile: return "Нельзя загрузить пустой файл"
+        case .avatarTooLarge: return "Размер аватара превышает 20 МиБ"
+        case .stagingFailed: return "Не удалось подготовить временный файл для загрузки"
+        case .sourceChangedWhileReading: return "Исходный файл изменился во время загрузки"
+        case .invalidSessionResponse(let message): return message
+        case .recoveryLimitReached: return "Не удалось восстановить загрузку после нескольких попыток"
+        case .processingTimedOut: return "Сервер не обработал аватар за 120 секунд"
+        case .server(_, let message): return message ?? "Ошибка upload-сессии"
+        case .http(let status, _, let message): return message ?? "Ошибка HTTP загрузки (\(status))"
+        }
+    }
+
+    public var serverErrorCode: String? {
+        switch self {
+        case .server(let errorCode, _), .http(_, let errorCode, _): return errorCode
+        default: return nil
+        }
+    }
 }
 
 /// Состояние серверной resumable upload-сессии. Токен намеренно не входит в
@@ -69,27 +104,30 @@ public struct FileUploadSession: Sendable, Equatable {
     }
 }
 
-/// Передача байтов файлов: gRPC `FilesApi` (получение ссылок/квоты) + обычный HTTP
-/// upload/download на готовые URL, которые возвращает сервер. Загрузка/скачивание
-/// идут НЕ через gRPC, а POST/GET на `:7025/web/upload|download/{id}` через
-/// `InsecureHTTP.session` (self-signed TLS).
+/// Передача файлов через общий Upload 2.0 и HTTP-скачивание через `InsecureHTTP`.
 public final class FileTransferService: Sendable {
     private let grpc: GrpcManager
+    private let uploadTransport: any UploadSessionTransport
+    private let uploader: Upload2Uploader
 
     public init(grpc: GrpcManager) {
         self.grpc = grpc
+        let transport = GrpcUploadSessionTransport(grpc: grpc)
+        self.uploadTransport = transport
+        self.uploader = Upload2Uploader(transport: transport)
+    }
+
+    init(grpc: GrpcManager, uploadTransport: any UploadSessionTransport, clock: any UploadClock) {
+        self.grpc = grpc
+        self.uploadTransport = uploadTransport
+        self.uploader = Upload2Uploader(transport: uploadTransport, clock: clock)
+    }
+
+    public static func isCancellationError(_ error: Error) -> Bool {
+        Upload2Uploader.isCancellation(error)
     }
 
     // MARK: - gRPC (FilesApi)
-
-    /// Получить адрес для загрузки и предварительный file_id.
-    public func getUploadURL(type: Barkcloud_Files_UploadFileType) async throws -> (url: String, fileID: String) {
-        let stub = try await grpc.filesStub()
-        var req = Barkcloud_Files_GetUploadUrlRequest()
-        req.fileType = type
-        let resp = try await stub.getUploadUrl(req)
-        return (resp.url, resp.fileID)
-    }
 
     // MARK: - Upload 2.0 control plane
 
@@ -98,44 +136,35 @@ public final class FileTransferService: Sendable {
         fileName: String,
         fileSize: Int64,
         contentType: String,
-        sha256: String
+        sha256: String,
+        fileType: Barkcloud_Files_UploadFileType = .cloudFile,
+        timeout: Duration? = nil
     ) async throws -> FileUploadSession {
-        let stub = try await grpc.filesStub()
-        var req = Barkcloud_Files_CreateUploadSessionRequest()
-        req.idempotencyKey = idempotencyKey
-        req.fileName = fileName
-        req.fileSize = fileSize
-        req.contentType = contentType
-        req.sha256 = sha256
-        return Self.mapUploadSession(try await stub.createUploadSession(req))
+        try await uploadTransport.create(
+            idempotencyKey: idempotencyKey,
+            fileName: fileName,
+            fileSize: fileSize,
+            contentType: contentType,
+            sha256: sha256,
+            fileType: fileType,
+            timeout: timeout
+        )
     }
 
-    public func getUploadSession(sessionID: String) async throws -> FileUploadSession {
-        let stub = try await grpc.filesStub()
-        var req = Barkcloud_Files_UploadSessionIdRequest()
-        req.sessionID = sessionID
-        return Self.mapUploadSession(try await stub.getUploadSession(req))
+    public func getUploadSession(sessionID: String, timeout: Duration? = nil) async throws -> FileUploadSession {
+        try await uploadTransport.get(sessionID: sessionID, timeout: timeout)
     }
 
-    public func resumeUploadSession(sessionID: String) async throws -> FileUploadSession {
-        let stub = try await grpc.filesStub()
-        var req = Barkcloud_Files_UploadSessionIdRequest()
-        req.sessionID = sessionID
-        return Self.mapUploadSession(try await stub.resumeUploadSession(req))
+    public func resumeUploadSession(sessionID: String, timeout: Duration? = nil) async throws -> FileUploadSession {
+        try await uploadTransport.resume(sessionID: sessionID, timeout: timeout)
     }
 
-    public func completeUploadSession(sessionID: String) async throws -> FileUploadSession {
-        let stub = try await grpc.filesStub()
-        var req = Barkcloud_Files_UploadSessionIdRequest()
-        req.sessionID = sessionID
-        return Self.mapUploadSession(try await stub.completeUploadSession(req))
+    public func completeUploadSession(sessionID: String, timeout: Duration? = nil) async throws -> FileUploadSession {
+        try await uploadTransport.complete(sessionID: sessionID, timeout: timeout)
     }
 
-    public func cancelUploadSession(sessionID: String) async throws -> FileUploadSession {
-        let stub = try await grpc.filesStub()
-        var req = Barkcloud_Files_UploadSessionIdRequest()
-        req.sessionID = sessionID
-        return Self.mapUploadSession(try await stub.cancelUploadSession(req))
+    public func cancelUploadSession(sessionID: String, timeout: Duration? = nil) async throws -> FileUploadSession {
+        try await uploadTransport.cancel(sessionID: sessionID, timeout: timeout)
     }
 
     /// HTTP/1 data-plane URL. nginx exposes this route on the public 443 host;
@@ -176,31 +205,46 @@ public final class FileTransferService: Sendable {
         await grpc.validAccessToken()
     }
 
-    // MARK: - HTTP
+    // MARK: - Upload 2.0
 
-    /// Залить байты по адресу из `getUploadURL`. Возвращает `fileId` ИЗ ОТВЕТА —
-    /// при дедупликации он может отличаться от запрошенного, всегда используем его.
-    public func upload(data: Data, fileName: String, to urlString: String) async throws -> String {
-        guard let url = URL(string: urlString) else { throw FileTransferError.badURL }
+    public func uploadFile(
+        fileURL: URL,
+        fileName: String? = nil,
+        contentType: String = "application/octet-stream",
+        fileType: Barkcloud_Files_UploadFileType = .cloudFile
+    ) async throws -> FileUploadSession {
+        try await uploader.upload(
+            fileURL: fileURL,
+            fileName: fileName ?? fileURL.lastPathComponent,
+            contentType: contentType,
+            fileType: fileType
+        )
+    }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        if let token = await grpc.validAccessToken(), !token.isEmpty {
-            request.setValue(token, forHTTPHeaderField: "x-auth-token")
+    public func uploadFile(
+        data: Data,
+        fileName: String,
+        contentType: String = "application/octet-stream",
+        fileType: Barkcloud_Files_UploadFileType = .cloudFile
+    ) async throws -> FileUploadSession {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BarkCloudStage-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appendingPathComponent("payload")
+        guard FileManager.default.createFile(atPath: fileURL.path, contents: nil) else {
+            throw FileTransferError.stagingFailed
         }
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        let body = Self.multipartBody(boundary: boundary, fieldName: "file", fileName: fileName, data: data)
-
-        let (respData, response) = try await InsecureHTTP.session.upload(for: request, from: body)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw FileTransferError.badUploadResponse
-        }
-        guard let obj = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
-              let fileID = obj["fileId"] as? String, !fileID.isEmpty else {
-            throw FileTransferError.badUploadResponse
-        }
-        return fileID
+        let handle = try FileHandle(forWritingTo: fileURL)
+        defer { try? handle.close() }
+        try handle.write(contentsOf: data)
+        try handle.close()
+        return try await uploadFile(
+            fileURL: fileURL,
+            fileName: fileName,
+            contentType: contentType,
+            fileType: fileType
+        )
     }
 
     /// Скачать оригинал во временный файл (для предпросмотра / шеринга).
@@ -223,17 +267,7 @@ public final class FileTransferService: Sendable {
         return dest
     }
 
-    private static func multipartBody(boundary: String, fieldName: String, fileName: String, data: Data) -> Data {
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
-        body.append(data)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        return body
-    }
-
-    private static func mapUploadSession(_ response: Barkcloud_Files_UploadSessionResponse) -> FileUploadSession {
+    static func mapUploadSession(_ response: Barkcloud_Files_UploadSessionResponse) -> FileUploadSession {
         let status: FileUploadSessionStatus
         switch response.status {
         case .uploading: status = .uploading

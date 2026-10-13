@@ -13,7 +13,7 @@ Parent: [[Architecture]] · См. также: [[Desktop/WindowsDrive]] · [[Ios/
 | `Mac/BarkCloudDrive/BarkCloudDrive/BarkCloudDriveApp.swift` | `BarkCloudDriveApp`, `RootView` | Menu-bar приложение и выбор экрана |
 | `Mac/BarkCloudDrive/BarkCloudDrive/AppModel.swift` | `AppModel` | Сессия, сервер, профиль и квота |
 | `Mac/BarkCloudDrive/BarkCloudDrive/FileProviderDomainManager.swift` | `FileProviderDomainManager` | Регистрация, пауза и удаление домена |
-| `Mac/BarkCloudDrive/BarkCloudFS/BarkCloudFileProvider.swift` | `BarkCloudFileProvider` | Реализация операций File Provider |
+| `Mac/BarkCloudDrive/BarkCloudFS/BarkCloudFileProvider.swift` | `BarkCloudFileProvider` | Реализация операций File Provider; передаёт URL содержимого в репозиторий |
 | `Mac/BarkCloudDrive/BarkCloudFS/BarkCloudFileProviderItem.swift` | `BarkCloudFileProviderItem` | Представление файла/каталога для Finder |
 | `Mac/BarkCloudDrive/BarkCloudFS/BarkCloudEnumerator.swift`, `BarkCloudItemCache.swift` | enumerator и cache actor | Перечисление и сопоставление идентификаторов |
 | `Mac/BarkCloudKit/Sources/BarkCloudKit/Networking/GrpcManager.swift`, `Data/Cloud/CloudRepository.swift` | `GrpcManager`, `CloudRepository` | Общий сетевой слой и файловый репозиторий |
@@ -38,8 +38,9 @@ Parent: [[Architecture]] · См. также: [[Desktop/WindowsDrive]] · [[Ios/
 ## Ограничения и важные детали
 
 - Чтение через `fetchContents` материализует файл целиком через временную download URL. `RangeBlockReader` создаётся в сетевом контейнере, но этот путь чтения его не вызывает.
-- `createItem` и изменение содержимого читают исходный файл целиком в `Data`; загрузка крупных файлов может потреблять память пропорционально размеру файла.
-- Изменение содержимого заменяет запись: старый entry удаляется, новое содержимое загружается и прикрепляется как новый entry. При ошибке загрузки провайдер пытается восстановить старую запись из корзины.
+- `createItem` и изменение содержимого передают исходный URL в `CloudRepository`; `Upload2Uploader` потоково считает размер и SHA-256, затем последовательно отправляет части из временных файлов через общий `BarkCloudKit`. `AttachFile` вызывается только после `READY` и содержит `uploadSessionID`.
+- Изменение содержимого заменяет запись: старый entry перемещается в корзину, новое содержимое загружается и прикрепляется как новый entry. При ошибке загрузки или привязки провайдер пытается восстановить старую запись из корзины.
+- Постоянной очереди загрузки Finder нет. Если расширение завершилось или Finder повторил операцию, передача начинается заново; серверные сессии при этом используют Upload 2.0 и истекают по серверному сроку.
 - `workingSet` и trash перечисляются пустыми. Sync anchor увеличивается после локальных мутаций; отдельного журнала или потока внешних изменений нет, поэтому изменения от других клиентов требуют полного перечисления каталога.
 - Для одного cloud file ID допускается одна живая запись. Одинаковое содержимое может иметь отдельные file ID; текущий backend сохраняет оригиналы без дедупликации. Модель описана в [[Backend/Files]].
 - Причина выбора File Provider задокументирована в `Mac/README.md`: для FSKit требуется entitlement, недоступный Personal Apple Developer team; File Provider не требует этого entitlement. Таргеты не объявляют FSKit entitlement.

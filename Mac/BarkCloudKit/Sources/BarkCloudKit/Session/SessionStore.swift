@@ -5,9 +5,15 @@ import Observation
 @MainActor
 @Observable
 public final class SessionStore {
-    private let service = "com.barkfluff.BarkCloud.tokens"
+    private let service: String
 
-    public init() {}
+    public init() {
+        self.service = "com.barkfluff.BarkCloud.tokens"
+    }
+
+    init(service: String) {
+        self.service = service
+    }
 
     /// Снимок всех токенов и их сроков — читается актором `GrpcManager` за один
     /// hop на главный поток при проактивной проверке/обновлении токена.
