@@ -57,22 +57,36 @@ describe('ServerSettingsTab', () => {
     });
     expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(false);
   });
-  it('подтверждает изменения квоты в диалоге и сохраняет целое значение с единицей', async () => {
-    const fetchMock = mockServer({ ...serverSettings, storageProfiles: [{ ...storageProfile, quotaBytes: '2199023255552' }] });
+  it('создаёт группу, не предлагает занятые бакеты и не показывает квоту в профиле', async () => {
+    const data = {
+      ...serverSettings,
+      storageBuckets: [
+        { serviceUrl: 'http://minio:9000', bucketName: 'cloud-universal', roles: ['universal'], isActive: true, isLegacy: false },
+        { serviceUrl: 'https://s3.example', bucketName: 'free-bucket', roles: ['images'], isActive: false, isLegacy: true },
+      ],
+      storageGroups: [{ id: 'grp-used', name: 'Уже занята', quotaBytes: '0', buckets: [{ serviceUrl: 'http://minio:9000', bucketName: 'cloud-universal' }] }],
+    };
+    const fetchMock = mockServer(data);
     render(<ServerSettingsTab />);
     await expandAll();
-    expect(editor().getByLabelText('Квота S3 бакета')).toHaveProperty('value', '2');
-    expect(editor().getByRole('combobox', { name: 'Единица квоты' }).textContent).toBe('ТБ');
-    fireEvent.change(editor().getByLabelText('Квота S3 бакета'), { target: { value: '3' } });
-    fireEvent.click(editor().getByRole('combobox', { name: 'Единица квоты' }));
-    fireEvent.click(screen.getByRole('option', { name: 'ПБ' }));
-    fireEvent.click(editor().getByRole('button', { name: 'Сохранить профиль' }));
-    expect(within(await screen.findByRole('dialog')).getByText('Квота: 3 PB')).toBeTruthy();
-    expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(false);
+    expect(screen.queryByLabelText('Квота S3 бакета')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Новая группа' }));
+    fireEvent.change(screen.getByLabelText('Название группы S3'), { target: { value: 'Фото' } });
+    fireEvent.change(screen.getByLabelText('Квота группы S3'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Добавить бакет' }));
+    expect(screen.queryByRole('option', { name: /cloud-universal/ })).toBeNull();
+    const freeBucket = screen.getByRole('option', { name: /free-bucket · s3.example · Изображения · неактивен · legacy/ });
+    expect(freeBucket).toBeTruthy();
+    fireEvent.click(freeBucket);
+    expect(screen.getByText('free-bucket')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить группу' }));
+    expect(within(await screen.findByRole('dialog')).getByText('Квота: 3 GB')).toBeTruthy();
     await confirm();
-    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/profile'))).toBe(true));
-    const call = fetchMock.mock.calls.find(([path]) => path.endsWith('/storage/profile'));
-    expect(JSON.parse(call?.[1]?.body as string)).toMatchObject({ quotaValue: '3', quotaUnit: 'pb', accessKey: '', secretKey: '' });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path.endsWith('/storage/groups/save'))).toBe(true));
+    const call = fetchMock.mock.calls.find(([path]) => path.endsWith('/storage/groups/save'));
+    expect(JSON.parse(call?.[1]?.body as string)).toMatchObject({ id: null, name: 'Фото', quotaValue: '3', quotaUnit: 'gb',
+      buckets: [{ serviceUrl: 'https://s3.example', bucketName: 'free-bucket' }] });
+    expect(screen.getByText(/Требуется перезапуск: files/)).toBeTruthy();
   });
   it('сворачивает группы, раскрывает совпадения и восстанавливает прежнее раскрытие и черновики', async () => {
     mockServer();

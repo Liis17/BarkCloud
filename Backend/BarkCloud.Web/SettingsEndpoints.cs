@@ -46,10 +46,16 @@ public static class SettingsEndpoints
         bool IsLegacy,
         string? ProfileId,
         bool ConfirmLegacyMutation,
-        string? QuotaValue,
-        string? QuotaUnit,
         string? Region = null,
         bool? ForcePathStyle = null);
+    public sealed record ServerStorageGroupBucketBody(string? ServiceUrl, string? BucketName);
+    public sealed record ServerStorageGroupBody(
+        string? Id,
+        string? Name,
+        string? QuotaValue,
+        string? QuotaUnit,
+        IReadOnlyList<ServerStorageGroupBucketBody>? Buckets);
+    public sealed record ServerStorageGroupDeleteBody(string? Id);
     public sealed record ServerStorageActivateBody(string? ProfileId);
     public sealed record ServerStorageDisableBody(string? Role);
     public sealed record ReservedNameBody(string? Name);
@@ -138,6 +144,8 @@ public static class SettingsEndpoints
                 ToStorageProfileEdit(body),
                 $"user:{user.UserId}",
                 http.RequestAborted))));
+
+        MapStorageQuotaGroupEndpoints(api);
 
         api.MapPost("/server/storage/check", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageProfileBody body) =>
             DoAdmin(http, auth, admin, async _ =>
@@ -450,6 +458,21 @@ public static class SettingsEndpoints
         });
     }
 
+    public static void MapStorageQuotaGroupEndpoints(RouteGroupBuilder api)
+    {
+        api.MapPost("/server/storage/groups/save", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageGroupBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.SaveStorageGroupAsync(
+                ToStorageGroupEdit(body),
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+
+        api.MapPost("/server/storage/groups/delete", (HttpContext http, AuthGateway auth, AdminGate admin, ConfigurationManagementGateway configuration, ServerStorageGroupDeleteBody body) =>
+            DoAdmin(http, auth, admin, async user => Mutation(await configuration.DeleteStorageGroupAsync(
+                body.Id ?? string.Empty,
+                $"user:{user.UserId}",
+                http.RequestAborted))));
+    }
+
     /// <summary>Авторизация + вызов gRPC c пользовательским токеном + единый маппинг ошибок.</summary>
     private static async Task<IResult> Do(HttpContext http, AuthGateway auth, Func<WebUser, Metadata, Task<IResult>> action)
     {
@@ -500,8 +523,17 @@ public static class SettingsEndpoints
         body.IsLegacy,
         body.ProfileId,
         body.ConfirmLegacyMutation,
+        body.Region,
+        body.ForcePathStyle);
+
+    private static StorageGroupEdit ToStorageGroupEdit(ServerStorageGroupBody body) => new(
+        body.Id,
+        body.Name ?? string.Empty,
         body.QuotaValue ?? "0",
-        body.QuotaUnit ?? "gb", body.Region, body.ForcePathStyle);
+        body.QuotaUnit ?? "gb",
+        (body.Buckets ?? []).Select(bucket => new StorageGroupBucketEdit(
+            bucket.ServiceUrl ?? string.Empty,
+            bucket.BucketName ?? string.Empty)).ToArray());
 
     private static IResult MapRpc(RpcException ex)
     {

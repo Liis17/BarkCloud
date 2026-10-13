@@ -48,6 +48,7 @@ export function Sidebar({ profileError = false, storageError = false, statistics
   const diskAvailable = !!storage && storage.state !== 'loading' && !(storage.state === 'error' && !storage.updatedAt);
   const diskState = storageError ? 'error' : storage?.state ?? (storage ? 'ready' : 'loading');
   const s3State = storageError ? 'error' : storage?.allS3State ?? (storage ? storage.allS3StatsAvailable ? 'ready' : 'error' : 'loading');
+  const s3Pending = ['loading', 'refreshing'].includes(s3State);
   const app = shell?.app;
 
   return (
@@ -97,30 +98,29 @@ export function Sidebar({ profileError = false, storageError = false, statistics
           {diskAvailable && <div className="sb-storage-foot"><span>{storage!.percent}% использовано</span></div>}
           {(storageError || storage && storage.state !== 'loading') && <StorageStatsStatus state={storageError ? 'error' : storage?.state} updatedAt={storage?.updatedAt} />}
         </div>
-        <div className="sb-storage-row">
-          <div className="sb-storage-head">
-            <span>S3-бакеты</span>
-            <span className="used">
-              {!storage?.allS3StatsAvailable ? s3State === 'loading' ? 'Подсчитываем…' : s3State === 'not_configured' ? 'не настроен' : 'недоступно' : storage.allS3HasFiniteQuota
-                ? `${storage.allS3UsedLabel} / ${storage.allS3QuotaLabel}`
-                : `${storage.allS3UsedLabel} · безлимит`}
-            </span>
-          </div>
-          <div className={"bar" + (s3State === "loading" ? " pending" : "")} role="progressbar" aria-label="Использование S3-хранилища"
-            aria-valuemin={0} aria-valuemax={100}
-            aria-valuenow={!storage?.allS3StatsAvailable ? undefined : storage.allS3HasFiniteQuota
-              ? storage.allS3Percent : 100}>
-            <div className="bar-fill" style={{
-              width: (!storage?.allS3StatsAvailable ? 0 : storage.allS3HasFiniteQuota
-                ? storage.allS3Percent : 100) + '%',
-              background: 'var(--md-primary)',
-            }} />
-          </div>
-          {storage?.allS3StatsAvailable && <div className="sb-storage-foot">
-            <span>{storage.allS3HasFiniteQuota ? `${storage.allS3Percent}% использовано` : 'безлимит'}</span>
-          </div>}
-          {s3State !== 'loading' && <StorageStatsStatus state={s3State} updatedAt={storage?.allS3UpdatedAt} />}
-        </div>
+        {!storage?.allS3StatsAvailable ? <div className="sb-storage-row">
+          <div className="sb-storage-head"><span>S3</span><span className="used">
+            {s3Pending ? 'Подсчитываем…' : s3State === 'not_configured' ? 'не настроен' : 'недоступно'}
+          </span></div>
+        </div> : <>
+          {storage.s3Groups.map((group) => {
+            const name = group.ungrouped ? 'Без группы' : group.name;
+            const used = group.ungrouped ? group.usedLabel : group.hasFiniteQuota
+              ? `${group.usedLabel} / ${group.quotaLabel}` : `${group.usedLabel} · безлимит`;
+            return <div className="sb-storage-row" key={group.id}>
+              <div className="sb-storage-head"><span>{name}</span><span className="used">{used}</span></div>
+              {!group.ungrouped && <div className="bar" role="progressbar" aria-label={`Использование S3: ${name}`} aria-valuemin={0} aria-valuemax={100}
+                aria-valuenow={group.percent}>
+                <div className="bar-fill" style={{ width: group.percent + '%', background: 'var(--md-primary)' }} />
+              </div>}
+              {(group.ungrouped || group.unmeasuredBuckets > 0 || !group.hasFiniteQuota) && <div className="sb-storage-foot">
+                {!group.ungrouped && <span>{group.hasFiniteQuota ? `${group.percent}% использовано` : 'безлимит'}</span>}
+                {group.unmeasuredBuckets > 0 && <span>учёт неполный</span>}
+              </div>}
+            </div>;
+          })}
+          <StorageStatsStatus state={s3State} updatedAt={storage.allS3UpdatedAt} />
+        </>}
       </div>
 
       <Link className="sb-user" to="/settings" aria-label={user?.displayName ? `Аккаунт ${user.displayName}` : 'Аккаунт'} title="Аккаунт">

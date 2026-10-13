@@ -275,10 +275,13 @@ export interface SharedMusicPlaylist {
 // ───────────────────────── Каркас (GET /api/me) ─────────────────────────
 
 export type StatsState = 'loading' | 'ready' | 'refreshing' | 'error' | 'not_configured';
+export interface S3GroupUsage {
+  id: string; name: string; usedLabel: string; quotaLabel: string; percent: number;
+  hasFiniteQuota: boolean; ungrouped: boolean; unmeasuredBuckets: number;
+}
 export interface SidebarStorage {
   usedLabel: string; totalLabel: string; percent: number; otherPct: number; s3Pct: number;
-  allS3UsedLabel: string; allS3QuotaLabel: string; allS3Percent: number;
-  allS3HasFiniteQuota: boolean; allS3StatsAvailable: boolean;
+  s3Groups: S3GroupUsage[]; allS3StatsAvailable: boolean;
   state?: StatsState; updatedAt?: string | null;
   allS3State?: StatsState; allS3UpdatedAt?: string | null;
 }

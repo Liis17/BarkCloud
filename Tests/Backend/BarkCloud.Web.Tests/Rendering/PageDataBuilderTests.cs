@@ -69,7 +69,15 @@ public class PageDataBuilderTests
                 TotalAvailableStorage = 100, DiskUsedStorage = 25,
                 PhysicalStatsState = "refreshing",
                 PhysicalStatsUpdatedAt = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(updatedAt),
-                AllS3StatsState = "loading"
+                AllS3StatsState = "loading",
+                S3QuotaGroups =
+                {
+                    new S3QuotaGroupUsage
+                    {
+                        Id = "grp-one", Name = "Фото", UsedBytes = 50, QuotaBytes = 100,
+                        UnmeasuredBuckets = 2
+                    }
+                }
             }));
 
         var json = JsonSerializer.SerializeToElement(await Create().BuildStorageAsync(User));
@@ -78,6 +86,15 @@ public class PageDataBuilderTests
         json.GetProperty("updatedAt").GetDateTimeOffset().UtcDateTime.Should().Be(updatedAt);
         json.GetProperty("allS3State").GetString().Should().Be("loading");
         json.GetProperty("allS3UpdatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        var group = json.GetProperty("s3Groups")[0];
+        group.GetProperty("id").GetString().Should().Be("grp-one");
+        group.GetProperty("name").GetString().Should().Be("Фото");
+        group.GetProperty("usedLabel").GetString().Should().NotBeNullOrEmpty();
+        group.GetProperty("quotaLabel").GetString().Should().NotBeNullOrEmpty();
+        group.GetProperty("percent").GetInt32().Should().Be(50);
+        group.GetProperty("hasFiniteQuota").GetBoolean().Should().BeTrue();
+        group.GetProperty("ungrouped").GetBoolean().Should().BeFalse();
+        group.GetProperty("unmeasuredBuckets").GetInt32().Should().Be(2);
         json.GetProperty("percent").GetInt32().Should().Be(25);
     }
 
