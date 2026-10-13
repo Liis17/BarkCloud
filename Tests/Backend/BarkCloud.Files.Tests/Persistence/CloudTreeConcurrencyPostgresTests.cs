@@ -1,6 +1,8 @@
 using BarkCloud.Files.Domain;
+using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
 using BarkCloud.Files.Features.Cloud.MoveDirectory;
+using BarkCloud.Files.Features.Cloud.SetDirectoryVisibility;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Tests._Helpers;
 using BarkCloud.Shared.Exceptions.Files;
@@ -67,6 +69,76 @@ public sealed class CloudTreeConcurrencyPostgresTests
         orphans.Should().BeEmpty("папка не должна указывать на уже удалённого родителя");
     }
 
+    [PostgresFact]
+    public async Task SetVisibility_RacingCreateChild_PreservesInheritance()
+    {
+        await using var database = await PostgresFilesDatabase.CreateAsync();
+        var parent = Directory("Parent");
+        await Seed(database, parent);
+
+        await RunConcurrently(
+            RunSetVisibility(database, parent.Id, inherit: false, hideFromGallery: true, hideFromSearch: true),
+            RunCreateDirectory(database, parent.Id, "Child"));
+
+        await AssertVisibilityConsistent(database);
+        await using var context = database.CreateContext();
+        var child = await context.CloudDirectories.AsNoTracking().SingleAsync(x => x.ParentId == parent.Id);
+        child.EffectiveHideFromGallery.Should().BeTrue();
+        child.EffectiveHideFromSearch.Should().BeTrue();
+    }
+
+    [PostgresFact]
+    public async Task SetVisibility_RacingMoveSubtree_PreservesInheritance()
+    {
+        await using var database = await PostgresFilesDatabase.CreateAsync();
+        var parent = Directory("Parent");
+        var moved = Directory("Moved");
+        var child = Directory("Child");
+        child.ParentId = moved.Id;
+        await Seed(database, parent, moved, child);
+
+        await RunConcurrently(
+            RunSetVisibility(database, parent.Id, inherit: false, hideFromGallery: true, hideFromSearch: true),
+            RunMoveDirectory(database, moved.Id, parent.Id));
+
+        await AssertVisibilityConsistent(database);
+        await using var context = database.CreateContext();
+        var persisted = await context.CloudDirectories.AsNoTracking().ToDictionaryAsync(x => x.Id);
+        persisted[moved.Id].ParentId.Should().Be(parent.Id);
+        persisted[moved.Id].EffectiveHideFromGallery.Should().BeTrue();
+        persisted[child.Id].EffectiveHideFromGallery.Should().BeTrue();
+        persisted[moved.Id].EffectiveHideFromSearch.Should().BeTrue();
+        persisted[child.Id].EffectiveHideFromSearch.Should().BeTrue();
+    }
+
+    [PostgresFact]
+    public async Task SetVisibility_RacingIntermediateOverride_PreservesOverride()
+    {
+        await using var database = await PostgresFilesDatabase.CreateAsync();
+        var parent = Directory("Parent");
+        var intermediate = Directory("Intermediate");
+        intermediate.ParentId = parent.Id;
+        intermediate.InheritVisibility = false;
+        var child = Directory("Child");
+        child.ParentId = intermediate.Id;
+        await Seed(database, parent, intermediate, child);
+
+        await RunConcurrently(
+            RunSetVisibility(database, parent.Id, inherit: false, hideFromGallery: true, hideFromSearch: true),
+            RunSetVisibility(database, intermediate.Id, inherit: false, hideFromGallery: false, hideFromSearch: false));
+
+        await AssertVisibilityConsistent(database);
+        await using var context = database.CreateContext();
+        var persisted = await context.CloudDirectories.AsNoTracking().ToDictionaryAsync(x => x.Id);
+        persisted[parent.Id].EffectiveHideFromGallery.Should().BeTrue();
+        persisted[parent.Id].EffectiveHideFromSearch.Should().BeTrue();
+        persisted[intermediate.Id].InheritVisibility.Should().BeFalse();
+        persisted[intermediate.Id].EffectiveHideFromGallery.Should().BeFalse();
+        persisted[intermediate.Id].EffectiveHideFromSearch.Should().BeFalse();
+        persisted[child.Id].EffectiveHideFromGallery.Should().BeFalse();
+        persisted[child.Id].EffectiveHideFromSearch.Should().BeFalse();
+    }
+
     private static Func<Task> RunMove(PostgresFilesDatabase database, CountdownEvent gate, Guid directoryId, Guid newParentId) =>
         () => Task.Run(async () =>
         {
@@ -91,6 +163,73 @@ public sealed class CloudTreeConcurrencyPostgresTests
                 NullLogger<DeleteDirectoryCommandHandler>.Instance);
             await handler.Handle(new DeleteDirectoryCommand { DirectoryId = directoryId }, CancellationToken.None);
         });
+
+    private static Func<Task> RunSetVisibility(
+        PostgresFilesDatabase database,
+        Guid directoryId,
+        bool inherit,
+        bool hideFromGallery,
+        bool hideFromSearch) =>
+        RunWithContext(database, context => new SetDirectoryVisibilityCommandHandler(
+                new CloudHierarchyStorage(context), UserContextFactory.Create(OwnerId))
+            .Handle(new SetDirectoryVisibilityCommand
+            {
+                DirectoryId = directoryId,
+                Inherit = inherit,
+                HideFromGallery = hideFromGallery,
+                HideFromSearch = hideFromSearch
+            }, CancellationToken.None));
+
+    private static Func<Task> RunCreateDirectory(PostgresFilesDatabase database, Guid parentId, string name) =>
+        RunWithContext(database, context => new CreateDirectoryCommandHandler(
+                new CloudHierarchyStorage(context), UserContextFactory.Create(OwnerId),
+                NullLogger<CreateDirectoryCommandHandler>.Instance)
+            .Handle(new CreateDirectoryCommand { Name = name, ParentId = parentId }, CancellationToken.None));
+
+    private static Func<Task> RunMoveDirectory(PostgresFilesDatabase database, Guid directoryId, Guid parentId) =>
+        RunWithContext(database, context => new MoveDirectoryCommandHandler(
+                new CloudHierarchyStorage(context), UserContextFactory.Create(OwnerId),
+                NullLogger<MoveDirectoryCommandHandler>.Instance)
+            .Handle(new MoveDirectoryCommand { DirectoryId = directoryId, NewParentId = parentId }, CancellationToken.None));
+
+    private static Func<Task> RunWithContext(PostgresFilesDatabase database, Func<FilesContext, Task> action) =>
+        async () =>
+        {
+            await using var context = database.CreateContext();
+            await action(context);
+        };
+
+    private static async Task RunConcurrently(params Func<Task>[] operations)
+    {
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tasks = operations.Select(operation => Task.Run(async () =>
+        {
+            await start.Task;
+            await operation();
+        })).ToArray();
+
+        start.SetResult();
+        await Task.WhenAll(tasks);
+    }
+
+    private static async Task AssertVisibilityConsistent(PostgresFilesDatabase database)
+    {
+        await using var context = database.CreateContext();
+        var directories = await context.CloudDirectories.AsNoTracking().ToDictionaryAsync(x => x.Id);
+        foreach (var directory in directories.Values)
+        {
+            var parent = directory.ParentId is Guid parentId ? directories[parentId] : null;
+            var expectedGallery = directory.InheritVisibility && parent is not null
+                ? parent.EffectiveHideFromGallery
+                : directory.HideFromGallery;
+            var expectedSearch = directory.InheritVisibility && parent is not null
+                ? parent.EffectiveHideFromSearch
+                : directory.HideFromSearch;
+
+            directory.EffectiveHideFromGallery.Should().Be(expectedGallery);
+            directory.EffectiveHideFromSearch.Should().Be(expectedSearch);
+        }
+    }
 
     /// <summary>
     /// Передаёт вызовы настоящему хранилищу; после проверки (Move: DirectoryNameExists) и после

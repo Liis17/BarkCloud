@@ -548,6 +548,7 @@ public class MusicLibraryService
         return _context.UploadedFiles
             .AsNoTracking()
             .WhereReady()
+            .WhereNotHiddenFromGallery(_context, ownerId)
             .Where(f => f.Uploaders.Contains(ownerId)
                         && f.Type == DomainUploadFileType.CloudFile
                         && f.MediaKind == DomainMediaKind.Audio

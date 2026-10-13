@@ -13,6 +13,8 @@ public interface ICloudHierarchyStorage
     Task UpdateDirectory(CloudDirectory directory, CancellationToken cancellationToken = default);
     Task<List<CloudDirectory>> ListSubdirectories(long ownerId, Guid? parentId, CancellationToken cancellationToken = default);
     Task<List<CloudDirectory>> GetSubtree(long ownerId, Guid rootDirectoryId, CancellationToken cancellationToken = default);
+    Task<(long FileCount, long TotalSizeBytes)> GetLiveFileStatsInDirectories(
+        long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken = default);
     void RemoveDirectories(IEnumerable<CloudDirectory> directories);
     Task<CloudFileEntry?> GetFileEntry(Guid id, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveFileEntriesByIds(long ownerId, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default);
@@ -28,7 +30,7 @@ public interface ICloudHierarchyStorage
     Task<List<CloudFileEntry>> ListFilesInDirectoryPage(
         long ownerId, Guid directoryId, string? cursorName, Guid? cursorEntryId, int limit,
         CancellationToken cancellationToken = default);
-    Task<List<CloudFileEntry>> SearchFileEntriesPage(long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit, IReadOnlyCollection<MediaKind>? kinds = null, CancellationToken cancellationToken = default);
+    Task<List<CloudFileEntry>> SearchFileEntriesPage(long ownerId, string query, DateTime? cursorCreatedAt, Guid? cursorEntryId, int limit, IReadOnlyCollection<MediaKind>? kinds = null, CancellationToken cancellationToken = default, bool excludeHiddenFromGallery = false);
     Task<List<CloudFileEntry>> GetFileEntriesInDirectories(long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveEntriesForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveEntriesForFiles(long ownerId, IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken = default);

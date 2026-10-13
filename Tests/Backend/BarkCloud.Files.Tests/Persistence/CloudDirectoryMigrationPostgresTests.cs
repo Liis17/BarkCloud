@@ -15,6 +15,7 @@ namespace BarkCloud.Files.Tests.Persistence;
 public sealed class CloudDirectoryMigrationPostgresTests
 {
     private const string Migration = "20261002020415_EnforceUniqueCloudDirectories";
+    private const string VisibilityMigration = "20261012223000_AddCloudDirectoryVisibility";
     private const string LegacyMigration = "20260913233127_PersistUploadSessionParts";
     private const long OwnerId = 42;
 
@@ -39,7 +40,9 @@ public sealed class CloudDirectoryMigrationPostgresTests
             Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = photos.Id, FileId = Guid.NewGuid(),
             Name = "file.txt", CreatedAt = DateTime.UtcNow
         };
-        context.CloudDirectories.AddRange(root, photos, child);
+        await InsertLegacyDirectory(context, root);
+        await InsertLegacyDirectory(context, photos);
+        await InsertLegacyDirectory(context, child);
         CloudFileEntryFixtures.AddOriginals(context, [entry]);
         context.CloudFileEntries.Add(entry);
         context.FolderShareLinks.Add(new FolderShareLink
@@ -52,22 +55,26 @@ public sealed class CloudDirectoryMigrationPostgresTests
             Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = photos.Id, RecipientId = 77, CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
-        var directories = await context.CloudDirectories.AsNoTracking().ToListAsync();
+        var legacyDirectories = await LegacyDirectoryRows(context);
         var entries = await context.CloudFileEntries.AsNoTracking().ToListAsync();
         var shares = await context.FolderShareLinks.AsNoTracking().ToListAsync();
         var grants = await context.DirectoryGrants.AsNoTracking().ToListAsync();
 
         await context.Database.MigrateAsync();
         await AssertUniqueIndexes(context);
+        (await context.Database.GetAppliedMigrationsAsync()).Should().Contain(VisibilityMigration);
+        await AssertVisibilityDefaults(context);
         await context.GetService<IMigrator>().MigrateAsync(LegacyMigration);
 
         (await IndexDefinition(context, "IX_CloudDirectories_OwnerId_Name")).Should().BeNull();
         (await IndexDefinition(context, "IX_CloudDirectories_OwnerId_SystemKind")).Should().Contain("CREATE INDEX");
         (await IndexDefinition(context, "IX_CloudDirectories_OwnerId_ParentId_Name")).Should().Contain("CREATE UNIQUE INDEX");
+        (await LegacyDirectoryRows(context)).Should().Equal(legacyDirectories);
         await context.Database.MigrateAsync();
 
         await AssertUniqueIndexes(context);
-        (await context.CloudDirectories.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(directories);
+        await AssertVisibilityDefaults(context);
+        (await LegacyDirectoryRows(context)).Should().Equal(legacyDirectories);
         (await context.CloudFileEntries.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(entries);
         (await context.FolderShareLinks.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(shares);
         (await context.DirectoryGrants.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(grants);
@@ -80,19 +87,18 @@ public sealed class CloudDirectoryMigrationPostgresTests
         await using var context = database.CreateContext();
         for (var owner = 1; owner <= 21; owner++)
         {
-            context.CloudDirectories.AddRange(
-                Directory("Docs", ownerId: owner), Directory("Docs", ownerId: owner),
-                Directory("Photos A", CloudDirectorySystemKind.Photos, owner),
-                Directory("Photos B", CloudDirectorySystemKind.Photos, owner));
+            await InsertLegacyDirectory(context, Directory("Docs", ownerId: owner));
+            await InsertLegacyDirectory(context, Directory("Docs", ownerId: owner));
+            await InsertLegacyDirectory(context, Directory("Photos A", CloudDirectorySystemKind.Photos, owner));
+            await InsertLegacyDirectory(context, Directory("Photos B", CloudDirectorySystemKind.Photos, owner));
         }
-        await context.SaveChangesAsync();
 
         var migrate = () => context.Database.MigrateAsync();
         var error = await migrate.Should().ThrowAsync<PostgresException>();
 
         Regex.Matches(error.Which.MessageText, "OwnerId=").Count.Should().Be(40);
         error.Which.MessageText.Should().Contain("OwnerId=20,").And.NotContain("OwnerId=21,");
-        (await context.CloudDirectories.CountAsync()).Should().Be(84);
+        (await LegacyDirectoryRows(context)).Should().HaveCount(84);
     }
 
     private static async Task AssertDuplicateMigration(bool system)
@@ -118,13 +124,15 @@ public sealed class CloudDirectoryMigrationPostgresTests
             Id = Guid.NewGuid(), OwnerId = OwnerId, RecipientId = 77, DirectoryId = second.Id,
             CreatedAt = DateTime.UtcNow
         };
-        context.CloudDirectories.AddRange(first, second, child);
+        await InsertLegacyDirectory(context, first);
+        await InsertLegacyDirectory(context, second);
+        await InsertLegacyDirectory(context, child);
         CloudFileEntryFixtures.AddOriginals(context, [entry]);
         context.CloudFileEntries.Add(entry);
         context.FolderShareLinks.Add(share);
         context.DirectoryGrants.Add(grant);
         await context.SaveChangesAsync();
-        var before = await context.CloudDirectories.AsNoTracking().ToListAsync();
+        var before = await LegacyDirectoryRows(context);
 
         var migrate = () => context.Database.MigrateAsync();
         var error = await migrate.Should().ThrowAsync<PostgresException>();
@@ -134,7 +142,7 @@ public sealed class CloudDirectoryMigrationPostgresTests
         (await context.Database.GetAppliedMigrationsAsync()).Should().NotContain(Migration);
         (await IndexDefinition(context, "IX_CloudDirectories_OwnerId_Name")).Should().BeNull();
         (await IndexDefinition(context, "IX_CloudDirectories_OwnerId_SystemKind")).Should().Contain("CREATE INDEX");
-        (await context.CloudDirectories.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(before);
+        (await LegacyDirectoryRows(context)).Should().Equal(before);
         var storage = new CloudHierarchyStorage(context);
         (await storage.GetFileEntry(entry.Id))!.DirectoryId.Should().Be(second.Id);
         (await context.FolderShareLinks.AsNoTracking().SingleAsync()).DirectoryId.Should().Be(second.Id);
@@ -142,13 +150,15 @@ public sealed class CloudDirectoryMigrationPostgresTests
 
         // Исправление выполняет оператор; миграция сама не переименовывает и не объединяет папки.
         if (system)
-            second.SystemKind = CloudDirectorySystemKind.None;
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"CloudDirectories\" SET \"SystemKind\" = 0 WHERE \"Id\" = {second.Id}");
         else
-            second.Name = "Docs (1)";
-        await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"CloudDirectories\" SET \"Name\" = {"Docs (1)"} WHERE \"Id\" = {second.Id}");
         await context.Database.MigrateAsync();
 
         await AssertUniqueIndexes(context);
+        await AssertVisibilityDefaults(context);
         (await storage.GetDirectoryAsNoTracking(child.Id))!.ParentId.Should().Be(second.Id);
         (await storage.GetFileEntry(entry.Id))!.DirectoryId.Should().Be(second.Id);
     }
@@ -159,6 +169,21 @@ public sealed class CloudDirectoryMigrationPostgresTests
         Id = Guid.NewGuid(), OwnerId = ownerId, Name = name, SystemKind = kind,
         CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
     };
+
+    private static Task<int> InsertLegacyDirectory(FilesContext context, CloudDirectory directory) =>
+        context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "CloudDirectories" ("Id", "OwnerId", "ParentId", "Name", "SystemKind", "CreatedAt", "UpdatedAt")
+            VALUES ({directory.Id}, {directory.OwnerId}, {directory.ParentId}, {directory.Name}, {(int)directory.SystemKind},
+                {directory.CreatedAt}, {directory.UpdatedAt})
+            """);
+
+    private static Task<List<string>> LegacyDirectoryRows(FilesContext context) =>
+        context.Database.SqlQuery<string>($"""
+            SELECT "Id"::text || '|' || "OwnerId"::text || '|' || COALESCE("ParentId"::text, '') || '|'
+                || "Name" || '|' || "SystemKind"::text || '|' || "CreatedAt"::text || '|' || "UpdatedAt"::text AS "Value"
+            FROM "CloudDirectories"
+            ORDER BY "Id"
+            """).ToListAsync();
 
     private static Task<string?> IndexDefinition(FilesContext context, string index) =>
         context.Database.SqlQuery<string>(
@@ -173,5 +198,15 @@ public sealed class CloudDirectoryMigrationPostgresTests
             .Should().Contain("CREATE UNIQUE INDEX").And.Contain("\"SystemKind\" <> 0");
         (await IndexDefinition(context, "IX_CloudDirectories_OwnerId_ParentId_Name"))
             .Should().Contain("CREATE UNIQUE INDEX");
+    }
+
+    private static async Task AssertVisibilityDefaults(FilesContext context)
+    {
+        var directories = await context.CloudDirectories.AsNoTracking().ToListAsync();
+        directories.Should().NotBeEmpty();
+        directories.Should().OnlyContain(directory => directory.InheritVisibility);
+        directories.Should().OnlyContain(directory => !directory.HideFromGallery && !directory.HideFromSearch);
+        directories.Should().OnlyContain(directory =>
+            !directory.EffectiveHideFromGallery && !directory.EffectiveHideFromSearch);
     }
 }

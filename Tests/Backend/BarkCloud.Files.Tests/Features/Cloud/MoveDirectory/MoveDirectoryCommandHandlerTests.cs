@@ -122,9 +122,12 @@ public class MoveDirectoryCommandHandlerTests
     {
         var id = Guid.NewGuid();
         var newParent = Guid.NewGuid();
-        SetupDir(id, new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null, Name = "Docs" });
+        var directory = new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null, Name = "Docs" };
+        SetupDir(id, directory);
         _storage.Setup(s => s.GetDirectoryAsNoTracking(newParent, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CloudDirectory { Id = newParent, OwnerId = OwnerId, ParentId = null });
+        _storage.Setup(s => s.GetSubtree(OwnerId, id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([directory]);
         _storage.Setup(s => s.DirectoryNameExists(OwnerId, newParent, "Docs", It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         await CreateSut().Handle(new MoveDirectoryCommand { DirectoryId = id, NewParentId = newParent }, default);
@@ -138,13 +141,16 @@ public class MoveDirectoryCommandHandlerTests
         var id = Guid.NewGuid();
         var newParent = Guid.NewGuid();
         var calls = new List<string>();
+        var directory = new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null, Name = "Docs" };
         _storage.Setup(s => s.LockTree(OwnerId, It.IsAny<CancellationToken>()))
             .Callback(() => calls.Add("lock")).ReturnsAsync(_treeLock.Object);
         _storage.Setup(s => s.GetDirectory(id, It.IsAny<CancellationToken>()))
             .Callback(() => calls.Add("read"))
-            .ReturnsAsync(new CloudDirectory { Id = id, OwnerId = OwnerId, ParentId = null, Name = "Docs" });
+            .ReturnsAsync(directory);
         _storage.Setup(s => s.GetDirectoryAsNoTracking(newParent, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CloudDirectory { Id = newParent, OwnerId = OwnerId, ParentId = null });
+        _storage.Setup(s => s.GetSubtree(OwnerId, id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([directory]);
         _storage.Setup(s => s.UpdateDirectory(It.IsAny<CloudDirectory>(), It.IsAny<CancellationToken>()))
             .Callback(() => calls.Add("update"));
         _treeLock.Setup(l => l.CommitAsync(It.IsAny<CancellationToken>()))

@@ -57,6 +57,10 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 - `AttachFile` вызывайте только после статуса `READY`. Параметр `route_by_media_kind=true` позволяет серверу выбрать системную папку по типу файла.
 - Фото и видео добавляются в альбомы через `AlbumApi.AddItemsToAlbum`; страница альбома использует `ListAlbums` и `ListAlbumItems`. Курсор альбомов — пара `(cursor_updated_at, cursor_album_id)`, элементов — `(cursor_added_at, cursor_file_id)`.
 
+`CloudApi.GetDirectoryProperties(directory_id)` возвращает свойства папки, рекурсивные счётчики живых файлов и вложенных папок, суммарный размер и собственные/effective-настройки видимости. `CloudApi.SetDirectoryVisibility` сохраняет `inherit`, `hide_from_gallery` и `hide_from_search`; для верхнеуровневой папки сервер рассчитывает `inherit` по её собственным флагам. Скрытие из галереи не убирает файл из папок, альбомов и плейлистов.
+
+В `CloudApi.SearchFilesRequest` передавайте `exclude_hidden_from_gallery=true`, если поиск обслуживает галерею и должен исключать файлы из папок, скрытых из галереи. Без этого флага обычный поиск Files включает их. Этот параметр не управляет `SearchApi.Search`, который применяет отдельную настройку скрытия из поиска.
+
 ### Поиск
 
 `SearchApi.Search` возвращает секции с рангом, сходством и курсором, рассчитанными PostgreSQL. `match_field` называет поле, определившее совпадение (`name`, `alias`, `tag`, `title`, `artist`, `album`, `documentTitle`, `documentAuthor`, `documentSubject` или `description`); `match_value` содержит отображаемое исходное значение. У системных и пользовательских умных папок, папок и shared-объектов поле называется `name`. Для алиаса и тега `match_value` сохраняет исходный регистр и пробелы.
