@@ -43,7 +43,7 @@ internal sealed class LocalSmtpServer : IAsyncDisposable
         var request = new CertificateRequest("CN=SMTP test CA", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign, true));
-        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-30), DateTimeOffset.UtcNow.AddDays(30));
+        return Persist(request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-30), DateTimeOffset.UtcNow.AddDays(30)));
     }
 
     public static X509Certificate2 CreateCertificate(string host = "localhost",
@@ -60,10 +60,16 @@ internal sealed class LocalSmtpServer : IAsyncDisposable
         var notBefore = DateTimeOffset.UtcNow.AddDays(-2);
         var notAfter = DateTimeOffset.UtcNow.AddDays(expired ? -1 : 1);
         if (authority == null)
-            return request.CreateSelfSigned(notBefore, notAfter);
+            return Persist(request.CreateSelfSigned(notBefore, notAfter));
 
         using var signed = request.Create(authority, notBefore, notAfter, RandomNumberGenerator.GetBytes(16));
-        return signed.CopyWithPrivateKey(key);
+        return Persist(signed.CopyWithPrivateKey(key));
+    }
+
+    private static X509Certificate2 Persist(X509Certificate2 certificate)
+    {
+        using (certificate)
+            return new X509Certificate2(certificate.Export(X509ContentType.Pfx), (string?)null, X509KeyStorageFlags.Exportable);
     }
 
     private async Task RunAsync()
