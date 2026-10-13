@@ -1,4 +1,5 @@
 using BarkCloud.Files.Domain;
+using BarkCloud.Files.Exceptions;
 using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Services;
 using BarkCloud.Files.Tests._Helpers;
@@ -28,7 +29,15 @@ public class UploadSessionCoordinatorTests : IDisposable
             ("StorageProfiles:universal:AccessKey", "test"),
             ("StorageProfiles:universal:SecretKey", "test-secret"),
             ("StorageProfiles:universal:BucketName", "files"),
-            ("StorageProfiles:universal:IsActive", "true")));
+            ("StorageProfiles:universal:IsActive", "true"),
+            ("StorageProfiles:avatars:ProfileId", "avatars-v1"),
+            ("StorageProfiles:avatars:Role", "avatars"),
+            ("StorageProfiles:avatars:Version", "1"),
+            ("StorageProfiles:avatars:ServiceUrl", "http://localhost:9000"),
+            ("StorageProfiles:avatars:AccessKey", "test"),
+            ("StorageProfiles:avatars:SecretKey", "test-secret"),
+            ("StorageProfiles:avatars:BucketName", "avatars"),
+            ("StorageProfiles:avatars:IsActive", "true")));
         _limits.Setup(x => x.GetLimitBytesAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((long?)null);
         _objects.Setup(x => x.InitiateAsync(
@@ -48,6 +57,125 @@ public class UploadSessionCoordinatorTests : IDisposable
         repeated.SessionId.Should().Be(first.SessionId);
         repeated.FileId.Should().Be(first.FileId);
         repeated.Status.Should().Be(UploadSessionStatus.Uploading);
+    }
+
+    [Theory]
+    [InlineData(UploadFileType.UserAvatar, "avatar.png", "image/png", "avatars-v1")]
+    [InlineData(UploadFileType.CloudFile, "movie.mp4", "video/mp4", "universal-v1")]
+    public async Task CreateAsync_PersistsRequestedTypeForSessionAndPlaceholderAndSelectsProfile(
+        UploadFileType type, string fileName, string contentType, string profileId)
+    {
+        var input = Input("typed-upload", 42, type, fileName, contentType);
+
+        var result = await CreateSut().CreateAsync(10, "Safari", input, default);
+
+        var session = await _database.Context.UploadSessions.SingleAsync(x => x.Id == result.SessionId);
+        var file = await _database.Context.UploadedFiles.SingleAsync(x => x.Id == result.FileId);
+        session.FileType.Should().Be(type);
+        session.StorageProfileId.Should().Be(profileId);
+        file.Type.Should().Be(type);
+        file.StorageProfileId.Should().Be(profileId);
+        _objects.Verify(x => x.InitiateAsync(
+            profileId, result.FileId.ToString(), contentType, fileName, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AtAvatarSizeLimit_IsAccepted()
+    {
+        var result = await CreateSut().CreateAsync(
+            10,
+            "Safari",
+            Input("avatar-limit", UploadSessionCoordinator.MaximumAvatarSize, UploadFileType.UserAvatar, "avatar.png", "image/png"),
+            default);
+
+        (await _database.Context.UploadSessions.SingleAsync(x => x.Id == result.SessionId)).DeclaredSize
+            .Should().Be(20L * 1024 * 1024);
+        UploadSessionCoordinator.MaximumAvatarSize.Should().Be(20L * 1024 * 1024);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AboveAvatarSizeLimit_RejectsBeforeQuotaAndMultipartReservation()
+    {
+        var act = () => CreateSut().CreateAsync(
+            10,
+            "Safari",
+            Input("avatar-too-large", UploadSessionCoordinator.MaximumAvatarSize + 1, UploadFileType.UserAvatar, "avatar.png", "image/png"),
+            default);
+
+        await act.Should().ThrowAsync<InvalidUploadSessionRequestException>();
+        _limits.Verify(x => x.GetLimitBytesAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        _objects.Verify(x => x.InitiateAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _database.Context.UploadSessions.Should().BeEmpty();
+        _database.Context.UploadedFiles.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(UploadFileType.UserAvatar, "cancel")]
+    [InlineData(UploadFileType.CloudFile, "cancel")]
+    [InlineData(UploadFileType.UserAvatar, "expire")]
+    [InlineData(UploadFileType.CloudFile, "expire")]
+    [InlineData(UploadFileType.UserAvatar, "failed-cleanup")]
+    [InlineData(UploadFileType.CloudFile, "failed-cleanup")]
+    public async Task CreateAsync_IdempotencyUsesPersistedTypeAfterCleanup(
+        UploadFileType type, string terminalPath)
+    {
+        var sut = CreateSut();
+        var input = Input("retained-upload", 42, type, "avatar.png", "image/png");
+        var created = await sut.CreateAsync(10, "Safari", input, default);
+
+        switch (terminalPath)
+        {
+            case "cancel":
+                await sut.CancelAsync(10, created.SessionId, default);
+                break;
+            case "expire":
+                var expiring = await _database.Context.UploadSessions.SingleAsync(x => x.Id == created.SessionId);
+                expiring.ExpiresAt = _time.GetUtcNow().UtcDateTime.AddMinutes(-1);
+                await _database.Context.SaveChangesAsync();
+                await new UploadSessionMaintenance(
+                    _database.Context,
+                    _objects.Object,
+                    Mock.Of<IUploadArtifactCleaner>(),
+                    _time,
+                    NullLogger<UploadSessionMaintenance>.Instance).RunOnceAsync(default);
+                break;
+            case "failed-cleanup":
+                var failed = await _database.Context.UploadSessions.SingleAsync(x => x.Id == created.SessionId);
+                failed.Status = UploadSessionStatus.Processing;
+                failed.CompletedEtag = "completed-etag";
+                await _database.Context.SaveChangesAsync();
+                var pipeline = new Mock<IUploadEnrichmentPipeline>();
+                pipeline.Setup(x => x.ProcessAsync(It.IsAny<UploadSession>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new FileIntegrityException("avatar integrity failure"));
+                var cleaner = new Mock<IUploadArtifactCleaner>();
+                cleaner.Setup(x => x.CleanupAsync(It.IsAny<UploadSession>(), It.IsAny<CancellationToken>()))
+                    .Returns(async (UploadSession session, CancellationToken ct) =>
+                    {
+                        var placeholder = await _database.Context.UploadedFiles
+                            .SingleAsync(x => x.Id == session.FileId, ct);
+                        _database.Context.UploadedFiles.Remove(placeholder);
+                        session.CleanupPending = false;
+                        await _database.Context.SaveChangesAsync(ct);
+                    });
+                var processor = new UploadSessionProcessor(
+                    _database.Context, pipeline.Object, cleaner.Object, _time,
+                    NullLogger<UploadSessionProcessor>.Instance);
+                (await processor.ProcessAsync(created.SessionId, default)).Should().Be(UploadProcessingOutcome.Failed);
+                break;
+        }
+
+        _database.Context.UploadedFiles.Should().BeEmpty();
+        var repeated = await sut.CreateAsync(10, "Safari", input, default);
+        repeated.SessionId.Should().Be(created.SessionId);
+        repeated.FileId.Should().Be(created.FileId);
+
+        var otherType = type == UploadFileType.UserAvatar ? UploadFileType.CloudFile : UploadFileType.UserAvatar;
+        var conflicting = () => sut.CreateAsync(
+            10, "Safari", Input("retained-upload", 42, otherType, "avatar.png", "image/png"), default);
+        await conflicting.Should().ThrowAsync<UploadIdempotencyConflictException>();
+        _objects.Verify(x => x.InitiateAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -556,12 +684,18 @@ public class UploadSessionCoordinatorTests : IDisposable
         _time,
         NullLogger<UploadSessionCoordinator>.Instance);
 
-    private static CreateUploadSessionInput Input(string key, long size) => new(
+    private static CreateUploadSessionInput Input(
+        string key,
+        long size,
+        UploadFileType fileType = UploadFileType.CloudFile,
+        string fileName = "movie.mp4",
+        string contentType = "video/mp4") => new(
         key,
-        "movie.mp4",
+        fileName,
         size,
-        "video/mp4",
-        new string('a', 64));
+        contentType,
+        new string('a', 64),
+        fileType);
 
     public void Dispose()
     {

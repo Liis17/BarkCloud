@@ -22,13 +22,15 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 
 ### Загрузка
 
-Для resumable-передачи вызовите `FilesApi.CreateUploadSession` с уникальным для операции `idempotency_key`, именем, размером, MIME-типом и SHA-256. Сервер вернёт `session_id`, `file_id`, состояние и размер части.
+Для resumable-передачи вызовите `FilesApi.CreateUploadSession` с уникальным для операции `idempotency_key`, именем, размером, MIME-типом и SHA-256. `file_type` необязателен и по умолчанию равен `CLOUD_FILE`; для аватара передайте `USER_AVATAR`. Сервер вернёт `session_id`, `file_id`, состояние и размер части.
 
 1. Отправляйте части по `PUT /file-upload/{session_id}/parts/{part_number}`.
 2. Для каждой части передайте `Content-Type: application/octet-stream`, точный `Content-Range: bytes start-end/total` и `X-Upload-Token` из ответа.
 3. При прерывании вызовите `ResumeUploadSession`: используйте новый токен и список `uploaded_parts`; отсутствующие части и части с `has_etag=false` отправьте повторно.
 4. Вызовите `CompleteUploadSession`, затем опрашивайте `GetUploadSession`, пока статус не станет `READY`.
 5. Для появления файла в облачной папке вызовите `CloudApi.AttachFile` с `file_id`.
+
+Для аватара размер ограничен 20 MiB. Дождитесь `READY`, затем передайте `file_id` в `UsersApi.SetProfilePicture`; `AttachFile` для аватара не вызывается. Сервер хранит исходный объект, его размер и SHA-256 без отдельного avatar-resize pipeline. Явный `UNKNOWN` или неподдерживаемое значение `file_type` отклоняется.
 
 Полный протокол, расчёт размеров частей и состояния — [[Backend/ResumableUpload]].
 

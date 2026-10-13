@@ -122,12 +122,24 @@ public static class WebApplicationBuilderExtensions
                 configurationDictionary[$"{prefix}:AccessKey"] = profile.AccessKey;
                 configurationDictionary[$"{prefix}:SecretKey"] = profile.SecretKey;
                 configurationDictionary[$"{prefix}:BucketName"] = profile.BucketName;
-                configurationDictionary[$"{prefix}:QuotaBytes"] = profile.QuotaBytes.ToString(CultureInfo.InvariantCulture);
                 configurationDictionary[$"{prefix}:IsR2"] = profile.IsR2.ToString();
                 configurationDictionary[$"{prefix}:Region"] = profile.Region;
                 configurationDictionary[$"{prefix}:ForcePathStyle"] = (!profile.HasForcePathStyle || profile.ForcePathStyle).ToString();
                 configurationDictionary[$"{prefix}:IsActive"] = profile.IsActive.ToString();
                 configurationDictionary[$"{prefix}:IsLegacy"] = profile.IsLegacy.ToString();
+            }
+
+            foreach (var group in profiles.QuotaGroups)
+            {
+                var prefix = $"StorageQuotaGroups:{group.Id}";
+                configurationDictionary[$"{prefix}:Name"] = group.Name;
+                configurationDictionary[$"{prefix}:QuotaBytes"] = group.QuotaBytes.ToString(CultureInfo.InvariantCulture);
+                for (var index = 0; index < group.Buckets.Count; index++)
+                {
+                    var bucketPrefix = $"{prefix}:Buckets:{index}";
+                    configurationDictionary[$"{bucketPrefix}:ServiceUrl"] = group.Buckets[index].ServiceUrl;
+                    configurationDictionary[$"{bucketPrefix}:BucketName"] = group.Buckets[index].BucketName;
+                }
             }
         }
 

@@ -40,3 +40,27 @@ class AuthInterceptor(
             Metadata.Key.of("x-auth-token", Metadata.ASCII_STRING_MARSHALLER)
     }
 }
+
+/** Добавляет уже разрешённый access-token без синхронного вызова refresher. */
+class FixedTokenInterceptor(
+    private val accessToken: String,
+) : ClientInterceptor {
+
+    override fun <ReqT : Any, RespT : Any> interceptCall(
+        method: MethodDescriptor<ReqT, RespT>,
+        callOptions: CallOptions,
+        next: Channel,
+    ): ClientCall<ReqT, RespT> = object : ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
+        next.newCall(method, callOptions)
+    ) {
+        override fun start(responseListener: Listener<RespT>, headers: Metadata) {
+            if (accessToken.isNotBlank()) headers.put(AUTH_TOKEN_KEY, accessToken)
+            super.start(responseListener, headers)
+        }
+    }
+
+    private companion object {
+        val AUTH_TOKEN_KEY: Metadata.Key<String> =
+            Metadata.Key.of("x-auth-token", Metadata.ASCII_STRING_MARSHALLER)
+    }
+}

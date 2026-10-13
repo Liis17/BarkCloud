@@ -38,7 +38,7 @@ export function MigrationApplyPanel({ active, onExpired, onApplied }: { active: 
       message={<div className="settings-confirm-lines"><p>{confirm.source.serviceUrl} / {confirm.source.bucketName}</p>
         <p>Назначение: {confirm.destination.serviceUrl} / {confirm.destination.bucketName}</p>
         <p>Регион: {confirm.destination.region || 'автоматически'} · {confirm.destination.forcePathStyle ? 'Path style' : 'Virtual host'}{confirm.destination.isR2 ? ' · Cloudflare R2' : ''}</p>
-        <p>Будут заменены подключения всех профилей: {confirm.source.profileIds.join(', ')}. Их ID, версии, роли и квоты сохранятся.</p>
+        <p>Будут заменены подключения всех профилей: {confirm.source.profileIds.join(', ')}. Их ID, версии и роли сохранятся.</p>
         <p>Новые записи временно приостановятся. После завершения активных загрузок выполним финальную досинхронизацию, сохраним подключения и автоматически перезапустим Files. Чтение доступно до перезапуска.</p>
       </div>} onConfirm={() => mutate('/api/settings/server/storage/migration/apply', { jobId: confirm.id })} />}
   </div>;
