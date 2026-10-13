@@ -22,6 +22,8 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 
 `IdentityApi` предоставляет отдельные `CreateAccountWithPassword` и `ConfirmAccountWithPassword` для регистрации с первоначальным паролем. Они используют request-типы `CreateAccountRequest` и `ConfirmAccountRequest` с optional `initial_password` (поля 5 и 3 соответственно); legacy `CreateAccount` и `ConfirmAccount` это поле игнорируют. Сервер проверяет пароль нового контракта до побочных эффектов.
 
+`FilesApi.CreateUploadSessionRequest.file_type` — optional enum на поле 6: без него сервер выбирает `CLOUD_FILE`; явные `CLOUD_FILE` и `USER_AVATAR` поддержаны, `UNKNOWN` и неизвестные значения отклоняются. Для аватара действует лимит 20 MiB.
+
 ## Генерация и взаимодействия
 
 `Shared/BarkCloud.Proto/BarkCloud.Proto.csproj` не перечисляет `.proto` для генерации. Backend и Web подключают исходные файлы в собственных `.csproj` с нужным `GrpcServices` режимом. `Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj` генерирует `configuration_api.proto` и `session_revocation_api.proto` с `Both`; Identity, Users, Files, Torrent и Web компилируют клиентские/серверные стороны используемых ими API.
