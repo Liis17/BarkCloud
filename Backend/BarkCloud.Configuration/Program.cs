@@ -76,6 +76,7 @@ public class Program
 
         builder.Services.AddScoped<IConfigurationStorage, ConfigurationStorage>();
         builder.Services.AddScoped<StorageProfileStorage>();
+        builder.Services.AddScoped<StorageQuotaGroupStorage>();
 
         var app = builder.Build();
 

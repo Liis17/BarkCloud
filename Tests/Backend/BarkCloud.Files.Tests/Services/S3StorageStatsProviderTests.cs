@@ -13,72 +13,48 @@ namespace BarkCloud.Files.Tests.Services;
 public sealed class S3StorageStatsProviderTests
 {
     [Fact]
-    public async Task GetStatsAsync_SumsEveryPageAndCountsOnlyUniqueActiveNonLegacyBuckets()
+    public async Task GetStatsAsync_SumsGroupsOncePerPhysicalBucketAndAddsUngroupedActiveBuckets()
     {
         var client = new Mock<IAmazonS3>();
         client.Setup(s3 => s3.ListObjectsV2Async(
-                It.Is<ListObjectsV2Request>(request => request.BucketName == "shared" && request.ContinuationToken == null),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Page(10, "preview/photo.jpg", 20, truncated: true, next: "page-2"));
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "shared"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(10, "photo.jpg"));
         client.Setup(s3 => s3.ListObjectsV2Async(
-                It.Is<ListObjectsV2Request>(request => request.BucketName == "shared" && request.ContinuationToken == "page-2"),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Page(30, "original/photo.heic"));
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "inactive-grouped"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(20, "archive.zip"));
         client.Setup(s3 => s3.ListObjectsV2Async(
-                It.Is<ListObjectsV2Request>(request => request.BucketName == "other"),
-                It.IsAny<CancellationToken>()))
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "other"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Page(40, "document.pdf"));
 
         var profiles = new[]
         {
             (Profile("images-v1", "shared", active: true), client.Object),
             (Profile("previews-v1", "shared", active: true), client.Object),
+            (Profile("archive-v1", "inactive-grouped", active: false), client.Object),
             (Profile("other-v1", "other", active: true), client.Object),
             (Profile("old-v1", "legacy", active: true, legacy: true), client.Object),
             (Profile("inactive-v1", "inactive", active: false), client.Object)
         };
-        var sut = CreateProvider(profiles);
+        var groups = new[]
+        {
+            Group("group-1", "Основная", 100, Ref("https://s3.example", "shared"), Ref("https://s3.example", "inactive-grouped"))
+        };
 
-        var stats = await sut.GetStatsAsync();
+        var stats = await CreateProvider(profiles, groups).GetStatsAsync();
 
         stats.IsAvailable.Should().BeTrue();
-        stats.UsedBytes.Should().Be(100);
+        stats.Groups.Should().HaveCount(2);
+        stats.Groups[0].Should().Be(new S3QuotaGroupStats("group-1", "Основная", 30, 100, 0, false));
+        stats.Groups[1].Should().Be(new S3QuotaGroupStats("", "Без группы", 40, 0, 0, true));
         client.Verify(s3 => s3.ListObjectsV2Async(
-            It.Is<ListObjectsV2Request>(request => request.BucketName == "shared"), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            It.Is<ListObjectsV2Request>(request => request.BucketName == "shared"), It.IsAny<CancellationToken>()), Times.Once);
+        client.Verify(s3 => s3.ListObjectsV2Async(
+            It.Is<ListObjectsV2Request>(request => request.BucketName == "inactive-grouped"), It.IsAny<CancellationToken>()), Times.Once);
         client.Verify(s3 => s3.ListObjectsV2Async(
             It.Is<ListObjectsV2Request>(request => request.BucketName == "other"), It.IsAny<CancellationToken>()), Times.Once);
         client.Verify(s3 => s3.ListObjectsV2Async(
             It.Is<ListObjectsV2Request>(request => request.BucketName == "legacy" || request.BucketName == "inactive"),
             It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task GetStatsAsync_SumsQuotaOncePerPhysicalBucketAndMarksMixedQuotaUnlimited()
-    {
-        var client = new Mock<IAmazonS3>();
-        client.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ListObjectsV2Response { S3Objects = [] });
-        var profiles = new[]
-        {
-            (Profile("images-v1", "shared", active: true, quota: 12), client.Object),
-            (Profile("previews-v1", "shared", active: true, quota: 12), client.Object),
-            (Profile("videos-v1", "videos", active: true, quota: 30), client.Object)
-        };
-
-        var finite = await CreateProvider(profiles).GetStatsAsync();
-
-        finite.HasFiniteQuota.Should().BeTrue();
-        finite.QuotaBytes.Should().Be(42);
-
-        var mixed = await CreateProvider(new[]
-        {
-            (Profile("images-v1", "shared", active: true, quota: 12), client.Object),
-            (Profile("previews-v1", "shared", active: true, quota: 12), client.Object),
-            (Profile("videos-v1", "videos", active: true), client.Object)
-        }).GetStatsAsync();
-
-        mixed.HasFiniteQuota.Should().BeFalse();
-        mixed.QuotaBytes.Should().Be(12);
     }
 
     [Fact]
@@ -99,9 +75,137 @@ public sealed class S3StorageStatsProviderTests
         var stats = await CreateProvider(profiles).GetStatsAsync();
 
         stats.IsAvailable.Should().BeTrue();
-        stats.UsedBytes.Should().Be(23);
+        stats.Groups.Should().ContainSingle(group => group.IsUngrouped && group.UsedBytes == 23);
         deniedClient.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Once);
         readableClient.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_SumsEveryPageForAGroupBucket()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "photos" && request.ContinuationToken == null),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ListObjectsV2Response
+            {
+                IsTruncated = true,
+                NextContinuationToken = "page-2",
+                S3Objects = [new S3Object { Key = "one", Size = 10 }, new S3Object { Key = "two", Size = 20 }]
+            });
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "photos" && request.ContinuationToken == "page-2"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(30, "three"));
+        var profiles = new[] { (Profile("images-v1", "photos", active: true), client.Object) };
+
+        var stats = await CreateProvider(profiles,
+            [Group("g1", "Main", 100, Ref("https://s3.example", "photos"))]).GetStatsAsync();
+
+        stats.Groups.Should().ContainSingle(group => group.UsedBytes == 60);
+        client.Verify(s3 => s3.ListObjectsV2Async(
+            It.Is<ListObjectsV2Request>(request => request.ContinuationToken == null), It.IsAny<CancellationToken>()), Times.Once);
+        client.Verify(s3 => s3.ListObjectsV2Async(
+            It.Is<ListObjectsV2Request>(request => request.ContinuationToken == "page-2"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_DoesNotRequestUnavailableInactiveBucketOutsideGroups()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "measured"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(5, "object"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "inactive"), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("unavailable"));
+
+        var profiles = new[]
+        {
+            (Profile("images-v1", "measured", active: true), client.Object),
+            (Profile("documents-v1", "inactive", active: false), client.Object)
+        };
+        var stats = await CreateProvider(profiles, [Group("g1", "Group", 0, Ref("https://s3.example", "measured"))])
+            .GetStatsAsync();
+
+        stats.IsAvailable.Should().BeTrue();
+        stats.Groups.Should().ContainSingle(group => group.UsedBytes == 5);
+        client.Verify(s3 => s3.ListObjectsV2Async(
+            It.Is<ListObjectsV2Request>(request => request.BucketName == "inactive"), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_ReportsUnmeasuredMembersAndKeepsMeasuredUsage()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(23, "object"));
+        var profiles = new[] { (Profile("images-v1", "measured", active: true), client.Object) };
+        var group = Group("g1", "Group", 50,
+            Ref("https://s3.example", "measured"), Ref("https://source.example", "no-profile"));
+
+        var stats = await CreateProvider(profiles, [group]).GetStatsAsync();
+
+        stats.Groups.Should().ContainSingle(groupStats => groupStats.Name == "Group"
+            && groupStats.UsedBytes == 23 && groupStats.QuotaBytes == 50 && groupStats.UnmeasuredBuckets == 1);
+        client.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_ReportsFailedLegacyGroupBucketAsUnmeasuredAndKeepsOtherGroupsAvailable()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "legacy-member"), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("unavailable"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "measured-member"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(23, "object"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "second-group"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(40, "object"));
+        client.Setup(s3 => s3.ListObjectsV2Async(
+                It.Is<ListObjectsV2Request>(request => request.BucketName == "ungrouped"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Page(50, "object"));
+        var profiles = new[]
+        {
+            (Profile("images-v1", "measured-member", active: true), client.Object),
+            (Profile("images-old-v1", "legacy-member", active: true, legacy: true), client.Object),
+            (Profile("documents-v1", "legacy-member", active: false), client.Object),
+            (Profile("videos-v1", "second-group", active: true), client.Object),
+            (Profile("other-v1", "ungrouped", active: true), client.Object)
+        };
+        var groups = new[]
+        {
+            Group("g1", "Group A", 100, Ref("https://s3.example", "measured-member"), Ref("https://s3.example", "legacy-member")),
+            Group("g2", "Group B", 200, Ref("https://s3.example", "second-group"))
+        };
+
+        var stats = await CreateProvider(profiles, groups).GetStatsAsync();
+
+        stats.IsAvailable.Should().BeTrue();
+        stats.Groups.Should().HaveCount(3);
+        stats.Groups.Should().Contain(group => group.Name == "Group A"
+            && group.UsedBytes == 23 && group.UnmeasuredBuckets == 1);
+        stats.Groups.Should().Contain(group => group.Name == "Group B"
+            && group.UsedBytes == 40 && group.UnmeasuredBuckets == 0);
+        stats.Groups.Should().Contain(group => group.IsUngrouped && group.UsedBytes == 50);
+        client.Verify(s3 => s3.ListObjectsV2Async(
+            It.Is<ListObjectsV2Request>(request => request.BucketName == "legacy-member"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_PreservesZeroQuotaAsUnlimited()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ListObjectsV2Response { S3Objects = [] });
+        var profiles = new[] { (Profile("images-v1", "shared", active: false), client.Object) };
+
+        var stats = await CreateProvider(profiles,
+            [Group("g1", "Unlimited", 0, Ref("https://s3.example", "shared"))]).GetStatsAsync();
+
+        stats.Groups.Should().ContainSingle(group => group.QuotaBytes == 0 && !group.IsUngrouped);
     }
 
     [Fact]
@@ -112,7 +216,7 @@ public sealed class S3StorageStatsProviderTests
             .ReturnsAsync(Page(17, "object"))
             .ThrowsAsync(new AmazonS3Exception("temporary failure"));
         var time = new MutableTimeProvider();
-        var sut = CreateProvider([(Profile("universal-v1", "shared", active: true), client.Object)], time);
+        var sut = CreateProvider([(Profile("universal-v1", "shared", active: true), client.Object)], timeProvider: time);
 
         var initial = await sut.GetStatsAsync();
         time.Advance(TimeSpan.FromMinutes(6));
@@ -121,8 +225,8 @@ public sealed class S3StorageStatsProviderTests
 
         initial.IsAvailable.Should().BeTrue();
         refreshed.IsAvailable.Should().BeTrue();
-        refreshed.UsedBytes.Should().Be(17);
-        cached.UsedBytes.Should().Be(17);
+        refreshed.Groups.Should().ContainSingle(group => group.UsedBytes == 17 && group.IsUngrouped);
+        cached.Groups.Should().ContainSingle(group => group.UsedBytes == 17 && group.IsUngrouped);
         client.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
@@ -136,11 +240,26 @@ public sealed class S3StorageStatsProviderTests
         var stats = await CreateProvider([(Profile("universal-v1", "shared", active: true), client.Object)]).GetStatsAsync();
 
         stats.IsAvailable.Should().BeFalse();
-        stats.UsedBytes.Should().Be(0);
+        stats.Groups.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task GetStatsAsync_ReportsUnavailableWhenThereAreNoActiveBuckets()
+    public async Task GetStatsAsync_ReportsUnavailableWhenActiveGroupBucketCannotBeListed()
+    {
+        var client = new Mock<IAmazonS3>();
+        client.Setup(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new AmazonS3Exception("unreachable"));
+        var profiles = new[] { (Profile("universal-v1", "active-group", active: true), client.Object) };
+
+        var stats = await CreateProvider(profiles,
+            [Group("g1", "Group", 100, Ref("https://s3.example", "active-group"))]).GetStatsAsync();
+
+        stats.IsAvailable.Should().BeFalse();
+        stats.Groups.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_ReportsNotConfiguredWhenThereAreNoGroupsOrBuckets()
     {
         var client = new Mock<IAmazonS3>();
         var profiles = new[]
@@ -152,17 +271,36 @@ public sealed class S3StorageStatsProviderTests
         var stats = await CreateProvider(profiles).GetStatsAsync();
 
         stats.IsAvailable.Should().BeFalse();
+        stats.State.Should().Be("not_configured");
         client.Verify(s3 => s3.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static S3StorageStatsProvider CreateProvider(
         IEnumerable<(StorageProfileOptions Profile, IAmazonS3 Client)> profiles,
+        IEnumerable<StorageQuotaGroupOptions>? groups = null,
         TimeProvider? timeProvider = null)
     {
+        var configurationValues = new Dictionary<string, string?>();
+        var configuredGroups = groups?.ToArray() ?? [];
+        for (var groupIndex = 0; groupIndex < configuredGroups.Length; groupIndex++)
+        {
+            var group = configuredGroups[groupIndex];
+            var prefix = $"StorageQuotaGroups:{group.Id}";
+            configurationValues[$"{prefix}:Name"] = group.Name;
+            configurationValues[$"{prefix}:QuotaBytes"] = group.QuotaBytes.ToString();
+            for (var bucketIndex = 0; bucketIndex < group.Buckets.Count; bucketIndex++)
+            {
+                var bucketPrefix = $"{prefix}:Buckets:{bucketIndex}";
+                configurationValues[$"{bucketPrefix}:ServiceUrl"] = group.Buckets[bucketIndex].ServiceUrl;
+                configurationValues[$"{bucketPrefix}:BucketName"] = group.Buckets[bucketIndex].BucketName;
+            }
+        }
+
         var registry = new Mock<S3BucketRegistry>(new ConfigurationBuilder().Build());
         registry.Setup(value => value.GetAllProfiles()).Returns(profiles);
         return new S3StorageStatsProvider(
             registry.Object,
+            new ConfigurationBuilder().AddInMemoryCollection(configurationValues).Build(),
             timeProvider ?? TimeProvider.System,
             NullLogger<S3StorageStatsProvider>.Instance);
     }
@@ -172,38 +310,42 @@ public sealed class S3StorageStatsProviderTests
         string bucket,
         bool active,
         bool legacy = false,
-        long quota = 0) => new()
+        string serviceUrl = "https://s3.example",
+        bool isR2 = false) => new()
     {
         ProfileId = id,
         Role = id.Split('-')[0],
-        ServiceUrl = "https://s3.example",
+        ServiceUrl = serviceUrl,
         AccessKey = "access",
         SecretKey = "secret",
         BucketName = bucket,
         IsActive = active,
         IsLegacy = legacy,
-        QuotaBytes = quota
+        IsR2 = isR2
     };
 
-    private static ListObjectsV2Response Page(
-        long firstSize,
-        string firstKey,
-        long? secondSize = null,
-        string? secondKey = null,
-        bool truncated = false,
-        string? next = null)
+    private static StorageQuotaGroupOptions Group(
+        string id,
+        string name,
+        long quotaBytes,
+        params StorageQuotaGroupBucketOptions[] buckets) => new()
     {
-        var response = new ListObjectsV2Response
-        {
-            IsTruncated = truncated,
-            NextContinuationToken = next,
-            S3Objects = []
-        };
-        response.S3Objects.Add(new S3Object { Key = firstKey, Size = firstSize });
-        if (secondSize is not null)
-            response.S3Objects.Add(new S3Object { Key = secondKey, Size = secondSize.Value });
-        return response;
-    }
+        Id = id,
+        Name = name,
+        QuotaBytes = quotaBytes,
+        Buckets = buckets.ToList()
+    };
+
+    private static StorageQuotaGroupBucketOptions Ref(string serviceUrl, string bucketName) => new()
+    {
+        ServiceUrl = serviceUrl,
+        BucketName = bucketName
+    };
+
+    private static ListObjectsV2Response Page(long size, string key) => new()
+    {
+        S3Objects = [new S3Object { Key = key, Size = size }]
+    };
 
     private sealed class MutableTimeProvider : TimeProvider
     {

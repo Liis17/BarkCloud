@@ -34,18 +34,17 @@ public class ConfigurationManagementGatewayTests
             ProfileId = "universal-v1",
             AccessKey = "visible-access",
             SecretKey = "raw-secret",
-            HasSecretKey = true,
-            QuotaBytes = 12_345
+            HasSecretKey = true
         });
 
         dto.HasSecretKey.Should().BeTrue();
         dto.GetType().GetProperty("AccessKey").Should().BeNull();
         dto.GetType().GetProperty("SecretKey").Should().BeNull();
-        dto.QuotaBytes.Should().Be("12345");
+        dto.GetType().GetProperty("QuotaBytes").Should().BeNull();
     }
 
     [Fact]
-    public async Task SaveStorageProfile_PassesIntegerQuotaValueAndUnitToConfigurationService()
+    public async Task SaveStorageProfile_DoesNotSendProfileQuota()
     {
         var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>();
         configuration
@@ -53,7 +52,7 @@ public class ConfigurationManagementGatewayTests
             .Returns(GrpcCallHelpers.AsyncUnary(new GetStorageProfilesResponse()));
         configuration
             .Setup(client => client.SaveStorageProfileAsync(
-                It.Is<SaveStorageProfileRequest>(request => request.QuotaValue == "2" && request.QuotaUnit == "tb"),
+                It.Is<SaveStorageProfileRequest>(request => request.Role == "images" && request.BucketName == "images"),
                 null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new SaveStorageProfileResponse { Success = true }));
         var gateway = new ConfigurationManagementGateway(
@@ -62,13 +61,13 @@ public class ConfigurationManagementGatewayTests
             new S3AccessChecker());
 
         var result = await gateway.SaveStorageProfileAsync(new StorageProfileEdit(
-            "images", "https://s3.example", "access", "secret", "images", false, false, null, false, "2", "tb"),
+            "images", "https://s3.example", "access", "secret", "images", false, false, null, false),
             "user:1");
 
         result.Success.Should().BeTrue();
         result.RestartTargets.Should().Contain("files");
         configuration.Verify(client => client.SaveStorageProfileAsync(
-            It.Is<SaveStorageProfileRequest>(request => request.QuotaValue == "2" && request.QuotaUnit == "tb"),
+            It.Is<SaveStorageProfileRequest>(request => request.Role == "images" && request.BucketName == "images"),
             null, null, default), Times.Once);
     }
 
@@ -95,7 +94,7 @@ public class ConfigurationManagementGatewayTests
             {
                 Profiles =
                 {
-                    new StorageProfileItem { AccessKey = "raw-access", SecretKey = "raw-secret", HasSecretKey = true }
+                    new StorageProfileItem { ServiceUrl = "https://s3.example/", BucketName = "images", Role = "images", AccessKey = "raw-access", SecretKey = "raw-secret", HasSecretKey = true }
                 }
             }));
 
@@ -107,6 +106,88 @@ public class ConfigurationManagementGatewayTests
         dto.Settings.Should().ContainSingle(item => item.Section == "JwtSettings" && item.Key == "Issuer");
         dto.Settings.Should().NotContain(item => item.Key == "Token");
         dto.StorageProfiles.Single().GetType().GetProperty("AccessKey").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAsync_MapsQuotaGroupsAndUniqueNormalizedBuckets()
+    {
+        var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>();
+        configuration
+            .Setup(client => client.GetAllConfigurationsAsync(It.IsAny<GetAllConfigurationsRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetAllConfigurationsResponse()));
+        configuration
+            .Setup(client => client.GetReservedNamesAsync(It.IsAny<GetReservedNamesRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetReservedNamesResponse()));
+        configuration
+            .Setup(client => client.GetStorageProfilesAsync(It.IsAny<GetStorageProfilesRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new GetStorageProfilesResponse
+            {
+                Profiles =
+                {
+                    new StorageProfileItem { ServiceUrl = "http://r2.example", IsR2 = true, BucketName = "photos", Role = "images", IsActive = true },
+                    new StorageProfileItem { ServiceUrl = "https://r2.example/", IsR2 = true, BucketName = "photos", Role = "videos", IsActive = false },
+                    new StorageProfileItem { ServiceUrl = "https://s3.example", BucketName = "archive", Role = "other", IsLegacy = true }
+                },
+                QuotaGroups =
+                {
+                    new StorageQuotaGroupItem
+                    {
+                        Id = "grp-photos", Name = "Фото", QuotaBytes = 1_073_741_824,
+                        Buckets = { new StorageBucketRef { ServiceUrl = "https://r2.example", BucketName = "photos" } }
+                    }
+                }
+            }));
+
+        var dto = await new ConfigurationManagementGateway(
+            configuration.Object,
+            new ConfigurationBuilder().Build(),
+            new S3AccessChecker()).GetAsync();
+
+        dto.StorageGroups.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Id = "grp-photos",
+            Name = "Фото",
+            QuotaBytes = "1073741824",
+            Buckets = new[] { new { ServiceUrl = "https://r2.example", BucketName = "photos" } }
+        });
+        dto.StorageBuckets.Should().HaveCount(2);
+        dto.StorageBuckets.Should().ContainSingle(bucket => bucket.ServiceUrl == "https://r2.example" && bucket.BucketName == "photos")
+            .Which.Roles.Should().BeEquivalentTo("images", "videos");
+        dto.StorageBuckets.Should().ContainSingle(bucket => bucket.BucketName == "archive" && !bucket.IsActive && bucket.IsLegacy);
+        foreach (var profile in dto.StorageProfiles)
+            profile.GetType().GetProperty("QuotaBytes").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveAndDeleteStorageGroup_UseConfigurationRpcAndRequireFilesRestart()
+    {
+        var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>();
+        configuration
+            .Setup(client => client.SaveStorageQuotaGroupAsync(It.IsAny<SaveStorageQuotaGroupRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new UpdateConfigurationResponse { Success = true }));
+        configuration
+            .Setup(client => client.DeleteStorageQuotaGroupAsync(It.IsAny<DeleteStorageQuotaGroupRequest>(), null, null, default))
+            .Returns(GrpcCallHelpers.AsyncUnary(new UpdateConfigurationResponse { Success = true }));
+        var gateway = new ConfigurationManagementGateway(
+            configuration.Object,
+            new ConfigurationBuilder().Build(),
+            new S3AccessChecker());
+
+        var saved = await gateway.SaveStorageGroupAsync(new StorageGroupEdit(
+            "grp-photos", "Фото", "2", "tb", [new StorageGroupBucketEdit("https://s3.example", "photos")]), "user:1");
+        var deleted = await gateway.DeleteStorageGroupAsync("grp-photos", "user:1");
+
+        saved.Success.Should().BeTrue();
+        saved.RestartTargets.Should().Equal("files");
+        deleted.Success.Should().BeTrue();
+        deleted.RestartTargets.Should().Equal("files");
+        configuration.Verify(client => client.SaveStorageQuotaGroupAsync(
+            It.Is<SaveStorageQuotaGroupRequest>(request => request.Id == "grp-photos" && request.Name == "Фото"
+                && request.QuotaValue == "2" && request.QuotaUnit == "tb" && request.EditedBy == "user:1"
+                && request.Buckets.Single().BucketName == "photos"), null, null, default), Times.Once);
+        configuration.Verify(client => client.DeleteStorageQuotaGroupAsync(
+            It.Is<DeleteStorageQuotaGroupRequest>(request => request.Id == "grp-photos" && request.EditedBy == "user:1"),
+            null, null, default), Times.Once);
     }
 
     [Fact]

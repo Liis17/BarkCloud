@@ -45,8 +45,6 @@ public static class CloudApiEndpoints
             int.TryParse(v.GetValueOrDefault("storage.percent"), out var percent);
             double.TryParse(v.GetValueOrDefault("storage.other_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var otherPct);
             double.TryParse(v.GetValueOrDefault("storage.s3_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var s3Pct);
-            int.TryParse(v.GetValueOrDefault("storage.all_s3_percent"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var allS3Percent);
-            bool.TryParse(v.GetValueOrDefault("storage.all_s3_has_finite_quota"), out var allS3HasFiniteQuota);
             bool.TryParse(v.GetValueOrDefault("storage.all_s3_stats_available"), out var allS3StatsAvailable);
 
             return Results.Json(new
@@ -65,10 +63,6 @@ public static class CloudApiEndpoints
                     percent,
                     otherPct,
                     s3Pct,
-                    allS3UsedLabel = v.GetValueOrDefault("storage.all_s3_used_label"),
-                    allS3QuotaLabel = v.GetValueOrDefault("storage.all_s3_quota_label"),
-                    allS3Percent,
-                    allS3HasFiniteQuota,
                     allS3StatsAvailable
                 } : null,
                 app = new
