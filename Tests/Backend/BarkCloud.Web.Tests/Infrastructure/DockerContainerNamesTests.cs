@@ -63,6 +63,7 @@ public sealed class DockerContainerNamesTests
     [InlineData("web", "a")]
     [InlineData("web", "cloud-nginx")]
     [InlineData("web", "cloud-identity")]
+    [InlineData("web", "app\n")]
     public void InvalidOrConflictingNames_AreRejected(string service, string name)
     {
         var act = () => DockerContainerNames.FromConfiguration(Configuration((service, name)));
@@ -241,6 +242,23 @@ public sealed class DockerContainerNamesTests
     }
 
     [Fact]
+    public void BashLauncher_UsesWslOnWindows()
+    {
+        var (executable, prefixArguments) = GetBashLauncher();
+
+        if (OperatingSystem.IsWindows())
+        {
+            executable.Should().Be("wsl.exe");
+            prefixArguments.Should().Equal("--exec", "bash");
+        }
+        else
+        {
+            executable.Should().Be("bash");
+            prefixArguments.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
     public async Task Restart_UsesCustomWebNameAndOperationSpecificHelperWithoutProxyCommands()
     {
         var runner = new RecordingDockerRunner();
@@ -279,41 +297,62 @@ public sealed class DockerContainerNamesTests
             runner.RunAsync);
     }
 
-    private static async Task<string> GetBashExecutableAsync()
+    private static (string Executable, string[] PrefixArguments) GetBashLauncher()
+        => OperatingSystem.IsWindows()
+            ? ("wsl.exe", ["--exec", "bash"])
+            : ("bash", []);
+
+    private static async Task<(string Executable, string[] PrefixArguments)> GetBashExecutableAsync()
     {
-        var executable = OperatingSystem.IsWindows() ? "bash.exe" : "bash";
+        var launcher = GetBashLauncher();
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(executable, "--version")
+            var startInfo = new ProcessStartInfo(launcher.Executable)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-            });
+            };
+            foreach (var argument in launcher.PrefixArguments)
+                startInfo.ArgumentList.Add(argument);
+            startInfo.ArgumentList.Add("--version");
+
+            using var process = Process.Start(startInfo);
             if (process is null)
-                throw SkipException.ForSkip("Bash is not available for generated-script verification.");
+                throw SkipException.ForSkip(BashUnavailableReason());
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
             if (process.ExitCode != 0)
-                throw SkipException.ForSkip("Bash is not available for generated-script verification.");
-            return executable;
+            {
+                var details = (await standardError).Trim();
+                throw SkipException.ForSkip(details.Length == 0
+                    ? BashUnavailableReason()
+                    : $"{BashUnavailableReason()} {details}");
+            }
+            await standardOutput;
+            await standardError;
+            return launcher;
         }
         catch (Win32Exception)
         {
-            throw SkipException.ForSkip("Bash is not available for generated-script verification.");
+            throw SkipException.ForSkip(BashUnavailableReason());
         }
     }
 
     private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunBashAsync(
-        string executable,
+        (string Executable, string[] PrefixArguments) launcher,
         string script)
     {
-        var startInfo = new ProcessStartInfo(executable)
+        var startInfo = new ProcessStartInfo(launcher.Executable)
         {
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        foreach (var argument in launcher.PrefixArguments)
+            startInfo.ArgumentList.Add(argument);
         startInfo.ArgumentList.Add("-s");
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
@@ -323,6 +362,11 @@ public sealed class DockerContainerNamesTests
         await process.WaitForExitAsync();
         return (process.ExitCode, await standardOutput, await standardError);
     }
+
+    private static string BashUnavailableReason()
+        => OperatingSystem.IsWindows()
+            ? "WSL bash is unavailable for generated-script verification; install WSL and a default Linux distribution."
+            : "Bash is not available for generated-script verification.";
 
     private static string ToBashPath(string path)
     {

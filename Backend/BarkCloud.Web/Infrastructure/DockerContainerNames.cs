@@ -25,7 +25,7 @@ internal sealed class DockerContainerNames
         StringComparer.OrdinalIgnoreCase);
 
     private static readonly Regex ValidName = new(
-        @"^[a-zA-Z0-9][a-zA-Z0-9_.-]+$",
+        @"^[a-zA-Z0-9][a-zA-Z0-9_.-]+\z",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly IReadOnlyDictionary<string, string> _names;

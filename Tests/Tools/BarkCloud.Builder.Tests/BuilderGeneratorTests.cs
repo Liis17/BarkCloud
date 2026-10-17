@@ -245,4 +245,22 @@ public sealed class BuilderGeneratorTests
 
         Assert.Contains(errors, x => x.Contains("Порт Files должен быть числом"));
     }
+
+    [Fact]
+    public void Validation_rejects_trailing_line_feeds_in_names_ports_and_nginx_tokens()
+    {
+        var errors = BuilderModelValidator.Validate(new BuilderModel
+        {
+            DockerNetworkName = "barkcloud-network\n",
+            WebContainerName = "cloud-web\n",
+            IdentityPort = "7020\n",
+            NginxLocation = "Compose",
+            CertCrtPath = "certificate.pem\n",
+        });
+
+        Assert.Contains(errors, x => x.Contains("Docker-сети"));
+        Assert.Contains(errors, x => x.Contains("Имя контейнера cloud-web"));
+        Assert.Contains(errors, x => x.Contains("Порт Identity должен быть числом"));
+        Assert.Contains(errors, x => x.Contains("Файл сертификата") && x.Contains("недопустимые символы"));
+    }
 }
