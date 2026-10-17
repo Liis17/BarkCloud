@@ -61,11 +61,48 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("proxy_request_buffering off;", nginx);
         Assert.Contains("proxy_read_timeout 7200s;", nginx);
         Assert.DoesNotContain("proxy_pass http://cloud-web:8080", nginx);
-        Assert.DoesNotContain("listen 80 ssl;", nginx);
+        Assert.DoesNotMatch(@"(?m)^[ \t]*listen[ \t]+80(?:[ \t]|;)", nginx);
         Assert.DoesNotContain("{{", nginx);
         Assert.DoesNotContain("}}", nginx);
         Assert.DoesNotContain("NGINX_SEQ_PORT", env);
         Assert.DoesNotContain("NGINX_MINIO_CONSOLE_PORT", env);
+    }
+
+    [Fact]
+    public void Empty_data_paths_are_written_as_empty_and_use_named_volume_fallbacks()
+    {
+        var model = new BuilderModel
+        {
+            MinioDataPath = "",
+            PostgresDataPath = "",
+            BackupPath = "",
+            SeqDataPath = "",
+            TorrentDownloadPath = "",
+            ArchiveTempPath = "",
+        };
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.Contains("MINIO_DATA_PATH=\n", env);
+        Assert.Contains("POSTGRES_DATA_PATH=\n", env);
+        Assert.Contains("BACKUP_PATH=\n", env);
+        Assert.Contains("SEQ_DATA_PATH=\n", env);
+        Assert.Contains("TORRENT_DOWNLOAD_PATH=\n", env);
+        Assert.Contains("ARCHIVE_TEMP_PATH=\n", env);
+        Assert.Contains("${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro", compose);
+        Assert.Contains("${MINIO_DATA_PATH:-cloud-minio_data}:/data", compose);
+        Assert.Contains("${POSTGRES_DATA_PATH:-pgdata}:/var/lib/postgresql", compose);
+        Assert.Contains("${BACKUP_PATH:-backup_volume}:/backup", compose);
+        Assert.Contains("${SEQ_DATA_PATH:-seq_data}:/data", compose);
+        Assert.Contains("${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents", compose);
+        Assert.Contains("${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp", compose);
+        Assert.Contains("  cloud-minio_data:\n", compose);
+        Assert.Contains("  pgdata:\n", compose);
+        Assert.Contains("  backup_volume:\n", compose);
+        Assert.Contains("  seq_data:\n", compose);
+        Assert.Contains("  torrent_data:\n", compose);
+        Assert.Contains("  archive_temp:\n", compose);
     }
 
     [Fact]

@@ -44,7 +44,7 @@ BarkCloud — самохостируемое облако файлов и мед
 
 ### Клиентский запрос
 
-Клиент → nginx (TLS) → gRPC-сервис по порту: `7020` Identity, `7021` Users, `7025` Files (gRPC + HTTP загрузок), `7027` Torrent; `443` — веб (`cloud-web:8080`) и HTTP-выдача файлов. JWT и заголовки устройства проверяются перехватчиками из `Shared/BarkCloud.Shared.Auth` и `BarkCloud.GrpcServer`. Подробнее: [[Platform/Infrastructure]].
+Клиент → nginx (TLS) → gRPC-сервис по порту: `8000` Identity, `8001` Users, `8005` Files (gRPC + HTTP загрузок), `8007` Torrent; `443` — веб (`cloud-web:8080`) и HTTP-выдача файлов. JWT и заголовки устройства проверяются перехватчиками из `Shared/BarkCloud.Shared.Auth` и `BarkCloud.GrpcServer`. Подробнее: [[Platform/Infrastructure]].
 
 ### Межсервисные события
 
