@@ -226,7 +226,11 @@ public sealed class DockerContainerNamesTests
                 .Replace("__STATE_DIR__", DockerService.ShQuote(shellDirectory), StringComparison.Ordinal)
                 .Replace("__OLD_CONTAINER_ID__", OldContainerId, StringComparison.Ordinal);
 
-            var result = await RunBashAsync(bash, fakeDocker + "\n" + script);
+            var bashInput = (fakeDocker + "\n" + script)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\r", "\n", StringComparison.Ordinal)
+                .Replace("\n", "\r\n", StringComparison.Ordinal);
+            var result = await RunBashAsync(bash, bashInput);
 
             result.ExitCode.Should().Be(1, result.StandardError);
             File.ReadAllText(Path.Combine(tempDirectory, "app.id")).Should().Be("rollback-container-id");
@@ -357,7 +361,10 @@ public sealed class DockerContainerNamesTests
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
-        await process.StandardInput.WriteAsync(script);
+        var normalizedScript = script
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
+        await process.StandardInput.WriteAsync(normalizedScript);
         process.StandardInput.Close();
         await process.WaitForExitAsync();
         return (process.ExitCode, await standardOutput, await standardError);
