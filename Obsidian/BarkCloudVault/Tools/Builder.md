@@ -33,7 +33,7 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 ## Зависимости и взаимодействия
 
-- Модель по умолчанию включает backend-ядро, Web, инфраструктурные сервисы и внешний nginx. Порты и хост-пути основаны на `Backend/sample.env`; стандартные пути данных — `/data/minio`, `/data/pgdata`, `/data/pgbackup`, `/data/seq`, `/data/torrent` и `/data/archive-temp`.
+- Модель по умолчанию включает backend-ядро, Web, инфраструктурные сервисы и внешний nginx. Порты и хост-пути основаны на `Backend/sample.env`; стандартные пути данных — `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/seq`, `./data/torrent` и `./data/archive-temp`, относительно папки с генерируемым `docker-compose.yml`.
 - Web получает фактические имена Configuration, Identity, Users, Files и Web через `Docker__ContainerNames__*`; Notification и Torrent передаются только при включённых сервисах.
 - nginx использует динамическое разрешение Docker DNS через `127.0.0.11`. Нужен nginx OSS 1.27.3 или новее; в общем nginx все upstream используют отдельные shared zones, а TLS session cache имеет имя `barkcloud_ssl`.
 - При внешнем nginx установщик подключает его контейнер к выбранной уже созданной Docker-сети и устанавливает сгенерированный файл в `http/conf.d`. Пути сертификата и ключа указываются внутри внешнего контейнера; Builder их не копирует и не перезагружает внешний nginx.

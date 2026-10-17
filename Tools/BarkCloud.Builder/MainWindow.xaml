@@ -265,7 +265,7 @@
                             </ui:TextBox.Text>
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="/data/minio" Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="./data/minio" Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -303,7 +303,7 @@
                             </ui:TextBox.Text>
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="ARCHIVE_TEMP_PATH (пусто — named volume archive_temp)" />
-                        <ui:TextBox PlaceholderText="/data/archive-temp" Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="./data/archive-temp" Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -396,9 +396,9 @@
                             </ui:TextBox.Text>
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/data/pgdata" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="./data/pgdata" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="BACKUP_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="/data/pgbackup" Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="./data/pgbackup" Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -544,7 +544,7 @@
                             </ui:TextBox.Text>
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="/data/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="./data/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -589,7 +589,7 @@
                             </ui:TextBox.Text>
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_DOWNLOAD_PATH (папка на хосте; пусто — named volume)" />
-                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/data/torrent" Text="{Binding TorrentDownloadPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="./data/torrent" Text="{Binding TorrentDownloadPath, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="EXTERNAL_TORRENT_HOST (внешний адрес для клиентов)" />
                         <ui:TextBox Text="{Binding ExternalTorrentHost, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
