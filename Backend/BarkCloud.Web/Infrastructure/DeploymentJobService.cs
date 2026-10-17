@@ -299,7 +299,7 @@ public sealed class DeploymentJobService : BackgroundService
         if (!DockerService.TryGetManagedNonWebService(step.Service, out var canonicalService))
             throw new InvalidOperationException($"Неизвестный или недоступный для очереди сервис: {step.Service}");
 
-        var container = DockerService.ContainerNameFor(canonicalService);
+        var container = _docker.ContainerNameFor(canonicalService);
         switch (job.Kind)
         {
             case DeploymentJobKind.Start:
@@ -388,7 +388,7 @@ public sealed class DeploymentJobService : BackgroundService
         var composeService = DockerService.ComposeServiceNameFor(service);
         var previousCompose = await _compose.SetBranchAsync(composeService, branch, job.Id.ToString("N"));
         var composeRestored = false;
-        var container = DockerService.ContainerNameFor(service);
+        var container = _docker.ContainerNameFor(service);
         var oldImageId = await _docker.GetContainerImageIdAsync(container);
         var oldReference = oldImageId is null ? null : await _docker.GetContainerImageReferenceAsync(container);
 
