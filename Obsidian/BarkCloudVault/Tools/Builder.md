@@ -4,15 +4,16 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 ## Назначение
 
-`Tools/BarkCloud.Builder/` — Windows WPF-приложение на .NET 10, которое генерирует конфигурацию запуска BarkCloud: `docker-compose.yml` и `.env`. При выборе nginx дополнительно создаёт конфиг прокси и копирует выбранные сертификаты.
+`Tools/BarkCloud.Builder/` — Windows WPF-приложение на .NET 10, генерирующее `docker-compose.yml` и `.env`, а также nginx-конфигурацию для встроенного или внешнего reverse proxy.
 
 ## Источники
 
 | Файл | Символ | Роль |
 |---|---|---|
-| `Tools/BarkCloud.Builder/BuilderModel.cs` | `BuilderModel` | Параметры и включение сервисов |
+| `Tools/BarkCloud.Builder/BuilderModel.cs` | `BuilderModel` | Настройки сервисов, Docker-сети, имён контейнеров и прокси |
+| `Tools/BarkCloud.Builder/BuilderModelValidator.cs` | `Validate` | Проверка режима, имён, путей сертификатов и портов до записи файлов |
 | `Tools/BarkCloud.Builder/BackendComposeGenerator.cs` | `BuildCompose`, `BuildEnv`, `BuildNginxConf` | Генерация compose, env и nginx |
-| `Tools/BarkCloud.Builder/MainWindow.xaml.cs` | `OnGenerate` | Запись файлов и копирование сертификатов |
+| `Tools/BarkCloud.Builder/MainWindow.xaml.cs` | `OnGenerate` | Проверка, запись файлов и копирование локальных сертификатов |
 | `Tools/BarkCloud.Builder/BarkCloud.Builder.csproj` | TargetFramework, WPF-UI | Технологическая основа |
 
 ## Публичные контракты
@@ -20,18 +21,25 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 | Контракт | Поведение |
 |---|---|
 | Выходные файлы | Создаёт `docker-compose.yml` и `.env` в выбранной существующей папке |
-| Дополнительный nginx | При включённой опции создаёт `nginx/cloud.barkfluff.conf` и `certs/` |
+| Режим без nginx | Создаёт только compose и env; Builder показывает предупреждение об отсутствии TLS reverse proxy |
+| Compose nginx | Добавляет контейнер `cloud-nginx`, публикует HTTPS/gRPC и выбранные порты консолей, создаёт `nginx/cloud.barkfluff.conf` и копирует выбранные сертификаты в `certs/` |
+| Внешний nginx | По умолчанию генерирует `nginx/cloud.barkfluff.conf`, не добавляя nginx-контейнер, публикацию портов или копирование сертификатов |
+| Docker-сеть | Переменная `DOCKER_NETWORK_NAME` задаёт реальное имя общей внешней сети; логический ключ Compose остаётся `barkcloud-network` |
+| Имена контейнеров | Редактируемые `*_CONTAINER_NAME` задают фактические имена только включённых сервисов; ключи сервисов Compose `cloud-*` и внутренние адреса `CONFIGURATION_SERVICE_URL` остаются стабильными |
 | Канал образа | Release, Nightly или Dev выбирает реестр `docker.barkfluff.com` и суффикс образа |
-| Состав сервисов | Configuration, Identity, Users, Files и Web включены всегда; Notification, Torrent, MinIO, RabbitMQ, PostgreSQL, Seq и nginx переключаются в UI |
+| Состав сервисов | Configuration, Identity, Users, Files и Web включены всегда; Notification, Torrent, MinIO, RabbitMQ, PostgreSQL и Seq переключаются в UI |
 
 ## Зависимости и взаимодействия
 
-- Модель по умолчанию включает backend-ядро, Web и перечисленные инфраструктурные сервисы, отключает nginx; настройки портов и путей основаны на `Backend/sample.env`.
-- Сгенерированный стек использует внешнюю сеть `barkcloud-network`. При включённом nginx наружу маршрутизирует именно он; внутренние сервисы остаются в сети.
-- При запуске Builder случайно генерирует `CONFIGURATION_ACCESS_KEY` и `WEB_ADMIN_PASSWORD`.
+- Модель по умолчанию включает backend-ядро, Web, инфраструктурные сервисы и внешний nginx. Порты сервисов и пути основаны на `Backend/sample.env`.
+- Web получает фактические имена Configuration, Identity, Users, Files и Web через `Docker__ContainerNames__*`; Notification и Torrent передаются только при включённых сервисах.
+- nginx использует динамическое разрешение Docker DNS через `127.0.0.11`. Нужен nginx OSS 1.27.3 или новее; в общем nginx все upstream используют отдельные shared zones, а TLS session cache имеет имя `barkcloud_ssl`.
+- При внешнем nginx установщик подключает его контейнер к выбранной уже созданной Docker-сети и устанавливает сгенерированный файл в `http/conf.d`. Пути сертификата и ключа указываются внутри внешнего контейнера; Builder их не копирует и не перезагружает внешний nginx.
+- Seq Console и MinIO Console можно отдельно включить как TLS-прокси на настраиваемых listener-портах. Их backend-порты фиксированы: 80 и 9001 соответственно.
 
 ## Ограничения и важные детали
 
-Папка вывода должна существовать. Файлы записываются UTF-8 без BOM с переводами строк LF. При выборе сертификатов в nginx-конфиг попадают имена файлов, сами сертификаты копируются в `certs/`.
-
-Если `ARCHIVE_TEMP_PATH` пуст, compose использует named volume `archive_temp`. В комментарии `BuilderModel` указано, что такой том создаётся с владельцем root и Files под uid 1654 не сможет записать в него временный архив; для архивов нужна хост-папка с правом записи для uid 1654.
+- Все проверки модели выполняются до записи compose/env/config. Имена контейнеров должны соответствовать Docker, быть уникальными среди включённых сервисов и не совпадать с `cloud-*` alias другого сервиса, даже если он отключён.
+- Папка вывода должна существовать. Файлы записываются UTF-8 без BOM с переводами строк LF. При смене режима существующие `certs/` не удаляются.
+- В Compose режиме пустые поля сертификата разрешены, чтобы конфигурацию можно было сгенерировать заранее; для запуска nginx нужны реальные сертификат и ключ в `certs/`.
+- Если `ARCHIVE_TEMP_PATH` пуст, compose использует named volume `archive_temp`. Владелец такого тома — root, поэтому Files под uid 1654 не сможет записать туда временный архив; для архивов нужна хост-папка с правом записи для uid 1654.

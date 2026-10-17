@@ -20,8 +20,7 @@ public static class BackendComposeGenerator
         };
         string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
 
-        // Все сервисы доступны только внутри barkcloud-network.
-        // Внешние порты публикует reverse-proxy, если он включён.
+        // Compose service keys remain the stable DNS and depends_on contract.
 
         // SMTP-переменные в configuration имеют смысл только с notification (он шлёт письма).
         // Без notification — не выводим блок, чтобы не тащить пустые EMAIL_* в configuration.
@@ -33,9 +32,9 @@ public static class BackendComposeGenerator
               + "\n      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}"
             : "";
         string torrentDependency = m.IncludeTorrent ? "\n      - cloud-torrent" : "";
-        string torrentNginxPort = m.IncludeTorrent
-            ? "\n      - \"${TORRENT_PORT}:${TORRENT_PORT}\""
-            : "";
+        string webOptionalContainerNames = string.Concat(
+            m.IncludeNotification ? "\n      Docker__ContainerNames__Notification: \"${NOTIFICATION_CONTAINER_NAME}\"" : "",
+            m.IncludeTorrent ? "\n      Docker__ContainerNames__Torrent: \"${TORRENT_CONTAINER_NAME}\"" : "");
 
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
@@ -55,7 +54,7 @@ services:
 
   cloud-configuration:
     image: {{Img("configuration")}}
-    container_name: cloud-configuration
+    container_name: ${CONFIGURATION_CONTAINER_NAME}
     restart: always
     env_file:
       - .env
@@ -87,7 +86,7 @@ services:
 
   cloud-identity:
     image: {{Img("identity")}}
-    container_name: cloud-identity
+    container_name: ${IDENTITY_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -99,7 +98,7 @@ services:
 
   cloud-users:
     image: {{Img("users")}}
-    container_name: cloud-users
+    container_name: ${USERS_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -112,7 +111,7 @@ services:
 
   cloud-files:
     image: {{Img("files")}}
-    container_name: cloud-files
+    container_name: ${FILES_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -136,7 +135,7 @@ services:
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   cloud-notification:
     image: {{Img("notification")}}
-    container_name: cloud-notification
+    container_name: ${NOTIFICATION_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -148,13 +147,11 @@ services:
 
         if (m.IncludeTorrent)
         {
-            var torrentPorts = "";
-
             sections.Add($$"""
   # Торрент-сервис: качает торренты на хост-диск ({TORRENT_DOWNLOAD_PATH} → /mnt/torrents)
   cloud-torrent:
     image: {{Img("torrent")}}
-    container_name: cloud-torrent
+    container_name: ${TORRENT_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -164,7 +161,7 @@ services:
       Torrent__DownloadPath: "/mnt/torrents"
       Torrent__PeerPort: ${TORRENT_PEER_PORT}
     volumes:
-      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents{{torrentPorts}}
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
     networks:
       - barkcloud-network
     depends_on:
@@ -178,7 +175,7 @@ services:
   # Веб-клиент
   cloud-web:
     image: {{Img("web")}}
-    container_name: cloud-web
+    container_name: ${WEB_CONTAINER_NAME}
     restart: always
     user: root
     env_file:
@@ -189,6 +186,11 @@ services:
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
+      Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
+      Docker__ContainerNames__Users: "${USERS_CONTAINER_NAME}"
+      Docker__ContainerNames__Files: "${FILES_CONTAINER_NAME}"
+      Docker__ContainerNames__Web: "${WEB_CONTAINER_NAME}"{{webOptionalContainerNames}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
@@ -204,18 +206,31 @@ services:
 """);
 
         if (m.IncludeNginx)
-            sections.Add("""
+        {
+            var nginxPorts = new List<string>
+            {
+                "      - \"443:443\"",
+                "      - \"${IDENTITY_PORT}:${IDENTITY_PORT}\"",
+                "      - \"${USERS_PORT}:${USERS_PORT}\"",
+                "      - \"${FILES_PORT}:${FILES_PORT}\"",
+            };
+            if (m.IncludeTorrent)
+                nginxPorts.Add("      - \"${TORRENT_PORT}:${TORRENT_PORT}\"");
+            if (m.NginxSeqProxy && m.IncludeSeq)
+                nginxPorts.Add("      - \"${NGINX_SEQ_PORT}:${NGINX_SEQ_PORT}\"");
+            if (m.NginxMinioConsoleProxy && m.IncludeMinio)
+                nginxPorts.Add("      - \"${NGINX_MINIO_CONSOLE_PORT}:${NGINX_MINIO_CONSOLE_PORT}\"");
+
+            string torrentNginxDependency = m.IncludeTorrent ? "\n      - cloud-torrent" : "";
+            sections.Add($$"""
   # === Reverse-proxy (единственная точка выхода наружу) ===
   cloud-nginx:
     image: nginx:latest
-    container_name: cloud-nginx
+    container_name: ${NGINX_CONTAINER_NAME}
     restart: always
     # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
-      - "443:443"
-      - "${IDENTITY_PORT}:${IDENTITY_PORT}"
-      - "${USERS_PORT}:${USERS_PORT}"
-      - "${FILES_PORT}:${FILES_PORT}"{{torrentNginxPort}}
+{{string.Join("\n", nginxPorts)}}
     volumes:
       - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
       - ./certs:/etc/nginx/certs:ro
@@ -225,8 +240,9 @@ services:
       - cloud-identity
       - cloud-users
       - cloud-files
-      - cloud-web{{torrentDependency}}
+      - cloud-web{{torrentNginxDependency}}
 """);
+        }
 
         if (m.IncludeSeq || m.IncludeMinio || m.IncludeRabbitmq || m.IncludePostgres)
             sections.Add("  # === Инфраструктурные сервисы ===");
@@ -235,7 +251,7 @@ services:
             sections.Add("""
   cloud-seq:
     image: datalust/seq:latest
-    container_name: cloud-seq
+    container_name: ${SEQ_CONTAINER_NAME}
     restart: always
     environment:
       ACCEPT_EULA: "Y"
@@ -250,7 +266,7 @@ services:
             sections.Add("""
   cloud-minio:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
-    container_name: cloud-minio
+    container_name: ${MINIO_CONTAINER_NAME}
     restart: always
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
@@ -266,7 +282,7 @@ services:
             sections.Add("""
   cloud-rabbitmq:
     image: rabbitmq:latest
-    container_name: cloud-rabbitmq
+    container_name: ${RABBITMQ_CONTAINER_NAME}
     restart: always
     volumes:
       - cloud-rabbitmq_data:/var/lib/rabbitmq
@@ -281,7 +297,7 @@ services:
             sections.Add("""
   cloud-postgres:
     image: postgres:18
-    container_name: cloud-postgres
+    container_name: ${POSTGRES_CONTAINER_NAME}
     restart: always
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -336,7 +352,7 @@ services:
 networks:
   barkcloud-network:
     external: true
-    name: barkcloud-network
+    name: ${DOCKER_NETWORK_NAME}
 
 volumes:
 
@@ -372,6 +388,11 @@ volumes:
         sb.Append('\n');
         // Bootstrap-ключ доступа к ConfigurationApi. Должен совпадать у всех сервисов.
         K("CONFIGURATION_ACCESS_KEY", m.ConfigurationAccessKey);
+
+        Section("Docker-сеть и имена контейнеров");
+        K("DOCKER_NETWORK_NAME", m.DockerNetworkName);
+        foreach (var container in m.ContainerNames.Where(x => x.Enabled))
+            K(container.EnvironmentVariable, container.Name);
 
         Section("Режим ASP.NET Core");
         K("ASPNETCORE_ENVIRONMENT", m.AspNetCoreEnvironment);
@@ -428,6 +449,18 @@ volumes:
             K("SEQ_DATA_PATH", m.SeqDataPath);
         }
 
+        if (m.UseNginx && m.NginxSeqProxy && m.IncludeSeq)
+        {
+            Section("Nginx — прокси Seq");
+            K("NGINX_SEQ_PORT", m.NginxSeqPort);
+        }
+
+        if (m.UseNginx && m.NginxMinioConsoleProxy && m.IncludeMinio)
+        {
+            Section("Nginx — прокси MinIO Console");
+            K("NGINX_MINIO_CONSOLE_PORT", m.NginxMinioConsolePort);
+        }
+
         Section("Веб-клиент");
         K("WEB_PORT", m.WebPort);
         K("WEB_COOKIE_SECURE", m.WebCookieSecure ? "true" : "false");
@@ -453,253 +486,270 @@ volumes:
     }
 
     /// <summary>
-    /// nginx/cloud.barkfluff.conf: домен (server_name), порты (listen + upstream) и
-    /// имена файлов сертификатов подставляются из полей модели.
+    /// Генерирует конфиг для встроенного или внешнего nginx с динамическим DNS Docker.
     /// </summary>
     public static string BuildNginxConf(BuilderModel m)
     {
         string domain = string.IsNullOrWhiteSpace(m.NginxDomain) ? "cloud.barkfluff.com" : m.NginxDomain.Trim();
-        string crt = string.IsNullOrWhiteSpace(m.CertCrtPath) ? "barkfluff.com-crt.pem" : Path.GetFileName(m.CertCrtPath);
-        string key = string.IsNullOrWhiteSpace(m.CertKeyPath) ? "barkfluff.com-key.pem" : Path.GetFileName(m.CertKeyPath);
+        string crt = m.NginxLocation == "External"
+            ? m.ExternalNginxCertificatePath.Trim()
+            : "/etc/nginx/certs/" + (string.IsNullOrWhiteSpace(m.CertCrtPath) ? "barkfluff.com-crt.pem" : Path.GetFileName(m.CertCrtPath));
+        string key = m.NginxLocation == "External"
+            ? m.ExternalNginxKeyPath.Trim()
+            : "/etc/nginx/certs/" + (string.IsNullOrWhiteSpace(m.CertKeyPath) ? "barkfluff.com-key.pem" : Path.GetFileName(m.CertKeyPath));
 
-        // Торрент-сервис маршрутизируется только если включён: gRPC на своём порту + HTTP1
-        // (/web/download/{id}) для стриминга файлов внешним клиентам (веб ходит напрямую в docker-сеть).
-        string torrentServer = !m.IncludeTorrent ? "" : $$"""
+        string Upstream(string name, string containerName, string port, string keepalive) => $$"""
+        upstream {{name}} {
+            zone {{name}} 64k;
+            resolver 127.0.0.11 valid=5s;
+            resolver_timeout 2s;
+            server {{containerName}}:{{port}} resolve;
+        {{keepalive}}
+        }
+        """;
 
-# --- Пулы торрент-сервиса ---
-upstream barkcloud_torrent {
-    server cloud-torrent:{{m.TorrentPort}};
-    keepalive 32;
-    keepalive_requests 1000;
-    keepalive_timeout 60s;
-}
+        string tls = string.Join('\n',
+            $"    ssl_certificate     {crt};",
+            $"    ssl_certificate_key {key};",
+            "    ssl_protocols       TLSv1.2 TLSv1.3;",
+            "    ssl_ciphers         HIGH:!aNULL:!MD5;",
+            "    ssl_prefer_server_ciphers on;",
+            "    ssl_session_cache   shared:barkcloud_ssl:10m;",
+            "    ssl_session_timeout 10m;");
 
-upstream barkcloud_torrent_http {
-    server cloud-torrent:{{m.TorrentHttp1Port}};
-    keepalive 16;
-    keepalive_timeout 60s;
-}
+        string GrpcServer(string title, string port, string upstream) => $$"""
+        # --- {{title}} (порт {{port}}) ---
+        server {
+            listen {{port}} ssl;
+            http2 on;
+            server_name {{domain}};
 
-# --- Torrent (порт {{m.TorrentPort}}): gRPC + HTTP1 стриминг файлов ---
-server {
-    listen {{m.TorrentPort}} ssl;
-    http2 on;
-    server_name {{domain}};
+        {{tls}}
+            location / {
+                grpc_pass grpc://{{upstream}};
+                grpc_set_header Host $host;
+                grpc_set_header X-Real-IP $remote_addr;
+                grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                grpc_set_header X-Forwarded-Proto $scheme;
+                grpc_read_timeout 300s;
+                grpc_send_timeout 300s;
+            }
+        }
+        """;
 
-    ssl_certificate     /etc/nginx/certs/{{crt}};
-    ssl_certificate_key /etc/nginx/certs/{{key}};
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache   shared:SSL:10m;
-    ssl_session_timeout 10m;
+        string filesHttp = $$"""
+            # HTTP-веб: /web/upload/{id}, /web/download/{id} → Files HTTP/1.
+            location /web/ {
+                rewrite ^/web/(.*) /$1 break;
+                proxy_pass http://barkcloud_files_http;
+                proxy_http_version 1.1;
+                proxy_set_header Connection "";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_request_buffering off;
+                proxy_buffering off;
+                proxy_read_timeout 7200s;
+                proxy_send_timeout 7200s;
+                client_body_timeout 7200s;
+            }
+        """;
 
-    client_max_body_size 0;
+        string torrentServer = "";
+        if (m.IncludeTorrent)
+        {
+            torrentServer = $$"""
+            # --- Torrent (порт {{m.TorrentPort}}): gRPC + HTTP/1 стриминг ---
+            server {
+                listen {{m.TorrentPort}} ssl;
+                http2 on;
+                server_name {{domain}};
 
-    location / {
-        grpc_pass grpc://barkcloud_torrent;
-        grpc_set_header Host $host;
-        grpc_set_header X-Real-IP $remote_addr;
-        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        grpc_set_header X-Forwarded-Proto $scheme;
-        grpc_read_timeout 300s;
-        grpc_send_timeout 300s;
-    }
+            {{tls}}
+                client_max_body_size 0;
 
-    # HTTP-веб: /web/download/{id} -> cloud-torrent:{{m.TorrentHttp1Port}}/download/{id}
-    location /web/ {
-        rewrite ^/web/(.*) /$1 break;
-        proxy_pass http://barkcloud_torrent_http;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_read_timeout 7200s;
-        proxy_send_timeout 7200s;
-    }
-}
-""";
+                location / {
+                    grpc_pass grpc://barkcloud_torrent;
+                    grpc_set_header Host $host;
+                    grpc_set_header X-Real-IP $remote_addr;
+                    grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    grpc_set_header X-Forwarded-Proto $scheme;
+                    grpc_read_timeout 300s;
+                    grpc_send_timeout 300s;
+                }
 
-        return $$"""
-# BarkCloud — единый субдомен {{domain}}, маршрутизация по порту.
+                # HTTP-веб: /web/download/{id} → Torrent HTTP/1.
+                location /web/ {
+                    rewrite ^/web/(.*) /$1 break;
+                    proxy_pass http://barkcloud_torrent_http;
+                    proxy_http_version 1.1;
+                    proxy_set_header Connection "";
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_buffering off;
+                    proxy_read_timeout 7200s;
+                    proxy_send_timeout 7200s;
+                }
+            }
+            """;
+        }
 
-# --- Пулы соединений к бэкендам (постоянные h2c-соединения для gRPC) ---
-upstream barkcloud_identity {
-    server cloud-identity:{{m.IdentityPort}};
-    keepalive 32;            # держать до 32 idle-соединений в пуле на воркер
-    keepalive_requests 1000; # пересоздавать соединение после 1000 запросов
-    keepalive_timeout 60s;   # закрыть простаивающее соединение через 60с
-}
+        string webServer = $$"""
+        # --- Web (порт 443) ---
+        server {
+            listen 443 ssl;
+            server_name {{domain}};
+            client_max_body_size 0;
 
-upstream barkcloud_users {
-    server cloud-users:{{m.UsersPort}};
-    keepalive 32;
-    keepalive_requests 1000;
-    keepalive_timeout 60s;
-}
+        {{tls}}
+            # Upload 2.0: байты напрямую стримятся в HTTP/1 Files.
+            location /file-upload/ {
+                proxy_pass http://barkcloud_files_http;
+                proxy_http_version 1.1;
+                proxy_set_header Connection "";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_request_buffering off;
+                proxy_buffering off;
+                proxy_read_timeout 7200s;
+                proxy_send_timeout 7200s;
+                client_body_timeout 7200s;
+            }
 
-upstream barkcloud_files {
-    server cloud-files:{{m.FilesPort}};
-    keepalive 32;
-    keepalive_requests 1000;
-    keepalive_timeout 60s;
-}
+            location / {
+                proxy_pass http://barkcloud_web;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cookie_path / "/; secure; HttpOnly; SameSite=strict";
+                proxy_redirect off;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_request_buffering off;
+                proxy_buffering off;
+                proxy_read_timeout 7200s;
+                proxy_send_timeout 7200s;
+                client_body_timeout 7200s;
+            }
+        }
+        """;
 
-# HTTP/1.1-пул для скачивания/загрузки файлов (/web/ и /file-upload/).
-upstream barkcloud_files_http {
-    server cloud-files:{{m.FilesHttp1Port}};
-    keepalive 16;
-    keepalive_timeout 60s;
-}
+        string consoleHeaders = """
+                    proxy_set_header Host $http_host;
+                    proxy_set_header X-Forwarded-Host $http_host;
+                    proxy_set_header X-Forwarded-Port $server_port;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+            """;
 
-# --- Identity (порт {{m.IdentityPort}}) ---
-server {
-    listen {{m.IdentityPort}} ssl;
-    http2 on;
-    server_name {{domain}};
+        string seqServer = m.NginxSeqProxy && m.IncludeSeq
+            ? $$"""
+            # --- Seq Console ---
+            server {
+                listen {{m.NginxSeqPort}} ssl;
+                server_name {{domain}};
 
-    ssl_certificate     /etc/nginx/certs/{{crt}};
-    ssl_certificate_key /etc/nginx/certs/{{key}};
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache   shared:SSL:10m;
-    ssl_session_timeout 10m;
+            {{tls}}
+                location / {
+                    proxy_pass http://barkcloud_seq;
+                    proxy_http_version 1.1;
+            {{consoleHeaders}}
+                    proxy_read_timeout 300s;
+                    proxy_send_timeout 300s;
+                }
+            }
+            """
+            : "";
 
-    location / {
-        grpc_pass grpc://barkcloud_identity;
-        grpc_set_header Host $host;
-        grpc_set_header X-Real-IP $remote_addr;
-        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        grpc_set_header X-Forwarded-Proto $scheme;
-        grpc_read_timeout 300s;
-        grpc_send_timeout 300s;
-    }
-}
+        string minioServer = m.NginxMinioConsoleProxy && m.IncludeMinio
+            ? $$"""
+            # --- MinIO Console ---
+            server {
+                listen {{m.NginxMinioConsolePort}} ssl;
+                server_name {{domain}};
 
-# --- Users (порт {{m.UsersPort}}) ---
-server {
-    listen {{m.UsersPort}} ssl;
-    http2 on;
-    server_name {{domain}};
+            {{tls}}
+                client_max_body_size 0;
+                location / {
+                    proxy_pass http://barkcloud_minio_console;
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+            {{consoleHeaders}}
+                    proxy_request_buffering off;
+                    proxy_buffering off;
+                    proxy_read_timeout 7200s;
+                    proxy_send_timeout 7200s;
+                    client_body_timeout 7200s;
+                }
+            }
+            """
+            : "";
 
-    ssl_certificate     /etc/nginx/certs/{{crt}};
-    ssl_certificate_key /etc/nginx/certs/{{key}};
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache   shared:SSL:10m;
-    ssl_session_timeout 10m;
+        var sections = new List<string>
+        {
+            $"# BarkCloud — единый субдомен {domain}, маршрутизация по порту.",
+            Upstream("barkcloud_identity", m.IdentityContainerName, m.IdentityPort, "    keepalive 32;\n    keepalive_requests 1000;\n    keepalive_timeout 60s;"),
+            Upstream("barkcloud_users", m.UsersContainerName, m.UsersPort, "    keepalive 32;\n    keepalive_requests 1000;\n    keepalive_timeout 60s;"),
+            Upstream("barkcloud_files", m.FilesContainerName, m.FilesPort, "    keepalive 32;\n    keepalive_requests 1000;\n    keepalive_timeout 60s;"),
+            Upstream("barkcloud_files_http", m.FilesContainerName, m.FilesHttp1Port, "    keepalive 16;\n    keepalive_timeout 60s;"),
+            Upstream("barkcloud_web", m.WebContainerName, "8080", "    keepalive 16;\n    keepalive_timeout 60s;"),
+            GrpcServer("Identity", m.IdentityPort, "barkcloud_identity"),
+            GrpcServer("Users", m.UsersPort, "barkcloud_users"),
+            """
+            # --- Files: gRPC + HTTP/1 веб ---
+            """,
+            $$"""
+            server {
+                listen {{m.FilesPort}} ssl;
+                http2 on;
+                server_name {{domain}};
 
-    location / {
-        grpc_pass grpc://barkcloud_users;
-        grpc_set_header Host $host;
-        grpc_set_header X-Real-IP $remote_addr;
-        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        grpc_set_header X-Forwarded-Proto $scheme;
-        grpc_read_timeout 300s;
-        grpc_send_timeout 300s;
-    }
-}
+            {{tls}}
+                client_max_body_size 0;
+                location / {
+                    grpc_pass grpc://barkcloud_files;
+                    grpc_set_header Host $host;
+                    grpc_set_header X-Real-IP $remote_addr;
+                    grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    grpc_set_header X-Forwarded-Proto $scheme;
+                    grpc_read_timeout 300s;
+                    grpc_send_timeout 300s;
+                }
+            {{filesHttp}}
+            }
+            """,
+        };
 
-# --- Files (порт {{m.FilesPort}}): gRPC + HTTP1 веб для скачивания/загрузки ---
-server {
-    listen {{m.FilesPort}} ssl;
-    http2 on;
-    server_name {{domain}};
+        if (m.IncludeTorrent)
+        {
+            sections.Add(Upstream("barkcloud_torrent", m.TorrentContainerName, m.TorrentPort, "    keepalive 32;\n    keepalive_requests 1000;\n    keepalive_timeout 60s;"));
+            sections.Add(Upstream("barkcloud_torrent_http", m.TorrentContainerName, m.TorrentHttp1Port, "    keepalive 16;\n    keepalive_timeout 60s;"));
+            sections.Add(torrentServer);
+        }
 
-    ssl_certificate     /etc/nginx/certs/{{crt}};
-    ssl_certificate_key /etc/nginx/certs/{{key}};
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache   shared:SSL:10m;
-    ssl_session_timeout 10m;
+        if (m.NginxSeqProxy && m.IncludeSeq)
+        {
+            sections.Add(Upstream("barkcloud_seq", m.SeqContainerName, "80", "    keepalive 16;\n    keepalive_timeout 60s;"));
+            sections.Add(seqServer);
+        }
 
-    client_max_body_size 0;  # без лимита размера тела (загрузка файлов)
+        if (m.NginxMinioConsoleProxy && m.IncludeMinio)
+        {
+            sections.Add(Upstream("barkcloud_minio_console", m.MinioContainerName, "9001", "    keepalive 16;\n    keepalive_timeout 60s;"));
+            sections.Add(minioServer);
+        }
 
-    # gRPC API (основной)
-    location / {
-        grpc_pass grpc://barkcloud_files;
-        grpc_set_header Host $host;
-        grpc_set_header X-Real-IP $remote_addr;
-        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        grpc_set_header X-Forwarded-Proto $scheme;
-        grpc_read_timeout 300s;
-        grpc_send_timeout 300s;
-    }
-
-    # HTTP-веб: /web/upload/{id}, /web/download/{id} -> cloud-files:{{m.FilesHttp1Port}}/upload|download
-    location /web/ {
-        rewrite ^/web/(.*) /$1 break;
-        proxy_pass http://barkcloud_files_http;
-        # keepalive к апстриму требует HTTP/1.1 и очистки заголовка Connection
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # Большие файлы — буферизацию выключаем, таймауты увеличиваем (2 часа)
-        proxy_request_buffering off;
-        proxy_buffering off;
-        proxy_read_timeout 7200s;
-        proxy_send_timeout 7200s;
-        client_body_timeout 7200s;
-    }
-}
-
-{{torrentServer}}
-# --- Веб-клиент (порт 443): прокси на cloud-web:8080 ---
-server {
-    listen 443 ssl;
-    server_name {{domain}};
-    client_max_body_size 0;  # без лимита размера тела (загрузка через браузер)
-    ssl_certificate /etc/nginx/certs/{{crt}};
-    ssl_certificate_key /etc/nginx/certs/{{key}};
-
-    # Upload 2.0 data plane: байты минуют Web и напрямую стримятся в HTTP/1 Files.
-    location /file-upload/ {
-        proxy_pass http://barkcloud_files_http;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_request_buffering off;
-        proxy_buffering off;
-        proxy_read_timeout 7200s;
-        proxy_send_timeout 7200s;
-        client_body_timeout 7200s;
-    }
-
-    location / {
-        proxy_pass http://cloud-web:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cookie_path / "/; secure; HttpOnly; SameSite=strict";
-        proxy_redirect off;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-
-        # Загрузка/скачивание больших файлов через браузер: буферизация off, таймауты 2 часа
-        proxy_request_buffering off;
-        proxy_buffering off;
-        proxy_read_timeout 7200s;
-        proxy_send_timeout 7200s;
-        client_body_timeout 7200s;
-    }
-}
-
-""";
+        sections.Add(webServer);
+        return string.Join("\n\n", sections.Select(x => x.Trim()));
     }
 }
