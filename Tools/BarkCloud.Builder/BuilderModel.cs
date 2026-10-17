@@ -2,7 +2,7 @@ namespace BarkCloud.Builder;
 
 /// <summary>
 /// Параметры генерации docker-compose.yml и .env для бэкенда BarkCloud.
-/// Дефолты соответствуют Backend/sample.env.
+/// Дефолты основаны на Backend/sample.env; хост-пути данных относительны к папке compose.
 /// </summary>
 public sealed class BuilderModel
 {
@@ -47,7 +47,7 @@ public sealed class BuilderModel
     public string MinioRootPassword { get; set; } = "password";
     public string MinioPort { get; set; } = "9000";
     public string MinioWebPort { get; set; } = "9001";
-    public string MinioDataPath { get; set; } = "/data/minio";
+    public string MinioDataPath { get; set; } = "./data/minio";
 
     // RabbitMQ
     public string RabbitUser { get; set; } = "user";
@@ -58,8 +58,8 @@ public sealed class BuilderModel
     public string PostgresPassword { get; set; } = "password";
     public string PostgresDb { get; set; } = "postgrescloud";
     public string PostgresPort { get; set; } = "5432";
-    public string PostgresDataPath { get; set; } = "/data/pgdata";
-    public string BackupPath { get; set; } = "/data/pgbackup";
+    public string PostgresDataPath { get; set; } = "./data/pgdata";
+    public string BackupPath { get; set; } = "./data/pgbackup";
 
     // Порты сервисов
     public string IdentityPort { get; set; } = "8000";
@@ -72,16 +72,16 @@ public sealed class BuilderModel
     public string TorrentPeerPort { get; set; } = "6881";
 
     // Torrent: папка на хосте, куда качаются торренты (монтируется в /mnt/torrents).
-    public string TorrentDownloadPath { get; set; } = "/data/torrent";
+    public string TorrentDownloadPath { get; set; } = "./data/torrent";
 
     // Files: внешняя папка для временных ZIP-архивов (скачивание папок/альбомов).
     // Пусто — named volume archive_temp (создаётся от root → files под uid 1654 не запишет).
-    public string ArchiveTempPath { get; set; } = "/data/archive-temp";
+    public string ArchiveTempPath { get; set; } = "./data/archive-temp";
 
     // Seq
     public string SeqAdminPassword { get; set; } = "password";
     public string SeqWebPort { get; set; } = "80";
-    public string SeqDataPath { get; set; } = "/data/seq";
+    public string SeqDataPath { get; set; } = "./data/seq";
 
     // Веб-клиент
     public string WebPort { get; set; } = "8080";
