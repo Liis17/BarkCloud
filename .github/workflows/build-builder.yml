@@ -24,12 +24,15 @@ jobs:
         shell: pwsh
     env:
       RELEASE_TAG: builder-${{ github.run_number }}-${{ github.run_attempt }}
-      SELF_CONTAINED_DIR: ${{ runner.temp }}/BarkCloud.Builder-win-x64-self-contained
-      FRAMEWORK_DEPENDENT_DIR: ${{ runner.temp }}/BarkCloud.Builder-win-x64-framework-dependent
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Set publish paths
+        run: |
+          "SELF_CONTAINED_DIR=$env:RUNNER_TEMP/BarkCloud.Builder-win-x64-self-contained" >> $env:GITHUB_ENV
+          "FRAMEWORK_DEPENDENT_DIR=$env:RUNNER_TEMP/BarkCloud.Builder-win-x64-framework-dependent" >> $env:GITHUB_ENV
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
