@@ -49,7 +49,7 @@
                                    TextWrapping="Wrap"
                                    Text="Ядро (configuration, identity, users, files) и web включаются всегда. Остальное — по выбору." />
                         <UniformGrid Columns="2">
-                            <ui:ToggleSwitch x:Name="NginxToggle" Margin="0,4" Content="nginx (reverse-proxy)" IsChecked="{Binding IncludeNginx}" />
+                            <ui:ToggleSwitch x:Name="NginxToggle" Margin="0,4" Content="Использовать nginx" IsChecked="{Binding UseNginx}" />
                             <ui:ToggleSwitch x:Name="NotificationToggle" Margin="0,4" Content="notification (SMTP)" IsChecked="{Binding IncludeNotification}" />
                             <ui:ToggleSwitch x:Name="MinioToggle" Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
                             <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
@@ -61,7 +61,7 @@
                         <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=NginxToggle, Converter={StaticResource InverseBool}}"
                                     Title="nginx отключён"
-                                    Message="Отключайте только если знаете, что делаете. nginx — единственный мост наружу и TLS-терминация; без него подключение клиентов может не работать, трафик идёт по h2c без шифрования, и этот режим не тестировался." />
+                                    Message="Без nginx конфигурация не включает TLS reverse-proxy. Внешние клиенты должны подключаться к сервисам через другой настроенный proxy." />
                         <ui:InfoBar Margin="0,10,0,0" Severity="Error" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=MinioToggle, Converter={StaticResource InverseBool}}"
                                     Title="MinIO отключён"
@@ -80,6 +80,70 @@
                                     Message="Агрегатор логов нужно поднять отдельно, вручную отредактировать .env и прописать его в базе Configuration." />
                     </StackPanel>
                 </ui:Card>
+
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Server24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Docker-сеть и имена контейнеров" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Имена контейнеров для Docker и внешних инструментов; service keys cloud-* остаются прежними" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="DOCKER_NETWORK_NAME (должна существовать до запуска)" />
+                        <ui:TextBox Text="{Binding DockerNetworkName, UpdateSourceTrigger=PropertyChanged}" />
+                        <UniformGrid Margin="0,4,0,0" Columns="2">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding ConfigurationContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="IDENTITY_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding IdentityContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="USERS_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding UsersContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding FilesContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="NOTIFICATION_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding NotificationContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding TorrentContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding WebContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding MinioContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding RabbitmqContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding PostgresContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_CONTAINER_NAME" />
+                                <ui:TextBox Text="{Binding SeqContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="NGINX_CONTAINER_NAME (только compose nginx)" />
+                                <ui:TextBox Text="{Binding NginxContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </UniformGrid>
+                    </StackPanel>
+                </ui:CardExpander>
 
                 <!-- Общие -->
                 <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Settings24}" IsExpanded="True">
@@ -361,7 +425,7 @@
                         <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=CookieSecureToggle}"
                                     Title="WEB_COOKIE_SECURE = true"
-                                    Message="Включайте только при работе без nginx (не тестировалось)." />
+                                    Message="Включайте, если WEB_PUBLIC_HOST доступен браузеру по HTTPS." />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PUBLIC_HOST (пусто — из заголовка запроса)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPublicHost, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_ADMIN_PASSWORD (пусто — раздел «Обслуживание» недоступен)" />
@@ -434,52 +498,113 @@
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="Nginx / HTTPS" />
                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Домен и TLS-сертификаты (порты берутся из «Порты сервисов»)" />
+                                       Text="Встроенный или внешний reverse-proxy" />
                         </StackPanel>
                     </ui:CardExpander.Header>
                     <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Размещение nginx" />
+                        <ComboBox x:Name="NginxLocationBox" SelectedValue="{Binding NginxLocation, Mode=TwoWay}" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="В составе создаваемого compose" Tag="Compose" />
+                            <ComboBoxItem Content="Внешний nginx в общей Docker-сети" Tag="External" />
+                        </ComboBox>
+
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedValue, ElementName=NginxLocationBox}" Value="External">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
+                                        Title="Внешний nginx"
+                                        Message="Нужен nginx OSS 1.27.3 или новее. Подключите его к выбранной существующей Docker-сети, установите сгенерированный nginx/cloud.barkfluff.conf в http/conf.d и откройте указанные слушающие порты. Builder не перезагружает внешний nginx." />
+                        </StackPanel>
+
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Внешний домен (server_name)" />
                         <ui:TextBox Text="{Binding NginxDomain, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
                                     Title="Домен панели"
                                     Message="Рекомендуется, чтобы домен совпадал с хостом из WEB_PUBLIC_HOST." />
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Сертификат — crt (barkfluff.com-crt.pem)" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ui:TextBox x:Name="CertCrtBox" Grid.Column="0" IsReadOnly="True"
-                                        PlaceholderText="не выбран"
-                                        Text="{Binding CertCrtPath, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
-                                       CommandParameter="{Binding ElementName=CertCrtBox}" Click="OnPickCert" />
-                        </Grid>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Дополнительные HTTPS-прокси" />
+                        <ui:ToggleSwitch x:Name="SeqProxyToggle" Margin="0,4" Content="Seq Console" IsChecked="{Binding NginxSeqProxy}"
+                                         IsEnabled="{Binding IsChecked, ElementName=SeqToggle}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Порт Seq Console (внутренний backend: 80)" />
+                        <ui:TextBox Text="{Binding NginxSeqPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:ToggleSwitch x:Name="MinioConsoleProxyToggle" Margin="0,8,0,4" Content="MinIO Console" IsChecked="{Binding NginxMinioConsoleProxy}"
+                                         IsEnabled="{Binding IsChecked, ElementName=MinioToggle}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Порт MinIO Console (внутренний backend: 9001)" />
+                        <ui:TextBox Text="{Binding NginxMinioConsolePort, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Ключ — key (barkfluff.com-key.pem)" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ui:TextBox x:Name="CertKeyBox" Grid.Column="0" IsReadOnly="True"
-                                        PlaceholderText="не выбран"
-                                        Text="{Binding CertKeyPath, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
-                                       CommandParameter="{Binding ElementName=CertKeyBox}" Click="OnPickCert" />
-                        </Grid>
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedValue, ElementName=NginxLocationBox}" Value="Compose">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Сертификат — crt (локальный файл копируется в ./certs)" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox x:Name="CertCrtBox" Grid.Column="0" IsReadOnly="True"
+                                            PlaceholderText="не выбран"
+                                            Text="{Binding CertCrtPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
+                                           CommandParameter="{Binding ElementName=CertCrtBox}" Click="OnPickCert" />
+                            </Grid>
 
-                        <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
-                                    Title="Сертификаты не выбраны"
-                                    Message="Нужны для HTTPS. Можно сгенерировать и без них (положить в certs/ позже), но это очень небезопасно.">
-                            <ui:InfoBar.IsOpen>
-                                <MultiBinding Converter="{StaticResource AnyEmpty}">
-                                    <Binding Path="Text" ElementName="CertCrtBox" />
-                                    <Binding Path="Text" ElementName="CertKeyBox" />
-                                </MultiBinding>
-                            </ui:InfoBar.IsOpen>
-                        </ui:InfoBar>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Ключ — key (локальный файл копируется в ./certs)" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox x:Name="CertKeyBox" Grid.Column="0" IsReadOnly="True"
+                                            PlaceholderText="не выбран"
+                                            Text="{Binding CertKeyPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
+                                           CommandParameter="{Binding ElementName=CertKeyBox}" Click="OnPickCert" />
+                            </Grid>
+
+                            <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False"
+                                        Title="Сертификаты не выбраны"
+                                        Message="Для запуска nginx нужны оба реальных файла в ./certs. Можно добавить их позже; до этого TLS не запустится.">
+                                <ui:InfoBar.IsOpen>
+                                    <MultiBinding Converter="{StaticResource AnyEmpty}">
+                                        <Binding Path="Text" ElementName="CertCrtBox" />
+                                        <Binding Path="Text" ElementName="CertKeyBox" />
+                                    </MultiBinding>
+                                </ui:InfoBar.IsOpen>
+                            </ui:InfoBar>
+                        </StackPanel>
+
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedValue, ElementName=NginxLocationBox}" Value="External">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Сертификат — полный путь внутри внешнего nginx-контейнера" />
+                            <ui:TextBox Text="{Binding ExternalNginxCertificatePath, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Ключ — полный путь внутри внешнего nginx-контейнера" />
+                            <ui:TextBox Text="{Binding ExternalNginxKeyPath, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
                     </StackPanel>
                 </ui:CardExpander>
 

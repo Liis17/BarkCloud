@@ -71,6 +71,13 @@ namespace BarkCloud.Builder
                 return;
             }
 
+            var validationErrors = BuilderModelValidator.Validate(_model);
+            if (validationErrors.Count > 0)
+            {
+                SetStatus(string.Join("\n", validationErrors), error: true);
+                return;
+            }
+
             try
             {
                 var encoding = new UTF8Encoding(false);
@@ -80,19 +87,25 @@ namespace BarkCloud.Builder
                     ToLf(BackendComposeGenerator.BuildEnv(_model)), encoding);
 
                 var extra = "";
-                if (_model.IncludeNginx)
+                if (_model.UseNginx)
                 {
                     var nginxDir = Path.Combine(dir, "nginx");
                     Directory.CreateDirectory(nginxDir);
                     File.WriteAllText(Path.Combine(nginxDir, "cloud.barkfluff.conf"),
                         ToLf(BackendComposeGenerator.BuildNginxConf(_model)), encoding);
 
-                    var certsDir = Path.Combine(dir, "certs");
-                    Directory.CreateDirectory(certsDir);
-                    CopyCert(_model.CertCrtPath, certsDir);
-                    CopyCert(_model.CertKeyPath, certsDir);
-
-                    extra = " + nginx/ и certs/";
+                    if (_model.IncludeNginx)
+                    {
+                        var certsDir = Path.Combine(dir, "certs");
+                        Directory.CreateDirectory(certsDir);
+                        CopyCert(_model.CertCrtPath, certsDir);
+                        CopyCert(_model.CertKeyPath, certsDir);
+                        extra = " + nginx/ и certs/";
+                    }
+                    else
+                    {
+                        extra = " + конфиг для внешнего nginx/";
+                    }
                 }
 
                 SetStatus($"Готово: docker-compose.yml, .env{extra} записаны в {dir}", error: false);

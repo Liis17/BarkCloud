@@ -20,6 +20,9 @@
   <Folder Name="/Tests/">
     <Project Path="Tests/BarkCloud.TestKit/BarkCloud.TestKit.csproj" />
   </Folder>
+  <Folder Name="/Tests/Tools/">
+    <Project Path="Tests/Tools/BarkCloud.Builder.Tests/BarkCloud.Builder.Tests.csproj" />
+  </Folder>
   <Folder Name="/Tests/Backend/">
     <Project Path="Tests/Backend/BarkCloud.Configuration.Tests/BarkCloud.Configuration.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Files.Tests/BarkCloud.Files.Tests.csproj" />
