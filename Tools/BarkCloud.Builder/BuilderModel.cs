@@ -45,9 +45,9 @@ public sealed class BuilderModel
     // MinIO
     public string MinioRootUser { get; set; } = "user";
     public string MinioRootPassword { get; set; } = "password";
-    public string MinioPort { get; set; } = "9020";
-    public string MinioWebPort { get; set; } = "9021";
-    public string MinioDataPath { get; set; } = "";
+    public string MinioPort { get; set; } = "9000";
+    public string MinioWebPort { get; set; } = "9001";
+    public string MinioDataPath { get; set; } = "/data/minio";
 
     // RabbitMQ
     public string RabbitUser { get; set; } = "user";
@@ -57,44 +57,44 @@ public sealed class BuilderModel
     public string PostgresUser { get; set; } = "user";
     public string PostgresPassword { get; set; } = "password";
     public string PostgresDb { get; set; } = "postgrescloud";
-    public string PostgresPort { get; set; } = "6543";
-    public string PostgresDataPath { get; set; } = "";
-    public string BackupPath { get; set; } = "";
+    public string PostgresPort { get; set; } = "5432";
+    public string PostgresDataPath { get; set; } = "/data/pgdata";
+    public string BackupPath { get; set; } = "/data/pgbackup";
 
     // Порты сервисов
-    public string IdentityPort { get; set; } = "7020";
-    public string UsersPort { get; set; } = "7021";
-    public string ConfigurationPort { get; set; } = "7023";
-    public string FilesPort { get; set; } = "7025";
-    public string FilesHttp1Port { get; set; } = "7026";
-    public string TorrentPort { get; set; } = "7027";
-    public string TorrentHttp1Port { get; set; } = "7028";
+    public string IdentityPort { get; set; } = "8000";
+    public string UsersPort { get; set; } = "8001";
+    public string ConfigurationPort { get; set; } = "8003";
+    public string FilesPort { get; set; } = "8005";
+    public string FilesHttp1Port { get; set; } = "8006";
+    public string TorrentPort { get; set; } = "8007";
+    public string TorrentHttp1Port { get; set; } = "8008";
     public string TorrentPeerPort { get; set; } = "6881";
 
     // Torrent: папка на хосте, куда качаются торренты (монтируется в /mnt/torrents).
-    public string TorrentDownloadPath { get; set; } = "";
+    public string TorrentDownloadPath { get; set; } = "/data/torrent";
 
     // Files: внешняя папка для временных ZIP-архивов (скачивание папок/альбомов).
     // Пусто — named volume archive_temp (создаётся от root → files под uid 1654 не запишет).
-    public string ArchiveTempPath { get; set; } = "";
+    public string ArchiveTempPath { get; set; } = "/data/archive-temp";
 
     // Seq
     public string SeqAdminPassword { get; set; } = "password";
-    public string SeqWebPort { get; set; } = "8881";
-    public string SeqDataPath { get; set; } = "";
+    public string SeqWebPort { get; set; } = "80";
+    public string SeqDataPath { get; set; } = "/data/seq";
 
     // Веб-клиент
-    public string WebPort { get; set; } = "63222";
+    public string WebPort { get; set; } = "8080";
     public bool WebCookieSecure { get; set; } = false;
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebAdminPassword { get; set; } = "";
 
     // Внешние адреса сервисов для клиентов (обязательны). Configuration пишет их в БД
     // на чистом старте. По умолчанию — единый домен + порт сервиса (как маршрутизирует nginx).
-    public string ExternalIdentityHost { get; set; } = "https://cloud.barkfluff.com:7020";
-    public string ExternalUsersHost { get; set; } = "https://cloud.barkfluff.com:7021";
-    public string ExternalFilesHost { get; set; } = "https://cloud.barkfluff.com:7025";
-    public string ExternalTorrentHost { get; set; } = "https://cloud.barkfluff.com:7027";
+    public string ExternalIdentityHost { get; set; } = "https://cloud.barkfluff.com:8000";
+    public string ExternalUsersHost { get; set; } = "https://cloud.barkfluff.com:8001";
+    public string ExternalFilesHost { get; set; } = "https://cloud.barkfluff.com:8005";
+    public string ExternalTorrentHost { get; set; } = "https://cloud.barkfluff.com:8007";
 
     // Почта (SMTP) — опционально. Все 4 поля непусты → подтверждение по email включено; иначе выключено.
     public string EmailHost { get; set; } = "";

@@ -21,8 +21,36 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("name: ${DOCKER_NETWORK_NAME}", compose);
         Assert.Contains("container_name: ${WEB_CONTAINER_NAME}", compose);
         Assert.Contains("Docker__ContainerNames__Web: \"${WEB_CONTAINER_NAME}\"", compose);
+        Assert.Contains("image: docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1", compose);
+        Assert.Contains("CONFIGURATION_SERVICE_URL=http://cloud-configuration:8003", env);
+        Assert.Contains("IDENTITY_PORT=8000", env);
+        Assert.Contains("USERS_PORT=8001", env);
+        Assert.Contains("FILES_PORT=8005", env);
+        Assert.Contains("FILES_HTTP1PORT=8006", env);
+        Assert.Contains("TORRENT_PORT=8007", env);
+        Assert.Contains("TORRENT_HTTP1PORT=8008", env);
+        Assert.Contains("MINIO_PORT=9000", env);
+        Assert.Contains("MINIO_WEBPORT=9001", env);
+        Assert.Contains("POSTGRES_PORT=5432", env);
+        Assert.Contains("SEQ_WEBPORT=80", env);
+        Assert.Contains("WEB_PORT=8080", env);
+        Assert.Contains("MINIO_DATA_PATH=/data/minio", env);
+        Assert.Contains("POSTGRES_DATA_PATH=/data/pgdata", env);
+        Assert.Contains("BACKUP_PATH=/data/pgbackup", env);
+        Assert.Contains("SEQ_DATA_PATH=/data/seq", env);
+        Assert.Contains("TORRENT_DOWNLOAD_PATH=/data/torrent", env);
+        Assert.Contains("ARCHIVE_TEMP_PATH=/data/archive-temp", env);
         Assert.Contains("server cloud-web:8080 resolve;", nginx);
-        Assert.Contains("server cloud-identity:7020 resolve;", nginx);
+        Assert.Contains("server cloud-identity:8000 resolve;", nginx);
+        Assert.Contains("server cloud-users:8001 resolve;", nginx);
+        Assert.Contains("server cloud-files:8005 resolve;", nginx);
+        Assert.Contains("server cloud-files:8006 resolve;", nginx);
+        Assert.Contains("server cloud-torrent:8007 resolve;", nginx);
+        Assert.Contains("server cloud-torrent:8008 resolve;", nginx);
+        Assert.Contains("listen 8000 ssl;", nginx);
+        Assert.Contains("listen 8001 ssl;", nginx);
+        Assert.Contains("listen 8005 ssl;", nginx);
+        Assert.Contains("listen 8007 ssl;", nginx);
         Assert.Contains("resolver 127.0.0.11 valid=5s;", nginx);
         Assert.Contains("resolver_timeout 2s;", nginx);
         Assert.Contains("zone barkcloud_web 64k;", nginx);
@@ -33,7 +61,7 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("proxy_request_buffering off;", nginx);
         Assert.Contains("proxy_read_timeout 7200s;", nginx);
         Assert.DoesNotContain("proxy_pass http://cloud-web:8080", nginx);
-        Assert.DoesNotContain("listen 80", nginx);
+        Assert.DoesNotContain("listen 80 ssl;", nginx);
         Assert.DoesNotContain("{{", nginx);
         Assert.DoesNotContain("}}", nginx);
         Assert.DoesNotContain("NGINX_SEQ_PORT", env);
@@ -77,7 +105,7 @@ public sealed class BuilderGeneratorTests
         Assert.DoesNotContain("${TORRENT_PORT}:${TORRENT_PORT}", compose);
         Assert.Contains("\"443:443\"", compose);
         Assert.Contains("\"${IDENTITY_PORT}:${IDENTITY_PORT}\"", compose);
-        Assert.Contains("server prod-identity:7020 resolve;", nginx);
+        Assert.Contains("server prod-identity:8000 resolve;", nginx);
         Assert.Contains("server prod-web:8080 resolve;", nginx);
         Assert.Contains("/etc/nginx/certs/public.crt", nginx);
         Assert.Contains("/etc/nginx/certs/private.key", nginx);
@@ -105,6 +133,41 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("      - cloud-torrent", compose);
         Assert.DoesNotContain("{{", compose);
         Assert.DoesNotContain("}}", compose);
+    }
+
+    [Fact]
+    public void Custom_container_names_and_ports_flow_into_nginx_without_changing_stable_service_dns()
+    {
+        var model = new BuilderModel
+        {
+            IdentityContainerName = "identity-prod",
+            IdentityPort = "8120",
+            ConfigurationContainerName = "config-prod",
+            ConfigurationPort = "8123",
+            FilesContainerName = "files-prod",
+            FilesPort = "8125",
+            FilesHttp1Port = "8126",
+            TorrentContainerName = "torrent-prod",
+            TorrentPort = "8127",
+            TorrentHttp1Port = "8128",
+        };
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+        var nginx = BackendComposeGenerator.BuildNginxConf(model);
+
+        Assert.Contains("IDENTITY_CONTAINER_NAME=identity-prod", env);
+        Assert.Contains("CONFIGURATION_CONTAINER_NAME=config-prod", env);
+        Assert.Contains("CONFIGURATION_SERVICE_URL=http://cloud-configuration:8123", env);
+        Assert.Contains("EXTERNAL_IDENTITY_HOST=https://cloud.barkfluff.com:8000", env);
+        Assert.Contains("container_name: ${IDENTITY_CONTAINER_NAME}", compose);
+        Assert.Contains("server identity-prod:8120 resolve;", nginx);
+        Assert.Contains("server files-prod:8125 resolve;", nginx);
+        Assert.Contains("server files-prod:8126 resolve;", nginx);
+        Assert.Contains("server torrent-prod:8127 resolve;", nginx);
+        Assert.Contains("server torrent-prod:8128 resolve;", nginx);
+        Assert.Contains("listen 8120 ssl;", nginx);
+        Assert.Contains("listen 8127 ssl;", nginx);
     }
 
     [Fact]
@@ -218,7 +281,7 @@ public sealed class BuilderGeneratorTests
             FilesHttp1Port = "not-a-port",
             TorrentHttp1Port = "65536",
             NginxSeqProxy = true,
-            NginxSeqPort = "7025",
+            NginxSeqPort = "8005",
             NginxMinioConsoleProxy = true,
             NginxMinioConsolePort = "65536",
             ExternalNginxCertificatePath = "/etc/nginx/certs/bad\";include.conf",
@@ -231,7 +294,7 @@ public sealed class BuilderGeneratorTests
         Assert.Contains(errors, x => x.Contains("MinIO Console"));
         Assert.Contains(errors, x => x.Contains("Files HTTP/1"));
         Assert.Contains(errors, x => x.Contains("Torrent HTTP/1"));
-        Assert.Contains(errors, x => x.Contains("Порт 7025 указан"));
+        Assert.Contains(errors, x => x.Contains("Порт 8005 указан"));
         Assert.Contains(errors, x => x.Contains("Путь к сертификату внешнего nginx"));
     }
 
@@ -253,7 +316,7 @@ public sealed class BuilderGeneratorTests
         {
             DockerNetworkName = "barkcloud-network\n",
             WebContainerName = "cloud-web\n",
-            IdentityPort = "7020\n",
+            IdentityPort = "8000\n",
             NginxLocation = "Compose",
             CertCrtPath = "certificate.pem\n",
         });
