@@ -34,12 +34,12 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("POSTGRES_PORT=5432", env);
         Assert.Contains("SEQ_WEBPORT=80", env);
         Assert.Contains("WEB_PORT=8080", env);
-        Assert.Contains("MINIO_DATA_PATH=/data/minio", env);
-        Assert.Contains("POSTGRES_DATA_PATH=/data/pgdata", env);
-        Assert.Contains("BACKUP_PATH=/data/pgbackup", env);
-        Assert.Contains("SEQ_DATA_PATH=/data/seq", env);
-        Assert.Contains("TORRENT_DOWNLOAD_PATH=/data/torrent", env);
-        Assert.Contains("ARCHIVE_TEMP_PATH=/data/archive-temp", env);
+        Assert.Contains("MINIO_DATA_PATH=./data/minio", env);
+        Assert.Contains("POSTGRES_DATA_PATH=./data/pgdata", env);
+        Assert.Contains("BACKUP_PATH=./data/pgbackup", env);
+        Assert.Contains("SEQ_DATA_PATH=./data/seq", env);
+        Assert.Contains("TORRENT_DOWNLOAD_PATH=./data/torrent", env);
+        Assert.Contains("ARCHIVE_TEMP_PATH=./data/archive-temp", env);
         Assert.Contains("server cloud-web:8080 resolve;", nginx);
         Assert.Contains("server cloud-identity:8000 resolve;", nginx);
         Assert.Contains("server cloud-users:8001 resolve;", nginx);
