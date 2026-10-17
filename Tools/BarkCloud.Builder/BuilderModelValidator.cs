@@ -5,10 +5,10 @@ namespace BarkCloud.Builder;
 
 public static partial class BuilderModelValidator
 {
-    private static readonly Regex DockerNetworkNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]*$", RegexOptions.Compiled);
-    private static readonly Regex DockerContainerNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]+$", RegexOptions.Compiled);
-    private static readonly Regex NginxTokenPattern = new("^[A-Za-z0-9*._-]+$", RegexOptions.Compiled);
-    private static readonly Regex PortPattern = new("^[0-9]+$", RegexOptions.Compiled);
+    private static readonly Regex DockerNetworkNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]*\\z", RegexOptions.Compiled);
+    private static readonly Regex DockerContainerNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]+\\z", RegexOptions.Compiled);
+    private static readonly Regex NginxTokenPattern = new("^[A-Za-z0-9*._-]+\\z", RegexOptions.Compiled);
+    private static readonly Regex PortPattern = new("^[0-9]+\\z", RegexOptions.Compiled);
 
     public static IReadOnlyList<string> Validate(BuilderModel model)
     {

@@ -76,7 +76,6 @@ public sealed class DockerCommandException : Exception
 public sealed class DockerService : IDockerDeployment
 {
     private const string WebService = "web";
-    private const string DefaultWebContainer = "cloud-web";
 
     // Управляемый набор: логическое имя UI/очереди -> имя сервиса Compose.
     // В compose BarkCloud ключи имеют префикс cloud-, а очередь работает с короткими именами.
