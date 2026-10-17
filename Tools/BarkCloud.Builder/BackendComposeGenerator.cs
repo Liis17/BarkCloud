@@ -42,8 +42,6 @@ public static class BackendComposeGenerator
         {
             // Шапка + ядро микросервисов (всегда присутствует).
             $$"""
-version: '3.8'
-
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"

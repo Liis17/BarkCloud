@@ -58,7 +58,7 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
             .Should().OnlyContain(item => item.Value == string.Empty);
         second.Single(item => item.ServiceId == ServiceId.Notification
                               && item.Section == "Email"
-                              && item.Key == "AllowInsecure").Value.Should().Be("false");
+                              && item.Key == "AllowInsecure").Value.Should().Be("true");
 
         var universal = await _context.StorageProfiles.SingleAsync();
         universal.ProfileId.Should().Be("universal-v1");

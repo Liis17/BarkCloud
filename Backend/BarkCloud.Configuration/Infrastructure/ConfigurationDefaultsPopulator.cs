@@ -188,7 +188,7 @@ public class ConfigurationDefaultsPopulator
             return $"Host={_postgresHost};Database={database.Database};Username={_postgresUsername};Password={_postgresPassword};Maximum Pool Size=20;Connection Idle Lifetime=60;Connection Pruning Interval=10";
 
         if (entry.ServiceId == ServiceId.Notification && entry.Section == "Email" && entry.Key == "AllowInsecure")
-            return "false";
+            return "true";
         if (entry.ServiceId == ServiceId.Notification && entry.Section == "Email")
             return EmptyAsNull(entry.Key switch
             {
