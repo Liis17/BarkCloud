@@ -42,6 +42,8 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 ## Ограничения и важные детали
 
+- `.github/workflows/build-builder.yml` при push в любую ветку с изменениями Builder, его тестов, общих build properties или самого workflow (и при ручном запуске) выполняет тесты и публикует две Release-сборки `win-x64`. Полные папки публикации с `BarkCloud.Builder.exe` упаковываются отдельно: `BarkCloud.Builder-win-x64-self-contained.zip` включает .NET runtime, а `BarkCloud.Builder-win-x64-framework-dependent.zip` требует установленного .NET 10 Desktop Runtime (x64). Оба архива прикрепляются к одному GitHub Release с тегом `builder-<run_number>-<run_attempt>`, указывающим на собранный коммит. Релиз не получает статус Latest; публикация использует встроенный `GITHUB_TOKEN` с `contents: write`.
+
 - Все проверки модели выполняются до записи compose/env/config. Имена контейнеров должны соответствовать Docker, быть уникальными среди включённых сервисов и не совпадать с `cloud-*` alias другого сервиса, даже если он отключён.
 - Папка вывода должна существовать. Файлы записываются UTF-8 без BOM с переводами строк LF. При смене режима существующие `certs/` не удаляются.
 - В Compose режиме пустые поля сертификата разрешены, чтобы конфигурацию можно было сгенерировать заранее; для запуска nginx нужны реальные сертификат и ключ в `certs/`.
