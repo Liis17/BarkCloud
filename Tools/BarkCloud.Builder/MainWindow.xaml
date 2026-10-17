@@ -776,7 +776,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <ui:TextBox x:Name="CertCrtBox" Grid.Column="0" IsReadOnly="True" ClearButtonEnabled="False"
+                                <ui:TextBox x:Name="CertCrtBox" Grid.Column="0" IsReadOnly="True"
                                             PlaceholderText="не выбран"
                                             Text="{Binding CertCrtPath, UpdateSourceTrigger=PropertyChanged}" />
                                 <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
@@ -789,7 +789,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <ui:TextBox x:Name="CertKeyBox" Grid.Column="0" IsReadOnly="True" ClearButtonEnabled="False"
+                                <ui:TextBox x:Name="CertKeyBox" Grid.Column="0" IsReadOnly="True"
                                             PlaceholderText="не выбран"
                                             Text="{Binding CertKeyPath, UpdateSourceTrigger=PropertyChanged}" />
                                 <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Выбрать…" Icon="{ui:SymbolIcon FolderOpen24}"
