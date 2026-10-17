@@ -265,7 +265,7 @@ services:
         if (m.IncludeMinio)
             sections.Add("""
   cloud-minio:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
+    image: docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
     container_name: ${MINIO_CONTAINER_NAME}
     restart: always
     environment:

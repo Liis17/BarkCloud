@@ -95,51 +95,51 @@
                         <UniformGrid Margin="0,4,0,0" Columns="2">
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding ConfigurationContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="ConfigurationNameBox" Text="{Binding ConfigurationContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="IDENTITY_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding IdentityContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="IdentityNameBox" Text="{Binding IdentityContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="USERS_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding UsersContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="UsersNameBox" Text="{Binding UsersContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding FilesContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="FilesNameBox" Text="{Binding FilesContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="NOTIFICATION_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding NotificationContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="NotificationNameBox" Text="{Binding NotificationContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding TorrentContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="TorrentNameBox" Text="{Binding TorrentContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding WebContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="WebNameBox" Text="{Binding WebContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding MinioContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="MinioNameBox" Text="{Binding MinioContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding RabbitmqContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="RabbitNameBox" Text="{Binding RabbitmqContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding PostgresContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="PostgresNameBox" Text="{Binding PostgresContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_CONTAINER_NAME" />
-                                <ui:TextBox Text="{Binding SeqContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="SeqNameBox" Text="{Binding SeqContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Style="{StaticResource FieldLabel}" Text="NGINX_CONTAINER_NAME (только compose nginx)" />
-                                <ui:TextBox Text="{Binding NginxContainerName, UpdateSourceTrigger=PropertyChanged}" />
+                                <ui:TextBox x:Name="NginxNameBox" Text="{Binding NginxContainerName, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </UniformGrid>
                     </StackPanel>
@@ -161,8 +161,20 @@
                             <ComboBoxItem Content="Development" />
                         </ComboBox>
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_SERVICE_URL (имя контейнера + порт)" />
-                        <ui:TextBox IsReadOnly="True"
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Configuration" />
+                        <ui:TextBox x:Name="ConfigurationContainerPreviewBox" IsReadOnly="True"
+                                    Text="{Binding Text, ElementName=ConfigurationNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний gRPC-адрес выбранного контейнера" />
+                        <ui:TextBox x:Name="ConfigurationAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="ConfigurationNameBox" Path="Text" />
+                                    <Binding ElementName="ConfigPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_SERVICE_URL (стабильный service DNS)" />
+                        <ui:TextBox x:Name="ConfigurationServiceUrlBox" IsReadOnly="True"
                                     Text="{Binding Text, ElementName=ConfigPortBox, Mode=OneWay, StringFormat='http://cloud-configuration:{0}'}" />
 
                         <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_ACCESS_KEY (одинаковый у всех сервисов)" />
@@ -232,12 +244,28 @@
                             <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
                                        Tag="20" CommandParameter="{Binding ElementName=MinioPassBox}" Click="OnRandom" />
                         </Grid>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_PORT (API)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioPort, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_WEBPORT (консоль)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding MinioWebPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера MinIO" />
+                        <ui:TextBox x:Name="MinioContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=MinioNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="S3 API в Docker-сети" />
+                        <ui:TextBox x:Name="MinioApiAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="MinioNameBox" Path="Text" />
+                                    <Binding ElementName="MinioPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="MinIO Console в Docker-сети" />
+                        <ui:TextBox x:Name="MinioConsoleAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="MinioNameBox" Path="Text" />
+                                    <Binding ElementName="MinioWebPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="/d/barkcloud/minio" Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/data/minio" Text="{Binding MinioDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -254,8 +282,28 @@
                         <ui:InfoBar Margin="0,0,0,4" Severity="Warning" IsClosable="False" IsOpen="True"
                                     Title="Нужны права на запись"
                                     Message="Сервис files работает не от root (uid 1654). Named volume (пусто) создаётся под root и недоступен на запись — при скачивании архивом будет «Access denied». Укажите внешнюю папку, доступную на запись для uid 1654." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Files" />
+                        <ui:TextBox x:Name="FilesContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=FilesNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний gRPC-адрес Files" />
+                        <ui:TextBox x:Name="FilesGrpcAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="FilesNameBox" Path="Text" />
+                                    <Binding ElementName="FilesPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний HTTP/1-адрес Files" />
+                        <ui:TextBox x:Name="FilesHttpAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="FilesNameBox" Path="Text" />
+                                    <Binding ElementName="FilesHttp1PortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="ARCHIVE_TEMP_PATH (пусто — named volume archive_temp)" />
-                        <ui:TextBox PlaceholderText="/d/barkcloud/archive-temp" Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/data/archive-temp" Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -289,6 +337,17 @@
                             <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
                                        Tag="20" CommandParameter="{Binding ElementName=RabbitPassBox}" Click="OnRandom" />
                         </Grid>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера RabbitMQ" />
+                        <ui:TextBox x:Name="RabbitContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=RabbitNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний AMQP-адрес" />
+                        <ui:TextBox x:Name="RabbitAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="amqp://{0}:{1}">
+                                    <Binding ElementName="RabbitNameBox" Path="Text" />
+                                    <Binding ElementName="RabbitPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -325,12 +384,21 @@
                         </Grid>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DB" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresDb, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PORT (host-маппинг)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding PostgresPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера PostgreSQL" />
+                        <ui:TextBox x:Name="PostgresContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=PostgresNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний адрес PostgreSQL" />
+                        <ui:TextBox x:Name="PostgresAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="postgresql://{0}:{1}">
+                                    <Binding ElementName="PostgresNameBox" Path="Text" />
+                                    <Binding ElementName="PostgresPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/d/barkcloud/pgdata" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/data/pgdata" Text="{Binding PostgresDataPath, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="BACKUP_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="/d/barkcloud/backup" Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/data/pgbackup" Text="{Binding BackupPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -340,20 +408,97 @@
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="Порты сервисов" />
                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Внешние порты (через nginx)" />
+                                       Text="Внутренние и внешние порты приложений; фиксированные порты ниже" />
                         </StackPanel>
                     </ui:CardExpander.Header>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="IDENTITY_PORT" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding IdentityPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:InfoBar Margin="0,0,0,4" Severity="Informational" IsClosable="False" IsOpen="True"
+                                    Title="Публикация портов"
+                                    Message="Compose nginx публикует HTTPS 443 и API-порты Identity, Users, Files и Torrent с теми же номерами. Configuration и инфраструктурные порты доступны внутри сети; HTTP/1, BitTorrent и Web listener не имеют отдельных host-публикаций. Консоли можно открыть через nginx ниже." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="IDENTITY_PORT (внутренний gRPC; тот же порт nginx)" />
+                        <ui:TextBox x:Name="IdentityPortBox" Margin="0,0,0,6" Text="{Binding IdentityPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Identity" />
+                        <ui:TextBox x:Name="IdentityContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=IdentityNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний gRPC-адрес" />
+                        <ui:TextBox x:Name="IdentityAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="IdentityNameBox" Path="Text" />
+                                    <Binding ElementName="IdentityPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="USERS_PORT" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding UsersPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox x:Name="UsersPortBox" Margin="0,0,0,6" Text="{Binding UsersPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Users" />
+                        <ui:TextBox x:Name="UsersContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=UsersNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний gRPC-адрес" />
+                        <ui:TextBox x:Name="UsersAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="UsersNameBox" Path="Text" />
+                                    <Binding ElementName="UsersPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_PORT (порт запуска; доступен только в docker-сети)" />
                         <ui:TextBox x:Name="ConfigPortBox" Margin="0,0,0,6" Text="{Binding ConfigurationPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_PORT" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding FilesPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox x:Name="FilesPortBox" Margin="0,0,0,6" Text="{Binding FilesPort, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="FILES_HTTP1PORT" />
-                        <ui:TextBox Text="{Binding FilesHttp1Port, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox x:Name="FilesHttp1PortBox" Text="{Binding FilesHttp1Port, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_PORT (gRPC; тот же порт nginx)" />
+                        <ui:TextBox x:Name="TorrentPortBox" Margin="0,0,0,6" Text="{Binding TorrentPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_HTTP1PORT (стриминг файлов внутри сети)" />
+                        <ui:TextBox x:Name="TorrentHttp1PortBox" Margin="0,0,0,6" Text="{Binding TorrentHttp1Port, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_PEER_PORT (BitTorrent TCP+UDP; не публикуется этим compose)" />
+                        <ui:TextBox x:Name="TorrentPeerPortBox" Text="{Binding TorrentPeerPort, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Margin="0,12,0,0" FontWeight="Medium" Text="Фиксированные внутренние порты" />
+                        <TextBlock Margin="0,0,0,6" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Только для адресов контейнеров; не публикуются напрямую на хост." />
+                        <UniformGrid Columns="2">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_PORT (API)" />
+                                <ui:TextBox x:Name="MinioPortBox" IsReadOnly="True" Text="{Binding MinioPort, Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="MINIO_WEBPORT (консоль)" />
+                                <ui:TextBox x:Name="MinioWebPortBox" IsReadOnly="True" Text="{Binding MinioWebPort, Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="RABBITMQ AMQP" />
+                                <ui:TextBox x:Name="RabbitPortBox" IsReadOnly="True" Text="5672" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="POSTGRES_PORT" />
+                                <ui:TextBox x:Name="PostgresPortBox" IsReadOnly="True" Text="{Binding PostgresPort, Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_WEBPORT" />
+                                <ui:TextBox x:Name="SeqWebPortBox" IsReadOnly="True" Text="{Binding SeqWebPort, Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_INGESTION_PORT" />
+                                <ui:TextBox x:Name="SeqIngestionPortBox" IsReadOnly="True" Text="5341" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PORT" />
+                                <ui:TextBox x:Name="WebPortBox" IsReadOnly="True" Text="{Binding WebPort, Mode=OneWay}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="HTTPS (nginx)" />
+                                <ui:TextBox x:Name="NginxHttpsPortBox" IsReadOnly="True" Text="443" />
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <TextBlock Margin="0,12,0,0" FontWeight="Medium" Text="Дополнительные listener-порты nginx" />
+                        <TextBlock Margin="0,0,0,6" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Используются при включённых прокси Seq Console и MinIO Console в разделе Nginx." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="NGINX_SEQ_PORT (публикуется при включённой консоли)" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding NginxSeqPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="NGINX_MINIO_CONSOLE_PORT (публикуется при включённой консоли)" />
+                        <ui:TextBox Text="{Binding NginxMinioConsolePort, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -378,10 +523,28 @@
                             <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайно" Icon="{ui:SymbolIcon ArrowSync24}"
                                        Tag="20" CommandParameter="{Binding ElementName=SeqPassBox}" Click="OnRandom" />
                         </Grid>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_WEBPORT" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding SeqWebPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Seq" />
+                        <ui:TextBox x:Name="SeqContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=SeqNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="HTTP Console в Docker-сети" />
+                        <ui:TextBox x:Name="SeqConsoleAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="SeqNameBox" Path="Text" />
+                                    <Binding ElementName="SeqWebPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="HTTP ingestion в Docker-сети" />
+                        <ui:TextBox x:Name="SeqIngestionAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="SeqNameBox" Path="Text" />
+                                    <Binding ElementName="SeqIngestionPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="/d/barkcloud/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox PlaceholderText="/data/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -396,14 +559,37 @@
                         </StackPanel>
                     </ui:CardExpander.Header>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_PORT (gRPC)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding TorrentPort, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_HTTP1PORT (стриминг файлов)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding TorrentHttp1Port, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_PEER_PORT (BitTorrent, TCP+UDP; публикуется на хост)" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding TorrentPeerPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Torrent" />
+                        <ui:TextBox x:Name="TorrentContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=TorrentNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний gRPC-адрес Torrent" />
+                        <ui:TextBox x:Name="TorrentGrpcAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="TorrentNameBox" Path="Text" />
+                                    <Binding ElementName="TorrentPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний HTTP/1-адрес Torrent" />
+                        <ui:TextBox x:Name="TorrentHttpAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="TorrentNameBox" Path="Text" />
+                                    <Binding ElementName="TorrentHttp1PortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="BitTorrent TCP/UDP endpoint (внутри сети)" />
+                        <ui:TextBox x:Name="TorrentPeerAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="{}{0}:{1} (TCP/UDP)">
+                                    <Binding ElementName="TorrentNameBox" Path="Text" />
+                                    <Binding ElementName="TorrentPeerPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="TORRENT_DOWNLOAD_PATH (папка на хосте; пусто — named volume)" />
-                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/d/barkcloud/torrents" Text="{Binding TorrentDownloadPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Margin="0,0,0,6" PlaceholderText="/data/torrent" Text="{Binding TorrentDownloadPath, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="EXTERNAL_TORRENT_HOST (внешний адрес для клиентов)" />
                         <ui:TextBox Text="{Binding ExternalTorrentHost, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
@@ -419,8 +605,17 @@
                         </StackPanel>
                     </ui:CardExpander.Header>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PORT" />
-                        <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPort, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Web" />
+                        <ui:TextBox x:Name="WebContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=WebNameBox, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний HTTP-адрес Web" />
+                        <ui:TextBox x:Name="WebAddressPreviewBox" IsReadOnly="True">
+                            <ui:TextBox.Text>
+                                <MultiBinding Mode="OneWay" StringFormat="http://{0}:{1}">
+                                    <Binding ElementName="WebNameBox" Path="Text" />
+                                    <Binding ElementName="WebPortBox" Path="Text" />
+                                </MultiBinding>
+                            </ui:TextBox.Text>
+                        </ui:TextBox>
                         <ui:ToggleSwitch x:Name="CookieSecureToggle" Margin="0,8,0,0" Content="WEB_COOKIE_SECURE" IsChecked="{Binding WebCookieSecure}" />
                         <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=CookieSecureToggle}"
@@ -477,6 +672,10 @@
                         <ui:InfoBar Margin="0,0,0,4" Severity="Informational" IsClosable="False" IsOpen="True"
                                     Title="Опционально"
                                     Message="Заполните все 4 поля, чтобы включить подтверждение по email. Если оставить пусто — работа без почты." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера Notification" />
+                        <ui:TextBox x:Name="NotificationContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=NotificationNameBox, Mode=OneWay}" />
+                        <TextBlock Margin="0,0,0,6" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="У Notification нет HTTP/gRPC endpoint; сервис обрабатывает очередь RabbitMQ." />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="EMAIL_HOST" />
                         <ui:TextBox Margin="0,0,0,6" PlaceholderText="smtp.example.com"
                                     Text="{Binding EmailHost, UpdateSourceTrigger=PropertyChanged}" />
@@ -521,7 +720,31 @@
                             </StackPanel.Style>
                             <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
                                         Title="Внешний nginx"
-                                        Message="Нужен nginx OSS 1.27.3 или новее. Подключите его к выбранной существующей Docker-сети, установите сгенерированный nginx/cloud.barkfluff.conf в http/conf.d и откройте указанные слушающие порты. Builder не перезагружает внешний nginx." />
+                                        Message="Нужен nginx OSS 1.27.3 или новее. Подключите его к выбранной существующей Docker-сети, установите сгенерированный nginx/cloud.barkfluff.conf в http/conf.d и откройте указанные слушающие порты. Имя и адрес внешнего контейнера задаются отдельно и здесь неизвестны. Builder не перезагружает внешний nginx." />
+                        </StackPanel>
+
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedValue, ElementName=NginxLocationBox}" Value="Compose">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Выбранное имя контейнера nginx" />
+                            <ui:TextBox x:Name="NginxContainerPreviewBox" IsReadOnly="True" Text="{Binding Text, ElementName=NginxNameBox, Mode=OneWay}" />
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Внутренний HTTPS-адрес nginx" />
+                            <ui:TextBox x:Name="NginxAddressPreviewBox" IsReadOnly="True">
+                                <ui:TextBox.Text>
+                                    <MultiBinding Mode="OneWay" StringFormat="https://{0}:{1}">
+                                        <Binding ElementName="NginxNameBox" Path="Text" />
+                                        <Binding ElementName="NginxHttpsPortBox" Path="Text" />
+                                    </MultiBinding>
+                                </ui:TextBox.Text>
+                            </ui:TextBox>
                         </StackPanel>
 
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Внешний домен (server_name)" />
@@ -533,12 +756,8 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Дополнительные HTTPS-прокси" />
                         <ui:ToggleSwitch x:Name="SeqProxyToggle" Margin="0,4" Content="Seq Console" IsChecked="{Binding NginxSeqProxy}"
                                          IsEnabled="{Binding IsChecked, ElementName=SeqToggle}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Порт Seq Console (внутренний backend: 80)" />
-                        <ui:TextBox Text="{Binding NginxSeqPort, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:ToggleSwitch x:Name="MinioConsoleProxyToggle" Margin="0,8,0,4" Content="MinIO Console" IsChecked="{Binding NginxMinioConsoleProxy}"
                                          IsEnabled="{Binding IsChecked, ElementName=MinioToggle}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="Порт MinIO Console (внутренний backend: 9001)" />
-                        <ui:TextBox Text="{Binding NginxMinioConsolePort, UpdateSourceTrigger=PropertyChanged}" />
 
                         <StackPanel>
                             <StackPanel.Style>
