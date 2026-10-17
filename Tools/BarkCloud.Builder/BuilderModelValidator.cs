@@ -5,7 +5,8 @@ namespace BarkCloud.Builder;
 
 public static partial class BuilderModelValidator
 {
-    private static readonly Regex DockerNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]*$", RegexOptions.Compiled);
+    private static readonly Regex DockerNetworkNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]*$", RegexOptions.Compiled);
+    private static readonly Regex DockerContainerNamePattern = new("^[A-Za-z0-9][A-Za-z0-9_.-]+$", RegexOptions.Compiled);
     private static readonly Regex NginxTokenPattern = new("^[A-Za-z0-9*._-]+$", RegexOptions.Compiled);
     private static readonly Regex PortPattern = new("^[0-9]+$", RegexOptions.Compiled);
 
@@ -13,11 +14,11 @@ public static partial class BuilderModelValidator
     {
         var errors = new List<string>();
 
-        ValidateDockerName(model.DockerNetworkName, "Имя Docker-сети", errors);
+        ValidateDockerNetworkName(model.DockerNetworkName, errors);
 
         var allNames = model.ContainerNames;
         foreach (var container in allNames.Where(x => x.Enabled))
-            ValidateDockerName(container.Name, $"Имя контейнера {container.ServiceAlias}", errors);
+            ValidateDockerContainerName(container.Name, $"Имя контейнера {container.ServiceAlias}", errors);
 
         foreach (var group in allNames.Where(x => x.Enabled)
                      .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
@@ -94,10 +95,16 @@ public static partial class BuilderModelValidator
         return errors;
     }
 
-    private static void ValidateDockerName(string? value, string label, ICollection<string> errors)
+    private static void ValidateDockerNetworkName(string? value, ICollection<string> errors)
     {
-        if (string.IsNullOrWhiteSpace(value) || !DockerNamePattern.IsMatch(value))
-            errors.Add($"{label} должно начинаться с буквы или цифры и содержать только буквы, цифры, точку, дефис или подчёркивание.");
+        if (string.IsNullOrWhiteSpace(value) || !DockerNetworkNamePattern.IsMatch(value))
+            errors.Add("Имя Docker-сети должно начинаться с буквы или цифры и содержать только буквы, цифры, точку, дефис или подчёркивание.");
+    }
+
+    private static void ValidateDockerContainerName(string? value, string label, ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DockerContainerNamePattern.IsMatch(value))
+            errors.Add($"{label} должно содержать не менее двух символов, начинаться с буквы или цифры и содержать только буквы, цифры, точку, дефис или подчёркивание.");
     }
 
     private static void ValidateExternalCertificatePath(string? value, string label, ICollection<string> errors)

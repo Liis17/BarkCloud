@@ -1,3 +1,4 @@
+using System.IO;
 using BarkCloud.Builder;
 
 namespace BarkCloud.Builder.Tests;
@@ -53,8 +54,8 @@ public sealed class BuilderGeneratorTests
             IncludeTorrent = false,
             IncludeSeq = false,
             NginxSeqProxy = true,
-            CertCrtPath = @"C:\certs\public.crt",
-            CertKeyPath = @"C:\certs\private.key",
+            CertCrtPath = Path.Combine(Path.GetTempPath(), "certs", "public.crt"),
+            CertKeyPath = Path.Combine(Path.GetTempPath(), "certs", "private.key"),
         };
 
         var compose = BackendComposeGenerator.BuildCompose(model);
@@ -156,9 +157,55 @@ public sealed class BuilderGeneratorTests
             IdentityContainerName = "shared-name",
             WebContainerName = "shared-name",
         };
+        var reservedDisabledAlias = new BuilderModel
+        {
+            IncludeNotification = false,
+            WebContainerName = "cloud-notification",
+        };
 
         Assert.Contains(BuilderModelValidator.Validate(reservedAlias), x => x.Contains("зарезервировано именем сервиса"));
         Assert.Contains(BuilderModelValidator.Validate(duplicate), x => x.Contains("используется несколькими сервисами"));
+        Assert.Contains(BuilderModelValidator.Validate(reservedDisabledAlias), x => x.Contains("зарезервировано именем сервиса"));
+    }
+
+    [Fact]
+    public void One_character_container_names_are_rejected_for_core_and_enabled_optional_services()
+    {
+        var model = new BuilderModel
+        {
+            WebContainerName = "a",
+            NotificationContainerName = "b",
+        };
+
+        var errors = BuilderModelValidator.Validate(model);
+
+        Assert.Contains(errors, x => x.Contains("Имя контейнера cloud-web") && x.Contains("не менее двух символов"));
+        Assert.Contains(errors, x => x.Contains("Имя контейнера cloud-notification") && x.Contains("не менее двух символов"));
+    }
+
+    [Fact]
+    public void Two_character_container_names_are_valid_and_single_character_network_names_remain_valid()
+    {
+        var model = new BuilderModel
+        {
+            DockerNetworkName = "n",
+            WebContainerName = "ab",
+            NotificationContainerName = "xy",
+        };
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
+    }
+
+    [Fact]
+    public void Disabled_optional_container_name_is_not_validated()
+    {
+        var model = new BuilderModel
+        {
+            IncludeNotification = false,
+            NotificationContainerName = "a",
+        };
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
     }
 
     [Fact]
