@@ -24,8 +24,8 @@ jobs:
         shell: pwsh
     env:
       RELEASE_TAG: builder-${{ github.run_number }}-${{ github.run_attempt }}
-      PUBLISH_DIR: ${{ runner.temp }}/BarkCloud.Builder-win-x64
-      ARCHIVE_PATH: ${{ runner.temp }}/BarkCloud.Builder-win-x64.zip
+      SELF_CONTAINED_DIR: ${{ runner.temp }}/BarkCloud.Builder-win-x64-self-contained
+      FRAMEWORK_DEPENDENT_DIR: ${{ runner.temp }}/BarkCloud.Builder-win-x64-framework-dependent
 
     steps:
       - name: Checkout
@@ -39,20 +39,30 @@ jobs:
       - name: Test Builder
         run: dotnet test Tests/Tools/BarkCloud.Builder.Tests/BarkCloud.Builder.Tests.csproj --configuration Release
 
-      - name: Publish Windows executable
+      - name: Publish self-contained Windows executable
         run: >-
           dotnet publish Tools/BarkCloud.Builder/BarkCloud.Builder.csproj
           --configuration Release
           --runtime win-x64
           --self-contained true
-          --output "$env:PUBLISH_DIR"
+          --output "$env:SELF_CONTAINED_DIR"
 
-      - name: Archive publish folder
+      - name: Publish framework-dependent Windows executable
+        run: >-
+          dotnet publish Tools/BarkCloud.Builder/BarkCloud.Builder.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained false
+          --output "$env:FRAMEWORK_DEPENDENT_DIR"
+
+      - name: Archive publish folders
         run: |
-          if (-not (Test-Path -LiteralPath "$env:PUBLISH_DIR/BarkCloud.Builder.exe")) {
-            throw 'BarkCloud.Builder.exe was not published.'
+          foreach ($publishDir in @($env:SELF_CONTAINED_DIR, $env:FRAMEWORK_DEPENDENT_DIR)) {
+            if (-not (Test-Path -LiteralPath "$publishDir/BarkCloud.Builder.exe")) {
+              throw "BarkCloud.Builder.exe was not published in $publishDir."
+            }
+            Compress-Archive -LiteralPath $publishDir -DestinationPath "$publishDir.zip"
           }
-          Compress-Archive -LiteralPath $env:PUBLISH_DIR -DestinationPath $env:ARCHIVE_PATH
 
       - name: Create GitHub release
         env:
@@ -60,8 +70,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_BRANCH: ${{ github.ref_name }}
         run: |
-          gh release create $env:RELEASE_TAG $env:ARCHIVE_PATH `
+          gh release create $env:RELEASE_TAG "${env:SELF_CONTAINED_DIR}.zip" "${env:FRAMEWORK_DEPENDENT_DIR}.zip" `
             --target $env:GITHUB_SHA `
             --title "BarkCloud Builder $env:RELEASE_TAG" `
-            --notes "Windows x64, self-contained. Branch: $env:SOURCE_BRANCH. Commit: $env:GITHUB_SHA. Extract the ZIP and run BarkCloud.Builder.exe from the included folder." `
+            --notes "Windows x64. The self-contained archive includes .NET; the framework-dependent archive requires .NET 10 Desktop Runtime (x64). Branch: $env:SOURCE_BRANCH. Commit: $env:GITHUB_SHA. Extract the chosen ZIP and run BarkCloud.Builder.exe from the included folder." `
             --latest=false
