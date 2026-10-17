@@ -24,10 +24,21 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 |---|---|
 | `Tests/Backend/BarkCloud.*.Tests` | Тесты backend и инфраструктуры по сервисам |
 | `Tests/Backend/BarkCloud.Identity.IntegrationTests`, `Tests/Backend/BarkCloud.Users.IntegrationTests` | Отдельные интеграционные проекты |
+| `Tests/Tools/BarkCloud.Builder.Tests` | Проверки режимов Builder, генерации compose/env/nginx и валидации имён/портов без зависимости от WPF |
 | `Tests/Shared/*` | Тесты общих библиотек |
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests` | `net10.0-windows`; тесты запускаются в Windows-окружении, unit-сценарии используют фейки вместо сервера и Dokany |
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
+
+## BarkCloud Builder
+
+`Tests/Tools/BarkCloud.Builder.Tests` линкует чистые `BuilderModel`, `BuilderModelValidator` и `BackendComposeGenerator` из `Tools/BarkCloud.Builder/`, поэтому unit-тесты не требуют загрузки WPF. Они проверяют режимы без nginx/Compose/external, пользовательские Docker-имена и сеть, опциональные Seq/MinIO Console proxy, dynamic DNS upstream и отклонение конфликтующих имён и портов.
+
+```bash
+dotnet test Tests/Tools/BarkCloud.Builder.Tests -c Release
+```
+
+Сгенерированные compose-варианты можно отдельно разобрать без Docker daemon командой `docker compose config --quiet --env-file <temp>/.env`.
 
 ## Windows Drive
 

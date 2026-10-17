@@ -7,6 +7,7 @@ namespace BarkCloud.Web.Infrastructure;
 public interface IDockerDeployment
 {
     Task<ServicesSnapshot> GetServicesStatusAsync();
+    string ContainerNameFor(string service);
 
     Task<ServiceActionResult> RestartServiceAsync(string service);
     Task<ServiceActionResult> StartServiceAsync(string service);

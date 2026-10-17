@@ -35,6 +35,8 @@ public sealed class DeploymentJobServiceTests
     public async Task Update_ProcessesServicesInSafeOrderAndWaitsForRunningState()
     {
         var docker = new FakeDocker();
+        docker.ContainerNames["configuration"] = "config-app";
+        docker.ContainerNames["users"] = "users-app";
         var service = CreateService(docker);
         await service.StartAsync(CancellationToken.None);
 
@@ -47,9 +49,13 @@ public sealed class DeploymentJobServiceTests
             job.Steps.Select(step => step.Service).Should().Equal("configuration", "users");
             docker.Calls.Should().ContainInOrder(
                 "preflight:update",
+                "image-id:config-app",
                 "up:configuration",
+                "image-id:users-app",
                 "up:users",
                 "prune");
+            docker.Calls.Should().Contain("inspect-state:config-app");
+            docker.Calls.Should().Contain("inspect-state:users-app");
         }
         finally
         {
@@ -145,7 +151,14 @@ public sealed class DeploymentJobServiceTests
     {
         public List<string> Calls { get; } = [];
 
+        public Dictionary<string, string> ContainerNames { get; } = DockerContainerNames.DefaultValues.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+
         public ServicesSnapshot Snapshot { get; set; } = new([], true, null);
+
+        public string ContainerNameFor(string service) => ContainerNames[service];
 
         public Func<string, int, (string State, string Health)> State { get; init; }
             = (_, _) => ("running", "none");
@@ -211,13 +224,17 @@ public sealed class DeploymentJobServiceTests
 
         public Task<(string State, string Health)> InspectStateAsync(string container)
         {
+            Calls.Add($"inspect-state:{container}");
             _inspectionCounts.TryGetValue(container, out var count);
             _inspectionCounts[container] = count + 1;
             return Task.FromResult(State(container, count));
         }
 
         public Task<string?> GetContainerImageIdAsync(string container)
-            => Task.FromResult<string?>("sha256:old");
+        {
+            Calls.Add($"image-id:{container}");
+            return Task.FromResult<string?>("sha256:old");
+        }
 
         public Task<string?> GetContainerImageReferenceAsync(string container)
             => Task.FromResult<string?>("registry/users:latest");

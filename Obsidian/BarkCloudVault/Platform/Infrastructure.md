@@ -18,7 +18,7 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 
 | Контракт | Поведение |
 |---|---|
-| Docker-сеть `barkcloud-network` | Внешняя сеть; должна быть создана до запуска Compose |
+| Docker-сеть `barkcloud-network` | Логический ключ общей внешней сети в Compose; Builder задаёт реальное имя через `DOCKER_NETWORK_NAME`, сеть нужно создать до запуска |
 | `CONFIGURATION_SERVICE_URL`, `CONFIGURATION_ACCESS_KEY` | Bootstrap-адрес и ключ для получения конфигурации сервисами |
 | `IDENTITY_PORT`, `USERS_PORT`, `CONFIGURATION_PORT`, `FILES_PORT`, `FILES_HTTP1PORT`, `TORRENT_PORT`, `TORRENT_HTTP1PORT` | Внутренние gRPC и HTTP/1 порты |
 | `EXTERNAL_*_HOST` | Публичные адреса сервисов для клиентских приложений |
@@ -26,15 +26,17 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 
 ## Зависимости и взаимодействия
 
-- `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-notification`, `cloud-torrent` и `cloud-web` получают общие параметры Configuration. Compose задаёт порядок запуска зависимостей через `depends_on`.
+- `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-notification`, `cloud-torrent` и `cloud-web` получают общие параметры Configuration. Compose задаёт порядок запуска зависимостей через `depends_on`; редактируемые Docker container names не меняют ключи сервисов и их DNS alias `cloud-*`.
 - `cloud-files` подключает данные MinIO для проверки диска read-only и отдельный каталог временных архивов. `cloud-torrent` хранит загружаемые торренты в `/mnt/torrents`.
 - `cloud-web` получает `docker.sock`, compose-файл для записи, `.env` только для чтения и постоянный том обслуживания.
-- Конфигурация nginx публикует gRPC backend-сервисов под TLS, проксирует HTTP/1 загрузки и скачивания Files/Torrent, а веб-клиент направляет на Web. Поток байтов resumable upload идёт через nginx напрямую в HTTP/1 Files; детали в [[Backend/ResumableUpload]].
+- `Backend/nginx/cloud.barkfluff.conf` направляет gRPC backend-сервисов под TLS, HTTP/1 загрузки и скачивания Files/Torrent, и Web через отдельные upstream. Поток байтов resumable upload идёт через nginx напрямую в HTTP/1 Files; детали в [[Backend/ResumableUpload]].
+- Все nginx upstream используют shared zone и разрешают Docker DNS через `127.0.0.11` с периодом 5 секунд. Это позволяет переживать пересоздание контейнеров без перезапуска nginx; требуется nginx OSS 1.27.3 или новее. Session cache использует имя `barkcloud_ssl`, чтобы не пересекаться с конфигами других приложений в общем nginx.
 - Для хранения используются тома или хост-пути: PostgreSQL и backup, MinIO, RabbitMQ, Seq, временные архивы, Torrent и состояние обслуживания Web.
 
 ## Ограничения и важные детали
 
-- `cloud-nginx` не включён в базовый compose. Файл nginx предназначен для внешнего reverse proxy; генератор может добавить nginx в создаваемый compose, см. [[Tools/Builder]].
+- `cloud-nginx` не включён в базовый compose. Builder может включить его в сгенерированный compose или оставить внешний nginx; при внешнем режиме nginx-контейнер подключается к реальному имени общей Docker-сети из `DOCKER_NETWORK_NAME`. См. [[Tools/Builder]].
+- При переходе внешнего nginx со статических адресов нужно один раз вручную установить динамический upstream-конфиг и активировать его после подключения nginx к общей Docker-сети. Дальнейшее восстановление backend-адресов выполняется через Docker DNS без reload внешнего nginx. Интеграция Web для обслуживания описана в [[Web/SystemUpdates]].
 - Внутренние порты сервисов не опубликованы секцией `ports` базового compose. Прокси/внешняя инфраструктура отвечает за публикацию портов.
 - Почта передаётся в Configuration переменными `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SENDER_EMAIL` и `EMAIL_SENDER_PASSWORD`; отправку выполняет Notification.
 
