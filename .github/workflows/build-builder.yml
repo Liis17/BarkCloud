@@ -3,7 +3,14 @@ name: BarkCloud Builder Release
 on:
   push:
     branches:
-      - '**'
+      - master
+    paths:
+      - 'Tools/BarkCloud.Builder/**'
+      - 'Tests/Tools/BarkCloud.Builder.Tests/**'
+      - 'Tests/Directory.Build.props'
+      - 'Directory.Build.props'
+      - '.github/workflows/build-builder.yml'
+  pull_request:
     paths:
       - 'Tools/BarkCloud.Builder/**'
       - 'Tests/Tools/BarkCloud.Builder.Tests/**'
@@ -68,6 +75,7 @@ jobs:
           }
 
       - name: Create GitHub release
+        if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
