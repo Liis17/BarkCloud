@@ -174,6 +174,9 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("      - cloud-torrent", compose);
         Assert.DoesNotContain("{{", compose);
         Assert.DoesNotContain("}}", compose);
+        var nginxStart = compose.IndexOf("  cloud-nginx:", StringComparison.Ordinal);
+        var infrastructureStart = compose.IndexOf("  # === Инфраструктурные сервисы ===", nginxStart, StringComparison.Ordinal);
+        Assert.DoesNotContain("environment:", compose[nginxStart..infrastructureStart]);
     }
 
     [Fact]
@@ -646,13 +649,18 @@ public sealed class BuilderGeneratorTests
         Assert.Equal(5, files.Count);
         Assert.Contains("FROM nginx:latest", files["nginx.Dockerfile"]);
         Assert.Contains("ENTRYPOINT [\"/usr/local/bin/lognara-agent\", \"run\", \"--\", \"/docker-entrypoint.sh\"]", files["nginx.Dockerfile"]);
+        Assert.Contains("CMD [\"nginx\", \"-g\", \"daemon off;\"]", files["nginx.Dockerfile"]);
         Assert.Contains("FROM postgres:18", files["postgres.Dockerfile"]);
         Assert.Contains("\"docker-entrypoint.sh\"]", files["postgres.Dockerfile"]);
+        Assert.Contains("CMD [\"postgres\"]", files["postgres.Dockerfile"]);
         Assert.Contains("FROM rabbitmq:latest", files["rabbitmq.Dockerfile"]);
+        Assert.Contains("CMD [\"rabbitmq-server\"]", files["rabbitmq.Dockerfile"]);
         Assert.Contains("FROM docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1", files["minio.Dockerfile"]);
         Assert.Contains("\"/usr/bin/docker-entrypoint.sh\"]", files["minio.Dockerfile"]);
+        Assert.Contains("CMD [\"minio\"]", files["minio.Dockerfile"]);
         Assert.Contains("FROM datalust/seq:latest", files["seq.Dockerfile"]);
         Assert.Contains("\"/bin/seqentry\"]", files["seq.Dockerfile"]);
+        Assert.DoesNotContain("\nCMD ", files["seq.Dockerfile"]);
 
         foreach (var dockerfile in files.Values)
         {
@@ -660,16 +668,32 @@ public sealed class BuilderGeneratorTests
             Assert.Contains("amd64|arm64", dockerfile);
             Assert.Contains("SHA256SUMS", dockerfile);
             Assert.Contains("ARG LOGNARA_AGENT_VERSION=latest", dockerfile);
-            Assert.DoesNotContain("\nCMD ", dockerfile);
             Assert.DoesNotContain("\nUSER ", dockerfile);
             Assert.DoesNotContain("\nSTOPSIGNAL ", dockerfile);
         }
 
         Assert.Contains("stop_grace_period: 30s", compose);
+        Assert.Contains("      - \"postgres\"", compose);
         Assert.Contains("logging_collector=off", compose);
         Assert.Contains("log_destination=stderr", compose);
         Assert.Contains("command: server /data --console-address \":9001\"", compose);
         Assert.DoesNotContain("ports:", compose[compose.IndexOf("  lognara-relay:", StringComparison.Ordinal)..]);
+    }
+
+    [Fact]
+    public void Nginx_agent_environment_is_nested_under_environment_for_the_full_profile()
+    {
+        var model = ValidLognaraModel();
+        model.NginxLocation = "Compose";
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var nginxStart = compose.IndexOf("  cloud-nginx:", StringComparison.Ordinal);
+        var infrastructureStart = compose.IndexOf("  # === Инфраструктурные сервисы ===", nginxStart, StringComparison.Ordinal);
+
+        Assert.True(nginxStart >= 0);
+        Assert.True(infrastructureStart > nginxStart);
+        var nginxService = compose[nginxStart..infrastructureStart];
+        Assert.Contains("    environment:\n      LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\"", nginxService);
+        Assert.Contains("LOGNARA_RELAY_TOKEN: ${LOGNARA_NGINX_TOKEN}", nginxService);
     }
 
     private static BuilderModel ValidLognaraModel()
