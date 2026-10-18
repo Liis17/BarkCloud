@@ -27,6 +27,11 @@ public static class BackendComposeGenerator
         string InfraBuild(string prefix) => InfrastructureBuild(m, prefix);
         string InfraControls(string prefix) => InfrastructureAgentControls(m, prefix);
         string InfraEnv(string prefix) => InfrastructureAgentEnvironment(m, prefix);
+        string InfraEnvSection(string prefix)
+        {
+            var environment = InfraEnv(prefix);
+            return environment.Length == 0 ? "" : "\n    environment:" + environment;
+        }
         string InfraVolume(string prefix) => InfrastructureAgentVolume(m, prefix);
 
         // Compose service keys remain the stable DNS and depends_on contract.
@@ -243,7 +248,7 @@ services:
     image: {{InfraImage("NGINX", "nginx:latest")}}
 {{InfraBuild("NGINX")}}
     container_name: ${NGINX_CONTAINER_NAME}
-    restart: always{{InfraControls("NGINX")}}{{InfraEnv("NGINX")}}
+    restart: always{{InfraControls("NGINX")}}{{InfraEnvSection("NGINX")}}
     # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
 {{string.Join("\n", nginxPorts)}}
@@ -558,20 +563,20 @@ networks:
         if (!m.IncludeLognara)
             return new Dictionary<string, string>();
 
-        var definitions = new (string Prefix, string File, string Image, string Entrypoint)[]
+        var definitions = new (string Prefix, string File, string Image, string Entrypoint, string? Command)[]
         {
-            ("NGINX", "nginx.Dockerfile", "nginx:latest", "/docker-entrypoint.sh"),
-            ("MINIO", "minio.Dockerfile", "docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1", "/usr/bin/docker-entrypoint.sh"),
-            ("POSTGRES", "postgres.Dockerfile", "postgres:18", "docker-entrypoint.sh"),
-            ("RABBITMQ", "rabbitmq.Dockerfile", "rabbitmq:latest", "docker-entrypoint.sh"),
-            ("SEQ", "seq.Dockerfile", "datalust/seq:latest", "/bin/seqentry"),
+            ("NGINX", "nginx.Dockerfile", "nginx:latest", "/docker-entrypoint.sh", "[\"nginx\", \"-g\", \"daemon off;\"]"),
+            ("MINIO", "minio.Dockerfile", "docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1", "/usr/bin/docker-entrypoint.sh", "[\"minio\"]"),
+            ("POSTGRES", "postgres.Dockerfile", "postgres:18", "docker-entrypoint.sh", "[\"postgres\"]"),
+            ("RABBITMQ", "rabbitmq.Dockerfile", "rabbitmq:latest", "docker-entrypoint.sh", "[\"rabbitmq-server\"]"),
+            ("SEQ", "seq.Dockerfile", "datalust/seq:latest", "/bin/seqentry", null),
         };
 
         return definitions
             .Where(x => m.IsInfrastructureIncluded(m.LognaraInfrastructure.Single(y => y.Prefix == x.Prefix)))
             .ToDictionary(
                 x => x.File,
-                x => InfrastructureDockerfile(x.Image, x.Entrypoint),
+                x => InfrastructureDockerfile(x.Image, x.Entrypoint, x.Command),
                 StringComparer.Ordinal);
     }
 
@@ -696,7 +701,7 @@ networks:
             : "";
     }
 
-    private static string InfrastructureDockerfile(string baseImage, string entrypoint)
+    private static string InfrastructureDockerfile(string baseImage, string entrypoint, string? command)
     {
         const string template = """
 # syntax=docker/dockerfile:1
@@ -730,11 +735,13 @@ FROM __BASE_IMAGE__
 COPY --from=lognara-agent /download/lognara-agent /usr/local/bin/lognara-agent
 RUN mkdir -p /var/lib/lognara-agent/spool && chown 0:0 /var/lib/lognara-agent/spool
 ENTRYPOINT ["/usr/local/bin/lognara-agent", "run", "--", "__ORIGINAL_ENTRYPOINT__"]
+__ORIGINAL_COMMAND__
 """;
 
         return template
             .Replace("__BASE_IMAGE__", baseImage, StringComparison.Ordinal)
-            .Replace("__ORIGINAL_ENTRYPOINT__", entrypoint, StringComparison.Ordinal);
+            .Replace("__ORIGINAL_ENTRYPOINT__", entrypoint, StringComparison.Ordinal)
+            .Replace("__ORIGINAL_COMMAND__", command is null ? "" : $"\nCMD {command}", StringComparison.Ordinal);
     }
 
     /// <summary>
