@@ -14,13 +14,28 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        try
+        {
+            Run(args);
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
+    }
+
+    private static void Run(string[] args)
+    {
         var builder = WebApplication.CreateBuilder(args);
 
         ConfigurationAccessPolicy.EnsureConfigured(
             builder.Environment.IsDevelopment(),
             builder.Configuration["CONFIGURATION_ACCESS_KEY"]);
 
-        builder.AddBarkCloudSerilog("BarkCloud.Configuration");
+        var lognaraAgentUrl = builder.Configuration["Lognara:AgentUrl"];
+        builder.AddBarkCloudSerilog(
+            "BarkCloud.Configuration",
+            string.IsNullOrWhiteSpace(lognaraAgentUrl) ? null : sink => sink.Lognara(lognaraAgentUrl));
         builder.Services.AddBarkCloudMetrics("BarkCloud.Configuration");
 
         var envPort = Environment.GetEnvironmentVariable("CONFIGURATION_PORT")
@@ -195,7 +210,6 @@ public class Program
 
         app.MapGrpcService<ConfigurationApiService>();
 
-        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
         app.Run();
     }
 }

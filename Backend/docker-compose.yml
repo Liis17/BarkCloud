@@ -12,6 +12,10 @@ services:
     image: docker.barkfluff.com/barkcloud-configuration:latest
     container_name: cloud-configuration
     restart: always
+    # Lognara: раскомментируйте вместе с настройками окружения, томом и внешней сетью ниже.
+    # entrypoint: ["/usr/local/bin/lognara-agent", "run", "--", "dotnet", "BarkCloud.Configuration.dll"]
+    # init: true
+    # stop_grace_period: 30s
     env_file:
       - .env
     environment:
@@ -42,8 +46,21 @@ services:
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
       TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
+      # Lognara перехватывает stdout/stderr; консольный приёмник Serilog заменяется, а Seq остаётся включённым.
+      # Lognara__AgentUrl: "http://127.0.0.1:7400/v1/logs"
+      # LOGNARA_LISTEN_ADDR: "127.0.0.1:7400"
+      # LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool
+      # LOGNARA_SERVICE: barkcloud-configuration
+      # LOGNARA_SERVER: ${LOGNARA_SERVER}
+      # LOGNARA_BACKEND: ${LOGNARA_BACKEND}
+      # LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}
+      # LOGNARA_RELAY_URL: ${LOGNARA_RELAY_URL}
+      # LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}
+    # volumes:
+    #   - ${LOGNARA_CONFIGURATION_SPOOL_PATH:-lognara_configuration_spool}:/var/lib/lognara-agent/spool
     networks:
       - barkcloud-network
+      # - lognara
 
   cloud-identity:
     image: docker.barkfluff.com/barkcloud-identity:latest
@@ -239,6 +256,10 @@ networks:
   barkcloud-network:
     external: true
     name: barkcloud-network
+  # Сначала создайте эту внешнюю сеть; ретранслятор должен слушать на 0.0.0.0:7401.
+  # lognara:
+  #   external: true
+  #   name: ${LOGNARA_NETWORK}
 
 volumes:
   pgdata:
@@ -249,3 +270,5 @@ volumes:
   archive_temp:
   torrent_data:
   cloud-web-maintenance:
+  # Раскомментируйте вместе с томом для очереди Lognara Configuration.
+  # lognara_configuration_spool:

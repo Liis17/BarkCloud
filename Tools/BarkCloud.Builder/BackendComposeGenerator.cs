@@ -35,6 +35,26 @@ public static class BackendComposeGenerator
         string webOptionalContainerNames = string.Concat(
             m.IncludeNotification ? "\n      Docker__ContainerNames__Notification: \"${NOTIFICATION_CONTAINER_NAME}\"" : "",
             m.IncludeTorrent ? "\n      Docker__ContainerNames__Torrent: \"${TORRENT_CONTAINER_NAME}\"" : "");
+        string lognaraContainerSettings = m.IncludeLognara
+            ? "\n    entrypoint: [\"/usr/local/bin/lognara-agent\", \"run\", \"--\", \"dotnet\", \"BarkCloud.Configuration.dll\"]"
+              + "\n    init: true"
+              + "\n    stop_grace_period: 30s"
+            : "";
+        string lognaraEnvironment = m.IncludeLognara
+            ? "\n      Lognara__AgentUrl: \"http://127.0.0.1:7400/v1/logs\""
+              + "\n      LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\""
+              + "\n      LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool"
+              + "\n      LOGNARA_SERVICE: barkcloud-configuration"
+              + "\n      LOGNARA_SERVER: ${LOGNARA_SERVER}"
+              + "\n      LOGNARA_BACKEND: ${LOGNARA_BACKEND}"
+              + (string.IsNullOrWhiteSpace(m.LognaraEnvironment) ? "" : "\n      LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}")
+              + "\n      LOGNARA_RELAY_URL: ${LOGNARA_RELAY_URL}"
+              + "\n      LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}"
+            : "";
+        string lognaraVolume = m.IncludeLognara
+            ? "\n    volumes:\n      - ${LOGNARA_CONFIGURATION_SPOOL_PATH:-lognara_configuration_spool}:/var/lib/lognara-agent/spool"
+            : "";
+        string lognaraNetwork = m.IncludeLognara ? "\n      - lognara" : "";
 
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
@@ -53,7 +73,7 @@ services:
   cloud-configuration:
     image: {{Img("configuration")}}
     container_name: ${CONFIGURATION_CONTAINER_NAME}
-    restart: always
+    restart: always{{lognaraContainerSettings}}
     env_file:
       - .env
     environment:
@@ -78,9 +98,9 @@ services:
       # Порты торрент-сервиса нужны configuration для вычисления TorrentService:Host/RunSettings
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
-      TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
+      TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}{{lognaraEnvironment}}{{lognaraVolume}}
     networks:
-      - barkcloud-network
+      - barkcloud-network{{lognaraNetwork}}
 
   cloud-identity:
     image: {{Img("identity")}}
@@ -351,10 +371,12 @@ networks:
   barkcloud-network:
     external: true
     name: ${DOCKER_NETWORK_NAME}
-
-volumes:
-
 """);
+        sb.Append("\n");
+        if (m.IncludeLognara)
+            sb.Append("  lognara:\n    external: true\n    name: ${LOGNARA_NETWORK}\n");
+
+        sb.Append("\nvolumes:\n");
         if (m.IncludePostgres) sb.Append("  pgdata:\n");
         if (m.IncludeRabbitmq) sb.Append("  cloud-rabbitmq_data:\n");
         sb.Append("  cloud-minio_data:\n");
@@ -363,6 +385,7 @@ volumes:
         sb.Append("  archive_temp:\n");
         if (m.IncludeTorrent) sb.Append("  torrent_data:\n");
         sb.Append("  cloud-web-maintenance:\n");
+        if (m.IncludeLognara) sb.Append("  lognara_configuration_spool:\n");
 
         return sb.ToString();
     }
@@ -445,6 +468,19 @@ volumes:
             K("SEQ_ADMIN_PASSWORD", m.SeqAdminPassword);
             K("SEQ_WEBPORT", m.SeqWebPort);
             K("SEQ_DATA_PATH", m.SeqDataPath);
+        }
+
+        if (m.IncludeLognara)
+        {
+            Section("Lognara (логи Configuration)");
+            K("LOGNARA_NETWORK", m.LognaraNetworkName);
+            K("LOGNARA_RELAY_URL", m.LognaraRelayUrl);
+            K("LOGNARA_CONFIGURATION_TOKEN", m.LognaraConfigurationToken);
+            K("LOGNARA_SERVER", m.LognaraServer);
+            K("LOGNARA_BACKEND", m.LognaraBackend);
+            if (!string.IsNullOrWhiteSpace(m.LognaraEnvironment))
+                K("LOGNARA_ENVIRONMENT", m.LognaraEnvironment);
+            K("LOGNARA_CONFIGURATION_SPOOL_PATH", m.LognaraConfigurationSpoolPath);
         }
 
         if (m.UseNginx && m.NginxSeqProxy && m.IncludeSeq)

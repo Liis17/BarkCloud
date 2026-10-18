@@ -83,6 +83,16 @@ public sealed class BuilderModel
     public string SeqWebPort { get; set; } = "80";
     public string SeqDataPath { get; set; } = "./data/seq";
 
+    // Lognara — сбор логов Configuration через агент в том же контейнере.
+    public bool IncludeLognara { get; set; }
+    public string LognaraNetworkName { get; set; } = "lognara-ingest";
+    public string LognaraRelayUrl { get; set; } = "http://lognara-relay:7401/v1/batches";
+    public string LognaraConfigurationToken { get; set; } = "";
+    public string LognaraServer { get; set; } = "";
+    public string LognaraBackend { get; set; } = "barkcloud";
+    public string LognaraEnvironment { get; set; } = "";
+    public string LognaraConfigurationSpoolPath { get; set; } = "";
+
     // Веб-клиент
     public string WebPort { get; set; } = "8080";
     public bool WebCookieSecure { get; set; } = false;
