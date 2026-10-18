@@ -32,7 +32,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 ## Зависимости и взаимодействия
 
-`AddBarkCloudSerilog` настраивает console и Seq sink. `AddBarkCloudMetrics` регистрирует общий `MetricsCollector`; `MetricsReporterService` пишет снимки метрик в структурированный лог каждые 5 секунд.
+`AddBarkCloudSerilog` настраивает Seq и по умолчанию Console sink. Необязательный `replaceConsoleSink` позволяет одному потребителю заменить Console, не меняя поведение остальных сервисов; Configuration использует его для Lognara, потому что агент сам захватывает stdout/stderr. `AddBarkCloudMetrics` регистрирует общий `MetricsCollector`; `MetricsReporterService` пишет снимки метрик в структурированный лог каждые 5 секунд.
 
 `configuration_api.proto` и `session_revocation_api.proto` генерируются этим проектом с `GrpcServices="Both"`. Остальные backend-проекты подключают необходимые `.proto` с собственными параметрами генерации. См. [[Shared/Proto]].
 
