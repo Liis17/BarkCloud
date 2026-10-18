@@ -89,9 +89,23 @@
                                     Title="PostgreSQL отключён"
                                     Message="Если отключить PostgreSQL, придётся вручную отредактировать .env и поднять/настроить базу данных, прописав подключение в Configuration." />
                         <ui:InfoBar Margin="0,8,0,0" Severity="Error" IsClosable="False"
-                                    IsOpen="{Binding IsChecked, ElementName=SeqToggle, Converter={StaticResource InverseBool}}"
-                                    Title="Seq отключён"
-                                    Message="Канал Seq выключен. Включите Seq и выберите сервисы в таблице логирования, если нужен этот приёмник." />
+                                    Title="Централизованный сбор логов отключён"
+                                    Message="Seq и Lognara выключены. Включите хотя бы один из них и выберите сервисы в таблице логирования.">
+                            <ui:InfoBar.Style>
+                                <Style TargetType="ui:InfoBar" BasedOn="{StaticResource {x:Type ui:InfoBar}}">
+                                    <Setter Property="IsOpen" Value="False" />
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IncludeSeq}" Value="False" />
+                                                <Condition Binding="{Binding IncludeLognara}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="IsOpen" Value="True" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:InfoBar.Style>
+                        </ui:InfoBar>
                     </StackPanel>
                 </ui:Card>
 
