@@ -8,6 +8,9 @@ package barkcloud.configuration;
 
 service ConfigurationApi {
 
+  // Готовность настроек после стартовой инициализации (внутренний bootstrap API).
+  rpc GetReadiness(GetReadinessRequest) returns(GetReadinessResponse);
+
   // Получить настройки сервиса
   rpc GetConfiguration(GetConfigurationRequest) returns(GetConfigurationResponse);
   
@@ -33,6 +36,12 @@ service ConfigurationApi {
   rpc RelocateStorageProfiles(RelocateStorageProfilesRequest) returns(UpdateConfigurationResponse);
   rpc SaveStorageQuotaGroup(SaveStorageQuotaGroupRequest) returns(UpdateConfigurationResponse);
   rpc DeleteStorageQuotaGroup(DeleteStorageQuotaGroupRequest) returns(UpdateConfigurationResponse);
+}
+
+message GetReadinessRequest {}
+
+message GetReadinessResponse {
+  bool ready = 1;
 }
 
 message GetConfigurationRequest{
