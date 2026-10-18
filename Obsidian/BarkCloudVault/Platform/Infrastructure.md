@@ -12,6 +12,7 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 |---|---|---|
 | `Backend/docker-compose.yml` | services, networks, volumes | Сервисы, зависимости и постоянные данные |
 | `Backend/sample.env` | переменные окружения | Шаблон настройки compose |
+| `Backend/BarkCloud.Configuration/Dockerfile`, `Backend/BarkCloud.Configuration/Dockerfile.slim` | `lognara-agent` stage | Загрузка и проверка бинарника Lognara-agent для Configuration |
 | `Backend/nginx/cloud.barkfluff.conf` | upstream и server blocks | TLS, gRPC и HTTP-маршрутизация |
 
 ## Публичные контракты
@@ -19,6 +20,7 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 | Контракт | Поведение |
 |---|---|
 | Docker-сеть `barkcloud-network` | Логический ключ общей внешней сети в Compose; Builder задаёт реальное имя через `DOCKER_NETWORK_NAME`, сеть нужно создать до запуска |
+| Docker-сеть `lognara` | Опциональная внешняя сеть relay; Builder задаёт реальное имя через `LOGNARA_NETWORK` |
 | `CONFIGURATION_SERVICE_URL`, `CONFIGURATION_ACCESS_KEY` | Bootstrap-адрес и ключ для получения конфигурации сервисами |
 | `IDENTITY_PORT`, `USERS_PORT`, `CONFIGURATION_PORT`, `FILES_PORT`, `FILES_HTTP1PORT`, `TORRENT_PORT`, `TORRENT_HTTP1PORT` | Внутренние gRPC и HTTP/1 порты; значения по умолчанию: 8000, 8001, 8003, 8005/8006 и 8007/8008 |
 | `EXTERNAL_*_HOST` | Публичные адреса сервисов для клиентских приложений |
@@ -40,6 +42,14 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 - При переходе внешнего nginx со статических адресов нужно один раз вручную установить динамический upstream-конфиг и активировать его после подключения nginx к общей Docker-сети. Дальнейшее восстановление backend-адресов выполняется через Docker DNS без reload внешнего nginx. Интеграция Web для обслуживания описана в [[Web/SystemUpdates]].
 - Внутренние порты сервисов не опубликованы секцией `ports` базового compose. Прокси/внешняя инфраструктура отвечает за публикацию портов. Приложения по умолчанию используют Identity 8000, Users 8001, Configuration 8003, Files 8005/8006 и Torrent 8007/8008; стандартные listener-порты PostgreSQL 5432, RabbitMQ 5672, MinIO 9000/9001, Seq 80/5341 и Web 8080 остаются внутри Docker-сети.
 - Почта передаётся в Configuration переменными `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SENDER_EMAIL` и `EMAIL_SENDER_PASSWORD`; отправку выполняет Notification.
+
+## Lognara для Configuration
+
+Оба Dockerfile Configuration содержат стадию `lognara-agent`: она выбирает `amd64` или `arm64`, скачивает статический бинарник и сверяет его с `SHA256SUMS`. `LOGNARA_AGENT_VERSION=latest` находит последний опубликованный тег `agent-YYYYMMDD-HHMMSS-<sha12>`; сборку можно закрепить через `--build-arg LOGNARA_AGENT_VERSION=<тег>`. Локальный BuildKit может закэшировать разрешение `latest`; для принудительного обновления используйте закреплённый тег или `--no-cache-filter lognara-agent`. CI собирает `Dockerfile.slim` с той же стадией; workflow не меняется.
+
+В образе остаётся `ENTRYPOINT ["dotnet", "BarkCloud.Configuration.dll"]`. Только при включённом Lognara Compose заменяет его на `lognara-agent run -- dotnet BarkCloud.Configuration.dll`, задаёт `init: true` и grace period 30 секунд. Configuration подключается к внешней Docker-сети `lognara`, которую нужно создать заранее вместе с relay; relay должен слушать `0.0.0.0:7401`. Агент принимает HTTP, TLS к relay не поддерживается. Персональный `LOGNARA_CONFIGURATION_TOKEN` берётся из dock.
+
+`LOGNARA_CONFIGURATION_SPOOL_PATH` по умолчанию пуст и использует named volume, заполненный из образа с владельцем uid/gid 1654. Для bind-пути хост-каталог должен быть доступен на запись этому UID/GID; иначе агент завершится при старте и Configuration не поднимется. `.env` целиком передаётся через `env_file` в Configuration и Web, поэтому `LOGNARA_CONFIGURATION_TOKEN` виден обоим. Агент удаляет только `LOGNARA_RELAY_TOKEN` из окружения дочернего `dotnet`; строгая изоляция секрета от этих процессов не настроена.
 
 ## Files upload scheduler: внедрение и откат
 
