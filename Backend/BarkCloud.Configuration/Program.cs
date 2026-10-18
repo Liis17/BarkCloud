@@ -160,8 +160,9 @@ public class Program
                     catch (Exception populateEx)
                     {
                         metrics.Increment("defaults_populator_failed");
-                        logger.LogWarning(populateEx,
-                            "Ошибка при авто-заполнении конфигураций. Сервис продолжит работу.");
+                        logger.LogError(populateEx,
+                            "Ошибка при авто-заполнении конфигураций. Старт прерван.");
+                        throw;
                     }
 
                     break;

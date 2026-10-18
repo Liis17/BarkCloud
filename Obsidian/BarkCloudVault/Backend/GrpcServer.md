@@ -10,7 +10,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 | Файл | Символ | Роль |
 |---|---|---|
-| `Backend/BarkCloud.GrpcServer/WebApplicationBuilderExtensions.cs` | `LoadConfiguration`, `SetRunningAddress` | Bootstrap настроек и Kestrel |
+| `Backend/BarkCloud.GrpcServer/WebApplicationBuilderExtensions.cs` | `LoadConfigurationAsync`, `SetRunningAddress` | Bootstrap настроек и Kestrel |
 | `Backend/BarkCloud.GrpcServer/ServiceCollectionExtensions.cs` | `AddBarkCloudGrpc` | Регистрация gRPC и interceptor'ов |
 | `Backend/BarkCloud.GrpcServer/ServerExceptionInterceptor.cs` | `ServerExceptionInterceptor` | Преобразование ошибок |
 | `Backend/BarkCloud.GrpcServer/Tracker/RequestContextInterceptor.cs` | `RequestContextInterceptor` | Контекст входящего запроса |
@@ -20,7 +20,9 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 ## Публичные контракты
 
-`LoadConfiguration(ServiceId)` обращается к [[Backend/Configuration]] через `CONFIGURATION_SERVICE_URL` (fallback — `ConfigurationServiceAddr` или localhost). При наличии отправляет `x-config-access-key`. Он загружает global + service settings; для Files отдельно запрашивает S3-профили.
+`LoadConfigurationAsync(ServiceId, CancellationToken)` обращается к [[Backend/Configuration]] через `CONFIGURATION_SERVICE_URL` (fallback — `ConfigurationServiceAddr` или localhost). При наличии отправляет `x-config-access-key`. Перед чтением опрашивает `GetReadiness`: первая проверка сразу, максимум 5 проверок с deadline 2 секунды на каждую и четырьмя паузами по 5 секунд. `ready=false`, `Unavailable` и `DeadlineExceeded` приводят к повтору; после пятой неудачи запуск прерывается. Остальные gRPC-ошибки, включая ошибки доступа и `Unimplemented`, прерывают запуск сразу. Диагностика до настройки Serilog выводится в stderr с сервисом, адресом и причиной без bootstrap-ключа.
+
+После готовности загрузчик на том же канале с теми же metadata получает global + service settings; для Files отдельно запрашивает S3-профили и группы квот. Чтение настроек и профилей не повторяется при ошибке, снимок добавляется в builder только после успешного получения всех данных. Все шесть потребителей используют общий механизм; отдельного цикла ожидания в Web нет.
 
 `SetRunningAddress` использует `SERVICE_PORT` и `SERVICE_HTTP1PORT` как overrides для `RunSettings`. Kestrel слушает HTTP/2 на `RunSettings:Port`, при заданном `Http1Port` — HTTP/1 на отдельном порту; `RunSettings:Tls` включает TLS.
 

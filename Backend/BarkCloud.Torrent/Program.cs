@@ -20,14 +20,14 @@ namespace BarkCloud.Torrent;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         // gRPC к Files идёт по docker-сети без TLS (h2c) — разрешаем HTTP/2 поверх http://
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.LoadConfiguration(ServiceId.Torrent);
+        await builder.LoadConfigurationAsync(ServiceId.Torrent);
         builder.AddBarkCloudSerilog("BarkCloud.Torrent");
         builder.SetRunningAddress(builder.Configuration);
 

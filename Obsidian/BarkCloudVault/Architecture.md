@@ -40,7 +40,7 @@ BarkCloud — самохостируемое облако файлов и мед
 
 ### Старт сервиса
 
-Каждый сервис в `Program.cs` вызывает `builder.LoadConfiguration(ServiceId.X)` — настройки запрашиваются у Configuration по `CONFIGURATION_SERVICE_URL`; затем общие расширения из `BarkCloud.GrpcServer` подключают Serilog, метрики и перехватчики. Поэтому все сервисы в compose зависят от `cloud-configuration`. Подробнее: [[Backend/Configuration]], [[Backend/GrpcServer]].
+Потребители Configuration в `Program.cs` вызывают `await builder.LoadConfigurationAsync(ServiceId.X)` — сначала опрашивают внутренний `GetReadiness` по `CONFIGURATION_SERVICE_URL`, затем получают настройки. Общий загрузчик делает максимум 5 проверок с deadline 2 секунды и интервалами 5 секунд; после исчерпания попыток запуск прерывается. Configuration начинает слушать сеть только после успешных миграций и заполнения настроек. Затем общие расширения из `BarkCloud.GrpcServer` подключают Serilog, метрики и перехватчики. Все сервисы в compose зависят от `cloud-configuration`, а ожидание его готовности выполняется приложениями. Подробнее: [[Backend/Configuration]], [[Backend/GrpcServer]].
 
 ### Клиентский запрос
 

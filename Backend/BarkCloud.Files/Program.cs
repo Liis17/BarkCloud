@@ -23,11 +23,11 @@ namespace BarkCloud.Files;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.LoadConfiguration(ServiceId.Files);
+        await builder.LoadConfigurationAsync(ServiceId.Files);
         builder.AddBarkCloudSerilog("BarkCloud.Files");
         builder.SetRunningAddress(builder.Configuration);
 
