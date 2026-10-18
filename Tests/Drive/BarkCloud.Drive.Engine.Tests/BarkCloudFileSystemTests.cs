@@ -975,24 +975,26 @@ public sealed class BarkCloudFileSystemTests
 
         using var locked = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
-        var holder = Task.Run(() =>
+        var holder = Task.Factory.StartNew(() =>
         {
             Monitor.Enter(target.Sync);
             locked.Set();
             release.Wait();
             Monitor.Exit(target.Sync);
-        });
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         Task? close = null;
         Task<NtStatus>? move = null;
         try
         {
             (await Task.Run(() => locked.Wait(TimeSpan.FromSeconds(5)))).Should().BeTrue();
-            close = Task.Run(() => fileSystem.CloseFile("\\target.bin", info));
+            close = Task.Factory.StartNew(() => fileSystem.CloseFile("\\target.bin", info),
+                CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             SpinWait.SpinUntil(() => target.OpenCount == 0, TimeSpan.FromSeconds(5)).Should().BeTrue();
             var callCount = cloud.Invoker.Calls.Count;
 
-            move = Task.Run(() => fileSystem.MoveFile("\\source.bin", "\\target.bin", replace: true,
-                new FakeDokanFileInfo()));
+            // Таймаут проверяет блокировку MoveFile, поэтому запуск не должен ждать свободного потока в пуле.
+            move = Task.Factory.StartNew(() => fileSystem.MoveFile("\\source.bin", "\\target.bin", replace: true,
+                new FakeDokanFileInfo()), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             (await move.WaitAsync(TimeSpan.FromSeconds(2))).Should().Be(DokanResult.SharingViolation);
             cloud.Invoker.Calls.Skip(callCount).Should().NotContain(call =>
                 call.MethodFullName == FakeCloudMethods.DeleteFileEntry
