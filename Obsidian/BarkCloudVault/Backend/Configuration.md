@@ -25,6 +25,7 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 
 | Контракт | Поведение |
 |---|---|
+| `GetReadiness` | Внутренний bootstrap RPC: подтверждает завершение стартовой инициализации настроек |
 | `GetConfiguration`, `UpdateConfiguration` | Получить overlay сервиса или изменить существующий ключ каталога |
 | `GetReservedNames`, `AddReservedName`, `UpdateReservedName`, `DeleteReservedName` | Управлять зарезервированными именами |
 | `GetAllConfigurations`, `GetConfigurationHistory`, `RollbackConfiguration` | Административное чтение и откат ревизий |
@@ -33,6 +34,8 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 | `RelocateStorageProfiles` | Переназначить перечисленные профили на другое подключение |
 
 Все вызовы защищены `x-config-access-key`. Вне Development `CONFIGURATION_ACCESS_KEY` обязателен при запуске; без ключа в Development interceptor пропускает вызов и пишет предупреждение. Bootstrap-ключ нужен потому, что сервис раздаёт секреты при старте, когда JWT-аутентификация потребителя ещё не настроена.
+
+`GetReadiness` принимает пустой запрос и возвращает `ready=true`. `Program` запускает listener только после успешных миграций, `EnsureSeedAsync` и `PopulateDefaultsAsync`; до этого RPC недоступен. Ошибка заполнения настроек прерывает запуск, а существующие повторы при ошибках подключения к PostgreSQL сохраняются. Готовность подтверждает завершение инициализации, а не текущее состояние БД или готовность остальных сервисов.
 
 `GetConfiguration(service_id)` объединяет global scope с настройками сервиса; значение сервиса перекрывает global по `Section:Key`. Ответ также содержит `ReservedNames:Usernames` как CSV-проекцию. Для Files добавляются совместимые `S3Buckets:*` проекции. `Features:EmailEnabled` вычисляется по наличию SMTP host, port, sender email и sender password; в таблицу настроек не записывается.
 
@@ -46,9 +49,11 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 - `SettingsHistory` хранит изменения ключей; `ReservedNames` — нормализованные имена.
 - `StorageProfiles` и `StorageProfileRevisions` хранят версии подключений и их ревизии; `StorageQuotaGroups` и `StorageQuotaGroupBuckets` — группы и их бакеты. В `StorageProfiles` столбца квоты нет.
 - На старте `EnsureSeedAsync` добавляет недостающие строки каталога, а `PopulateDefaultsAsync` заполняет только пустые значения. Непустые значения оператора не перезаписываются.
-- Большинство сервисов получают снимок через `LoadConfiguration(ServiceId)` и `CONFIGURATION_SERVICE_URL`; обновления не рассылаются потребителям. Identity отдельно перечитывает `Features:RegistrationEnabled` при запросе регистрации.
+- Identity, Users, Files, Torrent, Notification и Web получают снимок через `LoadConfigurationAsync(ServiceId)` и `CONFIGURATION_SERVICE_URL`, предварительно опрашивая `GetReadiness` по правилам [[Backend/GrpcServer]]. Обновления не рассылаются потребителям. Identity отдельно перечитывает `Features:RegistrationEnabled` при запросе регистрации.
 - Валидация принимает только ключи каталога; Boolean нормализуются, URL ограничены абсолютными HTTP(S), порты — `1..65535`, другие integer-значения должны быть положительными. `JwtSettings:SecretKey` при изменении требует не менее 32 UTF-8 байт.
 
 ## Ограничения и важные детали
 
 Собственная БД и порт сервиса задаются bootstrap-переменными `CONFIGURATION_HOST`, `CONFIGURATION_DBPORT`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD` и `CONFIGURATION_PORT`. SMTP-поля могут оставаться пустыми; тогда `Features:EmailEnabled=false`. Вне Development обязательны внешние адреса Identity, Users, Files и Torrent.
+
+При развёртывании сначала обновляется Configuration с поддержкой `GetReadiness`, затем потребители. Старые потребители продолжают использовать прежние RPC; новые со старым Configuration завершают запуск с ошибкой `Unimplemented` без повторов.
