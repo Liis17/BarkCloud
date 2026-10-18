@@ -19,6 +19,15 @@ public static class BackendComposeGenerator
             _ => "",
         };
         string Img(string name) => $"{BuilderModel.ImageRegistry}/barkcloud-{name}{suffix}:latest";
+        string AppEnv(string prefix) => ApplicationLoggingEnvironment(m, prefix);
+        string AppControls(string prefix) => ApplicationAgentControls(m, prefix);
+        string AppVolume(string prefix) => ApplicationAgentVolume(m, prefix);
+        string AppVolumeSection(string prefix) => ApplicationAgentVolumeSection(m, prefix);
+        string InfraImage(string prefix, string original) => InfrastructureImage(m, prefix, original);
+        string InfraBuild(string prefix) => InfrastructureBuild(m, prefix);
+        string InfraControls(string prefix) => InfrastructureAgentControls(m, prefix);
+        string InfraEnv(string prefix) => InfrastructureAgentEnvironment(m, prefix);
+        string InfraVolume(string prefix) => InfrastructureAgentVolume(m, prefix);
 
         // Compose service keys remain the stable DNS and depends_on contract.
 
@@ -35,26 +44,14 @@ public static class BackendComposeGenerator
         string webOptionalContainerNames = string.Concat(
             m.IncludeNotification ? "\n      Docker__ContainerNames__Notification: \"${NOTIFICATION_CONTAINER_NAME}\"" : "",
             m.IncludeTorrent ? "\n      Docker__ContainerNames__Torrent: \"${TORRENT_CONTAINER_NAME}\"" : "");
-        string lognaraContainerSettings = m.IncludeLognara
-            ? "\n    entrypoint: [\"/usr/local/bin/lognara-agent\", \"run\", \"--\", \"dotnet\", \"BarkCloud.Configuration.dll\"]"
-              + "\n    init: true"
-              + "\n    stop_grace_period: 30s"
+        string configurationAgentSettings = AppEnv("CONFIGURATION");
+        string identityAgentSettings = AppEnv("IDENTITY");
+        string usersAgentSettings = AppEnv("USERS");
+        string filesAgentSettings = AppEnv("FILES");
+        string webAgentSettings = AppEnv("WEB");
+        string postgresLogConfig = m.IncludeLognara
+            ? "\n      - \"-c\"\n      - \"logging_collector=off\"\n      - \"-c\"\n      - \"log_destination=stderr\""
             : "";
-        string lognaraEnvironment = m.IncludeLognara
-            ? "\n      Lognara__AgentUrl: \"http://127.0.0.1:7400/v1/logs\""
-              + "\n      LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\""
-              + "\n      LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool"
-              + "\n      LOGNARA_SERVICE: barkcloud-configuration"
-              + "\n      LOGNARA_SERVER: ${LOGNARA_SERVER}"
-              + "\n      LOGNARA_BACKEND: ${LOGNARA_BACKEND}"
-              + (string.IsNullOrWhiteSpace(m.LognaraEnvironment) ? "" : "\n      LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}")
-              + "\n      LOGNARA_RELAY_URL: ${LOGNARA_RELAY_URL}"
-              + "\n      LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}"
-            : "";
-        string lognaraVolume = m.IncludeLognara
-            ? "\n    volumes:\n      - ${LOGNARA_CONFIGURATION_SPOOL_PATH:-lognara_configuration_spool}:/var/lib/lognara-agent/spool"
-            : "";
-        string lognaraNetwork = m.IncludeLognara ? "\n      - lognara" : "";
 
         // Каждый блок-секция не содержит завершающего перевода строки; секции склеиваются
         // через пустую строку, что даёт ровно один разделитель между сервисами.
@@ -73,7 +70,7 @@ services:
   cloud-configuration:
     image: {{Img("configuration")}}
     container_name: ${CONFIGURATION_CONTAINER_NAME}
-    restart: always{{lognaraContainerSettings}}
+    restart: always{{AppControls("CONFIGURATION")}}
     env_file:
       - .env
     environment:
@@ -98,17 +95,17 @@ services:
       # Порты торрент-сервиса нужны configuration для вычисления TorrentService:Host/RunSettings
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
-      TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}{{lognaraEnvironment}}{{lognaraVolume}}
+      TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}{{configurationAgentSettings}}{{AppVolumeSection("CONFIGURATION")}}
     networks:
-      - barkcloud-network{{lognaraNetwork}}
+      - barkcloud-network
 
   cloud-identity:
     image: {{Img("identity")}}
     container_name: ${IDENTITY_CONTAINER_NAME}
-    restart: always
+    restart: always{{AppControls("IDENTITY")}}
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${IDENTITY_PORT}
+      SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}{{AppVolumeSection("IDENTITY")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -117,10 +114,10 @@ services:
   cloud-users:
     image: {{Img("users")}}
     container_name: ${USERS_CONTAINER_NAME}
-    restart: always
+    restart: always{{AppControls("USERS")}}
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${USERS_PORT}
+      SERVICE_PORT: ${USERS_PORT}{{usersAgentSettings}}{{AppVolumeSection("USERS")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -130,16 +127,16 @@ services:
   cloud-files:
     image: {{Img("files")}}
     container_name: ${FILES_CONTAINER_NAME}
-    restart: always
+    restart: always{{AppControls("FILES")}}
     environment:
       <<: *common-variables
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
-      Archive__TempPath: "/mnt/archive-temp"
+      Archive__TempPath: "/mnt/archive-temp"{{filesAgentSettings}}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
-      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp{{AppVolume("FILES")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -154,9 +151,9 @@ services:
   cloud-notification:
     image: {{Img("notification")}}
     container_name: ${NOTIFICATION_CONTAINER_NAME}
-    restart: always
+    restart: always{{AppControls("NOTIFICATION")}}
     environment:
-      <<: *common-variables
+      <<: *common-variables{{AppEnv("NOTIFICATION")}}{{AppVolumeSection("NOTIFICATION")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -170,16 +167,16 @@ services:
   cloud-torrent:
     image: {{Img("torrent")}}
     container_name: ${TORRENT_CONTAINER_NAME}
-    restart: always
+    restart: always{{AppControls("TORRENT")}}
     environment:
       <<: *common-variables
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
       FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       Torrent__DownloadPath: "/mnt/torrents"
-      Torrent__PeerPort: ${TORRENT_PEER_PORT}
+      Torrent__PeerPort: ${TORRENT_PEER_PORT}{{AppEnv("TORRENT")}}
     volumes:
-      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents{{AppVolume("TORRENT")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -194,7 +191,7 @@ services:
   cloud-web:
     image: {{Img("web")}}
     container_name: ${WEB_CONTAINER_NAME}
-    restart: always
+    restart: always{{AppControls("WEB")}}
     user: root
     env_file:
       - .env
@@ -208,12 +205,12 @@ services:
       Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
       Docker__ContainerNames__Users: "${USERS_CONTAINER_NAME}"
       Docker__ContainerNames__Files: "${FILES_CONTAINER_NAME}"
-      Docker__ContainerNames__Web: "${WEB_CONTAINER_NAME}"{{webOptionalContainerNames}}
+      Docker__ContainerNames__Web: "${WEB_CONTAINER_NAME}"{{webOptionalContainerNames}}{{webAgentSettings}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
-      - cloud-web-maintenance:/app/maintenance
+      - cloud-web-maintenance:/app/maintenance{{AppVolume("WEB")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -243,15 +240,16 @@ services:
             sections.Add($$"""
   # === Reverse-proxy (единственная точка выхода наружу) ===
   cloud-nginx:
-    image: nginx:latest
+    image: {{InfraImage("NGINX", "nginx:latest")}}
+{{InfraBuild("NGINX")}}
     container_name: ${NGINX_CONTAINER_NAME}
-    restart: always
+    restart: always{{InfraControls("NGINX")}}{{InfraEnv("NGINX")}}
     # Наружу выставлены только эти порты; микросервисы доступны лишь через прокси
     ports:
 {{string.Join("\n", nginxPorts)}}
     volumes:
       - ./nginx/cloud.barkfluff.conf:/etc/nginx/conf.d/cloud.barkfluff.conf:ro
-      - ./certs:/etc/nginx/certs:ro
+      - ./certs:/etc/nginx/certs:ro{{InfraVolume("NGINX")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -266,62 +264,66 @@ services:
             sections.Add("  # === Инфраструктурные сервисы ===");
 
         if (m.IncludeSeq)
-            sections.Add("""
+            sections.Add($$"""
   cloud-seq:
-    image: datalust/seq:latest
+    image: {{InfraImage("SEQ", "datalust/seq:latest")}}
+{{InfraBuild("SEQ")}}
     container_name: ${SEQ_CONTAINER_NAME}
-    restart: always
+    restart: always{{InfraControls("SEQ")}}
     environment:
       ACCEPT_EULA: "Y"
-      SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"
+      SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"{{InfraEnv("SEQ")}}
     volumes:
-      - ${SEQ_DATA_PATH:-seq_data}:/data
+      - ${SEQ_DATA_PATH:-seq_data}:/data{{InfraVolume("SEQ")}}
     networks:
       - barkcloud-network
 """);
 
         if (m.IncludeMinio)
-            sections.Add("""
+            sections.Add($$"""
   cloud-minio:
-    image: docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
+    image: {{InfraImage("MINIO", "docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1")}}
+{{InfraBuild("MINIO")}}
     container_name: ${MINIO_CONTAINER_NAME}
-    restart: always
+    restart: always{{InfraControls("MINIO")}}
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"{{InfraEnv("MINIO")}}
     volumes:
-      - ${MINIO_DATA_PATH:-cloud-minio_data}:/data
+      - ${MINIO_DATA_PATH:-cloud-minio_data}:/data{{InfraVolume("MINIO")}}
     command: server /data --console-address ":9001"
     networks:
       - barkcloud-network
 """);
 
         if (m.IncludeRabbitmq)
-            sections.Add("""
+            sections.Add($$"""
   cloud-rabbitmq:
-    image: rabbitmq:latest
+    image: {{InfraImage("RABBITMQ", "rabbitmq:latest")}}
+{{InfraBuild("RABBITMQ")}}
     container_name: ${RABBITMQ_CONTAINER_NAME}
-    restart: always
+    restart: always{{InfraControls("RABBITMQ")}}
     volumes:
-      - cloud-rabbitmq_data:/var/lib/rabbitmq
+      - cloud-rabbitmq_data:/var/lib/rabbitmq{{InfraVolume("RABBITMQ")}}
     environment:
       RABBITMQ_DEFAULT_USER: "${RABBITMQ_DEFAULT_USER}"
-      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_DEFAULT_PASS}"{{InfraEnv("RABBITMQ")}}
     networks:
       - barkcloud-network
 """);
 
         if (m.IncludePostgres)
-            sections.Add("""
+            sections.Add($$"""
   cloud-postgres:
-    image: postgres:18
+    image: {{InfraImage("POSTGRES", "postgres:18")}}
+{{InfraBuild("POSTGRES")}}
     container_name: ${POSTGRES_CONTAINER_NAME}
-    restart: always
+    restart: always{{InfraControls("POSTGRES")}}
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: "${POSTGRES_DB}"
-      PGDATA: /var/lib/postgresql/data/pgdata
+      PGDATA: /var/lib/postgresql/data/pgdata{{InfraEnv("POSTGRES")}}
     command:
       - "postgres"
       - "-c"
@@ -353,16 +355,19 @@ services:
       - "-c"
       - "max_parallel_workers_per_gather=1"
       - "-c"
-      - "jit=off"
+      - "jit=off"{{postgresLogConfig}}
     volumes:
       - ${POSTGRES_DATA_PATH:-pgdata}:/var/lib/postgresql
-      - ${BACKUP_PATH:-backup_volume}:/backup
+      - ${BACKUP_PATH:-backup_volume}:/backup{{InfraVolume("POSTGRES")}}
     networks:
       - barkcloud-network
 """);
 
         var sb = new StringBuilder();
         sb.Append(string.Join("\n\n", sections));
+
+        if (m.IncludeLognara)
+            sb.Append("\n\n").Append(LognaraRelayService);
 
         // Сети + тома (объявляем только используемые named-тома; порядок — как в исходнике).
         sb.Append("\n\n");
@@ -372,9 +377,6 @@ networks:
     external: true
     name: ${DOCKER_NETWORK_NAME}
 """);
-        sb.Append("\n");
-        if (m.IncludeLognara)
-            sb.Append("  lognara:\n    external: true\n    name: ${LOGNARA_NETWORK}\n");
 
         sb.Append("\nvolumes:\n");
         if (m.IncludePostgres) sb.Append("  pgdata:\n");
@@ -385,7 +387,18 @@ networks:
         sb.Append("  archive_temp:\n");
         if (m.IncludeTorrent) sb.Append("  torrent_data:\n");
         sb.Append("  cloud-web-maintenance:\n");
-        if (m.IncludeLognara) sb.Append("  lognara_configuration_spool:\n");
+        if (m.IncludeLognara)
+        {
+            foreach (var application in m.LognaraApplications
+                         .Where(x => m.IsApplicationIncluded(x) && x.LognaraEnable && string.IsNullOrWhiteSpace(x.SpoolPath)))
+                sb.Append("  lognara_").Append(application.Prefix.ToLowerInvariant()).Append("_spool:\n");
+
+            foreach (var service in m.LognaraInfrastructure
+                         .Where(x => m.IsInfrastructureIncluded(x) && string.IsNullOrWhiteSpace(x.SpoolPath)))
+                sb.Append("  lognara_").Append(service.Prefix.ToLowerInvariant()).Append("_spool:\n");
+
+            sb.Append("  lognara_relay_spool:\n");
+        }
 
         return sb.ToString();
     }
@@ -412,7 +425,7 @@ networks:
 
         Section("Docker-сеть и имена контейнеров");
         K("DOCKER_NETWORK_NAME", m.DockerNetworkName);
-        foreach (var container in m.ContainerNames.Where(x => x.Enabled))
+        foreach (var container in m.ContainerNames.Where(x => x.Enabled && !string.IsNullOrEmpty(x.EnvironmentVariable)))
             K(container.EnvironmentVariable, container.Name);
 
         Section("Режим ASP.NET Core");
@@ -470,17 +483,38 @@ networks:
             K("SEQ_DATA_PATH", m.SeqDataPath);
         }
 
+        Section("Независимые каналы логирования сервисов");
+        foreach (var application in m.LognaraApplications)
+        {
+            K($"{application.Prefix}_CONSOLE_OUTPUT", application.ConsoleOutput ? "true" : "false");
+            K($"{application.Prefix}_SEQ_ENABLE", application.SeqEnable ? "true" : "false");
+            K($"{application.Prefix}_LOGNARA_ENABLE", application.LognaraEnable ? "true" : "false");
+        }
+
         if (m.IncludeLognara)
         {
-            Section("Lognara (логи Configuration)");
-            K("LOGNARA_NETWORK", m.LognaraNetworkName);
-            K("LOGNARA_RELAY_URL", m.LognaraRelayUrl);
-            K("LOGNARA_CONFIGURATION_TOKEN", m.LognaraConfigurationToken);
+            Section("Lognara relay и метаданные агентов");
+            K("LOGNARA_CORE_URL", m.LognaraCoreUrl);
+            K("LOGNARA_RELAY_CORE_TOKEN", m.LognaraCoreToken);
+            K("LOGNARA_RELAY_MEMORY_MB", "2048");
+            K("LOGNARA_AGENT_VERSION", string.IsNullOrWhiteSpace(m.LognaraAgentVersion) ? "latest" : m.LognaraAgentVersion);
             K("LOGNARA_SERVER", m.LognaraServer);
             K("LOGNARA_BACKEND", m.LognaraBackend);
             if (!string.IsNullOrWhiteSpace(m.LognaraEnvironment))
                 K("LOGNARA_ENVIRONMENT", m.LognaraEnvironment);
-            K("LOGNARA_CONFIGURATION_SPOOL_PATH", m.LognaraConfigurationSpoolPath);
+
+            foreach (var application in m.LognaraApplications
+                         .Where(x => m.IsApplicationIncluded(x) && x.LognaraEnable))
+            {
+                K(application.TokenVariable, application.Token);
+                K(application.SpoolVariable, application.SpoolPath);
+            }
+
+            foreach (var service in m.LognaraInfrastructure.Where(m.IsInfrastructureIncluded))
+            {
+                K(service.TokenVariable, service.Token);
+                K(service.SpoolVariable, service.SpoolPath);
+            }
         }
 
         if (m.UseNginx && m.NginxSeqProxy && m.IncludeSeq)
@@ -517,6 +551,190 @@ networks:
         }
 
         return sb.ToString();
+    }
+
+    public static IReadOnlyDictionary<string, string> BuildLognaraDockerfiles(BuilderModel m)
+    {
+        if (!m.IncludeLognara)
+            return new Dictionary<string, string>();
+
+        var definitions = new (string Prefix, string File, string Image, string Entrypoint)[]
+        {
+            ("NGINX", "nginx.Dockerfile", "nginx:latest", "/docker-entrypoint.sh"),
+            ("MINIO", "minio.Dockerfile", "docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1", "/usr/bin/docker-entrypoint.sh"),
+            ("POSTGRES", "postgres.Dockerfile", "postgres:18", "docker-entrypoint.sh"),
+            ("RABBITMQ", "rabbitmq.Dockerfile", "rabbitmq:latest", "docker-entrypoint.sh"),
+            ("SEQ", "seq.Dockerfile", "datalust/seq:latest", "/bin/seqentry"),
+        };
+
+        return definitions
+            .Where(x => m.IsInfrastructureIncluded(m.LognaraInfrastructure.Single(y => y.Prefix == x.Prefix)))
+            .ToDictionary(
+                x => x.File,
+                x => InfrastructureDockerfile(x.Image, x.Entrypoint),
+                StringComparer.Ordinal);
+    }
+
+    private const string LognaraRelayService = """
+  lognara-relay:
+    image: ghcr.io/liis17/lognara-relay:master
+    container_name: lognara-relay
+    restart: always
+    environment:
+      LOGNARA_LISTEN_ADDR: "0.0.0.0:7401"
+      LOGNARA_CORE_URL: "${LOGNARA_CORE_URL}"
+      LOGNARA_CORE_TOKEN: "${LOGNARA_RELAY_CORE_TOKEN}"
+      LOGNARA_RELAY_MEMORY_MB: "${LOGNARA_RELAY_MEMORY_MB:-2048}"
+      LOGNARA_SPOOL_DIR: /var/lib/lognara-relay/spool
+    mem_limit: ${LOGNARA_RELAY_MEMORY_MB:-2048}m
+    volumes:
+      - lognara_relay_spool:/var/lib/lognara-relay/spool
+    networks:
+      - barkcloud-network
+""";
+
+    private static string ApplicationLoggingEnvironment(BuilderModel model, string prefix)
+    {
+        var sb = new StringBuilder();
+        sb.Append("\n      ConsoleOutput: ${").Append(prefix).Append("_CONSOLE_OUTPUT}")
+            .Append("\n      SeqEnable: ${").Append(prefix).Append("_SEQ_ENABLE}")
+            .Append("\n      LognaraEnable: ${").Append(prefix).Append("_LOGNARA_ENABLE}");
+
+        var application = model.LognaraApplications.Single(x => x.Prefix == prefix);
+        if (model.IncludeLognara && model.IsApplicationIncluded(application) && application.LognaraEnable)
+            AppendAgentEnvironment(sb, model, prefix, $"{prefix}_CONTAINER_NAME", includeListener: true);
+
+        return sb.ToString();
+    }
+
+    private static string ApplicationAgentControls(BuilderModel model, string prefix)
+    {
+        var application = model.LognaraApplications.Single(x => x.Prefix == prefix);
+        return model.IncludeLognara && model.IsApplicationIncluded(application) && application.LognaraEnable
+            ? "\n    init: true\n    stop_grace_period: 75s"
+            : "";
+    }
+
+    private static string ApplicationAgentVolume(BuilderModel model, string prefix)
+    {
+        var application = model.LognaraApplications.Single(x => x.Prefix == prefix);
+        return model.IncludeLognara && model.IsApplicationIncluded(application) && application.LognaraEnable
+            ? $"\n      - ${{{application.SpoolVariable}:-lognara_{prefix.ToLowerInvariant()}_spool}}:/var/lib/lognara-agent/spool"
+            : "";
+    }
+
+    private static string ApplicationAgentVolumeSection(BuilderModel model, string prefix)
+    {
+        var volume = ApplicationAgentVolume(model, prefix);
+        return volume.Length == 0 ? "" : "\n    volumes:" + volume;
+    }
+
+    private static string InfrastructureImage(BuilderModel model, string prefix, string original)
+    {
+        var service = model.LognaraInfrastructure.Single(x => x.Prefix == prefix);
+        return model.IncludeLognara && model.IsInfrastructureIncluded(service)
+            ? $"barkcloud-lognara-{prefix.ToLowerInvariant()}:latest"
+            : original;
+    }
+
+    private static string InfrastructureBuild(BuilderModel model, string prefix)
+    {
+        var service = model.LognaraInfrastructure.Single(x => x.Prefix == prefix);
+        return !model.IncludeLognara || !model.IsInfrastructureIncluded(service)
+            ? ""
+            : $"    build:\n      context: .\n      dockerfile: lognara/{prefix.ToLowerInvariant()}.Dockerfile\n      args:\n        LOGNARA_AGENT_VERSION: ${{LOGNARA_AGENT_VERSION:-latest}}";
+    }
+
+    private static string InfrastructureAgentControls(BuilderModel model, string prefix)
+    {
+        var service = model.LognaraInfrastructure.Single(x => x.Prefix == prefix);
+        return model.IncludeLognara && model.IsInfrastructureIncluded(service)
+            ? "\n    init: true\n    stop_grace_period: 30s"
+            : "";
+    }
+
+    private static string InfrastructureAgentEnvironment(BuilderModel model, string prefix)
+    {
+        var service = model.LognaraInfrastructure.Single(x => x.Prefix == prefix);
+        if (!model.IncludeLognara || !model.IsInfrastructureIncluded(service))
+            return "";
+
+        var sb = new StringBuilder();
+        AppendAgentEnvironment(sb, model, prefix, $"{prefix}_CONTAINER_NAME", includeListener: true);
+        return sb.ToString();
+    }
+
+    private static void AppendAgentEnvironment(StringBuilder sb, BuilderModel model, string prefix, string containerNameVariable, bool includeListener)
+    {
+        sb.Append("\n      ");
+        if (prefix is "CONFIGURATION" or "IDENTITY" or "USERS" or "FILES" or "NOTIFICATION" or "TORRENT" or "WEB")
+            sb.Append("Lognara__AgentUrl: \"http://127.0.0.1:7400/v1/logs\"\n      ");
+        if (includeListener)
+            sb.Append("LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\"\n      ");
+
+        sb.Append("LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool")
+            .Append("\n      LOGNARA_SERVICE: ${").Append(containerNameVariable).Append("}")
+            .Append("\n      LOGNARA_SERVER: ${LOGNARA_SERVER}")
+            .Append("\n      LOGNARA_BACKEND: ${LOGNARA_BACKEND}");
+
+        if (!string.IsNullOrWhiteSpace(model.LognaraEnvironment))
+            sb.Append("\n      LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}");
+
+        var tokenVariable = prefix is "CONFIGURATION" or "IDENTITY" or "USERS" or "FILES" or "NOTIFICATION" or "TORRENT" or "WEB"
+            ? model.LognaraApplications.Single(x => x.Prefix == prefix).TokenVariable
+            : model.LognaraInfrastructure.Single(x => x.Prefix == prefix).TokenVariable;
+
+        sb.Append("\n      LOGNARA_RELAY_URL: \"http://lognara-relay:7401/v1/batches\"")
+            .Append("\n      LOGNARA_RELAY_TOKEN: ${").Append(tokenVariable).Append("}");
+    }
+
+    private static string InfrastructureAgentVolume(BuilderModel model, string prefix)
+    {
+        var service = model.LognaraInfrastructure.Single(x => x.Prefix == prefix);
+        return model.IncludeLognara && model.IsInfrastructureIncluded(service)
+            ? $"\n      - ${{{service.SpoolVariable}:-lognara_{prefix.ToLowerInvariant()}_spool}}:/var/lib/lognara-agent/spool"
+            : "";
+    }
+
+    private static string InfrastructureDockerfile(string baseImage, string entrypoint)
+    {
+        const string template = """
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS lognara-agent
+ARG TARGETARCH
+ARG LOGNARA_AGENT_VERSION=latest
+WORKDIR /download
+RUN apk add --no-cache curl jq
+RUN set -eu; \
+    case "$TARGETARCH" in amd64|arm64) ;; *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1;; esac; \
+    if [ "$LOGNARA_AGENT_VERSION" = "latest" ]; then \
+      page=1; tag=""; \
+      while :; do \
+        releases="$(curl -fSL --retry 3 "https://api.github.com/repos/Liis17/Lognara/releases?per_page=100&page=$page")"; \
+        count="$(printf '%s' "$releases" | jq 'if type == "array" then length else 0 end')"; \
+        [ "$count" -gt 0 ] || break; \
+        tag="$(printf '%s' "$releases" | jq -r '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | test("^agent-[0-9]{8}-[0-9]{6}-[0-9a-f]{12}$"))][0].tag_name // empty')"; \
+        [ -z "$tag" ] || break; page=$((page + 1)); \
+      done; \
+    else tag="$LOGNARA_AGENT_VERSION"; fi; \
+    [ -n "$tag" ] || { echo "No published Lognara agent release found" >&2; exit 1; }; \
+    base="https://github.com/Liis17/Lognara/releases/download/$tag"; \
+    archive="lognara-agent-linux-$TARGETARCH.tar.gz"; \
+    curl -fSL --retry 3 "$base/$archive" -o "$archive"; \
+    curl -fSL --retry 3 "$base/SHA256SUMS" -o SHA256SUMS; \
+    grep -E "^[0-9a-fA-F]{64}  ${archive}$" SHA256SUMS > selected.sha256; \
+    test "$(wc -l < selected.sha256)" -eq 1; sha256sum -c selected.sha256; \
+    tar -xzf "$archive"; test -f lognara-agent; chmod 755 lognara-agent
+
+FROM __BASE_IMAGE__
+COPY --from=lognara-agent /download/lognara-agent /usr/local/bin/lognara-agent
+RUN mkdir -p /var/lib/lognara-agent/spool && chown 0:0 /var/lib/lognara-agent/spool
+ENTRYPOINT ["/usr/local/bin/lognara-agent", "run", "--", "__ORIGINAL_ENTRYPOINT__"]
+""";
+
+        return template
+            .Replace("__BASE_IMAGE__", baseImage, StringComparison.Ordinal)
+            .Replace("__ORIGINAL_ENTRYPOINT__", entrypoint, StringComparison.Ordinal);
     }
 
     /// <summary>

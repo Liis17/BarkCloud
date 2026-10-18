@@ -39,6 +39,12 @@ namespace BarkCloud.Builder
             }
         }
 
+        private void OnIncludeSeqClick(object sender, RoutedEventArgs e) =>
+            _model.SetGlobalSeq(SeqToggle.IsChecked == true);
+
+        private void OnIncludeLognaraClick(object sender, RoutedEventArgs e) =>
+            _model.SetGlobalLognara(LognaraToggle.IsChecked == true);
+
         private void OnBrowse(object sender, RoutedEventArgs e)
         {
             var dialog = new OpenFolderDialog { Title = "Папка для docker-compose.yml и .env" };
@@ -77,7 +83,10 @@ namespace BarkCloud.Builder
                 _model = BuilderConfigLoader.Load(compose, File.ReadAllText(envPath), nginxConf, dir);
                 DataContext = _model;
                 var nginxNote = nginxConf == null ? " (nginx-конфиг не найден — nginx выключен)" : "";
-                SetStatus($"Конфигурация загружена из {dir}{nginxNote}", error: false);
+                var lognaraNote = _model.LegacyLognaraImport
+                    ? " Старый адрес relay сохранён как legacy-признак, Core URL и токен relay нужно заполнить вручную."
+                    : "";
+                SetStatus($"Конфигурация загружена из {dir}{nginxNote}.{lognaraNote}", error: false);
             }
             catch (Exception ex)
             {
@@ -125,7 +134,18 @@ namespace BarkCloud.Builder
                 File.WriteAllText(Path.Combine(dir, ".env"),
                     ToLf(BackendComposeGenerator.BuildEnv(_model)), encoding);
 
+                var lognaraDockerfiles = BackendComposeGenerator.BuildLognaraDockerfiles(_model);
+                if (lognaraDockerfiles.Count > 0)
+                {
+                    var lognaraDir = Path.Combine(dir, "lognara");
+                    Directory.CreateDirectory(lognaraDir);
+                    foreach (var (file, contents) in lognaraDockerfiles)
+                        File.WriteAllText(Path.Combine(lognaraDir, file), ToLf(contents), encoding);
+                }
+
                 var extra = "";
+                if (lognaraDockerfiles.Count > 0)
+                    extra = " + lognara/*.Dockerfile";
                 if (_model.UseNginx)
                 {
                     var nginxDir = Path.Combine(dir, "nginx");
