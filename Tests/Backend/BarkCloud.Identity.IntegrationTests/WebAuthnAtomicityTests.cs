@@ -213,10 +213,24 @@ public class WebAuthnAtomicityTests
             await setup.SaveChangesAsync();
         }
 
+        // Обе попытки должны прочитать исходный счётчик до коммита любой из них.
+        var bothAssertionsRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var assertionsRead = 0;
+        var fido = new Mock<IFido2>();
+        fido.Setup(x => x.MakeAssertionAsync(It.IsAny<MakeAssertionParams>(), It.IsAny<CancellationToken>()))
+            .Returns(async (MakeAssertionParams parameters, CancellationToken cancellationToken) =>
+            {
+                parameters.StoredSignatureCounter.Should().Be(4);
+                if (Interlocked.Increment(ref assertionsRead) == 2)
+                    bothAssertionsRead.TrySetResult();
+                await bothAssertionsRead.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                return new VerifyAssertionResult { SignCount = 9 };
+            });
+
         async Task<bool> Attempt(Guid id)
         {
             await using var context = database.CreateContext();
-            var handler = CreateHandler(context, new MetricsCollector(), new VerifyAssertionResult { SignCount = 9 });
+            var handler = CreateHandler(context, new MetricsCollector(), fido.Object);
             try
             {
                 await handler.Handle(Request(id), default);
