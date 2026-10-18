@@ -14,8 +14,6 @@ using MassTransit;
 
 using Microsoft.EntityFrameworkCore;
 
-using Serilog;
-
 namespace BarkCloud.Torrent;
 
 public class Program
@@ -28,7 +26,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         await builder.LoadConfigurationAsync(ServiceId.Torrent);
-        builder.AddBarkCloudSerilog("BarkCloud.Torrent");
+        await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Torrent");
         builder.SetRunningAddress(builder.Configuration);
 
         // Стриминг файлов без лимита размера тела и минимальной скорости.
@@ -103,7 +101,6 @@ public class Program
         app.MapControllers();
         app.MapGrpcService<TorrentApiService>();
 
-        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
-        app.Run();
+        await app.RunAsync();
     }
 }

@@ -38,40 +38,7 @@ public static partial class BuilderModelValidator
                 errors.Add($"Имя контейнера {container.ServiceAlias} «{container.Name}» зарезервировано именем сервиса {conflictingAlias.ServiceAlias}.");
         }
 
-        if (model.IncludeLognara)
-        {
-            if (string.IsNullOrWhiteSpace(model.LognaraNetworkName)
-                || !DockerNetworkNamePattern.IsMatch(model.LognaraNetworkName))
-                errors.Add("Имя внешней Docker-сети Lognara должно начинаться с буквы или цифры и содержать только буквы, цифры, точку, дефис или подчёркивание.");
-
-            if (!Uri.TryCreate(model.LognaraRelayUrl, UriKind.Absolute, out var relayUri)
-                || relayUri.Scheme != Uri.UriSchemeHttp
-                || string.IsNullOrWhiteSpace(relayUri.Host)
-                || model.LognaraRelayUrl.Any(char.IsWhiteSpace)
-                || model.LognaraRelayUrl.Any(char.IsControl)
-                || model.LognaraRelayUrl.IndexOfAny(['$', '\'', '"', '#']) >= 0)
-                errors.Add("URL Lognara relay должен быть абсолютным HTTP-адресом с непустым host без $, кавычек, #, пробелов и управляющих символов; HTTPS не поддерживается.");
-
-            if (string.IsNullOrWhiteSpace(model.LognaraConfigurationToken)
-                || !LognaraTokenPattern.IsMatch(model.LognaraConfigurationToken))
-                errors.Add("Токен Lognara обязателен и может содержать только буквы, цифры и символы . _ ~ + / = -.");
-
-            if (string.IsNullOrWhiteSpace(model.LognaraServer)
-                || !LognaraIdentifierPattern.IsMatch(model.LognaraServer))
-                errors.Add("Имя сервера Lognara обязательно и может содержать только буквы, цифры, точку, дефис или подчёркивание.");
-
-            if (string.IsNullOrWhiteSpace(model.LognaraBackend)
-                || !LognaraIdentifierPattern.IsMatch(model.LognaraBackend))
-                errors.Add("Имя backend Lognara обязательно и может содержать только буквы, цифры, точку, дефис или подчёркивание.");
-
-            if (!string.IsNullOrWhiteSpace(model.LognaraEnvironment)
-                && !LognaraIdentifierPattern.IsMatch(model.LognaraEnvironment))
-                errors.Add("Окружение Lognara может содержать только буквы, цифры, точку, дефис или подчёркивание.");
-
-            if (model.LognaraConfigurationSpoolPath.Contains('\r')
-                || model.LognaraConfigurationSpoolPath.Contains('\n'))
-                errors.Add("Путь Lognara spool не должен содержать переводы строк.");
-        }
+        ValidateLoggingSettings(model, errors);
 
         if (!model.UseNginx)
             return errors;
@@ -130,6 +97,85 @@ public static partial class BuilderModelValidator
         }
 
         return errors;
+    }
+
+    private static void ValidateLoggingSettings(BuilderModel model, ICollection<string> errors)
+    {
+        foreach (var application in model.LognaraApplications.Where(model.IsApplicationIncluded))
+        {
+            if (!model.IncludeSeq && application.SeqEnable)
+                errors.Add($"Seq отключён, но для {application.DisplayName} включён SeqEnable. Включите Seq или выключите этот канал.");
+            if (!model.IncludeLognara && application.LognaraEnable)
+                errors.Add($"Lognara отключена, но для {application.DisplayName} включён LognaraEnable. Включите Lognara или выключите этот канал.");
+        }
+
+        if (!model.IncludeLognara)
+            return;
+
+        ValidateCoreUrl(model.LognaraCoreUrl, errors);
+        ValidateAgentToken(model.LognaraCoreToken, "Токен relay для Lognara Core", errors);
+        if (!string.IsNullOrWhiteSpace(model.LognaraAgentVersion)
+            && !LognaraIdentifierPattern.IsMatch(model.LognaraAgentVersion))
+            errors.Add("Версия Lognara agent должна содержать только буквы, цифры, точку, дефис или подчёркивание.");
+
+        var agents = new List<(string Name, string Token, string SpoolPath)>();
+        agents.AddRange(model.LognaraApplications
+            .Where(x => model.IsApplicationIncluded(x) && x.LognaraEnable)
+            .Select(x => (x.DisplayName, x.Token, x.SpoolPath)));
+        agents.AddRange(model.LognaraInfrastructure
+            .Where(model.IsInfrastructureIncluded)
+            .Select(x => (x.DisplayName, x.Token, x.SpoolPath)));
+
+        if (agents.Count > 0)
+        {
+            if (string.IsNullOrWhiteSpace(model.LognaraServer)
+                || !LognaraIdentifierPattern.IsMatch(model.LognaraServer))
+                errors.Add("Имя сервера Lognara обязательно и может содержать только буквы, цифры, точку, дефис или подчёркивание.");
+
+            if (string.IsNullOrWhiteSpace(model.LognaraBackend)
+                || !LognaraIdentifierPattern.IsMatch(model.LognaraBackend))
+                errors.Add("Имя backend Lognara обязательно и может содержать только буквы, цифры, точку, дефис или подчёркивание.");
+
+            if (!string.IsNullOrWhiteSpace(model.LognaraEnvironment)
+                && !LognaraIdentifierPattern.IsMatch(model.LognaraEnvironment))
+                errors.Add("Окружение Lognara может содержать только буквы, цифры, точку, дефис или подчёркивание.");
+        }
+
+        foreach (var agent in agents)
+        {
+            ValidateAgentToken(agent.Token, $"Токен Lognara для {agent.Name}", errors);
+            if (agent.SpoolPath.Any(char.IsControl) || agent.SpoolPath.Contains(':'))
+                errors.Add($"Путь Lognara spool для {agent.Name} содержит недопустимые символы.");
+        }
+
+        foreach (var duplicate in agents.Where(x => !string.IsNullOrWhiteSpace(x.Token))
+                     .GroupBy(x => x.Token, StringComparer.Ordinal)
+                     .Where(x => x.Count() > 1))
+            errors.Add($"Токен Lognara используется несколькими агентами: {string.Join(", ", duplicate.Select(x => x.Name))}.");
+
+    }
+
+    private static void ValidateCoreUrl(string value, ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || string.IsNullOrWhiteSpace(uri.Host)
+            || uri.AbsolutePath != "/v1/batches"
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || value.Any(char.IsWhiteSpace)
+            || value.Any(char.IsControl)
+            || value.IndexOfAny(['$', '\'', '"', '#']) >= 0)
+            errors.Add("URL Lognara Core обязателен: абсолютный HTTP/HTTPS endpoint /v1/batches без учётных данных, query, #, пробелов и управляющих символов.");
+    }
+
+    private static void ValidateAgentToken(string value, string label, ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || !LognaraTokenPattern.IsMatch(value))
+            errors.Add($"{label} обязателен и может содержать только буквы, цифры и символы . _ ~ + / = -.");
     }
 
     private static void ValidateDockerNetworkName(string? value, ICollection<string> errors)

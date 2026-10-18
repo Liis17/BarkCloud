@@ -455,6 +455,22 @@ public sealed class DockerService : IDockerDeployment
         // без ведущего "run" — его добавляет шаблон скрипта (`docker run {args}`)
         var args = new List<string> { "-d", "--name", WebContainer };
 
+        if (host.TryGetProperty("Init", out var init) && init.ValueKind == JsonValueKind.True)
+            args.Add("--init");
+
+        if (config.TryGetProperty("StopTimeout", out var stopTimeout) && stopTimeout.TryGetInt32(out var stopTimeoutSeconds))
+        {
+            args.Add("--stop-timeout");
+            args.Add(stopTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        if (config.TryGetProperty("StopSignal", out var stopSignal) &&
+            stopSignal.ValueKind == JsonValueKind.String && stopSignal.GetString() is { Length: > 0 } signal)
+        {
+            args.Add("--stop-signal");
+            args.Add(signal);
+        }
+
         // restart policy
         if (host.TryGetProperty("RestartPolicy", out var rp) &&
             rp.TryGetProperty("Name", out var rpn) && rpn.GetString() is { Length: > 0 } policy && policy != "no")
@@ -697,7 +713,7 @@ $"{stateWriter}\n" +
         "  expose_state\n" +
         "  exit 1\n" +
         "fi\n" +
-        "run_logged docker stop -t 10 \"$backup_container\" || true\n" +
+        "run_logged docker stop \"$backup_container\" || true\n" +
         $"new_web_id=\"$(run_logged_capture docker run {run})\" || new_web_id=\"$(owned_web_id || true)\"\n" +
         "owned_id=\"$(owned_web_id || true)\"\n" +
         "if [ -n \"$new_web_id\" ] && [ \"$owned_id\" = \"$new_web_id\" ] && " +

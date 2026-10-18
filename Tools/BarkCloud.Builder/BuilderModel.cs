@@ -1,11 +1,18 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 namespace BarkCloud.Builder;
 
 /// <summary>
 /// Параметры генерации docker-compose.yml и .env для бэкенда BarkCloud.
 /// Дефолты основаны на Backend/sample.env; хост-пути данных относительны к папке compose.
 /// </summary>
-public sealed class BuilderModel
+public sealed class BuilderModel : INotifyPropertyChanged
 {
+    private bool _includeSeq;
+    private bool _includeLognara;
+
     // Сервисы, включаемые в compose. Ядро (configuration/identity/users/files)
     // и web — всегда; web отключить нельзя.
     public bool UseNginx { get; set; } = true;
@@ -15,7 +22,7 @@ public sealed class BuilderModel
     public bool IncludeMinio { get; set; } = true;
     public bool IncludeRabbitmq { get; set; } = true;
     public bool IncludePostgres { get; set; } = true;
-    public bool IncludeSeq { get; set; } = true;
+    public bool IncludeSeq { get => _includeSeq; set => Set(ref _includeSeq, value); }
     public bool IncludeTorrent { get; set; } = true;
 
     // Имена контейнеров уникальны в Docker daemon. DNS-имена Compose-сервисов
@@ -83,19 +90,21 @@ public sealed class BuilderModel
     public string SeqWebPort { get; set; } = "80";
     public string SeqDataPath { get; set; } = "./data/seq";
 
-    // Lognara — сбор логов Configuration через агент в том же контейнере.
-    public bool IncludeLognara { get; set; }
-    public string LognaraNetworkName { get; set; } = "lognara-ingest";
-    public string LognaraRelayUrl { get; set; } = "http://lognara-relay:7401/v1/batches";
-    public string LognaraConfigurationToken { get; set; } = "";
+    // Lognara: локальный relay и настройки агентов. Старый внешний relay URL намеренно
+    // не хранится как Core URL при импорте legacy-конфигурации.
+    public bool IncludeLognara { get => _includeLognara; set => Set(ref _includeLognara, value); }
+    public string LognaraCoreUrl { get; set; } = "";
+    public string LognaraCoreToken { get; set; } = "";
     public string LognaraServer { get; set; } = "";
     public string LognaraBackend { get; set; } = "barkcloud";
     public string LognaraEnvironment { get; set; } = "";
-    public string LognaraConfigurationSpoolPath { get; set; } = "";
+    public string LognaraAgentVersion { get; set; } = "latest";
+    public bool LegacyLognaraImport { get; set; }
+    public bool LegacySeqConfigurationUnknown { get; set; }
 
     // Веб-клиент
     public string WebPort { get; set; } = "8080";
-    public bool WebCookieSecure { get; set; } = false;
+    public bool WebCookieSecure { get; set; }
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebAdminPassword { get; set; } = "";
 
@@ -127,6 +136,60 @@ public sealed class BuilderModel
     // Вывод
     public string OutputPath { get; set; } = "";
 
+    public ObservableCollection<LognaraApplicationSettings> LognaraApplications { get; } =
+    [
+        new("CONFIGURATION", "Configuration"),
+        new("IDENTITY", "Identity"),
+        new("USERS", "Users"),
+        new("FILES", "Files"),
+        new("NOTIFICATION", "Notification"),
+        new("TORRENT", "Torrent"),
+        new("WEB", "Web"),
+    ];
+
+    public ObservableCollection<LognaraInfrastructureSettings> LognaraInfrastructure { get; } =
+    [
+        new("NGINX", "nginx"),
+        new("MINIO", "MinIO"),
+        new("POSTGRES", "PostgreSQL"),
+        new("RABBITMQ", "RabbitMQ"),
+        new("SEQ", "Seq"),
+    ];
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    // Выключение backend-флага сбрасывает только его канал; остальные значения независимы.
+    public void SetGlobalSeq(bool enabled)
+    {
+        IncludeSeq = enabled;
+        foreach (var application in LognaraApplications)
+            application.SeqEnable = enabled;
+    }
+
+    public void SetGlobalLognara(bool enabled)
+    {
+        IncludeLognara = enabled;
+        foreach (var application in LognaraApplications)
+            application.LognaraEnable = enabled;
+    }
+
+    public bool IsApplicationIncluded(LognaraApplicationSettings application) => application.Prefix switch
+    {
+        "NOTIFICATION" => IncludeNotification,
+        "TORRENT" => IncludeTorrent,
+        _ => true,
+    };
+
+    public bool IsInfrastructureIncluded(LognaraInfrastructureSettings service) => service.Prefix switch
+    {
+        "NGINX" => IncludeNginx,
+        "MINIO" => IncludeMinio,
+        "POSTGRES" => IncludePostgres,
+        "RABBITMQ" => IncludeRabbitmq,
+        "SEQ" => IncludeSeq,
+        _ => false,
+    };
+
     public IReadOnlyList<BuilderContainerName> ContainerNames =>
     [
         new("CONFIGURATION_CONTAINER_NAME", "cloud-configuration", ConfigurationContainerName, true),
@@ -141,7 +204,56 @@ public sealed class BuilderModel
         new("POSTGRES_CONTAINER_NAME", "cloud-postgres", PostgresContainerName, IncludePostgres),
         new("SEQ_CONTAINER_NAME", "cloud-seq", SeqContainerName, IncludeSeq),
         new("NGINX_CONTAINER_NAME", "cloud-nginx", NginxContainerName, IncludeNginx),
+        new("", "lognara-relay", "lognara-relay", IncludeLognara),
     ];
+
+    private void Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
+
+public sealed class LognaraApplicationSettings(string prefix, string displayName) : INotifyPropertyChanged
+{
+    private bool _consoleOutput = true;
+    private bool _seqEnable;
+    private bool _lognaraEnable;
+    private string _token = "";
+    private string _spoolPath = "";
+
+    public string Prefix { get; } = prefix;
+    public string DisplayName { get; } = displayName;
+    public string TokenVariable => $"LOGNARA_{Prefix}_TOKEN";
+    public string SpoolVariable => $"LOGNARA_{Prefix}_SPOOL_PATH";
+
+    public bool ConsoleOutput { get => _consoleOutput; set => Set(ref _consoleOutput, value); }
+    public bool SeqEnable { get => _seqEnable; set => Set(ref _seqEnable, value); }
+    public bool LognaraEnable { get => _lognaraEnable; set => Set(ref _lognaraEnable, value); }
+    public string Token { get => _token; set => Set(ref _token, value); }
+    public string SpoolPath { get => _spoolPath; set => Set(ref _spoolPath, value); }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+            return;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
+
+public sealed class LognaraInfrastructureSettings(string prefix, string displayName)
+{
+    public string Prefix { get; } = prefix;
+    public string DisplayName { get; } = displayName;
+    public string TokenVariable => $"LOGNARA_{Prefix}_TOKEN";
+    public string SpoolVariable => $"LOGNARA_{Prefix}_SPOOL_PATH";
+    public string Token { get; set; } = "";
+    public string SpoolPath { get; set; } = "";
 }
 
 public sealed record BuilderContainerName(string EnvironmentVariable, string ServiceAlias, string Name, bool Enabled);

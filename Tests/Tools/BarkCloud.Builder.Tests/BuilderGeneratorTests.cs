@@ -32,12 +32,15 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("MINIO_PORT=9000", env);
         Assert.Contains("MINIO_WEBPORT=9001", env);
         Assert.Contains("POSTGRES_PORT=5432", env);
-        Assert.Contains("SEQ_WEBPORT=80", env);
+        Assert.DoesNotContain("SEQ_WEBPORT=", env);
         Assert.Contains("WEB_PORT=8080", env);
         Assert.Contains("MINIO_DATA_PATH=./data/minio", env);
         Assert.Contains("POSTGRES_DATA_PATH=./data/pgdata", env);
         Assert.Contains("BACKUP_PATH=./data/pgbackup", env);
-        Assert.Contains("SEQ_DATA_PATH=./data/seq", env);
+        Assert.DoesNotContain("SEQ_DATA_PATH=", env);
+        Assert.Contains("CONFIGURATION_CONSOLE_OUTPUT=true", env);
+        Assert.Contains("CONFIGURATION_SEQ_ENABLE=false", env);
+        Assert.Contains("CONFIGURATION_LOGNARA_ENABLE=false", env);
         Assert.Contains("TORRENT_DOWNLOAD_PATH=./data/torrent", env);
         Assert.Contains("ARCHIVE_TEMP_PATH=./data/archive-temp", env);
         Assert.Contains("server cloud-web:8080 resolve;", nginx);
@@ -73,6 +76,7 @@ public sealed class BuilderGeneratorTests
     {
         var model = new BuilderModel
         {
+            IncludeSeq = true,
             MinioDataPath = "",
             PostgresDataPath = "",
             BackupPath = "",
@@ -170,6 +174,9 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("      - cloud-torrent", compose);
         Assert.DoesNotContain("{{", compose);
         Assert.DoesNotContain("}}", compose);
+        var nginxStart = compose.IndexOf("  cloud-nginx:", StringComparison.Ordinal);
+        var infrastructureStart = compose.IndexOf("  # === Инфраструктурные сервисы ===", nginxStart, StringComparison.Ordinal);
+        Assert.DoesNotContain("environment:", compose[nginxStart..infrastructureStart]);
     }
 
     [Fact]
@@ -213,6 +220,7 @@ public sealed class BuilderGeneratorTests
         var model = new BuilderModel
         {
             NginxLocation = "Compose",
+            IncludeSeq = true,
             NginxSeqProxy = true,
             NginxSeqPort = "38882",
             NginxMinioConsoleProxy = true,
@@ -317,6 +325,7 @@ public sealed class BuilderGeneratorTests
             IdentityPort = "443",
             FilesHttp1Port = "not-a-port",
             TorrentHttp1Port = "65536",
+            IncludeSeq = true,
             NginxSeqProxy = true,
             NginxSeqPort = "8005",
             NginxMinioConsoleProxy = true,
@@ -365,64 +374,221 @@ public sealed class BuilderGeneratorTests
     }
 
     [Fact]
-    public void Lognara_is_omitted_when_disabled()
+    public void New_defaults_enable_only_console_and_omit_relay_and_helpers()
     {
         var model = new BuilderModel();
-
         var compose = BackendComposeGenerator.BuildCompose(model);
         var env = BackendComposeGenerator.BuildEnv(model);
-        var composeLower = compose.ToLowerInvariant();
-        var envLower = env.ToLowerInvariant();
 
-        Assert.DoesNotContain("lognara", composeLower);
-        Assert.DoesNotContain("lognara", envLower);
-        Assert.DoesNotContain("lognara-agent", composeLower);
-        Assert.DoesNotContain("entrypoint:", composeLower);
-        Assert.DoesNotContain("init: true", composeLower);
-        Assert.DoesNotContain("stop_grace_period", composeLower);
-        Assert.DoesNotContain("lognara_configuration_spool", composeLower);
-        Assert.DoesNotContain("- lognara", composeLower);
-        Assert.DoesNotContain("lognara:", composeLower);
+        Assert.False(model.IncludeSeq);
+        Assert.False(model.IncludeLognara);
+        Assert.Empty(BackendComposeGenerator.BuildLognaraDockerfiles(model));
+        Assert.DoesNotContain("lognara-relay", compose);
+        Assert.DoesNotContain("LOGNARA_CORE_URL=", env);
+        Assert.DoesNotContain("LOGNARA_CONFIGURATION_TOKEN=", env);
+        Assert.DoesNotContain("entrypoint:", compose);
+        Assert.DoesNotContain("init: true", compose);
+        Assert.DoesNotContain("stop_grace_period", compose);
+
+        foreach (var app in model.LognaraApplications)
+        {
+            Assert.True(app.ConsoleOutput);
+            Assert.False(app.SeqEnable);
+            Assert.False(app.LognaraEnable);
+            Assert.Contains($"{app.Prefix}_CONSOLE_OUTPUT=true", env);
+            Assert.Contains($"{app.Prefix}_SEQ_ENABLE=false", env);
+            Assert.Contains($"{app.Prefix}_LOGNARA_ENABLE=false", env);
+        }
     }
 
-    [Fact]
-    public void Lognara_generates_agent_entrypoint_external_network_spool_and_environment()
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void Application_sinks_remain_independent_for_all_eight_combinations(bool console, bool seq, bool lognara)
     {
-        var model = new BuilderModel
+        var model = ValidLognaraModel();
+        foreach (var application in model.LognaraApplications)
         {
-            IncludeLognara = true,
-            LognaraConfigurationToken = "agent.token-+/=",
-            LognaraServer = "node-1",
-            LognaraEnvironment = "Production",
-        };
+            application.ConsoleOutput = console;
+            application.SeqEnable = seq;
+            application.LognaraEnable = lognara;
+        }
 
         var compose = BackendComposeGenerator.BuildCompose(model);
         var env = BackendComposeGenerator.BuildEnv(model);
 
         Assert.Empty(BuilderModelValidator.Validate(model));
-        Assert.Contains("entrypoint: [\"/usr/local/bin/lognara-agent\", \"run\", \"--\", \"dotnet\", \"BarkCloud.Configuration.dll\"]", compose);
-        Assert.Contains("    init: true", compose);
-        Assert.Contains("    stop_grace_period: 30s", compose);
-        Assert.Contains("Lognara__AgentUrl: \"http://127.0.0.1:7400/v1/logs\"", compose);
-        Assert.Contains("LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\"", compose);
-        Assert.Contains("LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool", compose);
-        Assert.Contains("LOGNARA_SERVICE: barkcloud-configuration", compose);
-        Assert.Contains("LOGNARA_SERVER: ${LOGNARA_SERVER}", compose);
-        Assert.Contains("LOGNARA_BACKEND: ${LOGNARA_BACKEND}", compose);
-        Assert.Contains("LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}", compose);
-        Assert.Contains("LOGNARA_RELAY_URL: ${LOGNARA_RELAY_URL}", compose);
+        foreach (var application in model.LognaraApplications)
+        {
+            Assert.Contains($"ConsoleOutput: ${{{application.Prefix}_CONSOLE_OUTPUT}}", compose);
+            Assert.Contains($"SeqEnable: ${{{application.Prefix}_SEQ_ENABLE}}", compose);
+            Assert.Contains($"LognaraEnable: ${{{application.Prefix}_LOGNARA_ENABLE}}", compose);
+            Assert.Contains($"{application.Prefix}_CONSOLE_OUTPUT={console.ToString().ToLowerInvariant()}", env);
+            Assert.Contains($"{application.Prefix}_SEQ_ENABLE={seq.ToString().ToLowerInvariant()}", env);
+            Assert.Contains($"{application.Prefix}_LOGNARA_ENABLE={lognara.ToString().ToLowerInvariant()}", env);
+            Assert.Equal(lognara, compose.Contains($"LOGNARA_RELAY_TOKEN: ${{{application.TokenVariable}}}"));
+        }
+    }
+
+    [Fact]
+    public void Global_toggles_change_only_their_channel_and_app_overrides_are_kept()
+    {
+        var model = new BuilderModel();
+        var configuration = App(model, "CONFIGURATION");
+
+        model.SetGlobalSeq(true);
+        model.SetGlobalLognara(true);
+        configuration.ConsoleOutput = false;
+        configuration.SeqEnable = false;
+        configuration.LognaraEnable = false;
+        model.SetGlobalSeq(false);
+
+        Assert.False(configuration.ConsoleOutput);
+        Assert.False(configuration.SeqEnable);
+        Assert.False(model.LognaraApplications.Single(x => x.Prefix == "IDENTITY").SeqEnable);
+        Assert.False(configuration.LognaraEnable);
+        Assert.True(model.LognaraApplications.Single(x => x.Prefix == "IDENTITY").LognaraEnable);
+    }
+
+    [Fact]
+    public void Optional_application_flags_survive_import_while_service_is_absent()
+    {
+        var model = new BuilderModel { IncludeNotification = false, IncludeTorrent = false };
+        model.SetGlobalLognara(true);
+
+        var imported = BuilderConfigLoader.Load(
+            BackendComposeGenerator.BuildCompose(model),
+            BackendComposeGenerator.BuildEnv(model),
+            null,
+            "C:\\out");
+
+        Assert.False(imported.IncludeNotification);
+        Assert.False(imported.IncludeTorrent);
+        Assert.True(App(imported, "NOTIFICATION").LognaraEnable);
+        Assert.True(App(imported, "TORRENT").LognaraEnable);
+        Assert.DoesNotContain("  cloud-notification:", BackendComposeGenerator.BuildCompose(imported));
+        Assert.DoesNotContain("  cloud-torrent:", BackendComposeGenerator.BuildCompose(imported));
+
+        imported.IncludeNotification = true;
+        Assert.Contains("LognaraEnable: ${NOTIFICATION_LOGNARA_ENABLE}", BackendComposeGenerator.BuildCompose(imported));
+    }
+
+    [Fact]
+    public void Lognara_generates_selected_app_agents_relay_and_distinct_spools()
+    {
+        var model = ValidLognaraModel();
+        model.LognaraCoreUrl = "https://logs.example.test/v1/batches";
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
+        Assert.Contains("image: ghcr.io/liis17/lognara-relay:master", compose);
+        Assert.Contains("LOGNARA_LISTEN_ADDR: \"0.0.0.0:7401\"", compose);
+        Assert.Contains("LOGNARA_CORE_URL: \"${LOGNARA_CORE_URL}\"", compose);
+        Assert.Contains("LOGNARA_CORE_TOKEN: \"${LOGNARA_RELAY_CORE_TOKEN}\"", compose);
+        Assert.Contains("LOGNARA_RELAY_MEMORY_MB: \"${LOGNARA_RELAY_MEMORY_MB:-2048}\"", compose);
+        Assert.Contains("mem_limit: ${LOGNARA_RELAY_MEMORY_MB:-2048}m", compose);
+        Assert.Contains("lognara_relay_spool:/var/lib/lognara-relay/spool", compose);
+        Assert.DoesNotContain("ports:", compose[compose.IndexOf("  lognara-relay:", StringComparison.Ordinal)..]);
+        Assert.Contains("LOGNARA_CORE_URL=https://logs.example.test/v1/batches", env);
+        Assert.Contains("LOGNARA_RELAY_CORE_TOKEN=relay-core-token", env);
+        Assert.Contains("LOGNARA_RELAY_MEMORY_MB=2048", env);
+        Assert.Contains("LOGNARA_AGENT_VERSION=latest", env);
+        Assert.Contains("LOGNARA_SERVICE: ${CONFIGURATION_CONTAINER_NAME}", compose);
+        Assert.Contains("LOGNARA_RELAY_URL: \"http://lognara-relay:7401/v1/batches\"", compose);
         Assert.Contains("LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}", compose);
+        Assert.Contains("init: true", compose);
+        Assert.Contains("stop_grace_period: 75s", compose);
+
+        foreach (var app in model.LognaraApplications)
+        {
+            Assert.Contains($"{app.TokenVariable}=agent-{app.Prefix.ToLowerInvariant()}", env);
+            Assert.Contains($"{app.SpoolVariable}=", env);
+            Assert.Contains($"LOGNARA_SERVICE: ${{{app.Prefix}_CONTAINER_NAME}}", compose);
+            Assert.Contains($"LOGNARA_RELAY_TOKEN: ${{{app.TokenVariable}}}", compose);
+            Assert.Contains($"${{{app.SpoolVariable}:-lognara_{app.Prefix.ToLowerInvariant()}_spool}}:/var/lib/lognara-agent/spool", compose);
+            Assert.Contains($"  lognara_{app.Prefix.ToLowerInvariant()}_spool:\n", compose);
+        }
+
+        foreach (var service in model.LognaraInfrastructure.Where(model.IsInfrastructureIncluded))
+        {
+            Assert.Contains($"{service.TokenVariable}=agent-{service.Prefix.ToLowerInvariant()}", env);
+            Assert.Contains($"LOGNARA_SERVICE: ${{{service.Prefix}_CONTAINER_NAME}}", compose);
+            Assert.Contains($"LOGNARA_RELAY_TOKEN: ${{{service.TokenVariable}}}", compose);
+        }
+    }
+
+    [Fact]
+    public void Disabled_optional_agents_are_not_generated_or_validated()
+    {
+        var model = ValidLognaraModel();
+        model.IncludeNotification = false;
+        model.IncludeTorrent = false;
+        App(model, "NOTIFICATION").Token = "bad token\n";
+        App(model, "NOTIFICATION").SpoolPath = "bad\npath";
+        App(model, "TORRENT").Token = "also bad$";
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
+        Assert.DoesNotContain("  cloud-notification:", compose);
+        Assert.DoesNotContain("  cloud-torrent:", compose);
+        Assert.DoesNotContain("LOGNARA_NOTIFICATION_TOKEN=", env);
+        Assert.DoesNotContain("LOGNARA_TORRENT_TOKEN=", env);
+        Assert.Contains("NOTIFICATION_LOGNARA_ENABLE=true", env);
+        Assert.Contains("TORRENT_LOGNARA_ENABLE=true", env);
+    }
+
+    [Fact]
+    public void Disabled_optional_infrastructure_agents_are_not_built_or_validated()
+    {
+        var model = ValidLognaraModel();
+        model.IncludeMinio = false;
+        model.IncludeRabbitmq = false;
+        model.IncludePostgres = false;
+        model.SetGlobalSeq(false);
+        Infra(model, "MINIO").Token = "bad token";
+        Infra(model, "MINIO").SpoolPath = "bad\npath";
+        Infra(model, "SEQ").Token = "bad$token";
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
+        Assert.DoesNotContain("  cloud-minio:\n", compose);
+        Assert.DoesNotContain("  cloud-rabbitmq:\n", compose);
+        Assert.DoesNotContain("  cloud-postgres:\n", compose);
+        Assert.DoesNotContain("  cloud-seq:\n", compose);
+        Assert.DoesNotContain("barkcloud-lognara-minio", compose);
+        Assert.DoesNotContain("barkcloud-lognara-postgres", compose);
+        Assert.DoesNotContain("LOGNARA_MINIO_TOKEN=", env);
+        Assert.DoesNotContain("LOGNARA_SEQ_TOKEN=", env);
+        Assert.DoesNotContain("  lognara_minio_spool:", compose);
+        Assert.DoesNotContain("  lognara_seq_spool:", compose);
+    }
+
+    [Fact]
+    public void Optional_bind_spools_replace_only_their_own_named_volumes()
+    {
+        var model = ValidLognaraModel();
+        App(model, "CONFIGURATION").SpoolPath = "./data/config-agent";
+        Infra(model, "MINIO").SpoolPath = "./data/minio-agent";
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+
         Assert.Contains("${LOGNARA_CONFIGURATION_SPOOL_PATH:-lognara_configuration_spool}:/var/lib/lognara-agent/spool", compose);
-        Assert.Contains("      - lognara", compose);
-        Assert.Contains("    name: ${LOGNARA_NETWORK}", compose);
-        Assert.Contains("  lognara_configuration_spool:", compose);
-        Assert.Contains("LOGNARA_NETWORK=lognara-ingest", env);
-        Assert.Contains("LOGNARA_RELAY_URL=http://lognara-relay:7401/v1/batches", env);
-        Assert.Contains("LOGNARA_CONFIGURATION_TOKEN=agent.token-+/=", env);
-        Assert.Contains("LOGNARA_SERVER=node-1", env);
-        Assert.Contains("LOGNARA_BACKEND=barkcloud", env);
-        Assert.Contains("LOGNARA_ENVIRONMENT=Production", env);
-        Assert.Contains("LOGNARA_CONFIGURATION_SPOOL_PATH=", env);
+        Assert.Contains("${LOGNARA_MINIO_SPOOL_PATH:-lognara_minio_spool}:/var/lib/lognara-agent/spool", compose);
+        Assert.DoesNotContain("  lognara_configuration_spool:\n", compose);
+        Assert.DoesNotContain("  lognara_minio_spool:\n", compose);
+        Assert.Contains("  lognara_identity_spool:\n", compose);
+        Assert.Contains("  lognara_relay_spool:\n", compose);
     }
 
     [Theory]
@@ -430,81 +596,131 @@ public sealed class BuilderGeneratorTests
     [InlineData("token$part")]
     [InlineData("token#part")]
     [InlineData("token with space")]
-    public void Lognara_rejects_invalid_tokens_even_without_nginx(string token)
+    public void Lognara_rejects_missing_or_invalid_active_agent_tokens(string token)
     {
-        var model = new BuilderModel
-        {
-            IncludeLognara = true,
-            UseNginx = false,
-            LognaraConfigurationToken = token,
-            LognaraServer = "node-1",
-        };
+        var model = ValidLognaraModel();
+        App(model, "CONFIGURATION").Token = token;
 
-        var errors = BuilderModelValidator.Validate(model);
-
-        Assert.Contains(errors, x => x.Contains("Токен Lognara"));
-    }
-
-    [Fact]
-    public void Lognara_omits_an_empty_environment()
-    {
-        var model = new BuilderModel
-        {
-            IncludeLognara = true,
-            UseNginx = false,
-            LognaraConfigurationToken = "agent-token",
-            LognaraServer = "node-1",
-        };
-
-        var errors = BuilderModelValidator.Validate(model);
-        var compose = BackendComposeGenerator.BuildCompose(model);
-        var env = BackendComposeGenerator.BuildEnv(model);
-
-        Assert.Empty(errors);
-        Assert.DoesNotContain("LOGNARA_ENVIRONMENT:", compose);
-        Assert.DoesNotContain("LOGNARA_ENVIRONMENT=", env);
+        Assert.Contains(BuilderModelValidator.Validate(model), x => x.Contains("Токен Lognara для Configuration"));
     }
 
     [Theory]
     [InlineData("/v1/batches")]
-    [InlineData("https://lognara-relay:7401/v1/batches")]
-    [InlineData("http://lognara-relay:7401/v1/$batches")]
-    [InlineData("http://lognara-relay:7401/v1/#batches")]
-    [InlineData("http://lognara-relay:7401/v1/batches with space")]
-    [InlineData("http://lognara-relay:7401/v1/batches'quoted")]
-    [InlineData("http://lognara-relay:7401/v1/batches\"quoted")]
-    [InlineData("http://lognara-relay:7401/v1/\tbatches")]
-    public void Lognara_rejects_invalid_relay_urls(string url)
+    [InlineData("ftp://core.example.test/v1/batches")]
+    [InlineData("https://core.example.test/v1/logs")]
+    [InlineData("https://core.example.test/v1/batches?x=1")]
+    [InlineData("https://core.example.test/v1/batches/")]
+    [InlineData("https://user@core.example.test/v1/batches")]
+    [InlineData("https://core.example.test/v1/batches with space")]
+    public void Lognara_requires_http_or_https_core_batches_endpoint(string url)
     {
-        var model = new BuilderModel
-        {
-            IncludeLognara = true,
-            UseNginx = false,
-            LognaraRelayUrl = url,
-            LognaraConfigurationToken = "agent-token",
-            LognaraServer = "node-1",
-        };
+        var model = ValidLognaraModel();
+        model.LognaraCoreUrl = url;
 
-        var errors = BuilderModelValidator.Validate(model);
-
-        Assert.Contains(errors, x => x.Contains("URL Lognara relay"));
+        Assert.Contains(BuilderModelValidator.Validate(model), x => x.Contains("URL Lognara Core"));
     }
 
     [Fact]
-    public void Lognara_rejects_invalid_network_name_and_newlines_in_spool_path()
+    public void Lognara_requires_a_unique_token_for_each_active_agent()
+    {
+        var model = ValidLognaraModel();
+        App(model, "IDENTITY").Token = App(model, "CONFIGURATION").Token;
+
+        Assert.Contains(BuilderModelValidator.Validate(model), x => x.Contains("Токен Lognara используется несколькими агентами"));
+    }
+
+    [Fact]
+    public void Relay_container_name_cannot_collide_with_a_BarkCloud_container()
+    {
+        var model = ValidLognaraModel();
+        model.IdentityContainerName = "lognara-relay";
+
+        Assert.Contains(BuilderModelValidator.Validate(model), x => x.Contains("используется несколькими сервисами"));
+    }
+
+    [Fact]
+    public void Infrastructure_agent_wrappers_preserve_base_entrypoints_commands_users_and_signals()
+    {
+        var model = ValidLognaraModel();
+        model.NginxLocation = "Compose";
+        var files = BackendComposeGenerator.BuildLognaraDockerfiles(model);
+        var compose = BackendComposeGenerator.BuildCompose(model);
+
+        Assert.Equal(5, files.Count);
+        Assert.Contains("FROM nginx:latest", files["nginx.Dockerfile"]);
+        Assert.Contains("ENTRYPOINT [\"/usr/local/bin/lognara-agent\", \"run\", \"--\", \"/docker-entrypoint.sh\"]", files["nginx.Dockerfile"]);
+        Assert.Contains("CMD [\"nginx\", \"-g\", \"daemon off;\"]", files["nginx.Dockerfile"]);
+        Assert.Contains("FROM postgres:18", files["postgres.Dockerfile"]);
+        Assert.Contains("\"docker-entrypoint.sh\"]", files["postgres.Dockerfile"]);
+        Assert.Contains("CMD [\"postgres\"]", files["postgres.Dockerfile"]);
+        Assert.Contains("FROM rabbitmq:latest", files["rabbitmq.Dockerfile"]);
+        Assert.Contains("CMD [\"rabbitmq-server\"]", files["rabbitmq.Dockerfile"]);
+        Assert.Contains("FROM docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1", files["minio.Dockerfile"]);
+        Assert.Contains("\"/usr/bin/docker-entrypoint.sh\"]", files["minio.Dockerfile"]);
+        Assert.Contains("CMD [\"minio\"]", files["minio.Dockerfile"]);
+        Assert.Contains("FROM datalust/seq:latest", files["seq.Dockerfile"]);
+        Assert.Contains("\"/bin/seqentry\"]", files["seq.Dockerfile"]);
+        Assert.DoesNotContain("\nCMD ", files["seq.Dockerfile"]);
+
+        foreach (var dockerfile in files.Values)
+        {
+            Assert.Contains("ARG TARGETARCH", dockerfile);
+            Assert.Contains("amd64|arm64", dockerfile);
+            Assert.Contains("SHA256SUMS", dockerfile);
+            Assert.Contains("ARG LOGNARA_AGENT_VERSION=latest", dockerfile);
+            Assert.DoesNotContain("\nUSER ", dockerfile);
+            Assert.DoesNotContain("\nSTOPSIGNAL ", dockerfile);
+        }
+
+        Assert.Contains("stop_grace_period: 30s", compose);
+        Assert.Contains("      - \"postgres\"", compose);
+        Assert.Contains("logging_collector=off", compose);
+        Assert.Contains("log_destination=stderr", compose);
+        Assert.Contains("command: server /data --console-address \":9001\"", compose);
+        Assert.DoesNotContain("ports:", compose[compose.IndexOf("  lognara-relay:", StringComparison.Ordinal)..]);
+    }
+
+    [Fact]
+    public void Nginx_agent_environment_is_nested_under_environment_for_the_full_profile()
+    {
+        var model = ValidLognaraModel();
+        model.NginxLocation = "Compose";
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var nginxStart = compose.IndexOf("  cloud-nginx:", StringComparison.Ordinal);
+        var infrastructureStart = compose.IndexOf("  # === Инфраструктурные сервисы ===", nginxStart, StringComparison.Ordinal);
+
+        Assert.True(nginxStart >= 0);
+        Assert.True(infrastructureStart > nginxStart);
+        var nginxService = compose[nginxStart..infrastructureStart];
+        Assert.Contains("    environment:\n      LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\"", nginxService);
+        Assert.Contains("LOGNARA_RELAY_TOKEN: ${LOGNARA_NGINX_TOKEN}", nginxService);
+    }
+
+    private static BuilderModel ValidLognaraModel()
     {
         var model = new BuilderModel
         {
-            IncludeLognara = true,
-            LognaraConfigurationToken = "agent-token",
+            IncludeSeq = true,
+            LognaraCoreUrl = "https://core.example.test/v1/batches",
+            LognaraCoreToken = "relay-core-token",
             LognaraServer = "node-1",
-            LognaraNetworkName = "bad network",
-            LognaraConfigurationSpoolPath = "./data/lognara\nspool",
+            LognaraBackend = "barkcloud",
+            LognaraEnvironment = "Production",
         };
+        model.SetGlobalSeq(true);
+        model.SetGlobalLognara(true);
 
-        var errors = BuilderModelValidator.Validate(model);
+        foreach (var application in model.LognaraApplications)
+            application.Token = $"agent-{application.Prefix.ToLowerInvariant()}";
+        foreach (var service in model.LognaraInfrastructure)
+            service.Token = $"agent-{service.Prefix.ToLowerInvariant()}";
 
-        Assert.Contains(errors, x => x.Contains("внешней Docker-сети Lognara"));
-        Assert.Contains(errors, x => x.Contains("Путь Lognara spool"));
+        return model;
     }
+
+    private static LognaraApplicationSettings App(BuilderModel model, string prefix) =>
+        model.LognaraApplications.Single(x => x.Prefix == prefix);
+
+    private static LognaraInfrastructureSettings Infra(BuilderModel model, string prefix) =>
+        model.LognaraInfrastructure.Single(x => x.Prefix == prefix);
 }

@@ -16,7 +16,7 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 | `Backend/BarkCloud.Configuration/Infrastructure/StorageQuotaGroupStorage.cs` | `StorageQuotaGroupStorage` | Группы квот и членство физических бакетов |
 | `Backend/BarkCloud.Configuration/Infrastructure/ConfigurationDefaultsPopulator.cs` | `ConfigurationDefaultsPopulator` | Заполнение начальных значений |
 | `Backend/BarkCloud.Configuration/Host/ConfigurationApiService.cs` | `ConfigurationApiService` | gRPC-реализация |
-| `Backend/BarkCloud.Configuration/Program.cs` | `Main`, `Lognara:AgentUrl` | Запуск сервиса и условная отправка Serilog в Lognara-agent |
+| `Backend/BarkCloud.Configuration/Program.cs` | `Main` | Запуск сервиса с общим logging lifecycle |
 | `Shared/BarkCloud.Proto/configuration_api.proto` | `ConfigurationApi` | gRPC-контракт |
 | `Backend/BarkCloud.GrpcServer/WebApplicationBuilderExtensions.cs` | `LoadConfiguration` | Загрузка настроек потребителями |
 
@@ -57,6 +57,6 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 
 Собственная БД и порт сервиса задаются bootstrap-переменными `CONFIGURATION_HOST`, `CONFIGURATION_DBPORT`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD` и `CONFIGURATION_PORT`. SMTP-поля могут оставаться пустыми; тогда `Features:EmailEnabled=false`. Вне Development обязательны внешние адреса Identity, Users, Files и Torrent.
 
-`Program` подключает sink `Serilog.Sinks.Lognara` только при заданном `Lognara:AgentUrl` (в Compose — `Lognara__AgentUrl=http://127.0.0.1:7400/v1/logs`). Тогда агент захватывает stdout/stderr, Console sink заменяется на Lognara, а Seq остаётся подключён. Без URL используется прежний Console + Seq. `Main` закрывает и сбрасывает Serilog через `Log.CloseAndFlush()` в `finally`, включая ошибки миграций и заполнения defaults до запуска приложения. Буфер sink по умолчанию хранится в памяти и ограничен 16 MiB; долговечность agent spool начинается после ответа `202`.
+Configuration использует общий с остальными backend-приложениями logging lifecycle из `BarkCloud.GrpcServer`. Локальные `ConsoleOutput`, `SeqEnable` и `LognaraEnable` задаются до запуска и не перекрываются remote overlay; Lognara подключается отдельным sink к loopback HTTP endpoint внутри того же контейнера. Агент не захватывает stdout/stderr и не читает файловые sources. Его запуск и остановка принадлежат общему lifecycle; настройки и ограничения описаны в [[Backend/GrpcServer]].
 
 При развёртывании сначала обновляется Configuration с поддержкой `GetReadiness`, затем потребители. Старые потребители продолжают использовать прежние RPC; новые со старым Configuration завершают запуск с ошибкой `Unimplemented` без повторов.
