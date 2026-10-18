@@ -363,4 +363,116 @@ public sealed class BuilderGeneratorTests
         Assert.Contains(errors, x => x.Contains("Порт Identity должен быть числом"));
         Assert.Contains(errors, x => x.Contains("Файл сертификата") && x.Contains("недопустимые символы"));
     }
+
+    [Fact]
+    public void Lognara_is_omitted_when_disabled()
+    {
+        var model = new BuilderModel();
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.DoesNotContain("LOGNARA", compose);
+        Assert.DoesNotContain("Lognara", compose);
+        Assert.DoesNotContain("LOGNARA", env);
+    }
+
+    [Fact]
+    public void Lognara_generates_agent_entrypoint_external_network_spool_and_environment()
+    {
+        var model = new BuilderModel
+        {
+            IncludeLognara = true,
+            LognaraConfigurationToken = "agent.token-+/=",
+            LognaraServer = "node-1",
+            LognaraEnvironment = "Production",
+        };
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
+        Assert.Contains("entrypoint: [\"/usr/local/bin/lognara-agent\", \"run\", \"--\", \"dotnet\", \"BarkCloud.Configuration.dll\"]", compose);
+        Assert.Contains("    init: true", compose);
+        Assert.Contains("    stop_grace_period: 30s", compose);
+        Assert.Contains("Lognara__AgentUrl: \"http://127.0.0.1:7400/v1/logs\"", compose);
+        Assert.Contains("LOGNARA_LISTEN_ADDR: \"127.0.0.1:7400\"", compose);
+        Assert.Contains("LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool", compose);
+        Assert.Contains("LOGNARA_SERVICE: barkcloud-configuration", compose);
+        Assert.Contains("LOGNARA_SERVER: ${LOGNARA_SERVER}", compose);
+        Assert.Contains("LOGNARA_BACKEND: ${LOGNARA_BACKEND}", compose);
+        Assert.Contains("LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}", compose);
+        Assert.Contains("LOGNARA_RELAY_URL: ${LOGNARA_RELAY_URL}", compose);
+        Assert.Contains("LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}", compose);
+        Assert.Contains("${LOGNARA_CONFIGURATION_SPOOL_PATH:-lognara_configuration_spool}:/var/lib/lognara-agent/spool", compose);
+        Assert.Contains("      - lognara", compose);
+        Assert.Contains("    name: ${LOGNARA_NETWORK}", compose);
+        Assert.Contains("  lognara_configuration_spool:", compose);
+        Assert.Contains("LOGNARA_NETWORK=lognara-ingest", env);
+        Assert.Contains("LOGNARA_RELAY_URL=http://lognara-relay:7401/v1/batches", env);
+        Assert.Contains("LOGNARA_CONFIGURATION_TOKEN=agent.token-+/=", env);
+        Assert.Contains("LOGNARA_SERVER=node-1", env);
+        Assert.Contains("LOGNARA_BACKEND=barkcloud", env);
+        Assert.Contains("LOGNARA_ENVIRONMENT=Production", env);
+        Assert.Contains("LOGNARA_CONFIGURATION_SPOOL_PATH=", env);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("token$part")]
+    [InlineData("token#part")]
+    [InlineData("token with space")]
+    public void Lognara_rejects_invalid_tokens_even_without_nginx(string token)
+    {
+        var model = new BuilderModel
+        {
+            IncludeLognara = true,
+            UseNginx = false,
+            LognaraConfigurationToken = token,
+            LognaraServer = "node-1",
+        };
+
+        var errors = BuilderModelValidator.Validate(model);
+
+        Assert.Contains(errors, x => x.Contains("Токен Lognara"));
+    }
+
+    [Fact]
+    public void Lognara_rejects_https_and_omits_an_empty_environment()
+    {
+        var model = new BuilderModel
+        {
+            IncludeLognara = true,
+            UseNginx = false,
+            LognaraRelayUrl = "https://lognara-relay:7401/v1/batches",
+            LognaraConfigurationToken = "agent-token",
+            LognaraServer = "node-1",
+        };
+
+        var errors = BuilderModelValidator.Validate(model);
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+
+        Assert.Contains(errors, x => x.Contains("HTTPS не поддерживается"));
+        Assert.DoesNotContain("LOGNARA_ENVIRONMENT:", compose);
+        Assert.DoesNotContain("LOGNARA_ENVIRONMENT=", env);
+    }
+
+    [Fact]
+    public void Lognara_rejects_invalid_network_name_and_newlines_in_spool_path()
+    {
+        var model = new BuilderModel
+        {
+            IncludeLognara = true,
+            LognaraConfigurationToken = "agent-token",
+            LognaraServer = "node-1",
+            LognaraNetworkName = "bad network",
+            LognaraConfigurationSpoolPath = "./data/lognara\nspool",
+        };
+
+        var errors = BuilderModelValidator.Validate(model);
+
+        Assert.Contains(errors, x => x.Contains("внешней Docker-сети Lognara"));
+        Assert.Contains(errors, x => x.Contains("Путь Lognara spool"));
+    }
 }
