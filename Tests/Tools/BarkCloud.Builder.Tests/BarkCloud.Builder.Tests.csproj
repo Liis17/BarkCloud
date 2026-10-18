@@ -12,6 +12,7 @@
     <Compile Include="../../../Tools/BarkCloud.Builder/BuilderModel.cs" Link="BuilderModel.cs" />
     <Compile Include="../../../Tools/BarkCloud.Builder/BuilderModelValidator.cs" Link="BuilderModelValidator.cs" />
     <Compile Include="../../../Tools/BarkCloud.Builder/BackendComposeGenerator.cs" Link="BackendComposeGenerator.cs" />
+    <Compile Include="../../../Tools/BarkCloud.Builder/BuilderConfigLoader.cs" Link="BuilderConfigLoader.cs" />
   </ItemGroup>
 
 </Project>
