@@ -28,7 +28,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 
 | Контракт | Поведение |
 |---|---|
-| `AppVersion.Current` | Единственный источник версии по умолчанию (поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
+| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.14.0`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
 | Cookie `bark_at`, `bark_rt`, `bark_did` | Access-, refresh- и device-id cookie. Все HttpOnly, режим Secure задаётся `App:CookieSecure` |
 | `GET /login`, `GET /register`, `GET /forgot` | Отдают лёгкую HTML-оболочку и state для React auth entry. `Accept: application/json` возвращает сам state; успешная операция возвращает `{ "redirectTo": "/photos" }` |
 | `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
