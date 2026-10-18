@@ -18,13 +18,21 @@ public static class BuilderConfigLoader
         var m = new BuilderModel { OutputPath = dir };
 
         bool HasService(string name) => compose.Contains($"\n  {name}:\n");
+        bool HasComposeText(string value, StringComparison comparison = StringComparison.Ordinal) => compose
+            .Split('\n')
+            .Any(line => !line.TrimStart().StartsWith('#') && line.Contains(value, comparison));
         m.IncludeNotification = HasService("cloud-notification");
         m.IncludeTorrent = HasService("cloud-torrent");
         m.IncludeMinio = HasService("cloud-minio");
         m.IncludeRabbitmq = HasService("cloud-rabbitmq");
         m.IncludePostgres = HasService("cloud-postgres");
         m.IncludeSeq = HasService("cloud-seq");
-        m.IncludeLognara = e.ContainsKey("LOGNARA_RELAY_URL");
+        var hasLognaraRelay = HasService("lognara-relay");
+        m.LegacyLognaraImport = !hasLognaraRelay
+            && (e.ContainsKey("LOGNARA_RELAY_URL")
+                || HasComposeText("Lognara__AgentUrl")
+                || HasComposeText("lognara-agent", StringComparison.OrdinalIgnoreCase));
+        m.IncludeLognara = hasLognaraRelay || m.LegacyLognaraImport;
         m.UseNginx = HasService("cloud-nginx") || nginxConf != null;
         m.NginxLocation = HasService("cloud-nginx") ? "Compose" : "External";
         m.ImageChannel = compose.Contains("barkcloud-configuration-nightly:") ? "Nightly"
@@ -82,13 +90,48 @@ public static class BuilderConfigLoader
         Set("SEQ_WEBPORT", v => m.SeqWebPort = v);
         Set("SEQ_DATA_PATH", v => m.SeqDataPath = v);
 
-        Set("LOGNARA_NETWORK", v => m.LognaraNetworkName = v);
-        Set("LOGNARA_RELAY_URL", v => m.LognaraRelayUrl = v);
-        Set("LOGNARA_CONFIGURATION_TOKEN", v => m.LognaraConfigurationToken = v);
+        Set("LOGNARA_CORE_URL", v => m.LognaraCoreUrl = v);
+        Set("LOGNARA_RELAY_CORE_TOKEN", v => m.LognaraCoreToken = v);
         Set("LOGNARA_SERVER", v => m.LognaraServer = v);
         Set("LOGNARA_BACKEND", v => m.LognaraBackend = v);
         Set("LOGNARA_ENVIRONMENT", v => m.LognaraEnvironment = v);
-        Set("LOGNARA_CONFIGURATION_SPOOL_PATH", v => m.LognaraConfigurationSpoolPath = v);
+        Set("LOGNARA_AGENT_VERSION", v => m.LognaraAgentVersion = v);
+
+        bool hasExplicitLoggingFlags = m.LognaraApplications.Any(application =>
+            e.ContainsKey($"{application.Prefix}_CONSOLE_OUTPUT")
+            || e.ContainsKey($"{application.Prefix}_SEQ_ENABLE")
+            || e.ContainsKey($"{application.Prefix}_LOGNARA_ENABLE"));
+        m.LegacySeqConfigurationUnknown = !hasExplicitLoggingFlags && !m.IncludeSeq;
+
+        foreach (var application in m.LognaraApplications)
+        {
+            Set($"{application.Prefix}_CONSOLE_OUTPUT", v => application.ConsoleOutput = ParseBoolean(v, application.ConsoleOutput));
+            Set($"{application.Prefix}_SEQ_ENABLE", v => application.SeqEnable = ParseBoolean(v, application.SeqEnable));
+            Set($"{application.Prefix}_LOGNARA_ENABLE", v => application.LognaraEnable = ParseBoolean(v, application.LognaraEnable));
+            Set(application.TokenVariable, v => application.Token = v);
+            Set(application.SpoolVariable, v => application.SpoolPath = v);
+        }
+
+        foreach (var service in m.LognaraInfrastructure)
+        {
+            Set(service.TokenVariable, v => service.Token = v);
+            Set(service.SpoolVariable, v => service.SpoolPath = v);
+        }
+
+        // Старые compose не содержали явных app-флагов: Seq соответствовал наличию Seq,
+        // а Lognara собирала только Configuration и заменяла его console sink.
+        if (!hasExplicitLoggingFlags)
+        {
+            foreach (var application in m.LognaraApplications)
+                application.SeqEnable = m.IncludeSeq;
+
+            if (m.LegacyLognaraImport)
+            {
+                var configuration = m.LognaraApplications.Single(x => x.Prefix == "CONFIGURATION");
+                configuration.ConsoleOutput = false;
+                configuration.LognaraEnable = true;
+            }
+        }
 
         // Порты прокси консолей пишутся в .env только при включённом прокси.
         m.NginxSeqProxy = e.ContainsKey("NGINX_SEQ_PORT");
@@ -160,4 +203,7 @@ public static class BuilderConfigLoader
         }
         return result;
     }
+
+    private static bool ParseBoolean(string value, bool fallback) =>
+        bool.TryParse(value, out var parsed) ? parsed : fallback;
 }
