@@ -22,6 +22,19 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         </Style>
+        <Style x:Key="LoggingCheckBox" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <DataTemplate x:Key="AgentTokenTemplate">
+            <ui:TextBox Text="{Binding Token, UpdateSourceTrigger=PropertyChanged}" ClearButtonEnabled="False" />
+        </DataTemplate>
+        <DataTemplate x:Key="AgentSpoolTemplate">
+            <ui:TextBox Text="{Binding SpoolPath, UpdateSourceTrigger=PropertyChanged}" ClearButtonEnabled="False" />
+        </DataTemplate>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -94,26 +107,26 @@
                                     Message="Импорт не подключается к Configuration и не может проверить прежние настройки Seq. Включите Seq и нужные строки, если старые приложения отправляли туда логи; недоступный backend автоматически не назначается." />
                         <DataGrid x:Name="ApplicationLoggingGrid" ItemsSource="{Binding LognaraApplications}"
                                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                                  HeadersVisibility="Column" RowHeaderWidth="0" MinHeight="210" MaxHeight="300">
+                                  HeadersVisibility="Column" RowHeaderWidth="0" MinHeight="210" MaxHeight="360">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Сервис" Binding="{Binding DisplayName}" IsReadOnly="True" Width="95" />
+                                <DataGridTextColumn Header="Сервис" Binding="{Binding DisplayName}" IsReadOnly="True" Width="125" />
                                 <DataGridTemplateColumn Header="Console" Width="65">
                                     <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate><CheckBox IsChecked="{Binding ConsoleOutput, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" /></DataTemplate>
+                                        <DataTemplate><CheckBox Style="{StaticResource LoggingCheckBox}" IsChecked="{Binding ConsoleOutput, UpdateSourceTrigger=PropertyChanged}" /></DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="Seq" Width="50">
                                     <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate><CheckBox IsChecked="{Binding SeqEnable, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DataContext.IncludeSeq, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" HorizontalAlignment="Center" /></DataTemplate>
+                                        <DataTemplate><CheckBox Style="{StaticResource LoggingCheckBox}" IsChecked="{Binding SeqEnable, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DataContext.IncludeSeq, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" /></DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="Lognara" Width="68">
                                     <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate><CheckBox IsChecked="{Binding LognaraEnable, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DataContext.IncludeLognara, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" HorizontalAlignment="Center" /></DataTemplate>
+                                        <DataTemplate><CheckBox Style="{StaticResource LoggingCheckBox}" IsChecked="{Binding LognaraEnable, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DataContext.IncludeLognara, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" /></DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Agent token" Binding="{Binding Token, UpdateSourceTrigger=PropertyChanged}" Width="170" />
-                                <DataGridTextColumn Header="Agent spool path (пусто — named volume)" Binding="{Binding SpoolPath, UpdateSourceTrigger=PropertyChanged}" Width="230" />
+                                <DataGridTemplateColumn Header="Agent token" CellTemplate="{StaticResource AgentTokenTemplate}" Width="180" />
+                                <DataGridTemplateColumn Header="Agent spool path (пусто — named volume)" CellTemplate="{StaticResource AgentSpoolTemplate}" Width="300" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>
@@ -622,11 +635,11 @@
                                    Text="Токен и spool используются, только если соответствующий сервис включён в compose; для выключенных сервисов эти поля не генерируются и не проверяются." />
                         <DataGrid ItemsSource="{Binding LognaraInfrastructure}" AutoGenerateColumns="False"
                                   CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
-                                  RowHeaderWidth="0" MinHeight="160" MaxHeight="230">
+                                  RowHeaderWidth="0" MinHeight="160" MaxHeight="300">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Сервис" Binding="{Binding DisplayName}" IsReadOnly="True" Width="110" />
-                                <DataGridTextColumn Header="Agent token" Binding="{Binding Token, UpdateSourceTrigger=PropertyChanged}" Width="180" />
-                                <DataGridTextColumn Header="Agent spool path (пусто — named volume)" Binding="{Binding SpoolPath, UpdateSourceTrigger=PropertyChanged}" Width="300" />
+                                <DataGridTemplateColumn Header="Agent token" CellTemplate="{StaticResource AgentTokenTemplate}" Width="180" />
+                                <DataGridTemplateColumn Header="Agent spool path (пусто — named volume)" CellTemplate="{StaticResource AgentSpoolTemplate}" Width="300" />
                             </DataGrid.Columns>
                         </DataGrid>
                         <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False" IsOpen="True"
