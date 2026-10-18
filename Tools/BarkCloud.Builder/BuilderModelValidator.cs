@@ -46,8 +46,11 @@ public static partial class BuilderModelValidator
 
             if (!Uri.TryCreate(model.LognaraRelayUrl, UriKind.Absolute, out var relayUri)
                 || relayUri.Scheme != Uri.UriSchemeHttp
-                || string.IsNullOrWhiteSpace(relayUri.Host))
-                errors.Add("URL Lognara relay должен быть абсолютным HTTP-адресом с непустым host; HTTPS не поддерживается.");
+                || string.IsNullOrWhiteSpace(relayUri.Host)
+                || model.LognaraRelayUrl.Any(char.IsWhiteSpace)
+                || model.LognaraRelayUrl.Any(char.IsControl)
+                || model.LognaraRelayUrl.IndexOfAny(['$', '\'', '"', '#']) >= 0)
+                errors.Add("URL Lognara relay должен быть абсолютным HTTP-адресом с непустым host без $, кавычек, #, пробелов и управляющих символов; HTTPS не поддерживается.");
 
             if (string.IsNullOrWhiteSpace(model.LognaraConfigurationToken)
                 || !LognaraTokenPattern.IsMatch(model.LognaraConfigurationToken))

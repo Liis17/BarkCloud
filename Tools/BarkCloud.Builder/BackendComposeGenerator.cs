@@ -372,11 +372,11 @@ networks:
     external: true
     name: ${DOCKER_NETWORK_NAME}
 """);
-        sb.Append('\n');
+        sb.Append("\r\n");
         if (m.IncludeLognara)
             sb.Append("  lognara:\n    external: true\n    name: ${LOGNARA_NETWORK}\n");
 
-        sb.Append("\nvolumes:\n\n");
+        sb.Append("\r\nvolumes:\r\n");
         if (m.IncludePostgres) sb.Append("  pgdata:\n");
         if (m.IncludeRabbitmq) sb.Append("  cloud-rabbitmq_data:\n");
         sb.Append("  cloud-minio_data:\n");
