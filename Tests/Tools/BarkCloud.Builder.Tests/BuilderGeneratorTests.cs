@@ -371,10 +371,18 @@ public sealed class BuilderGeneratorTests
 
         var compose = BackendComposeGenerator.BuildCompose(model);
         var env = BackendComposeGenerator.BuildEnv(model);
+        var composeLower = compose.ToLowerInvariant();
+        var envLower = env.ToLowerInvariant();
 
-        Assert.DoesNotContain("LOGNARA", compose);
-        Assert.DoesNotContain("Lognara", compose);
-        Assert.DoesNotContain("LOGNARA", env);
+        Assert.DoesNotContain("lognara", composeLower);
+        Assert.DoesNotContain("lognara", envLower);
+        Assert.DoesNotContain("lognara-agent", composeLower);
+        Assert.DoesNotContain("entrypoint:", composeLower);
+        Assert.DoesNotContain("init: true", composeLower);
+        Assert.DoesNotContain("stop_grace_period", composeLower);
+        Assert.DoesNotContain("lognara_configuration_spool", composeLower);
+        Assert.DoesNotContain("- lognara", composeLower);
+        Assert.DoesNotContain("lognara:", composeLower);
     }
 
     [Fact]
@@ -438,13 +446,12 @@ public sealed class BuilderGeneratorTests
     }
 
     [Fact]
-    public void Lognara_rejects_https_and_omits_an_empty_environment()
+    public void Lognara_omits_an_empty_environment()
     {
         var model = new BuilderModel
         {
             IncludeLognara = true,
             UseNginx = false,
-            LognaraRelayUrl = "https://lognara-relay:7401/v1/batches",
             LognaraConfigurationToken = "agent-token",
             LognaraServer = "node-1",
         };
@@ -453,9 +460,34 @@ public sealed class BuilderGeneratorTests
         var compose = BackendComposeGenerator.BuildCompose(model);
         var env = BackendComposeGenerator.BuildEnv(model);
 
-        Assert.Contains(errors, x => x.Contains("HTTPS не поддерживается"));
+        Assert.Empty(errors);
         Assert.DoesNotContain("LOGNARA_ENVIRONMENT:", compose);
         Assert.DoesNotContain("LOGNARA_ENVIRONMENT=", env);
+    }
+
+    [Theory]
+    [InlineData("/v1/batches")]
+    [InlineData("https://lognara-relay:7401/v1/batches")]
+    [InlineData("http://lognara-relay:7401/v1/$batches")]
+    [InlineData("http://lognara-relay:7401/v1/#batches")]
+    [InlineData("http://lognara-relay:7401/v1/batches with space")]
+    [InlineData("http://lognara-relay:7401/v1/batches'quoted")]
+    [InlineData("http://lognara-relay:7401/v1/batches\"quoted")]
+    [InlineData("http://lognara-relay:7401/v1/\tbatches")]
+    public void Lognara_rejects_invalid_relay_urls(string url)
+    {
+        var model = new BuilderModel
+        {
+            IncludeLognara = true,
+            UseNginx = false,
+            LognaraRelayUrl = url,
+            LognaraConfigurationToken = "agent-token",
+            LognaraServer = "node-1",
+        };
+
+        var errors = BuilderModelValidator.Validate(model);
+
+        Assert.Contains(errors, x => x.Contains("URL Lognara relay"));
     }
 
     [Fact]
