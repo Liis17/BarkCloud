@@ -17,8 +17,6 @@ using MassTransit;
 
 using Microsoft.EntityFrameworkCore;
 
-using Serilog;
-
 namespace BarkCloud.Files;
 
 public class Program
@@ -28,7 +26,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         await builder.LoadConfigurationAsync(ServiceId.Files);
-        builder.AddBarkCloudSerilog("BarkCloud.Files");
+        await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Files");
         builder.SetRunningAddress(builder.Configuration);
 
         // Тело запроса ограничено 32 МиБ (> 20 МиБ gRPC MaxReceiveMessageSize). Part-PUT задаёт
@@ -193,7 +191,6 @@ public class Program
         app.MapGrpcService<DynamicFolderApiService>();
         app.MapGrpcService<SearchApiService>();
 
-        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
-        app.Run();
+        await app.RunAsync();
     }
 }

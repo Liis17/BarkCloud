@@ -7,8 +7,6 @@ using BarkCloud.Shared.Identity;
 
 using MassTransit;
 
-using Serilog;
-
 namespace BarkCloud.Notification;
 
 public class Program
@@ -18,7 +16,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         await builder.LoadConfigurationAsync(ServiceId.Notification);
-        builder.AddBarkCloudSerilog("BarkCloud.Notification");
+        await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Notification");
         builder.SetRunningAddress(builder.Configuration);
         builder.Services.AddBarkCloudMetrics("BarkCloud.Notification");
 
@@ -50,7 +48,6 @@ public class Program
             app.Logger.LogWarning("Email:AllowInsecure=true: проверка сертификата SMTP отключена; разрешена отправка без TLS");
         app.UseRouting();
 
-        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
-        app.Run();
+        await app.RunAsync();
     }
 }

@@ -6,25 +6,11 @@ using BarkCloud.GrpcServer.Metrics;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 
-using Serilog;
-
 namespace BarkCloud.Configuration;
 
 public class Program
 {
-    public static void Main(string[] args)
-    {
-        try
-        {
-            Run(args);
-        }
-        finally
-        {
-            Log.CloseAndFlush();
-        }
-    }
-
-    private static void Run(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -32,10 +18,7 @@ public class Program
             builder.Environment.IsDevelopment(),
             builder.Configuration["CONFIGURATION_ACCESS_KEY"]);
 
-        var lognaraAgentUrl = builder.Configuration["Lognara:AgentUrl"];
-        builder.AddBarkCloudSerilog(
-            "BarkCloud.Configuration",
-            string.IsNullOrWhiteSpace(lognaraAgentUrl) ? null : sink => sink.Lognara(lognaraAgentUrl));
+        await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Configuration");
         builder.Services.AddBarkCloudMetrics("BarkCloud.Configuration");
 
         var envPort = Environment.GetEnvironmentVariable("CONFIGURATION_PORT")
@@ -210,6 +193,6 @@ public class Program
 
         app.MapGrpcService<ConfigurationApiService>();
 
-        app.Run();
+        await app.RunAsync();
     }
 }

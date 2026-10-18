@@ -16,8 +16,6 @@ using MassTransit;
 
 using Microsoft.EntityFrameworkCore;
 
-using Serilog;
-
 namespace BarkCloud.Users;
 
 public class Program
@@ -27,7 +25,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         await builder.LoadConfigurationAsync(ServiceId.Users);
-        builder.AddBarkCloudSerilog("BarkCloud.Users");
+        await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Users");
         builder.SetRunningAddress(builder.Configuration);
 
         // Регистрируем gRPC сервисы с интерцепторами
@@ -105,7 +103,6 @@ public class Program
         app.MapGrpcService<UsersServerApiService>();
         app.MapGrpcService<UsersApiService>();
 
-        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
-        app.Run();
+        await app.RunAsync();
     }
 }
