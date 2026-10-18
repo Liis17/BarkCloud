@@ -12,16 +12,16 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 |---|---|---|
 | `Backend/docker-compose.yml` | services, networks, volumes | Сервисы, зависимости и постоянные данные |
 | `Backend/sample.env` | переменные окружения | Шаблон настройки compose |
-| `Backend/BarkCloud.Configuration/Dockerfile`, `Backend/BarkCloud.Configuration/Dockerfile.slim` | `lognara-agent` stage | Загрузка и проверка бинарника Lognara-agent для Configuration |
+| `Tools/BarkCloud.Builder/BackendComposeGenerator.cs` | `BuildLognaraDockerfiles` | Генерация вспомогательных Dockerfile для включённых инфраструктурных агентов |
 | `Backend/nginx/cloud.barkfluff.conf` | upstream и server blocks | TLS, gRPC и HTTP-маршрутизация |
 
 ## Публичные контракты
 
 | Контракт | Поведение |
 |---|---|
-| Docker-сеть `barkcloud-network` | Логический ключ общей внешней сети в Compose; Builder задаёт реальное имя через `DOCKER_NETWORK_NAME`, сеть нужно создать до запуска |
-| Docker-сеть `lognara` | Опциональная внешняя сеть relay; Builder задаёт реальное имя через `LOGNARA_NETWORK` |
+| Docker-сеть `barkcloud-network` | Общая сеть сервисов и локального Lognara relay; Builder задаёт реальное имя через `DOCKER_NETWORK_NAME`, сеть нужно создать до запуска |
 | `CONFIGURATION_SERVICE_URL`, `CONFIGURATION_ACCESS_KEY` | Bootstrap-адрес и ключ для получения конфигурации сервисами |
+| `*_CONSOLE_OUTPUT`, `*_SEQ_ENABLE`, `*_LOGNARA_ENABLE` | Независимые локальные настройки sink для каждого из семи backend-приложений; defaults — Console on, Seq и Lognara off |
 | `IDENTITY_PORT`, `USERS_PORT`, `CONFIGURATION_PORT`, `FILES_PORT`, `FILES_HTTP1PORT`, `TORRENT_PORT`, `TORRENT_HTTP1PORT` | Внутренние gRPC и HTTP/1 порты; значения по умолчанию: 8000, 8001, 8003, 8005/8006 и 8007/8008 |
 | `EXTERNAL_*_HOST` | Публичные адреса сервисов для клиентских приложений |
 | `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST`, `WEB_ADMIN_PASSWORD` | Настройки браузерной cookie, публичного адреса и AdminGate |
@@ -30,8 +30,11 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 
 - `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-notification`, `cloud-torrent` и `cloud-web` получают общие параметры Configuration. Compose задаёт порядок запуска зависимостей через `depends_on`; редактируемые Docker container names не меняют ключи сервисов и их DNS alias `cloud-*`.
 - `cloud-files` подключает данные MinIO для проверки диска read-only и отдельный каталог временных архивов. `cloud-torrent` хранит загружаемые торренты в `/mnt/torrents`.
-- `Backend/sample.env` задаёт хост-пути `/data/minio`, `/data/pgdata`, `/data/pgbackup`, `/data/seq`, `/data/torrent` и `/data/archive-temp`. Очищенный путь в Compose означает использование существующего named volume. MinIO использует образ `docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1`.
+- `Backend/sample.env` задаёт относительные хост-пути `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/torrent` и `./data/archive-temp`; Seq-путь появляется при его включении. Пустой путь в Compose означает использование named volume. MinIO использует образ `docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1`.
 - `cloud-web` получает `docker.sock`, compose-файл для записи, `.env` только для чтения и постоянный том обслуживания.
+- Приложения фиксируют локальные startup flags до загрузки удалённой конфигурации. Console, Seq и Lognara не зависят друг от друга; значения задаются через `.env`, а command-line параметры имеют приоритет над environment.
+- При включении Lognara Compose добавляет локальный `lognara-relay` в `barkcloud-network`. Включённые агенты используют его по адресу `http://lognara-relay:7401/v1/batches`; relay пересылает данные на вручную указанный Core URL `/v1/batches`. Порты relay не публикуются на хост.
+- Включённые инфраструктурные контейнеры nginx, MinIO, PostgreSQL, RabbitMQ и Seq получают отдельный сгенерированный agent image на основе исходного image. Wrapper сохраняет исходные `ENTRYPOINT`, `CMD`, `USER` и `STOPSIGNAL`; Compose `command` остаётся применимым. Внешний nginx не меняется. Для PostgreSQL Lognara включение отключает файловый logging collector и направляет логи в stderr; Seq не получает источники из своих файлов или БД.
 - `Backend/nginx/cloud.barkfluff.conf` направляет gRPC backend-сервисов под TLS, HTTP/1 загрузки и скачивания Files/Torrent, и Web через отдельные upstream. Поток байтов resumable upload идёт через nginx напрямую в HTTP/1 Files; детали в [[Backend/ResumableUpload]].
 - Все nginx upstream используют shared zone и разрешают Docker DNS через `127.0.0.11` с периодом 5 секунд. Это позволяет переживать пересоздание контейнеров без перезапуска nginx; требуется nginx OSS 1.27.3 или новее. Session cache использует имя `barkcloud_ssl`, чтобы не пересекаться с конфигами других приложений в общем nginx.
 - Для хранения используются тома или хост-пути: PostgreSQL и backup, MinIO, RabbitMQ, Seq, временные архивы, Torrent и состояние обслуживания Web.
@@ -43,13 +46,15 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 - Внутренние порты сервисов не опубликованы секцией `ports` базового compose. Прокси/внешняя инфраструктура отвечает за публикацию портов. Приложения по умолчанию используют Identity 8000, Users 8001, Configuration 8003, Files 8005/8006 и Torrent 8007/8008; стандартные listener-порты PostgreSQL 5432, RabbitMQ 5672, MinIO 9000/9001, Seq 80/5341 и Web 8080 остаются внутри Docker-сети.
 - Почта передаётся в Configuration переменными `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SENDER_EMAIL` и `EMAIL_SENDER_PASSWORD`; отправку выполняет Notification.
 
-## Lognara для Configuration
+## Lognara relay и агенты
 
-Оба Dockerfile Configuration содержат стадию `lognara-agent`: она выбирает `amd64` или `arm64`, скачивает статический бинарник и сверяет его с `SHA256SUMS`. `LOGNARA_AGENT_VERSION=latest` находит последний опубликованный тег `agent-YYYYMMDD-HHMMSS-<sha12>`; сборку можно закрепить через `--build-arg LOGNARA_AGENT_VERSION=<тег>`. Локальный BuildKit может закэшировать разрешение `latest`; для принудительного обновления используйте закреплённый тег или `--no-cache-filter lognara-agent`. CI собирает `Dockerfile.slim` с той же стадией; workflow не меняется.
+Builder включает sink отдельно для каждого приложения. При включённом Lognara каждый выбранный агент получает свой вручную созданный token и spool volume или bind-путь. Relay использует `LOGNARA_CORE_URL` и `LOGNARA_CORE_TOKEN` для внешнего Core; он не регистрирует агентов автоматически. URL должен использовать HTTP или HTTPS и заканчиваться на `/v1/batches`.
 
-В образе остаётся `ENTRYPOINT ["dotnet", "BarkCloud.Configuration.dll"]`. Только при включённом Lognara Compose заменяет его на `lognara-agent run -- dotnet BarkCloud.Configuration.dll`, задаёт `init: true` и grace period 30 секунд. Configuration подключается к внешней Docker-сети `lognara`, которую нужно создать заранее вместе с relay; relay должен слушать `0.0.0.0:7401`. Агент принимает HTTP, TLS к relay не поддерживается. Персональный `LOGNARA_CONFIGURATION_TOKEN` берётся из dock.
+Builder генерирует `lognara/*.Dockerfile` только для включённых инфраструктурных служб, если выбран локальный Lognara. Образы скачивают опубликованный release Linux amd64/arm64 только во время `docker build`, проверяют archive по `SHA256SUMS`, а версия выбирается `LOGNARA_AGENT_VERSION` (по умолчанию `latest`). Изменение infrastructure image metadata следует сверять через локальный `docker image inspect` перед обновлением исходных образов.
 
-`LOGNARA_CONFIGURATION_SPOOL_PATH` по умолчанию пуст и использует named volume, заполненный из образа с владельцем uid/gid 1654. Для bind-пути хост-каталог должен быть доступен на запись этому UID/GID; иначе агент завершится при старте и Configuration не поднимется. `.env` целиком передаётся через `env_file` в Configuration и Web, поэтому `LOGNARA_CONFIGURATION_TOKEN` виден обоим. Агент удаляет только `LOGNARA_RELAY_TOKEN` из окружения дочернего `dotnet`; строгая изоляция секрета от этих процессов не настроена.
+Named spool volumes разделены между агентами. Configuration использует существующее имя `lognara_configuration_spool` и uid/gid 1654; остальные приложения кроме Web также используют runtime uid 1654, Web и локальные infrastructure images запускаются от root, relay — uid 1000. В `.env` находятся tokens активных агентов. Поскольку Compose сохраняет полный `env_file` для Configuration и Web, token isolation между этими сервисами не обеспечивается.
+
+Миграция выполняется в порядке: сначала новый Compose и `.env` вместе с созданными инфраструктурными Dockerfile helpers, затем новые app images. Существующие named spool volumes нужно сохранить. Новые app images, запущенные со старым Compose без явных startup flags, включат только Console и отключат Seq; старые образы сохраняют прежнее включение Seq. Старый Compose `entrypoint`-wrapper приложения следует убрать. При остановке agent run пересылает полученный сигнал остановки группе foreground-процессов (nginx получает `SIGQUIT`, PostgreSQL — `SIGINT`); после `SIGTERM`, `SIGINT` или `SIGQUIT` агент ждёт не более 10 секунд, затем отправляет группе `SIGKILL`. Compose задаёт 75 секунд приложению и 30 секунд инфраструктуре, но более длинный timeout Compose не увеличивает внутреннее окно agent run.
 
 ## Files upload scheduler: внедрение и откат
 

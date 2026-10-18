@@ -42,6 +42,10 @@ BarkCloud — самохостируемое облако файлов и мед
 
 Потребители Configuration в `Program.cs` вызывают `await builder.LoadConfigurationAsync(ServiceId.X)` — сначала опрашивают внутренний `GetReadiness` по `CONFIGURATION_SERVICE_URL`, затем получают настройки. Общий загрузчик делает максимум 5 проверок с deadline 2 секунды и интервалами 5 секунд; после исчерпания попыток запуск прерывается. Configuration начинает слушать сеть только после успешных миграций и заполнения настроек. Затем общие расширения из `BarkCloud.GrpcServer` подключают Serilog, метрики и перехватчики. Все сервисы в compose зависят от `cloud-configuration`, а ожидание его готовности выполняется приложениями. Подробнее: [[Backend/Configuration]], [[Backend/GrpcServer]].
 
+### Каналы логирования
+
+Семь backend-приложений — Configuration, Identity, Users, Files, Notification, Torrent и Web — читают локальные startup flags до `LoadConfigurationAsync`. `ConsoleOutput=true`, `SeqEnable=false` и `LognaraEnable=false` по умолчанию; CLI имеет приоритет над environment. Настройки console, Seq и Lognara независимы и задаются по отдельности для каждого приложения. При включении Lognara локальный relay в той же Docker-сети пересылает batches в настроенный вручную Core endpoint `/v1/batches`; агентские tokens и регистрация управляются отдельно от приложения. См. [[Tools/Builder]] и [[Platform/Infrastructure]].
+
 ### Клиентский запрос
 
 Клиент → nginx (TLS) → gRPC-сервис по порту: `8000` Identity, `8001` Users, `8005` Files (gRPC + HTTP загрузок), `8007` Torrent; `443` — веб (`cloud-web:8080`) и HTTP-выдача файлов. JWT и заголовки устройства проверяются перехватчиками из `Shared/BarkCloud.Shared.Auth` и `BarkCloud.GrpcServer`. Подробнее: [[Platform/Infrastructure]].

@@ -1,5 +1,6 @@
-version: '3.8'
-
+# По умолчанию приложения пишут только в Console; Seq и Lognara выключены.
+# Для Seq или локального relay Lognara используйте BarkCloud.Builder, чтобы он
+# согласованно обновил .env и сгенерировал нужные Lognara Dockerfile wrappers.
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
@@ -10,12 +11,8 @@ services:
 
   cloud-configuration:
     image: docker.barkfluff.com/barkcloud-configuration:latest
-    container_name: cloud-configuration
+    container_name: ${CONFIGURATION_CONTAINER_NAME}
     restart: always
-    # Lognara: раскомментируйте вместе с настройками окружения, томом и внешней сетью ниже.
-    # entrypoint: ["/usr/local/bin/lognara-agent", "run", "--", "dotnet", "BarkCloud.Configuration.dll"]
-    # init: true
-    # stop_grace_period: 30s
     env_file:
       - .env
     environment:
@@ -46,29 +43,22 @@ services:
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
       TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
-      # Lognara перехватывает stdout/stderr; консольный приёмник Serilog заменяется, а Seq остаётся включённым.
-      # Lognara__AgentUrl: "http://127.0.0.1:7400/v1/logs"
-      # LOGNARA_LISTEN_ADDR: "127.0.0.1:7400"
-      # LOGNARA_SPOOL_DIR: /var/lib/lognara-agent/spool
-      # LOGNARA_SERVICE: barkcloud-configuration
-      # LOGNARA_SERVER: ${LOGNARA_SERVER}
-      # LOGNARA_BACKEND: ${LOGNARA_BACKEND}
-      # LOGNARA_ENVIRONMENT: ${LOGNARA_ENVIRONMENT}
-      # LOGNARA_RELAY_URL: ${LOGNARA_RELAY_URL}
-      # LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}
-    # volumes:
-    #   - ${LOGNARA_CONFIGURATION_SPOOL_PATH:-lognara_configuration_spool}:/var/lib/lognara-agent/spool
+      ConsoleOutput: ${CONFIGURATION_CONSOLE_OUTPUT}
+      SeqEnable: ${CONFIGURATION_SEQ_ENABLE}
+      LognaraEnable: ${CONFIGURATION_LOGNARA_ENABLE}
     networks:
       - barkcloud-network
-      # - lognara
 
   cloud-identity:
     image: docker.barkfluff.com/barkcloud-identity:latest
-    container_name: cloud-identity
+    container_name: ${IDENTITY_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
       SERVICE_PORT: ${IDENTITY_PORT}
+      ConsoleOutput: ${IDENTITY_CONSOLE_OUTPUT}
+      SeqEnable: ${IDENTITY_SEQ_ENABLE}
+      LognaraEnable: ${IDENTITY_LOGNARA_ENABLE}
     networks:
       - barkcloud-network
     depends_on:
@@ -76,11 +66,14 @@ services:
 
   cloud-users:
     image: docker.barkfluff.com/barkcloud-users:latest
-    container_name: cloud-users
+    container_name: ${USERS_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
       SERVICE_PORT: ${USERS_PORT}
+      ConsoleOutput: ${USERS_CONSOLE_OUTPUT}
+      SeqEnable: ${USERS_SEQ_ENABLE}
+      LognaraEnable: ${USERS_LOGNARA_ENABLE}
     networks:
       - barkcloud-network
     depends_on:
@@ -89,7 +82,7 @@ services:
 
   cloud-files:
     image: docker.barkfluff.com/barkcloud-files:latest
-    container_name: cloud-files
+    container_name: ${FILES_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -97,6 +90,9 @@ services:
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"
+      ConsoleOutput: ${FILES_CONSOLE_OUTPUT}
+      SeqEnable: ${FILES_SEQ_ENABLE}
+      LognaraEnable: ${FILES_LOGNARA_ENABLE}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
@@ -109,10 +105,13 @@ services:
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   cloud-notification:
     image: docker.barkfluff.com/barkcloud-notification:latest
-    container_name: cloud-notification
+    container_name: ${NOTIFICATION_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
+      ConsoleOutput: ${NOTIFICATION_CONSOLE_OUTPUT}
+      SeqEnable: ${NOTIFICATION_SEQ_ENABLE}
+      LognaraEnable: ${NOTIFICATION_LOGNARA_ENABLE}
     networks:
       - barkcloud-network
     depends_on:
@@ -121,7 +120,7 @@ services:
   # Торрент-сервис: качает торренты на хост-диск ({TORRENT_DOWNLOAD_PATH} → /mnt/torrents)
   cloud-torrent:
     image: docker.barkfluff.com/barkcloud-torrent:latest
-    container_name: cloud-torrent
+    container_name: ${TORRENT_CONTAINER_NAME}
     restart: always
     environment:
       <<: *common-variables
@@ -130,6 +129,9 @@ services:
       FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       Torrent__DownloadPath: "/mnt/torrents"
       Torrent__PeerPort: ${TORRENT_PEER_PORT}
+      ConsoleOutput: ${TORRENT_CONSOLE_OUTPUT}
+      SeqEnable: ${TORRENT_SEQ_ENABLE}
+      LognaraEnable: ${TORRENT_LOGNARA_ENABLE}
     volumes:
       - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
     networks:
@@ -141,7 +143,7 @@ services:
   # Веб-клиент
   cloud-web:
     image: docker.barkfluff.com/barkcloud-web:latest
-    container_name: cloud-web
+    container_name: ${WEB_CONTAINER_NAME}
     restart: always
     user: root
     env_file:
@@ -152,6 +154,16 @@ services:
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
+      Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
+      Docker__ContainerNames__Users: "${USERS_CONTAINER_NAME}"
+      Docker__ContainerNames__Files: "${FILES_CONTAINER_NAME}"
+      Docker__ContainerNames__Web: "${WEB_CONTAINER_NAME}"
+      Docker__ContainerNames__Notification: "${NOTIFICATION_CONTAINER_NAME}"
+      Docker__ContainerNames__Torrent: "${TORRENT_CONTAINER_NAME}"
+      ConsoleOutput: ${WEB_CONSOLE_OUTPUT}
+      SeqEnable: ${WEB_SEQ_ENABLE}
+      LognaraEnable: ${WEB_LOGNARA_ENABLE}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
@@ -168,21 +180,10 @@ services:
 
   # === Инфраструктурные сервисы ===
 
-  cloud-seq:
-    image: datalust/seq:latest
-    container_name: cloud-seq
-    restart: always
-    environment:
-      ACCEPT_EULA: "Y"
-      SEQ_FIRSTRUN_ADMINPASSWORD: "${SEQ_ADMIN_PASSWORD}"
-    volumes:
-      - ${SEQ_DATA_PATH:-seq_data}:/data
-    networks:
-      - barkcloud-network
-
   cloud-minio:
     image: docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
-    container_name: cloud-minio
+
+    container_name: ${MINIO_CONTAINER_NAME}
     restart: always
     environment:
       MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
@@ -195,7 +196,8 @@ services:
 
   cloud-rabbitmq:
     image: rabbitmq:latest
-    container_name: cloud-rabbitmq
+
+    container_name: ${RABBITMQ_CONTAINER_NAME}
     restart: always
     volumes:
       - cloud-rabbitmq_data:/var/lib/rabbitmq
@@ -207,7 +209,8 @@ services:
 
   cloud-postgres:
     image: postgres:18
-    container_name: cloud-postgres
+
+    container_name: ${POSTGRES_CONTAINER_NAME}
     restart: always
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
@@ -255,20 +258,12 @@ services:
 networks:
   barkcloud-network:
     external: true
-    name: barkcloud-network
-  # Сначала создайте эту внешнюю сеть; ретранслятор должен слушать на 0.0.0.0:7401.
-  # lognara:
-  #   external: true
-  #   name: ${LOGNARA_NETWORK}
-
+    name: ${DOCKER_NETWORK_NAME}
 volumes:
   pgdata:
   cloud-rabbitmq_data:
   cloud-minio_data:
   backup_volume:
-  seq_data:
   archive_temp:
   torrent_data:
   cloud-web-maintenance:
-  # Раскомментируйте вместе с томом для очереди Lognara Configuration.
-  # lognara_configuration_spool:

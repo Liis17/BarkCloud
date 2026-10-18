@@ -117,6 +117,48 @@ public sealed class DockerContainerNamesTests
         DockerService.ShQuote("name'withquote").Should().Be("'name'\\''withquote'");
     }
 
+    [Fact]
+    public async Task SelfUpdate_PreservesAgentMountsAndLifecycleOptionsForNewAndRollbackRuns()
+    {
+        var runner = new RecordingDockerRunner();
+        var service = CreateDockerService(runner);
+
+        var result = await service.UpdateWebSelfAsync("new-web-image", OperationId);
+
+        result.Success.Should().BeTrue();
+        var script = runner.Calls.Single(args => args[0] == "run")[^1];
+        script.Split("'--init'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Split("'--stop-timeout'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Split("'--stop-signal'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Split("'LOGNARA_SERVICE=app'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Split("'LOGNARA_TOKEN=fixture-agent-token'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Split(
+            "'--mount' 'type=volume,source=barkcloud_lognara_app_spool,destination=/var/lib/lognara/spool'",
+            StringSplitOptions.None).Length.Should().Be(3);
+        script.Split("'--stop-timeout' '75'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Split("'--stop-signal' 'SIGTERM'", StringSplitOptions.None).Length.Should().Be(3);
+        script.Should().Contain("run_logged docker stop \"$backup_container\" || true");
+        script.Should().NotContain("docker stop -t ");
+    }
+
+    [Fact]
+    public async Task SelfUpdate_LegacyInspectWithoutLifecycleOptionsOmitsRunFlags()
+    {
+        var runner = new RecordingDockerRunner();
+        runner.UseLegacyLifecycleOptions();
+        var service = CreateDockerService(runner);
+
+        var result = await service.UpdateWebSelfAsync("new-web-image", OperationId);
+
+        result.Success.Should().BeTrue();
+        var script = runner.Calls.Single(args => args[0] == "run")[^1];
+        script.Should().NotContain("'--init'");
+        script.Should().NotContain("'--stop-timeout'");
+        script.Should().NotContain("'--stop-signal'");
+        script.Should().Contain("run_logged docker stop \"$backup_container\" || true");
+        script.Should().NotContain("docker stop -t ");
+    }
+
     [Theory]
     [InlineData("helper")]
     [InlineData("backup")]
@@ -149,8 +191,18 @@ public sealed class DockerContainerNamesTests
             var spec = new DockerService.WebRecreateSpec(
                 "new-web-image",
                 OldContainerId,
-                ["-d", "--name", WebContainer, "--label", $"com.barkcloud.maintenance-operation={NormalizedOperationId}", "new-web-image"],
-                ["-d", "--name", WebContainer, "--label", $"com.barkcloud.maintenance-operation={NormalizedOperationId}", OldContainerId],
+                [
+                    "-d", "--name", WebContainer, "--init", "--stop-timeout", "75", "--stop-signal", "SIGTERM",
+                    "-e", "LOGNARA_SERVICE=app", "-e", "LOGNARA_TOKEN=fixture-agent-token",
+                    "--mount", "type=volume,source=barkcloud_lognara_app_spool,destination=/var/lib/lognara/spool",
+                    "--label", $"com.barkcloud.maintenance-operation={NormalizedOperationId}", "new-web-image"
+                ],
+                [
+                    "-d", "--name", WebContainer, "--init", "--stop-timeout", "75", "--stop-signal", "SIGTERM",
+                    "-e", "LOGNARA_SERVICE=app", "-e", "LOGNARA_TOKEN=fixture-agent-token",
+                    "--mount", "type=volume,source=barkcloud_lognara_app_spool,destination=/var/lib/lognara/spool",
+                    "--label", $"com.barkcloud.maintenance-operation={NormalizedOperationId}", OldContainerId
+                ],
                 ["'docker' 'network' 'connect' '--alias' 'cloud-web' 'shared-barkcloud' 'app'"]);
             var script = DockerService.BuildSelfUpdateScript(
                 spec,
@@ -196,6 +248,7 @@ public sealed class DockerContainerNamesTests
                       run_number="$(cat "$state_dir/run-count")"
                       run_number=$((run_number + 1))
                       printf '%s' "$run_number" > "$state_dir/run-count"
+                      printf '%s\n' "$@" >> "$state_dir/run-args"
                       name=
                       operation=
                       while [ "$#" -gt 0 ]; do
@@ -238,6 +291,16 @@ public sealed class DockerContainerNamesTests
             File.Exists(Path.Combine(tempDirectory, $"{BackupContainer}.id")).Should().BeFalse();
             File.ReadAllLines(Path.Combine(tempDirectory, "removed")).Should().Equal(WebContainer, BackupContainer);
             File.ReadAllText(Path.Combine(tempDirectory, "run-count")).Should().Be("2");
+            var runArgs = File.ReadAllLines(Path.Combine(tempDirectory, "run-args"));
+            runArgs.Count(argument => argument == "--init").Should().Be(2);
+            runArgs.Count(argument => argument == "--stop-timeout").Should().Be(2);
+            runArgs.Count(argument => argument == "75").Should().Be(2);
+            runArgs.Count(argument => argument == "--stop-signal").Should().Be(2);
+            runArgs.Count(argument => argument == "SIGTERM").Should().Be(2);
+            runArgs.Count(argument => argument == "LOGNARA_SERVICE=app").Should().Be(2);
+            runArgs.Count(argument => argument == "LOGNARA_TOKEN=fixture-agent-token").Should().Be(2);
+            runArgs.Count(argument => argument == "type=volume,source=barkcloud_lognara_app_spool,destination=/var/lib/lognara/spool")
+                .Should().Be(2);
         }
         finally
         {
@@ -276,7 +339,9 @@ public sealed class DockerContainerNamesTests
         helperName.Should().Contain(NormalizedOperationId);
         helperName.Should().Contain("restarter");
         helperRun[^1].Should().Contain("web_container='app'");
-        helperRun[^1].Should().Contain("docker restart \"$web_container\"");
+        helperRun[^1].Should().Contain("run_logged docker restart \"$web_container\"");
+        helperRun[^1].Should().NotContain("docker restart -t ");
+        helperRun[^1].Should().NotContain("docker restart --timeout ");
         helperRun[^1].Should().NotContain("nginx");
     }
 
@@ -393,11 +458,13 @@ public sealed class DockerContainerNamesTests
               "Config":{
                 "Image":"docker.barkfluff.com/barkcloud-web:1.12.0",
                 "User":"",
-                "Env":["ASPNETCORE_ENVIRONMENT=Production"],
+                "StopSignal":"SIGTERM",
+                "StopTimeout":75,
+                "Env":["ASPNETCORE_ENVIRONMENT=Production","LOGNARA_SERVICE=app","LOGNARA_TOKEN=fixture-agent-token"],
               "Labels":{"com.docker.compose.project":"barkcloud","com.docker.compose.service":"cloud-web","com.barkcloud.maintenance-operation":"previous-operation"}
               },
-              "HostConfig":{"RestartPolicy":{"Name":"unless-stopped","MaximumRetryCount":0},"PortBindings":{}},
-              "Mounts":[{"Type":"volume","Name":"maintenance","Source":"barkcloud_cloud-web-maintenance","Destination":"/app/maintenance","RW":true}],
+              "HostConfig":{"Init":true,"RestartPolicy":{"Name":"unless-stopped","MaximumRetryCount":0},"PortBindings":{}},
+              "Mounts":[{"Type":"volume","Name":"maintenance","Source":"barkcloud_cloud-web-maintenance","Destination":"/app/maintenance","RW":true},{"Type":"volume","Name":"barkcloud_lognara_app_spool","Source":"/var/lib/docker/volumes/barkcloud_lognara_app_spool/_data","Destination":"/var/lib/lognara/spool","RW":true}],
               "NetworkSettings":{"Networks":{
                 "barkcloud-network":{"Aliases":["cloud-web","123456789012"]},
                 "shared-barkcloud":{"Aliases":["cloud-web","123456789012"]}
@@ -405,8 +472,18 @@ public sealed class DockerContainerNamesTests
             }]
             """;
 
+        private string _webInspect = WebInspect;
+
         public List<string[]> Calls { get; } = [];
         public HashSet<string> ExistingNames { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public void UseLegacyLifecycleOptions()
+        {
+            _webInspect = WebInspect
+                .Replace("\"StopSignal\":\"SIGTERM\",", string.Empty, StringComparison.Ordinal)
+                .Replace("\"StopTimeout\":75,", string.Empty, StringComparison.Ordinal)
+                .Replace("\"Init\":true,", string.Empty, StringComparison.Ordinal);
+        }
 
         public Task<string> RunAsync(string fileName, string[] args)
         {
@@ -426,7 +503,7 @@ public sealed class DockerContainerNamesTests
             if (args[0] == "inspect" && args.Length == 2)
             {
                 if (args[1] == WebContainer)
-                    return Task.FromResult(WebInspect);
+                    return Task.FromResult(_webInspect);
                 if (ExistingNames.Contains(args[1]))
                     return Task.FromResult("{}");
                 throw NotFound(args);

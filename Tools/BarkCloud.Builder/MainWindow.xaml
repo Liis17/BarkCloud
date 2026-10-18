@@ -54,8 +54,8 @@
                             <ui:ToggleSwitch x:Name="MinioToggle" Margin="0,4" Content="minio (хранилище)" IsChecked="{Binding IncludeMinio}" />
                             <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
                             <ui:ToggleSwitch x:Name="PostgresToggle" Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
-                            <ui:ToggleSwitch x:Name="SeqToggle" Margin="0,4" Content="seq (логи)" IsChecked="{Binding IncludeSeq}" />
-                            <ui:ToggleSwitch x:Name="LognaraToggle" Margin="0,4" Content="Lognara (логи Configuration)" IsChecked="{Binding IncludeLognara}" />
+                            <ui:ToggleSwitch x:Name="SeqToggle" Margin="0,4" Content="seq (канал логов)" IsChecked="{Binding IncludeSeq}" Click="OnIncludeSeqClick" />
+                            <ui:ToggleSwitch x:Name="LognaraToggle" Margin="0,4" Content="Lognara relay и агенты" IsChecked="{Binding IncludeLognara}" Click="OnIncludeLognaraClick" />
                             <ui:ToggleSwitch x:Name="TorrentToggle" Margin="0,4" Content="torrent (загрузка торрентов)" IsChecked="{Binding IncludeTorrent}" />
                         </UniformGrid>
 
@@ -78,7 +78,44 @@
                         <ui:InfoBar Margin="0,8,0,0" Severity="Error" IsClosable="False"
                                     IsOpen="{Binding IsChecked, ElementName=SeqToggle, Converter={StaticResource InverseBool}}"
                                     Title="Seq отключён"
-                                    Message="Агрегатор логов нужно поднять отдельно, вручную отредактировать .env и прописать его в базе Configuration." />
+                                    Message="Канал Seq выключен. Включите Seq и выберите сервисы в таблице логирования, если нужен этот приёмник." />
+                    </StackPanel>
+                </ui:Card>
+
+                <ui:Card Margin="0,0,0,8" Padding="16">
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="Логирование приложений" />
+                        <TextBlock Margin="0,2,0,8" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="Console, Seq и Lognara управляются независимо. Глобальные переключатели Seq и Lognara сначала меняют канал у всех сервисов; затем можно настроить строки отдельно. Токены и spool используются только для активных Lognara-агентов." />
+                        <ui:InfoBar Margin="0,0,0,8" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding LegacySeqConfigurationUnknown}"
+                                    Title="Старый Seq-настройки не содержали app-флаги"
+                                    Message="Импорт не подключается к Configuration и не может проверить прежние настройки Seq. Включите Seq и нужные строки, если старые приложения отправляли туда логи; недоступный backend автоматически не назначается." />
+                        <DataGrid x:Name="ApplicationLoggingGrid" ItemsSource="{Binding LognaraApplications}"
+                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  HeadersVisibility="Column" RowHeaderWidth="0" MinHeight="210" MaxHeight="300">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Сервис" Binding="{Binding DisplayName}" IsReadOnly="True" Width="95" />
+                                <DataGridTemplateColumn Header="Console" Width="65">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate><CheckBox IsChecked="{Binding ConsoleOutput, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" /></DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Seq" Width="50">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate><CheckBox IsChecked="{Binding SeqEnable, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DataContext.IncludeSeq, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" HorizontalAlignment="Center" /></DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Lognara" Width="68">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate><CheckBox IsChecked="{Binding LognaraEnable, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding DataContext.IncludeLognara, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}" HorizontalAlignment="Center" /></DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Agent token" Binding="{Binding Token, UpdateSourceTrigger=PropertyChanged}" Width="170" />
+                                <DataGridTextColumn Header="Agent spool path (пусто — named volume)" Binding="{Binding SpoolPath, UpdateSourceTrigger=PropertyChanged}" Width="230" />
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </StackPanel>
                 </ui:Card>
 
@@ -556,30 +593,45 @@
                         <StackPanel>
                             <TextBlock FontWeight="Medium" Text="Lognara" />
                             <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Сбор stdout/stderr Configuration и логов Serilog" />
+                                       Text="Локальный relay и отдельные агенты в выбранных контейнерах" />
                         </StackPanel>
                     </ui:CardExpander.Header>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_NETWORK (внешняя Docker-сеть relay)" />
-                        <ui:TextBox Text="{Binding LognaraNetworkName, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_RELAY_URL (HTTP endpoint /v1/batches)" />
-                        <ui:TextBox Text="{Binding LognaraRelayUrl, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
-                                    Title="Подключение к relay"
-                                    Message="Создайте внешнюю сеть заранее и подключите к ней relay. Агент поддерживает только HTTP; HTTPS не поддерживается." />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_CONFIGURATION_TOKEN (персональный токен агента из dock)" />
-                        <ui:TextBox Text="{Binding LognaraConfigurationToken, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_CORE_URL (Core endpoint /v1/batches, HTTP или HTTPS)" />
+                        <ui:TextBox Text="{Binding LognaraCoreUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_RELAY_CORE_TOKEN (персональный токен relay из Dock)" />
+                        <ui:TextBox Text="{Binding LognaraCoreToken, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_SERVER" />
                         <ui:TextBox Text="{Binding LognaraServer, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_BACKEND" />
                         <ui:TextBox Text="{Binding LognaraBackend, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_ENVIRONMENT (необязательно)" />
                         <ui:TextBox Text="{Binding LognaraEnvironment, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_CONFIGURATION_SPOOL_PATH (пусто — named volume)" />
-                        <ui:TextBox PlaceholderText="./data/lognara-configuration" Text="{Binding LognaraConfigurationSpoolPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_AGENT_VERSION (latest или tag релиза)" />
+                        <ui:TextBox Text="{Binding LognaraAgentVersion, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
+                                    Title="Ручная регистрация и токены"
+                                    Message="Создайте relay и отдельный токен для каждого активного агента в Lognara Dock. Builder не регистрирует агентов автоматически. Все агенты отправляют данные во внутренний lognara-relay в сети BarkCloud." />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
+                                    IsOpen="{Binding LegacyLognaraImport}"
+                                    Title="Импорт старой Lognara-конфигурации"
+                                    Message="Старый LOGNARA_RELAY_URL не считается адресом Core и не переносится. Старые токен и spool Configuration сохранены; укажите Core endpoint /v1/batches и новый токен relay." />
+                        <TextBlock Margin="0,14,0,0" FontWeight="Medium" Text="Настройки агентов инфраструктуры" />
+                        <TextBlock Margin="0,2,0,6" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="Токен и spool используются, только если соответствующий сервис включён в compose; для выключенных сервисов эти поля не генерируются и не проверяются." />
+                        <DataGrid ItemsSource="{Binding LognaraInfrastructure}" AutoGenerateColumns="False"
+                                  CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
+                                  RowHeaderWidth="0" MinHeight="160" MaxHeight="230">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Сервис" Binding="{Binding DisplayName}" IsReadOnly="True" Width="110" />
+                                <DataGridTextColumn Header="Agent token" Binding="{Binding Token, UpdateSourceTrigger=PropertyChanged}" Width="180" />
+                                <DataGridTextColumn Header="Agent spool path (пусто — named volume)" Binding="{Binding SpoolPath, UpdateSourceTrigger=PropertyChanged}" Width="300" />
+                            </DataGrid.Columns>
+                        </DataGrid>
                         <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False" IsOpen="True"
                                     Title="Права каталога spool"
-                                    Message="Bind-путь должен быть доступен на запись UID/GID 1654. При отсутствии прав агент не запустится и Configuration не поднимется." />
+                                    Message="Bind-путь должен быть доступен на запись владельцу контейнера (UID 1654 у приложений, root у Web и инфраструктурных образов). Named volumes сохраняют очередь каждого агента отдельно." />
                     </StackPanel>
                 </ui:CardExpander>
 

@@ -11,6 +11,9 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 | Файл | Символ | Роль |
 |---|---|---|
 | `Backend/BarkCloud.GrpcServer/WebApplicationBuilderExtensions.cs` | `LoadConfigurationAsync`, `SetRunningAddress` | Bootstrap настроек и Kestrel |
+| `Backend/BarkCloud.GrpcServer/LoggingStartupOptions.cs` | `LoggingStartupOptions` | Локальный startup snapshot трёх флагов логирования |
+| `Backend/BarkCloud.GrpcServer/SerilogExtensions.cs` | `AddBarkCloudSerilogAsync` | Независимые sinks и общий logging lifecycle |
+| `Backend/BarkCloud.GrpcServer/LognaraAgentRuntime.cs` | `LognaraAgentRuntime`, `BarkCloudLoggingLifetime` | Запуск, readiness, мониторинг и остановка принадлежащего хосту агента |
 | `Backend/BarkCloud.GrpcServer/ServiceCollectionExtensions.cs` | `AddBarkCloudGrpc` | Регистрация gRPC и interceptor'ов |
 | `Backend/BarkCloud.GrpcServer/ServerExceptionInterceptor.cs` | `ServerExceptionInterceptor` | Преобразование ошибок |
 | `Backend/BarkCloud.GrpcServer/Tracker/RequestContextInterceptor.cs` | `RequestContextInterceptor` | Контекст входящего запроса |
@@ -20,7 +23,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 ## Публичные контракты
 
-`LoadConfigurationAsync(ServiceId, CancellationToken)` обращается к [[Backend/Configuration]] через `CONFIGURATION_SERVICE_URL` (fallback — `ConfigurationServiceAddr` или localhost). При наличии отправляет `x-config-access-key`. Перед чтением опрашивает `GetReadiness`: первая проверка сразу, максимум 5 проверок с deadline 2 секунды на каждую и четырьмя паузами по 5 секунд. `ready=false`, `Unavailable` и `DeadlineExceeded` приводят к повтору; после пятой неудачи запуск прерывается. Остальные gRPC-ошибки, включая ошибки доступа и `Unimplemented`, прерывают запуск сразу. Диагностика до настройки Serilog выводится в stderr с сервисом, адресом и причиной без bootstrap-ключа.
+`LoadConfigurationAsync(ServiceId, CancellationToken)` обращается к [[Backend/Configuration]] через `CONFIGURATION_SERVICE_URL` (fallback — `ConfigurationServiceAddr` или localhost). При наличии отправляет `x-config-access-key`. Перед чтением опрашивает `GetReadiness`: первая проверка сразу, максимум 5 проверок с deadline 2 секунды на каждую и четырьмя паузами по 5 секунд. `ready=false`, `Unavailable` и `DeadlineExceeded` приводят к повтору; после пятой неудачи запуск прерывается. Остальные gRPC-ошибки, включая ошибки доступа и `Unimplemented`, прерывают запуск сразу. Диагностика до настройки Serilog выводится в stderr с сервисом, адресом и причиной без bootstrap-ключа только при `ConsoleOutput=true`.
 
 После готовности загрузчик на том же канале с теми же metadata получает global + service settings; для Files отдельно запрашивает S3-профили и группы квот. Чтение настроек и профилей не повторяется при ошибке, снимок добавляется в builder только после успешного получения всех данных. Все шесть потребителей используют общий механизм; отдельного цикла ожидания в Web нет.
 
@@ -32,7 +35,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 ## Зависимости и взаимодействия
 
-`AddBarkCloudSerilog` настраивает Seq и по умолчанию Console sink. Необязательный `replaceConsoleSink` позволяет одному потребителю заменить Console, не меняя поведение остальных сервисов; Configuration использует его для Lognara, потому что агент сам захватывает stdout/stderr. `AddBarkCloudMetrics` регистрирует общий `MetricsCollector`; `MetricsReporterService` пишет снимки метрик в структурированный лог каждые 5 секунд.
+`AddBarkCloudSerilogAsync` во всех семи backend-приложениях независимо управляет Console, Seq и Lognara флагами `ConsoleOutput`, `SeqEnable` и `LognaraEnable` (по умолчанию `true/false/false`; все комбинации, включая `false/false/false`, допустимы). Флаги строго разбираются как boolean и фиксируются из локальной конфигурации до remote overlay; remote значения не меняют startup-поведение. Seq сохраняет свои уровни, enrichers и durable buffer. При включённом Lognara приложение сначала запускает `/usr/local/bin/lognara-agent` без аргументов в том же контейнере, удаляет у дочернего процесса `LOGNARA_SOURCES_FILE` и ждёт до 10 секунд HTTP `GET /v1/logs` с ответом `405` и `Allow: POST`; только затем создаются sinks. Агент принимает Serilog только по `http://127.0.0.1:7400/v1/logs`; standalone sources ему не нужны. Sink Lognara использует ограниченную памятью очередь по умолчанию и не включает отдельный дисковый buffer; постоянный spool принадлежит агенту и отделён от sink. При выключенном Lognara процесс не запускается и runtime не требует бинарный файл. Host останавливается при неожиданном завершении агента. После `RunAsync` host прекращает работу и освобождает DI, затем logging lifetime завершает Serilog flush/dispose максимум за 20 секунд, пока агент ещё запущен; сетевые ожидания Seq ограничены 10 секундами, HTTP-клиент sink Lognara — 5 секундами. Затем агент получает SIGTERM, ожидание ограничено 10 секундами, после чего завершается только принадлежащий приложению процесс. Host shutdown budget — 30 секунд; суммарный предел до принудительного завершения процесса — 60 секунд. `AddBarkCloudMetrics` регистрирует общий `MetricsCollector`; `MetricsReporterService` пишет снимки метрик в структурированный лог каждые 5 секунд.
 
 `configuration_api.proto` и `session_revocation_api.proto` генерируются этим проектом с `GrpcServices="Both"`. Остальные backend-проекты подключают необходимые `.proto` с собственными параметрами генерации. См. [[Shared/Proto]].
 
