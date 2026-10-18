@@ -15,7 +15,7 @@ namespace BarkCloud.Builder
     /// </summary>
     public partial class MainWindow : FluentWindow
     {
-        private readonly BuilderModel _model;
+        private BuilderModel _model;
 
         public MainWindow()
         {
@@ -44,6 +44,45 @@ namespace BarkCloud.Builder
             var dialog = new OpenFolderDialog { Title = "Папка для docker-compose.yml и .env" };
             if (dialog.ShowDialog() == true)
                 OutputPathBox.Text = dialog.FolderName;
+        }
+
+        // Загружает ранее созданную конфигурацию и делает её папку папкой вывода.
+        private void OnOpen(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFolderDialog { Title = "Папка с docker-compose.yml и .env" };
+            if (dialog.ShowDialog() != true)
+                return;
+
+            var dir = dialog.FolderName;
+            var composePath = Path.Combine(dir, "docker-compose.yml");
+            var envPath = Path.Combine(dir, ".env");
+            var nginxPath = Path.Combine(dir, "nginx", "cloud.barkfluff.conf");
+            var missing = new[] { "docker-compose.yml", ".env" }.Where(f => !File.Exists(Path.Combine(dir, f))).ToList();
+            if (missing.Count > 0)
+            {
+                SetStatus("В папке не найдены: " + string.Join(", ", missing), error: true);
+                return;
+            }
+
+            try
+            {
+                var compose = File.ReadAllText(composePath).Replace("\r\n", "\n");
+                var nginxConf = File.Exists(nginxPath) ? File.ReadAllText(nginxPath) : null;
+                if (nginxConf == null && compose.Contains("\n  cloud-nginx:\n"))
+                {
+                    SetStatus("Compose содержит cloud-nginx, но не найден nginx/cloud.barkfluff.conf.", error: true);
+                    return;
+                }
+
+                _model = BuilderConfigLoader.Load(compose, File.ReadAllText(envPath), nginxConf, dir);
+                DataContext = _model;
+                var nginxNote = nginxConf == null ? " (nginx-конфиг не найден — nginx выключен)" : "";
+                SetStatus($"Конфигурация загружена из {dir}{nginxNote}", error: false);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Ошибка: " + ex.Message, error: true);
+            }
         }
 
         // Выбор файла сертификата; целевое поле передаётся в CommandParameter.
@@ -119,8 +158,12 @@ namespace BarkCloud.Builder
         // Копирует выбранный сертификат в certs/ под его исходным именем.
         private static void CopyCert(string? source, string certsDir)
         {
-            if (!string.IsNullOrWhiteSpace(source) && File.Exists(source))
-                File.Copy(source, Path.Combine(certsDir, Path.GetFileName(source)), overwrite: true);
+            if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
+                return;
+            var target = Path.Combine(certsDir, Path.GetFileName(source));
+            // После «Открыть» сертификат уже лежит в certs/ — копировать файл сам в себя нельзя.
+            if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
+                File.Copy(source, target, overwrite: true);
         }
 
         // Docker/Linux ожидает LF; нормализуем переводы строк.

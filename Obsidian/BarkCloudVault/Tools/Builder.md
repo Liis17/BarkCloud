@@ -14,6 +14,7 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 | `Tools/BarkCloud.Builder/BuilderModelValidator.cs` | `Validate` | Проверка режима, Lognara, имён, путей сертификатов и портов до записи файлов |
 | `Tools/BarkCloud.Builder/BackendComposeGenerator.cs` | `BuildCompose`, `BuildEnv`, `BuildNginxConf` | Генерация compose, env и nginx |
 | `Tools/BarkCloud.Builder/MainWindow.xaml.cs` | `OnGenerate` | Проверка, запись файлов и копирование локальных сертификатов |
+| `Tools/BarkCloud.Builder/BuilderConfigLoader.cs` | `Load` | Восстановление модели из ранее созданных compose, env и nginx-конфига (кнопка «Открыть») |
 | `Tools/BarkCloud.Builder/BarkCloud.Builder.csproj` | TargetFramework, WPF-UI | Технологическая основа |
 
 ## Публичные контракты
@@ -21,6 +22,7 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 | Контракт | Поведение |
 |---|---|
 | Выходные файлы | Создаёт `docker-compose.yml` и `.env` в выбранной существующей папке |
+| Открытие конфигурации | «Открыть» требует `docker-compose.yml` и `.env` в папке; значения берутся из `.env`, состав сервисов и канал образа — из compose, домен и пути сертификатов — из `nginx/cloud.barkfluff.conf`. Без nginx-конфига nginx считается выключенным (ошибка, если compose содержит `cloud-nginx`). Папка становится папкой вывода; локальные сертификаты Compose-режима указывают на уже лежащие в `certs/` файлы |
 | Режим без nginx | Создаёт только compose и env; Builder показывает предупреждение об отсутствии TLS reverse proxy |
 | Compose nginx | Добавляет контейнер `cloud-nginx`, публикует HTTPS/gRPC и выбранные порты консолей, создаёт `nginx/cloud.barkfluff.conf` и копирует выбранные сертификаты в `certs/` |
 | Внешний nginx | По умолчанию генерирует `nginx/cloud.barkfluff.conf`, не добавляя nginx-контейнер, публикацию портов или копирование сертификатов |

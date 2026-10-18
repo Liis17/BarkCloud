@@ -872,6 +872,7 @@
                 BorderThickness="0,1,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -881,15 +882,18 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <ui:TextBox Grid.Row="0" Grid.Column="0" x:Name="OutputPathBox"
+                <ui:Button Grid.Row="0" Grid.Column="0" Margin="0,0,8,0" Content="Открыть"
+                           ToolTip="Загрузить ранее созданную конфигурацию из папки"
+                           Icon="{ui:SymbolIcon FolderArrowUp24}" Click="OnOpen" />
+                <ui:TextBox Grid.Row="0" Grid.Column="1" x:Name="OutputPathBox"
                             PlaceholderText="Папка для docker-compose.yml и .env"
                             Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" />
-                <ui:Button Grid.Row="0" Grid.Column="1" Margin="8,0,0,0" Content="Обзор…"
+                <ui:Button Grid.Row="0" Grid.Column="2" Margin="8,0,0,0" Content="Обзор…"
                            Icon="{ui:SymbolIcon FolderOpen24}" Click="OnBrowse" />
-                <ui:Button Grid.Row="0" Grid.Column="2" Margin="8,0,0,0" Appearance="Primary"
-                           Content="Сгенерировать" Icon="{ui:SymbolIcon DocumentArrowRight24}" Click="OnGenerate" />
+                <ui:Button Grid.Row="0" Grid.Column="3" Margin="8,0,0,0" Appearance="Primary"
+                           Content="Создать" Icon="{ui:SymbolIcon DocumentArrowRight24}" Click="OnGenerate" />
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" x:Name="StatusText"
+                <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" x:Name="StatusText"
                            Margin="0,8,0,0" TextWrapping="Wrap" />
             </Grid>
         </Border>
