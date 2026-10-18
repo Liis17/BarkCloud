@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using Serilog;
+using Serilog.Configuration;
 using Serilog.Events;
 
 namespace BarkCloud.GrpcServer;
@@ -15,7 +16,10 @@ public static class SerilogExtensions
     /// Настраивает Serilog с выводом в консоль и Seq.
     /// Вызывать ПОСЛЕ LoadConfigurationAsync(), чтобы Seq URL из конфигурации был доступен.
     /// </summary>
-    public static WebApplicationBuilder AddBarkCloudSerilog(this WebApplicationBuilder builder, string serviceName)
+    public static WebApplicationBuilder AddBarkCloudSerilog(
+        this WebApplicationBuilder builder,
+        string serviceName,
+        Action<LoggerSinkConfiguration>? replaceConsoleSink = null)
     {
         var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://cloud-seq:5341";
 
@@ -39,11 +43,19 @@ public static class SerilogExtensions
                     period: TimeSpan.FromSeconds(2),
                     queueSizeLimit: 100000);
 
-            // Docker/systemd собирают stdout/stderr контейнера. Оставляем консольный
-            // sink и в Production: это особенно важно для ошибок до ApplicationStarted,
-            // которые могут не успеть попасть в Seq перед остановкой процесса.
-            loggerConfig.WriteTo.Console(
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+            if (replaceConsoleSink is null)
+            {
+                // Docker/systemd собирают stdout/stderr контейнера. Оставляем консольный
+                // sink и в Production: это особенно важно для ошибок до ApplicationStarted,
+                // которые могут не успеть попасть в Seq перед остановкой процесса.
+                loggerConfig.WriteTo.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+            }
+            else
+            {
+                // Агент захватывает stdout/stderr приложения; параллельный Console sink дублировал бы события.
+                replaceConsoleSink(loggerConfig.WriteTo);
+            }
         });
 
         return builder;

@@ -10,8 +10,8 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 | Файл | Символ | Роль |
 |---|---|---|
-| `Tools/BarkCloud.Builder/BuilderModel.cs` | `BuilderModel` | Настройки сервисов, Docker-сети, имён контейнеров и прокси |
-| `Tools/BarkCloud.Builder/BuilderModelValidator.cs` | `Validate` | Проверка режима, имён, путей сертификатов и портов до записи файлов |
+| `Tools/BarkCloud.Builder/BuilderModel.cs` | `BuilderModel` | Настройки сервисов, Lognara, Docker-сетей, имён контейнеров и прокси |
+| `Tools/BarkCloud.Builder/BuilderModelValidator.cs` | `Validate` | Проверка режима, Lognara, имён, путей сертификатов и портов до записи файлов |
 | `Tools/BarkCloud.Builder/BackendComposeGenerator.cs` | `BuildCompose`, `BuildEnv`, `BuildNginxConf` | Генерация compose, env и nginx |
 | `Tools/BarkCloud.Builder/MainWindow.xaml.cs` | `OnGenerate` | Проверка, запись файлов и копирование локальных сертификатов |
 | `Tools/BarkCloud.Builder/BarkCloud.Builder.csproj` | TargetFramework, WPF-UI | Технологическая основа |
@@ -25,6 +25,7 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 | Compose nginx | Добавляет контейнер `cloud-nginx`, публикует HTTPS/gRPC и выбранные порты консолей, создаёт `nginx/cloud.barkfluff.conf` и копирует выбранные сертификаты в `certs/` |
 | Внешний nginx | По умолчанию генерирует `nginx/cloud.barkfluff.conf`, не добавляя nginx-контейнер, публикацию портов или копирование сертификатов |
 | Docker-сеть | Переменная `DOCKER_NETWORK_NAME` задаёт реальное имя общей внешней сети; логический ключ Compose остаётся `barkcloud-network` |
+| Lognara | Опционально оборачивает только `cloud-configuration` командой агента, подключает его к внешней сети relay и хранит spool в named volume либо bind-пути |
 | Имена контейнеров | Редактируемые `*_CONTAINER_NAME` задают фактические имена только включённых сервисов; ключи сервисов Compose `cloud-*` и внутренние адреса `CONFIGURATION_SERVICE_URL` остаются стабильными |
 | Предпросмотр адресов | В блоках сервисов отображаются выбранные имена контейнеров и внутренние адреса, вычисленные из центральных полей имён и портов; все предпросмотры только для чтения |
 | Канал образа | Release, Nightly или Dev выбирает реестр `docker.barkfluff.com` и суффикс образа |
@@ -35,6 +36,7 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 - Модель по умолчанию включает backend-ядро, Web, инфраструктурные сервисы и внешний nginx. Порты и хост-пути основаны на `Backend/sample.env`; стандартные пути данных — `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/seq`, `./data/torrent` и `./data/archive-temp`, относительно папки с генерируемым `docker-compose.yml`.
 - Web получает фактические имена Configuration, Identity, Users, Files и Web через `Docker__ContainerNames__*`; Notification и Torrent передаются только при включённых сервисах.
+- При `IncludeLognara` Builder добавляет настройки relay и персональный токен в `.env`, заменяет Console sink Configuration на Lognara и подключает только Configuration к внешней сети relay. `LOGNARA_NETWORK` задаёт реальное имя сети; relay должен быть доступен по HTTP из неё. Пустой `LOGNARA_ENVIRONMENT` не записывается.
 - nginx использует динамическое разрешение Docker DNS через `127.0.0.11`. Нужен nginx OSS 1.27.3 или новее; в общем nginx все upstream используют отдельные shared zones, а TLS session cache имеет имя `barkcloud_ssl`.
 - При внешнем nginx установщик подключает его контейнер к выбранной уже созданной Docker-сети и устанавливает сгенерированный файл в `http/conf.d`. Пути сертификата и ключа указываются внутри внешнего контейнера; Builder их не копирует и не перезагружает внешний nginx.
 - Seq Console и MinIO Console можно отдельно включить как TLS-прокси на настраиваемых listener-портах. Их backend-порты фиксированы: 80 и 9001 соответственно.
@@ -48,3 +50,5 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 - Папка вывода должна существовать. Файлы записываются UTF-8 без BOM с переводами строк LF. При смене режима существующие `certs/` не удаляются.
 - В Compose режиме пустые поля сертификата разрешены, чтобы конфигурацию можно было сгенерировать заранее; для запуска nginx нужны реальные сертификат и ключ в `certs/`.
 - Если `ARCHIVE_TEMP_PATH` пуст, compose использует named volume `archive_temp`. Владелец такого тома — root, поэтому Files под uid 1654 не сможет записать туда временный архив; для архивов нужна хост-папка с правом записи для uid 1654.
+- Relay URL Lognara должен использовать `http`; текущий агент не поддерживает TLS. При пустом `LOGNARA_CONFIGURATION_SPOOL_PATH` используется named volume, созданный с владельцем uid/gid 1654 из образа. Bind-путь должен быть доступен на запись uid/gid 1654, иначе агент и Configuration не запустятся.
+- `.env` полностью передаётся в Configuration и Web через `env_file`. Поэтому `LOGNARA_CONFIGURATION_TOKEN` доступен обоим процессам; агент удаляет из окружения дочернего `dotnet` только переменную `LOGNARA_RELAY_TOKEN`. Строгая изоляция токена от Configuration и Web не обеспечивается.
