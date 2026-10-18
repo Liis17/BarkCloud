@@ -6,12 +6,14 @@ using Grpc.Core;
 using Grpc.Net.Client;
 
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Time.Testing;
 
 using System.Threading.Channels;
 
 namespace BarkCloud.GrpcServer.Tests;
 
+[Collection("Logging lifecycle")]
 public class ConfigurationLoadingTests
 {
     private const string Address = "http://configuration.test:7003";
@@ -185,6 +187,100 @@ public class ConfigurationLoadingTests
 
         _attempts.Should().Be(1);
         _clock.DelayCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task StartupLoggingOptions_AreCapturedLocallyBeforeRemoteOverlay_AndCommandLineWins()
+    {
+        var previousConsoleOutput = Environment.GetEnvironmentVariable("ConsoleOutput");
+        Environment.SetEnvironmentVariable("ConsoleOutput", "true");
+        try
+        {
+            var builder = WebApplication.CreateBuilder();
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SeqEnable"] = "true",
+                ["LognaraEnable"] = "false"
+            });
+            builder.Configuration.AddCommandLine(["--ConsoleOutput=false"]);
+            SetupReadiness(_ => new GetReadinessResponse { Ready = true });
+            var remote = new GetConfigurationResponse();
+            remote.Configurations.Add(new ConfigurationItem { Section = "ConsoleOutput", Value = "true" });
+            remote.Configurations.Add(new ConfigurationItem { Section = "SeqEnable", Value = "false" });
+            remote.Configurations.Add(new ConfigurationItem { Section = "LognaraEnable", Value = "true" });
+            _client.Setup(x => x.GetConfigurationAsync(It.IsAny<GetConfigurationRequest>(),
+                    _headers, null, default))
+                .Returns(() => GrpcCallHelpers.AsyncUnary(remote));
+
+            await WebApplicationBuilderExtensions.LoadConfigurationAsync(
+                builder, ServiceId.Torrent, Address, _client.Object, _headers, _clock);
+
+            builder.Configuration["ConsoleOutput"].Should().Be("false");
+            builder.Configuration["SeqEnable"].Should().Be("true");
+            builder.Configuration["LognaraEnable"].Should().Be("false");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ConsoleOutput", previousConsoleOutput);
+        }
+    }
+
+    [Theory]
+    [InlineData("ConsoleOutput")]
+    [InlineData("SeqEnable")]
+    [InlineData("LognaraEnable")]
+    public async Task InvalidStartupLoggingBoolean_FailsBeforeConfigurationRpc(string key)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [key] = "sometimes"
+        });
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            WebApplicationBuilderExtensions.LoadConfigurationAsync(
+                builder, ServiceId.Torrent, Address, _client.Object, _headers, _clock));
+
+        error.Message.Should().Contain(key).And.Contain("true").And.Contain("false");
+        _client.Verify(x => x.GetReadinessAsync(It.IsAny<GetReadinessRequest>(),
+            It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BootstrapReadinessDiagnostics_FollowConsoleOutputOption(bool consoleOutput)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConsoleOutput"] = consoleOutput.ToString()
+        });
+        SetupReadiness(attempt => attempt == 1
+            ? new GetReadinessResponse()
+            : new GetReadinessResponse { Ready = true });
+        SetupConfiguration();
+        using var errorOutput = new StringWriter();
+        var previousError = Console.Error;
+        Console.SetError(errorOutput);
+
+        try
+        {
+            var loading = WebApplicationBuilderExtensions.LoadConfigurationAsync(
+                builder, ServiceId.Torrent, Address, _client.Object, _headers, _clock);
+            (await _clock.NextDelay()).Should().Be(TimeSpan.FromSeconds(5));
+            _clock.Advance(TimeSpan.FromSeconds(5));
+            await loading;
+        }
+        finally
+        {
+            Console.SetError(previousError);
+        }
+
+        if (consoleOutput)
+            errorOutput.ToString().Should().Contain("[startup]");
+        else
+            errorOutput.ToString().Should().BeEmpty();
     }
 
     [Fact]

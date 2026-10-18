@@ -20,8 +20,6 @@ using MassTransit;
 
 using Microsoft.EntityFrameworkCore;
 
-using Serilog;
-
 namespace BarkCloud.Identity;
 
 public class Program
@@ -31,7 +29,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         await builder.LoadConfigurationAsync(ServiceId.Identity);
-        builder.AddBarkCloudSerilog("BarkCloud.Identity");
+        await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Identity");
         builder.SetRunningAddress(builder.Configuration);
 
         builder.Services.AddBarkCloudGrpc();
@@ -147,8 +145,7 @@ public class Program
         app.MapGrpcService<IdentityServerApiService>();
         app.MapGrpcService<SessionRevocationApiService>();
 
-        app.Lifetime.ApplicationStopped.Register(Log.CloseAndFlush);
-        app.Run();
+        await app.RunAsync();
 
     }
 }

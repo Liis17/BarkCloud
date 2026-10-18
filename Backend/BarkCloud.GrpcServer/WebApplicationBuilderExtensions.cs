@@ -74,6 +74,7 @@ public static class WebApplicationBuilderExtensions
     public static async Task<WebApplicationBuilder> LoadConfigurationAsync(this WebApplicationBuilder builder,
         ServiceId serviceId, CancellationToken cancellationToken = default)
     {
+        var loggingOptions = LoggingStartupOptions.Capture(builder);
         var configurationServiceAddress = Environment.GetEnvironmentVariable("CONFIGURATION_SERVICE_URL")
                                           ?? builder.Configuration["ConfigurationServiceAddr"]
                                           ?? "http://localhost:7003";
@@ -93,13 +94,20 @@ public static class WebApplicationBuilderExtensions
         }
 
         return await LoadConfigurationAsync(builder, serviceId, configurationServiceAddress,
-            configurationApiClient, headers, TimeProvider.System, cancellationToken);
+            configurationApiClient, headers, TimeProvider.System, loggingOptions, cancellationToken);
     }
 
     internal static async Task<WebApplicationBuilder> LoadConfigurationAsync(WebApplicationBuilder builder,
         ServiceId serviceId, string configurationServiceAddress,
         ConfigurationApi.ConfigurationApiClient client, Metadata? headers, TimeProvider timeProvider,
         CancellationToken cancellationToken = default)
+        => await LoadConfigurationAsync(builder, serviceId, configurationServiceAddress, client,
+            headers, timeProvider, LoggingStartupOptions.Capture(builder), cancellationToken);
+
+    private static async Task<WebApplicationBuilder> LoadConfigurationAsync(WebApplicationBuilder builder,
+        ServiceId serviceId, string configurationServiceAddress,
+        ConfigurationApi.ConfigurationApiClient client, Metadata? headers, TimeProvider timeProvider,
+        LoggingStartupOptions loggingOptions, CancellationToken cancellationToken)
     {
         const int maxAttempts = 5;
         for (var attempt = 1; ; attempt++)
@@ -134,9 +142,12 @@ public static class WebApplicationBuilderExtensions
                     $"[{serviceId}] Configuration ({configurationServiceAddress}) не готов после {maxAttempts} проверок. " +
                     $"Последняя причина: {reason}.");
 
-            Console.Error.WriteLine(
-                $"[startup] [{serviceId}] Configuration ({configurationServiceAddress}): {reason} " +
-                $"(попытка {attempt}/{maxAttempts}). Повтор через 5 с.");
+            if (loggingOptions.ConsoleOutput)
+            {
+                Console.Error.WriteLine(
+                    $"[startup] [{serviceId}] Configuration ({configurationServiceAddress}): {reason} " +
+                    $"(попытка {attempt}/{maxAttempts}). Повтор через 5 с.");
+            }
             await Task.Delay(TimeSpan.FromSeconds(5), timeProvider, cancellationToken);
         }
 
@@ -145,7 +156,7 @@ public static class WebApplicationBuilderExtensions
             cancellationToken: cancellationToken);
         var config = await configurationCall.ResponseAsync;
 
-        var configurationDictionary = new Dictionary<string, string>();
+        var configurationDictionary = new Dictionary<string, string?>();
 
         foreach (var configurationItem in config.Configurations)
         {
@@ -197,6 +208,8 @@ public static class WebApplicationBuilderExtensions
         }
 
         configurationDictionary.Add("ConfigurationServiceAddr", configurationServiceAddress);
+        foreach (var option in LoggingStartupOptions.ToConfiguration(loggingOptions))
+            configurationDictionary[option.Key] = option.Value;
 
         builder.Configuration.AddInMemoryCollection(configurationDictionary);
 
