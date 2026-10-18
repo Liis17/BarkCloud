@@ -55,6 +55,7 @@
                             <ui:ToggleSwitch x:Name="RabbitToggle" Margin="0,4" Content="rabbitmq (очередь)" IsChecked="{Binding IncludeRabbitmq}" />
                             <ui:ToggleSwitch x:Name="PostgresToggle" Margin="0,4" Content="postgres (БД)" IsChecked="{Binding IncludePostgres}" />
                             <ui:ToggleSwitch x:Name="SeqToggle" Margin="0,4" Content="seq (логи)" IsChecked="{Binding IncludeSeq}" />
+                            <ui:ToggleSwitch x:Name="LognaraToggle" Margin="0,4" Content="Lognara (логи Configuration)" IsChecked="{Binding IncludeLognara}" />
                             <ui:ToggleSwitch x:Name="TorrentToggle" Margin="0,4" Content="torrent (загрузка торрентов)" IsChecked="{Binding IncludeTorrent}" />
                         </UniformGrid>
 
@@ -545,6 +546,40 @@
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="SEQ_DATA_PATH (пусто — named volume)" />
                         <ui:TextBox PlaceholderText="./data/seq" Text="{Binding SeqDataPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- Lognara -->
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon DocumentBulletList24}"
+                                 Visibility="{Binding IsChecked, ElementName=LognaraToggle, Converter={StaticResource BoolToVis}}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Lognara" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Сбор stdout/stderr Configuration и логов Serilog" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_NETWORK (внешняя Docker-сеть relay)" />
+                        <ui:TextBox Text="{Binding LognaraNetworkName, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_RELAY_URL (HTTP endpoint /v1/batches)" />
+                        <ui:TextBox Text="{Binding LognaraRelayUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
+                                    Title="Подключение к relay"
+                                    Message="Создайте внешнюю сеть заранее и подключите к ней relay. Агент поддерживает только HTTP; HTTPS не поддерживается." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_CONFIGURATION_TOKEN (персональный токен агента из dock)" />
+                        <ui:TextBox Text="{Binding LognaraConfigurationToken, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_SERVER" />
+                        <ui:TextBox Text="{Binding LognaraServer, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_BACKEND" />
+                        <ui:TextBox Text="{Binding LognaraBackend, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_ENVIRONMENT (необязательно)" />
+                        <ui:TextBox Text="{Binding LognaraEnvironment, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="LOGNARA_CONFIGURATION_SPOOL_PATH (пусто — named volume)" />
+                        <ui:TextBox PlaceholderText="./data/lognara-configuration" Text="{Binding LognaraConfigurationSpoolPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False" IsOpen="True"
+                                    Title="Права каталога spool"
+                                    Message="Bind-путь должен быть доступен на запись UID/GID 1654. При отсутствии прав агент не запустится и Configuration не поднимется." />
                     </StackPanel>
                 </ui:CardExpander>
 
