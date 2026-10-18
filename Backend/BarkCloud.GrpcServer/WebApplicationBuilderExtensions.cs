@@ -71,7 +71,8 @@ public static class WebApplicationBuilderExtensions
         return builder;
     }
 
-    public static WebApplicationBuilder LoadConfiguration(this WebApplicationBuilder builder, ServiceId serviceId)
+    public static async Task<WebApplicationBuilder> LoadConfigurationAsync(this WebApplicationBuilder builder,
+        ServiceId serviceId, CancellationToken cancellationToken = default)
     {
         var configurationServiceAddress = Environment.GetEnvironmentVariable("CONFIGURATION_SERVICE_URL")
                                           ?? builder.Configuration["ConfigurationServiceAddr"]
@@ -91,8 +92,58 @@ public static class WebApplicationBuilderExtensions
             headers = new Metadata { { "x-config-access-key", accessKey } };
         }
 
-        var config = configurationApiClient.GetConfiguration(
-            new GetConfigurationRequest { ServiceId = (int)serviceId }, headers);
+        return await LoadConfigurationAsync(builder, serviceId, configurationServiceAddress,
+            configurationApiClient, headers, TimeProvider.System, cancellationToken);
+    }
+
+    internal static async Task<WebApplicationBuilder> LoadConfigurationAsync(WebApplicationBuilder builder,
+        ServiceId serviceId, string configurationServiceAddress,
+        ConfigurationApi.ConfigurationApiClient client, Metadata? headers, TimeProvider timeProvider,
+        CancellationToken cancellationToken = default)
+    {
+        const int maxAttempts = 5;
+        for (var attempt = 1; ; attempt++)
+        {
+            string reason;
+            try
+            {
+                using var readinessCall = client.GetReadinessAsync(new GetReadinessRequest(), headers,
+                    deadline: DateTime.UtcNow.AddSeconds(2), cancellationToken: cancellationToken);
+                if ((await readinessCall.ResponseAsync).Ready)
+                    break;
+                reason = "Configuration ещё не завершил инициализацию";
+            }
+            catch (RpcException ex) when (ex.StatusCode is StatusCode.Unavailable or StatusCode.DeadlineExceeded)
+            {
+                // Не печатаем произвольный ответ сервера: он может содержать чувствительные данные.
+                reason = ex.StatusCode.ToString();
+            }
+            catch (RpcException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+            catch (RpcException ex)
+            {
+                throw new InvalidOperationException(
+                    $"[{serviceId}] Проверка готовности Configuration ({configurationServiceAddress}) " +
+                    $"завершилась ошибкой {ex.StatusCode}. Проверьте bootstrap-ключ и версию Configuration.");
+            }
+
+            if (attempt == maxAttempts)
+                throw new InvalidOperationException(
+                    $"[{serviceId}] Configuration ({configurationServiceAddress}) не готов после {maxAttempts} проверок. " +
+                    $"Последняя причина: {reason}.");
+
+            Console.Error.WriteLine(
+                $"[startup] [{serviceId}] Configuration ({configurationServiceAddress}): {reason} " +
+                $"(попытка {attempt}/{maxAttempts}). Повтор через 5 с.");
+            await Task.Delay(TimeSpan.FromSeconds(5), timeProvider, cancellationToken);
+        }
+
+        using var configurationCall = client.GetConfigurationAsync(
+            new GetConfigurationRequest { ServiceId = (int)serviceId }, headers,
+            cancellationToken: cancellationToken);
+        var config = await configurationCall.ResponseAsync;
 
         var configurationDictionary = new Dictionary<string, string>();
 
@@ -110,8 +161,10 @@ public static class WebApplicationBuilderExtensions
 
         if (serviceId == ServiceId.Files)
         {
-            var profiles = configurationApiClient.GetStorageProfiles(
-                new GetStorageProfilesRequest { IncludeRevisions = false }, headers);
+            using var profilesCall = client.GetStorageProfilesAsync(
+                new GetStorageProfilesRequest { IncludeRevisions = false }, headers,
+                cancellationToken: cancellationToken);
+            var profiles = await profilesCall.ResponseAsync;
             foreach (var profile in profiles.Profiles)
             {
                 var prefix = $"StorageProfiles:{profile.ProfileId}";

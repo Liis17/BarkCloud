@@ -13,7 +13,7 @@ public static class SerilogExtensions
 {
     /// <summary>
     /// Настраивает Serilog с выводом в консоль и Seq.
-    /// Вызывать ПОСЛЕ LoadConfiguration(), чтобы Seq URL из конфигурации был доступен.
+    /// Вызывать ПОСЛЕ LoadConfigurationAsync(), чтобы Seq URL из конфигурации был доступен.
     /// </summary>
     public static WebApplicationBuilder AddBarkCloudSerilog(this WebApplicationBuilder builder, string serviceName)
     {

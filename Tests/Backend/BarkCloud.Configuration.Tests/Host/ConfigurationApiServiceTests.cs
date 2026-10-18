@@ -6,8 +6,12 @@ using BarkCloud.TestKit;
 
 using MediatR;
 
+using Grpc.Core;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Configuration.Tests.Host;
 
@@ -33,6 +37,29 @@ public sealed class ConfigurationApiServiceTests : IDisposable
             Mock.Of<IConfigurationStorage>(),
             new StorageProfileStorage(_context, metrics),
             new StorageQuotaGroupStorage(_context));
+    }
+
+    [Theory]
+    [InlineData("bootstrap-key", true)]
+    [InlineData("wrong-key", false)]
+    [InlineData(null, false)]
+    public async Task Readiness_UsesBootstrapAccessGate(string? providedKey, bool allowed)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["CONFIGURATION_ACCESS_KEY"] = "bootstrap-key" }).Build();
+        var interceptor = new ConfigurationAccessInterceptor(configuration,
+            NullLogger<ConfigurationAccessInterceptor>.Instance);
+        var context = new TestServerCallContext();
+        if (providedKey != null)
+            context.RequestHeaders.Add("x-config-access-key", providedKey);
+
+        var call = () => interceptor.UnaryServerHandler(new GetReadinessRequest(), context,
+            _service.GetReadiness);
+
+        if (allowed)
+            (await call()).Ready.Should().BeTrue();
+        else
+            (await Assert.ThrowsAsync<RpcException>(call)).StatusCode.Should().Be(StatusCode.Unauthenticated);
     }
 
     [Fact]
