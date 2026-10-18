@@ -13,11 +13,11 @@ namespace BarkCloud.Notification;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.LoadConfiguration(ServiceId.Notification);
+        await builder.LoadConfigurationAsync(ServiceId.Notification);
         builder.AddBarkCloudSerilog("BarkCloud.Notification");
         builder.SetRunningAddress(builder.Configuration);
         builder.Services.AddBarkCloudMetrics("BarkCloud.Notification");

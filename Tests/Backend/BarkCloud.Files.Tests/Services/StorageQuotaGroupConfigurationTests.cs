@@ -68,7 +68,7 @@ public sealed class StorageQuotaGroupConfigurationTests
             Environment.SetEnvironmentVariable("CONFIGURATION_ACCESS_KEY", null);
 
             var clientBuilder = WebApplication.CreateBuilder();
-            clientBuilder.LoadConfiguration(ServiceId.Files);
+            await clientBuilder.LoadConfigurationAsync(ServiceId.Files);
             clientBuilder.Configuration["StorageQuotaGroups:grp-main:Name"].Should().Be("Main");
             clientBuilder.Configuration["StorageQuotaGroups:grp-main:Buckets:1:BucketName"].Should().Be("videos");
             clientBuilder.Configuration["StorageQuotaGroups:grp-r2:Buckets:1:ServiceUrl"]
@@ -118,6 +118,10 @@ public sealed class StorageQuotaGroupConfigurationTests
     private sealed class FakeConfigurationApi(GetStorageProfilesResponse profiles)
         : ConfigurationApi.ConfigurationApiBase
     {
+        public override Task<GetReadinessResponse> GetReadiness(
+            GetReadinessRequest request,
+            Grpc.Core.ServerCallContext context) => Task.FromResult(new GetReadinessResponse { Ready = true });
+
         public override Task<GetConfigurationResponse> GetConfiguration(
             GetConfigurationRequest request,
             Grpc.Core.ServerCallContext context) => Task.FromResult(new GetConfigurationResponse());

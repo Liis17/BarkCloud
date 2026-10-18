@@ -43,6 +43,10 @@ public class ConfigurationApiService : BarkCloud.Proto.Configuration.Configurati
         _storageQuotaGroups = storageQuotaGroups;
     }
 
+    // Listener запускается только после успешных миграций и заполнения настроек в Program.
+    public override Task<GetReadinessResponse> GetReadiness(GetReadinessRequest request, ServerCallContext context)
+        => Task.FromResult(new GetReadinessResponse { Ready = true });
+
     public override async Task<GetConfigurationResponse> GetConfiguration(GetConfigurationRequest request, ServerCallContext context)
     {
         _metrics.Increment("config_get_requests");
