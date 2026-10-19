@@ -2,7 +2,7 @@ import React from 'react';
 import type { CardFile } from '../lib/types';
 
 const APP_NAME = 'BarkCloud';
-const DEFAULT_ICON_URL = '/barkcloud-icon-brand-b.png';
+const DEFAULT_ICON_URL = '/barkcloud-icon.png';
 const DYNAMIC_ICON_ATTR = 'data-barkcloud-dynamic-icon';
 const ICON_SIZE = 64;
 const ICON_RADIUS = 14;
