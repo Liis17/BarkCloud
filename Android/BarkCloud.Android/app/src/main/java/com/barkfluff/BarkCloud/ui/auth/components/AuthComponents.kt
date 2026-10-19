@@ -70,7 +70,10 @@ fun AuthScaffold(
     val focus = remember { mutableStateMapOf<Any, Boolean>() }
     val report = remember { { key: Any, focused: Boolean -> if (focused) focus[key] = true else focus.remove(key); Unit } }
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
-        .windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+        .background(MaterialTheme.colorScheme.tertiaryContainer)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+        .background(MaterialTheme.colorScheme.surface).imePadding()) {
         val availableHeight = maxHeight
         val heroHeight = if (maxHeight < 600.dp || keyboard) 156.dp else if (compactHeader) 180.dp else 236.dp
         CompositionLocalProvider(LocalAuthFocus provides report, LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
