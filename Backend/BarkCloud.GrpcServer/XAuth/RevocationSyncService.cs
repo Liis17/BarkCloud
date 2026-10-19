@@ -1,5 +1,9 @@
+using BarkCloud.GrpcServer;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
+using System.Diagnostics;
 
 namespace BarkCloud.GrpcServer.XAuth;
 
@@ -23,17 +27,26 @@ public class RevocationSyncService(
         // чтобы следующий hosted service (Kestrel) не принимал запросы с пустым кэшем.
         for (var attempt = 1; ; attempt++)
         {
-            try
+            var retry = false;
+            using (var operation = BarkCloudDiagnostics.StartOperation("RevocationSync.InitialSnapshot"))
             {
-                Apply(await feed.FetchAsync(null, cancellationToken));
-                _lastFullSync = _timeProvider.GetUtcNow();
+                try
+                {
+                    Apply(await feed.FetchAsync(null, cancellationToken));
+                    _lastFullSync = _timeProvider.GetUtcNow();
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested && attempt < 6)
+                {
+                    operation.Activity.SetStatus(ActivityStatusCode.Error, ex.Message);
+                    logger.LogWarning(ex, "Не удалось загрузить снимок отзывов сессий, попытка {Attempt}", attempt);
+                    retry = true;
+                }
+            }
+
+            if (!retry)
                 break;
-            }
-            catch (Exception ex) when (!cancellationToken.IsCancellationRequested && attempt < 6)
-            {
-                logger.LogWarning(ex, "Не удалось загрузить снимок отзывов сессий, попытка {Attempt}", attempt);
-                await Task.Delay(TimeSpan.FromSeconds(1 << (attempt - 1)), _timeProvider, cancellationToken);
-            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1 << (attempt - 1)), _timeProvider, cancellationToken);
         }
 
         await base.StartAsync(cancellationToken);
@@ -44,9 +57,11 @@ public class RevocationSyncService(
         while (!stoppingToken.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromSeconds(5), _timeProvider, stoppingToken);
+            var fullResync = _timeProvider.GetUtcNow() - _lastFullSync >= FullResyncInterval;
+            using var operation = BarkCloudDiagnostics.StartOperation("RevocationSync.Refresh");
+            operation.Activity.SetTag("revocation.sync.type", fullResync ? "full" : "incremental");
             try
             {
-                var fullResync = _timeProvider.GetUtcNow() - _lastFullSync >= FullResyncInterval;
                 Apply(await feed.FetchAsync(fullResync ? null : _serverTime.AddMinutes(-1), stoppingToken));
                 if (fullResync)
                 {
@@ -55,6 +70,7 @@ public class RevocationSyncService(
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
+                operation.Activity.SetStatus(ActivityStatusCode.Error, ex.Message);
                 logger.LogWarning(ex, "Не удалось обновить отзывы сессий; сохранён предыдущий кэш");
             }
         }

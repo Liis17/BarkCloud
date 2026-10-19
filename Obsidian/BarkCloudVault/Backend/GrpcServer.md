@@ -13,6 +13,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 | `Backend/BarkCloud.GrpcServer/WebApplicationBuilderExtensions.cs` | `LoadConfigurationAsync`, `SetRunningAddress` | Bootstrap настроек и Kestrel |
 | `Backend/BarkCloud.GrpcServer/LoggingStartupOptions.cs` | `LoggingStartupOptions` | Локальный startup snapshot трёх флагов логирования |
 | `Backend/BarkCloud.GrpcServer/SerilogExtensions.cs` | `AddBarkCloudSerilogAsync` | Независимые sinks и общий logging lifecycle |
+| `Backend/BarkCloud.GrpcServer/BarkCloudDiagnostics.cs` | `StartOperation` | Контекст фоновой операции и listener штатной передачи trace-контекста |
 | `Backend/BarkCloud.GrpcServer/LognaraAgentRuntime.cs` | `LognaraAgentRuntime`, `BarkCloudLoggingLifetime` | Запуск, readiness, мониторинг и остановка принадлежащего хосту агента |
 | `Backend/BarkCloud.GrpcServer/ServiceCollectionExtensions.cs` | `AddBarkCloudGrpc` | Регистрация gRPC и interceptor'ов |
 | `Backend/BarkCloud.GrpcServer/ServerExceptionInterceptor.cs` | `ServerExceptionInterceptor` | Преобразование ошибок |
@@ -40,5 +41,11 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 `configuration_api.proto` и `session_revocation_api.proto` генерируются этим проектом с `GrpcServices="Both"`. Остальные backend-проекты подключают необходимые `.proto` с собственными параметрами генерации. См. [[Shared/Proto]].
 
 ## Ограничения и важные детали
+
+### Корреляция логов
+
+После настройки Serilog каждое событие общего pipeline имеет нативные `LogEvent.TraceId` и `SpanId`. Общая обёртка перед разветвлением sinks сохраняет существующие ID, а недостающие генерирует один раз на событие. Поэтому Console, Seq (`@tr`/`@sp`) и Lognara (`trace_id`/`span_id`) получают одинаковую пару; обычные пользовательские свойства с такими именами не заменяют нативные ID. Fallback не меняет `Activity.Current` и не объединяет несвязанные записи одной трассой процесса. Ранний stderr загрузчика Configuration и аварийный вывод после закрытия логгера в эту гарантию не входят.
+
+Logging lifetime включает `ActivityListener` с `PropagationData` для BarkCloud, ASP.NET Core, HTTP/gRPC-клиентов и MassTransit; listener освобождается после flush логгера. Экспорт spans не подключён. HTTP/gRPC и сообщения используют штатную передачу контекста библиотек. `BarkCloudDiagnostics.StartOperation` создаёт W3C Activity: переданный контекст становится родителем, а default начинает независимую корневую операцию. Dispose восстанавливает предыдущую ambient Activity. Фоновые задачи ограничивают операцию одним проходом или заданием; каждый `ServiceMetrics` имеет собственную трассу отчёта, без привязки всех агрегированных запросов к этому ID. Контекст отложенных писем сохраняется отдельно в [[Backend/IdentityNotificationOutbox]].
 
 `ServerExceptionInterceptor` преобразует `BaseGrpcException` в `FailedPrecondition` с trailing metadata `x-error-code`; необработанное исключение становится `Unknown`. Клиентский перехватчик из [[Shared/SharedLibraries]] восстанавливает известные доменные ошибки по коду.
