@@ -27,7 +27,7 @@ public static class BuilderConfigLoader
         m.IncludeRabbitmq = HasService("cloud-rabbitmq");
         m.IncludePostgres = HasService("cloud-postgres");
         m.IncludeSeq = HasService("cloud-seq");
-        var hasLognaraRelay = HasService("lognara-relay");
+        var hasLognaraRelay = HasService("cloud-relay") || HasService("lognara-relay");
         m.LegacyLognaraImport = !hasLognaraRelay
             && (e.ContainsKey("LOGNARA_RELAY_URL")
                 || HasComposeText("Lognara__AgentUrl")
