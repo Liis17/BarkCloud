@@ -5,7 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 using Serilog;
+using Serilog.Core;
 using Serilog.Events;
+
+using System.Diagnostics;
 
 namespace BarkCloud.GrpcServer;
 
@@ -26,8 +29,12 @@ public static class SerilogExtensions
         var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://cloud-seq:5341";
         LognaraAgentRuntime? agent = null;
         Serilog.ILogger? logger = null;
+        ActivityListener? activityListener = null;
         try
         {
+            activityListener = BarkCloudDiagnostics.CreateActivityListener();
+            ActivitySource.AddActivityListener(activityListener);
+
             if (startupOptions.LognaraEnable)
             {
                 Directory.CreateDirectory(LognaraAgentRuntime.SpoolDirectory);
@@ -57,7 +64,7 @@ public static class SerilogExtensions
                         services.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LognaraAgentMonitorService>>()));
             }
 
-            return new BarkCloudLoggingLifetime(startupOptions.ConsoleOutput, agent);
+            return new BarkCloudLoggingLifetime(startupOptions.ConsoleOutput, agent, activityListener: activityListener);
         }
         catch (Exception startupError)
         {
@@ -74,6 +81,15 @@ public static class SerilogExtensions
                 {
                     cleanupError = exception;
                 }
+            }
+
+            try
+            {
+                activityListener?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                cleanupError ??= exception;
             }
 
             try
@@ -112,31 +128,79 @@ public static class SerilogExtensions
             .Enrich.WithThreadId()
             .Enrich.WithProperty("Application", serviceName);
 
-        if (startupOptions.SeqEnable)
+        Action<Serilog.Configuration.LoggerSinkConfiguration> configureWrappedSinks = sinks =>
         {
-            loggerConfig.WriteTo.Seq(seqUrl,
-                bufferBaseFilename: seqBufferBaseFilename,
-                bufferSizeLimitBytes: 104857600,
-                batchPostingLimit: 100,
-                period: TimeSpan.FromSeconds(2),
-                queueSizeLimit: 100000,
-                messageHandler: new BoundedHttpMessageHandler(SeqFlushRequestTimeout));
-        }
+            if (startupOptions.SeqEnable)
+            {
+                sinks.Seq(seqUrl,
+                    bufferBaseFilename: seqBufferBaseFilename,
+                    bufferSizeLimitBytes: 104857600,
+                    batchPostingLimit: 100,
+                    period: TimeSpan.FromSeconds(2),
+                    queueSizeLimit: 100000,
+                    messageHandler: new BoundedHttpMessageHandler(SeqFlushRequestTimeout));
+            }
 
-        if (startupOptions.ConsoleOutput)
-        {
-            loggerConfig.WriteTo.Console(
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
-        }
+            if (startupOptions.ConsoleOutput)
+            {
+                sinks.Console(
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] [{SourceContext}] [{TraceId}] [{SpanId}] {Message:lj}{NewLine}{Exception}");
+            }
 
-        if (startupOptions.LognaraEnable)
-        {
-            loggerConfig.WriteTo.Lognara(
-                lognaraAgentUrl,
-                period: TimeSpan.FromSeconds(2));
-        }
+            if (startupOptions.LognaraEnable)
+            {
+                sinks.Lognara(
+                    lognaraAgentUrl,
+                    period: TimeSpan.FromSeconds(2));
+            }
+        };
+        Func<ILogEventSink, ILogEventSink> wrapSink = sink => new TraceContextLogEventSink(sink);
+        var sharedSink = Serilog.Configuration.LoggerSinkConfiguration.Wrap(wrapSink, configureWrappedSinks);
+
+        loggerConfig.WriteTo.Sink(sharedSink);
 
         return loggerConfig;
+    }
+
+    private sealed class TraceContextLogEventSink(ILogEventSink innerSink) : ILogEventSink
+    {
+        public void Emit(LogEvent logEvent)
+        {
+            var traceId = logEvent.TraceId.GetValueOrDefault();
+            var spanId = logEvent.SpanId.GetValueOrDefault();
+            if (traceId == default && spanId == default)
+            {
+                traceId = ActivityTraceId.CreateRandom();
+                spanId = ActivitySpanId.CreateRandom();
+            }
+            else if (traceId == default)
+            {
+                traceId = ActivityTraceId.CreateRandom();
+            }
+            else if (spanId == default)
+            {
+                spanId = ActivitySpanId.CreateRandom();
+            }
+
+            if (traceId == logEvent.TraceId.GetValueOrDefault() && spanId == logEvent.SpanId.GetValueOrDefault())
+            {
+                innerSink.Emit(logEvent);
+                return;
+            }
+
+            var properties = logEvent.Properties.Select(property =>
+                new LogEventProperty(property.Key, property.Value));
+            var eventWithTraceContext = new LogEvent(
+                logEvent.Timestamp,
+                logEvent.Level,
+                logEvent.Exception,
+                logEvent.MessageTemplate,
+                properties,
+                traceId,
+                spanId);
+
+            innerSink.Emit(eventWithTraceContext);
+        }
     }
 
     private sealed class BoundedHttpMessageHandler(TimeSpan timeout)

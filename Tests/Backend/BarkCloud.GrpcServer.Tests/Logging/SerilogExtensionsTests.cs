@@ -1,7 +1,9 @@
 using BarkCloud.GrpcServer.Tests.Logging;
+using BarkCloud.GrpcServer.Metrics;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 using Serilog;
 
@@ -111,6 +113,223 @@ public class SerilogExtensionsTests
     }
 
     [Fact]
+    public async Task FallbackTraceContextIsSharedBySeqLognaraAndConsole()
+    {
+        await using var seqEndpoint = await FakeHttpEndpoint.StartAsync();
+        await using var lognaraEndpoint = await FakeHttpEndpoint.StartAsync();
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), $"barkcloud-trace-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        using var consoleOutput = new StringWriter();
+        var originalConsole = Console.Out;
+        var previousActivity = Activity.Current;
+        Console.SetOut(consoleOutput);
+        Activity.Current = null;
+
+        try
+        {
+            var logger = SerilogExtensions.ConfigureLogger(
+                new LoggerConfiguration(),
+                new LoggingStartupOptions(true, true, true),
+                "BarkCloud.Test",
+                seqEndpoint.Address,
+                $"{lognaraEndpoint.Address}/v1/logs",
+                Path.Combine(temporaryDirectory, "seq-buffer"))
+                .CreateLogger();
+
+            logger.Information("fallback-trace-context-marker");
+            Activity.Current.Should().BeNull();
+            await DisposeLoggerAsync(logger);
+
+            var seqEvent = ReadEvents(await seqEndpoint.ReadAsync(TimeSpan.FromSeconds(3)), "@tr", "@sp").Single();
+            var lognaraEvent = ReadEvents(await lognaraEndpoint.ReadAsync(TimeSpan.FromSeconds(3)), "trace_id", "span_id").Single();
+
+            seqEvent.TraceId.Should().NotBeNullOrWhiteSpace().And.HaveLength(32);
+            seqEvent.SpanId.Should().NotBeNullOrWhiteSpace().And.HaveLength(16);
+            seqEvent.Should().Be(lognaraEvent);
+            consoleOutput.ToString().Should().Contain(seqEvent.TraceId!).And.Contain(seqEvent.SpanId!);
+        }
+        finally
+        {
+            Activity.Current = previousActivity;
+            Console.SetOut(originalConsole);
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task MicrosoftLoggerExceptionEventCarriesNativeTraceContext()
+    {
+        await using var seqEndpoint = await FakeHttpEndpoint.StartAsync();
+        await using var lognaraEndpoint = await FakeHttpEndpoint.StartAsync();
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), $"barkcloud-logger-trace-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+
+        try
+        {
+            var logger = SerilogExtensions.ConfigureLogger(
+                new LoggerConfiguration(),
+                new LoggingStartupOptions(false, true, true),
+                "BarkCloud.Test",
+                seqEndpoint.Address,
+                $"{lognaraEndpoint.Address}/v1/logs",
+                Path.Combine(temporaryDirectory, "seq-buffer"))
+                .CreateLogger();
+
+            using (var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(logger, dispose: false)))
+            {
+                var typedLogger = loggerFactory.CreateLogger<SerilogExtensionsTests>();
+                typedLogger.LogError(
+                    new InvalidOperationException("logger-exception-detail"),
+                    "logger-exception-event {RequestId}",
+                    "logger-request-42");
+            }
+
+            await DisposeLoggerAsync(logger);
+
+            var seqRequest = await seqEndpoint.ReadAsync(TimeSpan.FromSeconds(3));
+            var lognaraRequest = await lognaraEndpoint.ReadAsync(TimeSpan.FromSeconds(3));
+            var seqContext = ReadEvents(seqRequest, "@tr", "@sp").Single();
+            var lognaraContext = ReadEvents(lognaraRequest, "trace_id", "span_id").Single();
+
+            seqContext.Should().Be(lognaraContext);
+            seqContext.TraceId.Should().NotBeNullOrWhiteSpace();
+            seqContext.SpanId.Should().NotBeNullOrWhiteSpace();
+            seqRequest.Body.Should().Contain("logger-exception-detail").And.Contain("logger-request-42");
+            lognaraRequest.Body.Should().Contain("logger-exception-detail").And.Contain("logger-request-42");
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task MetricsReporterEmitsNativeTraceContextInServiceMetricsPayload()
+    {
+        await using var lognaraEndpoint = await FakeHttpEndpoint.StartAsync();
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), $"barkcloud-metrics-trace-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        var collector = new MetricsCollector();
+        collector.Increment("requests.completed");
+
+        var logger = SerilogExtensions.ConfigureLogger(
+            new LoggerConfiguration(),
+            new LoggingStartupOptions(false, false, true),
+            "BarkCloud.Test",
+            "http://127.0.0.1:1",
+            $"{lognaraEndpoint.Address}/v1/logs",
+            Path.Combine(temporaryDirectory, "seq-buffer"))
+            .CreateLogger();
+
+        try
+        {
+            using var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(logger, dispose: false));
+            var reporter = new MetricsReporterService(
+                collector,
+                loggerFactory.CreateLogger<MetricsReporterService>(),
+                "BarkCloud.Test");
+
+            await reporter.StartAsync(CancellationToken.None);
+            try
+            {
+                var request = await lognaraEndpoint.ReadAsync(TimeSpan.FromSeconds(8));
+                var traceContext = ReadEvents(request, "trace_id", "span_id").Single();
+
+                request.Body.Should().Contain("ServiceMetrics").And.Contain("requests.completed");
+                traceContext.TraceId.Should().NotBeNullOrWhiteSpace().And.HaveLength(32);
+                traceContext.SpanId.Should().NotBeNullOrWhiteSpace().And.HaveLength(16);
+            }
+            finally
+            {
+                await reporter.StopAsync(CancellationToken.None);
+            }
+        }
+        finally
+        {
+            await DisposeLoggerAsync(logger);
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingActivityTraceContextIsPreservedAcrossSinks()
+    {
+        await using var seqEndpoint = await FakeHttpEndpoint.StartAsync();
+        await using var lognaraEndpoint = await FakeHttpEndpoint.StartAsync();
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), $"barkcloud-existing-trace-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+
+        try
+        {
+            var logger = SerilogExtensions.ConfigureLogger(
+                new LoggerConfiguration(),
+                new LoggingStartupOptions(false, true, true),
+                "BarkCloud.Test",
+                seqEndpoint.Address,
+                $"{lognaraEndpoint.Address}/v1/logs",
+                Path.Combine(temporaryDirectory, "seq-buffer"))
+                .CreateLogger();
+
+            using var activity = new Activity("existing-trace-context")
+                .SetIdFormat(ActivityIdFormat.W3C)
+                .Start();
+            logger.Information("existing-trace-context-marker");
+            await DisposeLoggerAsync(logger);
+
+            var seqEvent = ReadEvents(await seqEndpoint.ReadAsync(TimeSpan.FromSeconds(3)), "@tr", "@sp").Single();
+            var lognaraEvent = ReadEvents(await lognaraEndpoint.ReadAsync(TimeSpan.FromSeconds(3)), "trace_id", "span_id").Single();
+            var expected = new SerializedTraceContext(activity.TraceId.ToHexString(), activity.SpanId.ToHexString());
+
+            seqEvent.Should().Be(expected);
+            lognaraEvent.Should().Be(expected);
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentFallbackEventsGetDistinctPairsSharedByBothSinks()
+    {
+        const int eventCount = 24;
+        await using var seqEndpoint = await FakeHttpEndpoint.StartAsync();
+        await using var lognaraEndpoint = await FakeHttpEndpoint.StartAsync();
+        var temporaryDirectory = Path.Combine(Path.GetTempPath(), $"barkcloud-concurrent-trace-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        var previousActivity = Activity.Current;
+        Activity.Current = null;
+
+        try
+        {
+            var logger = SerilogExtensions.ConfigureLogger(
+                new LoggerConfiguration(),
+                new LoggingStartupOptions(false, true, true),
+                "BarkCloud.Test",
+                seqEndpoint.Address,
+                $"{lognaraEndpoint.Address}/v1/logs",
+                Path.Combine(temporaryDirectory, "seq-buffer"))
+                .CreateLogger();
+
+            Parallel.For(0, eventCount, index => logger.Information("concurrent fallback event {EventNumber}", index));
+            await DisposeLoggerAsync(logger);
+
+            var seqEvents = await ReadEventsAsync(seqEndpoint, eventCount, "@tr", "@sp");
+            var lognaraEvents = await ReadEventsAsync(lognaraEndpoint, eventCount, "trace_id", "span_id");
+
+            seqEvents.Should().OnlyHaveUniqueItems();
+            lognaraEvents.Should().OnlyHaveUniqueItems();
+            seqEvents.OrderBy(x => x.TraceId).ThenBy(x => x.SpanId)
+                .Should().Equal(lognaraEvents.OrderBy(x => x.TraceId).ThenBy(x => x.SpanId));
+        }
+        finally
+        {
+            Activity.Current = previousActivity;
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task DelayedLognaraResponse_DoesNotBlockPastClientTimeoutOrWriteSinkBuffer()
     {
         await using var endpoint = await FakeHttpEndpoint.StartAsync(TimeSpan.FromSeconds(7));
@@ -152,4 +371,78 @@ public class SerilogExtensionsTests
 
     private static int Count(string value, string marker)
         => Regex.Matches(value, Regex.Escape(marker)).Count;
+
+    private static IEnumerable<SerializedTraceContext> ReadEvents(FakeRequest request, string traceProperty, string spanProperty)
+    {
+        var traceContexts = new List<SerializedTraceContext>();
+        JsonDocument? payload = null;
+        try
+        {
+            payload = JsonDocument.Parse(request.Body);
+        }
+        catch (JsonException)
+        {
+            // Seq uses newline-delimited CLEF records, while Lognara sends a JSON array.
+        }
+
+        if (payload is not null)
+        {
+            using (payload)
+                AddRoot(payload.RootElement);
+        }
+        else
+        {
+            foreach (var json in request.Body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                using var line = JsonDocument.Parse(json);
+                AddRoot(line.RootElement);
+            }
+        }
+
+        return traceContexts;
+
+        void AddRoot(JsonElement root)
+        {
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                AddEvents(root);
+            }
+            else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("Events", out var events))
+            {
+                AddEvents(events);
+            }
+            else
+            {
+                AddEvent(root);
+            }
+        }
+
+        void AddEvents(JsonElement events)
+        {
+            foreach (var logEvent in events.EnumerateArray())
+                AddEvent(logEvent);
+        }
+
+        void AddEvent(JsonElement logEvent)
+        {
+            traceContexts.Add(new SerializedTraceContext(
+                logEvent.GetProperty(traceProperty).GetString(),
+                logEvent.GetProperty(spanProperty).GetString()));
+        }
+    }
+
+    private static async Task<List<SerializedTraceContext>> ReadEventsAsync(
+        FakeHttpEndpoint endpoint,
+        int expectedCount,
+        string traceProperty,
+        string spanProperty)
+    {
+        var events = new List<SerializedTraceContext>(expectedCount);
+        while (events.Count < expectedCount)
+            events.AddRange(ReadEvents(await endpoint.ReadAsync(TimeSpan.FromSeconds(3)), traceProperty, spanProperty));
+
+        return events;
+    }
+
+    private sealed record SerializedTraceContext(string? TraceId, string? SpanId);
 }
