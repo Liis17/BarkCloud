@@ -1,4 +1,5 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 namespace BarkCloud.Files.Services;
 
@@ -23,23 +24,26 @@ public class TempFileCleanupService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            using (BarkCloudDiagnostics.StartOperation("files.temp-file-cleanup"))
             {
-                using var scope = _scopeFactory.CreateScope();
-                var storage = scope.ServiceProvider.GetRequiredService<ITempFilesStorage>();
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var storage = scope.ServiceProvider.GetRequiredService<ITempFilesStorage>();
 
-                var deleted = await storage.DeleteExpiredAsync(stoppingToken);
+                    var deleted = await storage.DeleteExpiredAsync(stoppingToken);
 
-                if (deleted > 0)
-                    _logger.LogInformation("Удалено {Count} устаревших временных ссылок", deleted);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка при очистке просроченных TempFile");
+                    if (deleted > 0)
+                        _logger.LogInformation("Удалено {Count} устаревших временных ссылок", deleted);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при очистке просроченных TempFile");
+                }
             }
 
             try

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -20,12 +21,14 @@ namespace BarkCloud.Web.Infrastructure;
 public sealed class StorageMigrationService(IStorageMigrationControl control, MigrationS3ClientFactory clients,
     S3MigrationCopier copier, ILogger<StorageMigrationService> logger) : BackgroundService
 {
+    private sealed record QueuedMigrationJob(StorageMigrationJob Job, string Operation, ActivityContext ParentContext);
+
     private sealed record Prepared(MigrationSource Source, MigrationConnection SourceConnection,
         MigrationConnection Destination, string Actor, DateTime ExpiresAt);
     private readonly object _commands = new();
     private readonly Dictionary<string, Prepared> _prepared = new();
     private readonly ConcurrentDictionary<string, StorageMigrationJob> _jobs = new();
-    private readonly Channel<StorageMigrationJob> _queue = System.Threading.Channels.Channel.CreateUnbounded<StorageMigrationJob>();
+    private readonly Channel<QueuedMigrationJob> _queue = System.Threading.Channels.Channel.CreateUnbounded<QueuedMigrationJob>();
     private readonly string _workDirectory = Path.Combine(Path.GetTempPath(), "barkcloud-migrations", Guid.NewGuid().ToString("N"));
     private string? _runningId;
 
@@ -191,20 +194,22 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
             var job = new StorageMigrationJob(source, target with { ServiceUrl = source.ServiceUrl, BucketName = source.BucketName }, target, actor, _workDirectory, id)
             { BarrierStarted = true, ConfigurationApplied = true, PointOfNoReturn = true, FinalSyncDone = true };
             _jobs[id] = job;
-            Enqueue(job, "apply");
+            Enqueue(job, "apply", default(ActivityContext));
             return job.Snapshot();
         }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var job in _queue.Reader.ReadAllAsync(stoppingToken))
+        await foreach (var queued in _queue.Reader.ReadAllAsync(stoppingToken))
         {
+            using var operation = BarkCloudDiagnostics.StartOperation($"web.storage-migration.{queued.Operation}", queued.ParentContext);
+            var job = queued.Job;
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, job.Cancellation.Token);
             try
             {
                 job.Update(() => { job.State = "running"; job.Error = null; });
-                if (job.Operation == "copy") await CopyPassAsync(job, false, linked.Token);
+                if (queued.Operation == "copy") await CopyPassAsync(job, false, linked.Token);
                 else await ApplyJobAsync(job, linked.Token, stoppingToken);
             }
             catch (OperationCanceledException) when (job.Cancellation.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
@@ -477,11 +482,11 @@ public sealed class StorageMigrationService(IStorageMigrationControl control, Mi
         if (barriers.Any(x => x.MigrationId == id && x.State != "applied")) await control.CancelAsync(id, ct);
     }
 
-    private void Enqueue(StorageMigrationJob job, string operation)
+    private void Enqueue(StorageMigrationJob job, string operation, ActivityContext? parentContext = null)
     {
         job.Update(() => { job.Operation = operation; job.State = "queued"; job.Error = null; });
         _runningId = job.Id;
-        _queue.Writer.TryWrite(job);
+        _queue.Writer.TryWrite(new(job, operation, parentContext ?? Activity.Current?.Context ?? default));
     }
     private void RequireIdle() { if (_runningId is not null) throw new InvalidOperationException("Другая миграция уже выполняется."); }
     private StorageMigrationJob Find(string id) => _jobs.TryGetValue(id, out var job) ? job : throw new InvalidOperationException("Задача не найдена. После перезапуска Web временные задачи не восстанавливаются.");

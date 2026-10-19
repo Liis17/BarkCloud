@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.Torrent.Persistence;
 
 using MonoTorrent;
@@ -30,6 +31,7 @@ public class TorrentStartupService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        using var startupOperation = BarkCloudDiagnostics.StartOperation("torrent.startup");
         var downloadPath = _configuration["Torrent:DownloadPath"] ?? "/mnt/torrents";
         var peerPort = int.TryParse(_configuration["Torrent:PeerPort"], out var p) && p > 0 ? p : 6881;
 
@@ -41,23 +43,26 @@ public class TorrentStartupService : IHostedService
 
         foreach (var entity in all)
         {
-            try
+            using (BarkCloudDiagnostics.StartOperation("torrent.startup.restore", System.Diagnostics.Activity.Current?.Context ?? default))
             {
-                var start = !entity.Paused;
-                TorrentEngineService.ManagedTorrent managed;
+                try
+                {
+                    var start = !entity.Paused;
+                    TorrentEngineService.ManagedTorrent managed;
 
-                if (!string.IsNullOrEmpty(entity.MagnetUri))
-                    managed = await _engine.AddMagnetAsync(entity.Id, entity.MagnetUri, entity.SavePath, start);
-                else if (entity.TorrentFile is { Length: > 0 })
-                    managed = await _engine.AddTorrentFileAsync(entity.Id, entity.TorrentFile, entity.SavePath, start);
-                else
-                    continue;
+                    if (!string.IsNullOrEmpty(entity.MagnetUri))
+                        managed = await _engine.AddMagnetAsync(entity.Id, entity.MagnetUri, entity.SavePath, start);
+                    else if (entity.TorrentFile is { Length: > 0 })
+                        managed = await _engine.AddTorrentFileAsync(entity.Id, entity.TorrentFile, entity.SavePath, start);
+                    else
+                        continue;
 
-                await ReapplyPrioritiesAsync(managed, entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Не удалось восстановить торрент {Id}", entity.Id);
+                    await ReapplyPrioritiesAsync(managed, entity);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Не удалось восстановить торрент {Id}", entity.Id);
+                }
             }
         }
 

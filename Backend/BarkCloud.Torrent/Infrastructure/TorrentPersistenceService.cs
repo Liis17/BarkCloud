@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.Proto.Torrent;
 using BarkCloud.Torrent.Persistence;
 
@@ -31,27 +32,30 @@ public class TorrentPersistenceService : BackgroundService
         var tick = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            using (BarkCloudDiagnostics.StartOperation("torrent.persistence-pass"))
             {
-                await FlushAsync(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Ошибка при сохранении статистики торрентов");
-            }
+                try
+                {
+                    await FlushAsync(stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Ошибка при сохранении статистики торрентов");
+                }
 
-            try
-            {
-                await _engine.ReconcilePausedAsync(ReadPausedAsync, stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Ошибка при согласовании состояния Paused");
-            }
+                try
+                {
+                    await _engine.ReconcilePausedAsync(ReadPausedAsync, stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Ошибка при согласовании состояния Paused");
+                }
 
-            // Диагностический лог раз в 30 с (каждые 6 тиков по 5 с).
-            if (++tick % 6 == 0)
-                LogEngineState();
+                // Диагностический лог раз в 30 с (каждые 6 тиков по 5 с).
+                if (++tick % 6 == 0)
+                    LogEngineState();
+            }
 
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }

@@ -1,5 +1,6 @@
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -19,17 +20,20 @@ public sealed class FilePlaceholderBackfillService(
             await Task.Delay(TimeSpan.FromSeconds(60), timeProvider, stoppingToken);
             while (!stoppingToken.IsCancellationRequested)
             {
-                try
+                using (BarkCloudDiagnostics.StartOperation("files.placeholder-backfill.pass"))
                 {
-                    await RunPassAsync(stoppingToken);
-                }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Ошибка фонового прохода цветов превью");
+                    try
+                    {
+                        await RunPassAsync(stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Ошибка фонового прохода цветов превью");
+                    }
                 }
 
                 await Task.Delay(TimeSpan.FromMinutes(5), timeProvider, stoppingToken);
@@ -72,26 +76,29 @@ public sealed class FilePlaceholderBackfillService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 cursor = id;
-                try
+                using (BarkCloudDiagnostics.StartOperation("files.placeholder-backfill.file", System.Diagnostics.Activity.Current?.Context ?? default))
                 {
-                    using var scope = scopeFactory.CreateScope();
-                    var context = scope.ServiceProvider.GetRequiredService<FilesContext>();
-                    var file = await context.UploadedFiles.AsNoTracking().WhereReady()
-                        .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
-                    if (file is not null && await scope.ServiceProvider.GetRequiredService<FilePlaceholderService>()
-                        .EnsureAsync(file, cancellationToken: cancellationToken))
-                        processed++;
-                    else
-                        skipped++;
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    failed++;
-                    logger.LogWarning(ex, "Не удалось получить цвета превью файла {FileId}", id);
+                    try
+                    {
+                        using var scope = scopeFactory.CreateScope();
+                        var context = scope.ServiceProvider.GetRequiredService<FilesContext>();
+                        var file = await context.UploadedFiles.AsNoTracking().WhereReady()
+                            .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+                        if (file is not null && await scope.ServiceProvider.GetRequiredService<FilePlaceholderService>()
+                            .EnsureAsync(file, cancellationToken: cancellationToken))
+                            processed++;
+                        else
+                            skipped++;
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        logger.LogWarning(ex, "Не удалось получить цвета превью файла {FileId}", id);
+                    }
                 }
             }
         }

@@ -362,6 +362,7 @@ public sealed class BarkCloudLoggingLifetime : IAsyncDisposable
     internal static readonly TimeSpan FlushTimeout = TimeSpan.FromSeconds(20);
     private readonly bool _consoleOutput;
     private readonly LognaraAgentRuntime? _agent;
+    private readonly ActivityListener? _activityListener;
     private readonly Func<Task> _flushLogger;
     private readonly TimeSpan _flushTimeout;
     private int _disposed;
@@ -370,12 +371,14 @@ public sealed class BarkCloudLoggingLifetime : IAsyncDisposable
         bool consoleOutput,
         LognaraAgentRuntime? agent,
         Func<Task>? flushLogger = null,
-        TimeSpan? flushTimeout = null)
+        TimeSpan? flushTimeout = null,
+        ActivityListener? activityListener = null)
     {
         _consoleOutput = consoleOutput;
         _agent = agent;
         _flushLogger = flushLogger ?? (() => Log.CloseAndFlushAsync().AsTask());
         _flushTimeout = flushTimeout ?? FlushTimeout;
+        _activityListener = activityListener;
     }
 
     public async ValueTask DisposeAsync()
@@ -391,6 +394,15 @@ public sealed class BarkCloudLoggingLifetime : IAsyncDisposable
         catch (Exception exception)
         {
             shutdownError = exception;
+        }
+
+        try
+        {
+            _activityListener?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            shutdownError ??= exception;
         }
 
         try

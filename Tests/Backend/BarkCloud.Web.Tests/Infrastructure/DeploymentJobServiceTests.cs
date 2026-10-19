@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+
 using BarkCloud.Web.Infrastructure;
 
 using Microsoft.Extensions.Configuration;
@@ -56,6 +59,46 @@ public sealed class DeploymentJobServiceTests
                 "prune");
             docker.Calls.Should().Contain("inspect-state:config-app");
             docker.Calls.Should().Contain("inspect-state:users-app");
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task QueuedJobs_RestoreTheirCapturedRequestContexts()
+    {
+        var docker = new FakeDocker();
+        var service = CreateService(docker);
+        await service.StartAsync(CancellationToken.None);
+
+        try
+        {
+            var firstRequest = new Activity("first-request").SetIdFormat(ActivityIdFormat.W3C).Start();
+            firstRequest.TraceStateString = "vendor=one";
+            var firstParent = firstRequest.Context;
+            var first = service.EnqueueUpdate(["users"]);
+            firstRequest.Stop();
+
+            var secondRequest = new Activity("second-request").SetIdFormat(ActivityIdFormat.W3C).Start();
+            secondRequest.TraceStateString = "vendor=two";
+            var secondParent = secondRequest.Context;
+            var second = service.EnqueueUpdate(["files"]);
+            secondRequest.Stop();
+
+            (await WaitForTerminalAsync(service, first.Id)).State.Should().Be(DeploymentJobState.Completed);
+            (await WaitForTerminalAsync(service, second.Id)).State.Should().Be(DeploymentJobState.Completed);
+
+            var captured = docker.OperationContexts.ToArray();
+            captured.Should().HaveCount(2);
+            captured[0].Context.TraceId.Should().Be(firstParent.TraceId);
+            captured[0].ParentSpanId.Should().Be(firstParent.SpanId);
+            captured[0].Context.TraceState.Should().Be(firstParent.TraceState);
+            captured[1].Context.TraceId.Should().Be(secondParent.TraceId);
+            captured[1].ParentSpanId.Should().Be(secondParent.SpanId);
+            captured[1].Context.TraceState.Should().Be(secondParent.TraceState);
+            captured[0].Context.TraceId.Should().NotBe(captured[1].Context.TraceId);
         }
         finally
         {
@@ -150,6 +193,7 @@ public sealed class DeploymentJobServiceTests
     private sealed class FakeDocker : IDockerDeployment
     {
         public List<string> Calls { get; } = [];
+        public ConcurrentQueue<(ActivityContext Context, ActivitySpanId ParentSpanId)> OperationContexts { get; } = new();
 
         public Dictionary<string, string> ContainerNames { get; } = DockerContainerNames.DefaultValues.ToDictionary(
             pair => pair.Key,
@@ -203,6 +247,8 @@ public sealed class DeploymentJobServiceTests
 
         public Task<DockerPreflightResult> PreflightAsync(IEnumerable<string> services, bool pullImages, CancellationToken cancellationToken = default)
         {
+            if (Activity.Current is { } activity)
+                OperationContexts.Enqueue((activity.Context, activity.ParentSpanId));
             Calls.Add(pullImages ? "preflight:update" : "preflight:restart");
             if (FailPreflight)
                 return Task.FromResult(new DockerPreflightResult(false, new HashSet<string>(), [], "preflight failed", "docker compose config failed"));

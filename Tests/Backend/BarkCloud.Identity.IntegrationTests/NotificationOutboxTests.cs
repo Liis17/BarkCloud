@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 
 using System.Security.Claims;
@@ -130,10 +131,16 @@ public class NotificationOutboxTests
     public async Task PersistedNotification_IsDeliveredByWorkerCreatedAfterRestart()
     {
         await using var database = await PostgresIdentityDatabase.CreateAsync();
+        ActivityContext original;
         await using (var context = database.CreateContext())
         {
-            context.PendingNotifications.Add(Row(new Dictionary<string, string> { ["n"] = "persisted" }));
-            await context.SaveChangesAsync();
+            using var activity = new Activity("request").SetIdFormat(ActivityIdFormat.W3C).Start();
+            activity.TraceStateString = "vendor=value";
+            original = activity.Context;
+            await new NotificationOutbox(context, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+                    new MetricsCollector(), NullLogger<NotificationOutbox>.Instance)
+                .EnqueueAsync(42, NotificationType.PasswordChanged, "t",
+                    new Dictionary<string, string> { ["n"] = "persisted" });
         }
 
         var published = new ConcurrentBag<string>();
@@ -146,6 +153,10 @@ public class NotificationOutboxTests
         (await restarted.Worker.ProcessBatchAsync(default)).Should().Be(1);
 
         published.Should().ContainSingle().Which.Should().Be("persisted");
+        restarted.DeliveryContext.Should().NotBeNull();
+        restarted.DeliveryContext!.Value.TraceId.Should().Be(original.TraceId);
+        restarted.DeliveryContext.Value.SpanId.Should().NotBe(original.SpanId);
+        restarted.DeliveryContext.Value.TraceState.Should().Be("vendor=value");
         await using var reader = database.CreateContext();
         (await reader.PendingNotifications.AnyAsync()).Should().BeFalse();
     }
@@ -318,6 +329,7 @@ public class NotificationOutboxTests
             sender.Setup(s => s.SendNotification(It.IsAny<Notification>()))
                 .Callback<Notification>(n =>
                 {
+                    DeliveryContext = Activity.Current?.Context;
                     if (!PublisherAvailable)
                         throw new InvalidOperationException("publisher down");
                     published.Add(n.Payload.GetValueOrDefault("n") ?? Guid.NewGuid().ToString());
@@ -342,6 +354,8 @@ public class NotificationOutboxTests
         public bool PublisherAvailable { get; set; }
 
         public NotificationOutboxWorker Worker { get; }
+
+        public ActivityContext? DeliveryContext { get; private set; }
 
         public void Dispose() => _services.Dispose();
     }

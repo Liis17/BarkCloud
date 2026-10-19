@@ -17,7 +17,7 @@ namespace BarkCloud.Identity.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -151,6 +151,12 @@ namespace BarkCloud.Identity.Persistence.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TraceParent")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TraceState")
                         .HasColumnType("text");
 
                     b.Property<int>("Type")

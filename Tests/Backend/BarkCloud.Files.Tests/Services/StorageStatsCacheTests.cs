@@ -1,5 +1,8 @@
+using System.Diagnostics;
+
 using BarkCloud.Files.Services;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BarkCloud.Files.Tests.Services;
@@ -76,6 +79,37 @@ public class StorageStatsCacheTests
     }
 
     [Fact]
+    public async Task FailedRefresh_ContinuesRequestTraceAndLogsInsideItsOperation()
+    {
+        var logger = new ActivityLogger();
+        ActivityContext readContext = default;
+        ActivitySpanId readParentSpanId = default;
+        string? readTraceState = null;
+        var cache = Create(_ =>
+        {
+            var activity = Activity.Current!;
+            readContext = activity.Context;
+            readParentSpanId = activity.ParentSpanId;
+            readTraceState = activity.TraceStateString;
+            return Task.FromException<Reading>(new IOException("offline"));
+        }, logger: logger);
+
+        using var request = new Activity("storage-stats-request").SetIdFormat(ActivityIdFormat.W3C).Start();
+        request.TraceStateString = "vendor=storage";
+        var requestContext = request.Context;
+
+        (await cache.GetAsync(false, default)).State.Should().Be("error");
+
+        readContext.TraceId.Should().Be(requestContext.TraceId);
+        readParentSpanId.Should().Be(requestContext.SpanId);
+        readTraceState.Should().Be(requestContext.TraceState);
+        logger.LoggedContext.Should().NotBeNull();
+        logger.LoggedContext!.Value.TraceId.Should().Be(readContext.TraceId);
+        logger.LoggedContext.Value.SpanId.Should().Be(readContext.SpanId);
+        Activity.Current.Should().BeSameAs(request);
+    }
+
+    [Fact]
     public async Task HostShutdown_CancelsScanAndDoesNotPublishItsResult()
     {
         using var stopping = new CancellationTokenSource();
@@ -94,8 +128,24 @@ public class StorageStatsCacheTests
     }
 
     private static StorageStatsCache<Reading> Create(Func<CancellationToken, Task<Reading>> read,
-        TimeProvider? time = null, CancellationToken stoppingToken = default) =>
-        new(read, time ?? TimeProvider.System, NullLogger.Instance, stoppingToken);
+        TimeProvider? time = null, CancellationToken stoppingToken = default, ILogger? logger = null) =>
+        new(read, time ?? TimeProvider.System, logger ?? NullLogger.Instance, stoppingToken);
+
+    private sealed class ActivityLogger : ILogger
+    {
+        public ActivityContext? LoggedContext { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+                LoggedContext = Activity.Current?.Context;
+        }
+    }
 
     private sealed record Reading(long Bytes);
     private sealed class MutableTimeProvider : TimeProvider

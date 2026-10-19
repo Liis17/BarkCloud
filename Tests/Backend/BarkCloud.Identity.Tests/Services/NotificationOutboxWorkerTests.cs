@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using BarkCloud.GrpcServer.Metrics;
@@ -22,6 +23,11 @@ namespace BarkCloud.Identity.Tests.Services;
 
 public class NotificationOutboxWorkerTests : IDisposable
 {
+    private const string DeliveryActivityName = "Identity.NotificationOutbox.Deliver";
+    private const string FirstTraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+    private const string SecondTraceParent = "00-11111111111111111111111111111111-2222222222222222-01";
+    private const string TraceState = "vendor=value";
+
     private readonly SqliteIdentityContext _database = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _users = new();
     private readonly Mock<NotificationQueueSender> _sender;
@@ -202,6 +208,84 @@ public class NotificationOutboxWorkerTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessBatch_RetryUsesNewChildSpanInOriginalTrace()
+    {
+        var row = await Seed(configure: r =>
+        {
+            r.TraceParent = FirstTraceParent;
+            r.TraceState = TraceState;
+        });
+        var activities = new List<Activity>();
+        using var listener = ListenForDeliveryActivities(activities);
+        _sender.Setup(s => s.SendNotification(It.IsAny<Notification>()))
+            .ThrowsAsync(new InvalidOperationException("rabbit down"));
+
+        await CreateSut().ProcessBatchAsync(default);
+        await using (var context = _database.CreateAdditionalContext())
+        {
+            await context.PendingNotifications.ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.NextAttemptAt, DateTime.UtcNow.AddSeconds(-1)));
+        }
+
+        await CreateSut().ProcessBatchAsync(default);
+
+        activities.Should().HaveCount(2);
+        activities.Select(activity => activity.TraceId.ToString()).Distinct().Should().ContainSingle()
+            .Which.Should().Be("4bf92f3577b34da6a3ce929d0e0e4736");
+        activities.Select(activity => activity.ParentSpanId.ToString()).Distinct().Should().ContainSingle()
+            .Which.Should().Be("00f067aa0ba902b7");
+        activities.Select(activity => activity.SpanId).Distinct().Should().HaveCount(2);
+        activities.Should().OnlyContain(activity => activity.TraceStateString == TraceState);
+        (await Reload(row.Id))!.Attempts.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ProcessBatch_UsesEachRowsTraceContextWithoutLeakingBetweenNotifications()
+    {
+        await Seed(configure: r =>
+        {
+            r.TraceParent = FirstTraceParent;
+            r.TraceState = TraceState;
+        });
+        await Seed(configure: r => r.TraceParent = SecondTraceParent);
+
+        var activities = new List<Activity>();
+        using var listener = ListenForDeliveryActivities(activities);
+        using var ambient = new Activity("ambient").SetIdFormat(ActivityIdFormat.W3C).Start();
+
+        await CreateSut().ProcessBatchAsync(default);
+
+        activities.Should().HaveCount(2);
+        activities.Should().Contain(activity => activity.TraceId.ToString() == "4bf92f3577b34da6a3ce929d0e0e4736"
+            && activity.ParentSpanId.ToString() == "00f067aa0ba902b7"
+            && activity.TraceStateString == TraceState);
+        activities.Should().Contain(activity => activity.TraceId.ToString() == "11111111111111111111111111111111"
+            && activity.ParentSpanId.ToString() == "2222222222222222");
+        Activity.Current.Should().BeSameAs(ambient);
+        _published.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task ProcessBatch_MissingOrInvalidTraceContextStartsRootsAndStillDelivers()
+    {
+        await Seed();
+        await Seed(configure: r => r.TraceParent = "invalid");
+
+        var activities = new List<Activity>();
+        using var listener = ListenForDeliveryActivities(activities);
+        using var ambient = new Activity("ambient").SetIdFormat(ActivityIdFormat.W3C).Start();
+
+        await CreateSut().ProcessBatchAsync(default);
+
+        activities.Should().HaveCount(2);
+        activities.Should().OnlyContain(activity => activity.ParentSpanId == default
+            && activity.TraceId != ambient.TraceId);
+        activities.Select(activity => activity.TraceId).Distinct().Should().HaveCount(2);
+        Activity.Current.Should().BeSameAs(ambient);
+        _published.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task ProcessBatch_NotYetDue_IsNotClaimed()
     {
         var row = await Seed(configure: r => r.NextAttemptAt = DateTime.UtcNow.AddMinutes(5));
@@ -283,5 +367,23 @@ public class NotificationOutboxWorkerTests : IDisposable
         claimed.Should().Be(20);
         await using var context = _database.CreateAdditionalContext();
         (await context.PendingNotifications.CountAsync()).Should().Be(5);
+    }
+
+    private static ActivityListener ListenForDeliveryActivities(List<Activity> activities)
+    {
+        var listener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = activity =>
+            {
+                if (activity.OperationName == DeliveryActivityName)
+                {
+                    activities.Add(activity);
+                }
+            }
+        };
+        ActivitySource.AddActivityListener(listener);
+        return listener;
     }
 }

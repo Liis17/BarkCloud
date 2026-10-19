@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Queue.Users;
 using BarkCloud.Users.Features.DeleteAccount;
@@ -9,10 +10,13 @@ using MassTransit.EntityFrameworkCoreIntegration;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using System.Data.Common;
+using System.Diagnostics;
 
 namespace BarkCloud.Users.IntegrationTests;
 
@@ -120,26 +124,41 @@ public class OutboxTests
     [Fact]
     public async Task DeleteAccount_ProcessRestartsAfterCommit_DeliversSavedEvent()
     {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConsoleOutput"] = "false", ["SeqEnable"] = "false", ["LognaraEnable"] = "false"
+        });
+        await using var logging = await builder.AddBarkCloudSerilogAsync("Users.OutboxTraceTest");
         await using var database = await PostgresUsersDatabase.CreateAsync();
         await using var observer = new RabbitObserver();
         await observer.StartAsync();
         long userId;
+        ActivityContext original;
         await using (var first = new OutboxTestHost(database, deliver: false))
         {
             await first.StartAsync();
             using var scope = first.Services.CreateScope();
             var storage = scope.ServiceProvider.GetRequiredService<IUsersStorage>();
             userId = (await storage.CreateUser("alice", "Alice", "Smith", "alice@example.test")).Id;
-            await DeleteAsync(scope.ServiceProvider, userId);
+            using (var operation = BarkCloudDiagnostics.StartOperation("Users.DeleteAccount"))
+            {
+                original = operation.Context;
+                await DeleteAsync(scope.ServiceProvider, userId);
+            }
             await using var reader = database.CreateContext();
             (await new UsersStorage(reader).GetById(userId)).Should().BeNull();
-            (await reader.Set<OutboxMessage>().CountAsync()).Should().Be(1);
+            var saved = await reader.Set<OutboxMessage>().SingleAsync();
+            saved.Headers.Should().Contain(original.TraceId.ToHexString());
         }
 
         await using var restarted = new OutboxTestHost(database);
         await restarted.StartAsync();
         (await observer.ReceiveAsync(1)).Should().ContainSingle().Which
             .Should().BeOfType<UserDeleted>().Which.UserId.Should().Be(userId);
+        var delivered = await observer.ReceiveContextAsync();
+        delivered.TraceId.Should().Be(original.TraceId);
+        delivered.SpanId.Should().NotBe(original.SpanId).And.NotBe(default(ActivitySpanId));
         await AssertDrained(database);
     }
 

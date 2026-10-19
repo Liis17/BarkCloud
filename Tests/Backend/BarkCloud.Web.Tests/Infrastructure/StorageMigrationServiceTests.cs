@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 
 using BarkCloud.Proto.Configuration;
@@ -87,6 +89,74 @@ public sealed class StorageMigrationServiceTests
         fixture.Target.Objects["d"].Metadata.Should().BeEquivalentTo(fixture.Source.Objects["d"].Metadata);
         fixture.Target.Objects["external"].Data.Should().Equal(1);
         fixture.Source.Written.Should().BeEmpty(); fixture.Source.Deleted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task QueuedCopy_RestoresTheRequestContextCapturedAtEnqueue()
+    {
+        using var fixture = new Fixture();
+        await fixture.Service.StartAsync(default);
+        var check = await fixture.Prepare();
+        var captured = new TaskCompletionSource<(ActivityContext Context, ActivitySpanId ParentSpanId)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Source.OnList = () =>
+        {
+            if (Activity.Current is { } activity)
+                captured.TrySetResult((activity.Context, activity.ParentSpanId));
+        };
+
+        var request = new Activity("migration-request").SetIdFormat(ActivityIdFormat.W3C).Start();
+        request.TraceStateString = "vendor=migration";
+        var parent = request.Context;
+        var queued = fixture.Service.Start(check.ValidationId, "admin");
+        request.Stop();
+
+        var operation = await captured.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        (await fixture.Wait(queued.Id, "copied")).State.Should().Be("copied");
+        operation.Context.TraceId.Should().Be(parent.TraceId);
+        operation.ParentSpanId.Should().Be(parent.SpanId);
+        operation.Context.TraceState.Should().Be(parent.TraceState);
+    }
+
+    [Fact]
+    public async Task RecoverCutover_RebuildsAJobWithANewRootTrace()
+    {
+        using var fixture = new Fixture();
+        await fixture.Service.StartAsync(default);
+
+        var barrier = new StorageCutoverStatus
+        {
+            MigrationId = "durable-cutover",
+            State = "applying",
+            SourceServiceUrl = "https://source.example",
+            SourceBucketName = "from",
+            TargetServiceUrl = "https://target.example",
+            TargetBucketName = "to",
+            TargetRegion = Fixture.TargetConnection.Region,
+            TargetForcePathStyle = Fixture.TargetConnection.ForcePathStyle,
+            TargetIsR2 = Fixture.TargetConnection.IsR2,
+        };
+        barrier.ProfileIds.AddRange(fixture.Profiles.Select(x => x.ProfileId));
+        fixture.Barriers.Add(barrier);
+        foreach (var profile in fixture.Profiles)
+        {
+            profile.ServiceUrl = Fixture.TargetConnection.ServiceUrl;
+            profile.AccessKey = Fixture.TargetConnection.AccessKey;
+            profile.SecretKey = Fixture.TargetConnection.SecretKey;
+            profile.BucketName = Fixture.TargetConnection.BucketName;
+            profile.Region = Fixture.TargetConnection.Region;
+            profile.ForcePathStyle = Fixture.TargetConnection.ForcePathStyle;
+            profile.IsR2 = Fixture.TargetConnection.IsR2;
+        }
+
+        var request = new Activity("recovery-request").SetIdFormat(ActivityIdFormat.W3C).Start();
+        var parent = request.Context;
+        await fixture.Service.RecoverCutoverAsync(barrier.MigrationId, "admin", default);
+        request.Stop();
+
+        (await fixture.Wait(barrier.MigrationId, "completed")).State.Should().Be("completed");
+        var operation = fixture.OperationContexts.Should().ContainSingle().Subject;
+        operation.Context.TraceId.Should().NotBe(parent.TraceId);
+        operation.ParentSpanId.Should().Be(default(ActivitySpanId));
     }
 
     [Fact]
@@ -321,6 +391,7 @@ public sealed class StorageMigrationServiceTests
             Profile("images-v1", "images", 1), Profile("images-v2", "images", 2, true), Profile("cloud-files-old-v1", "cloud-files-old", 1, false, true)];
         public List<StorageCutoverStatus> Barriers { get; } = [];
         public List<string> Events { get; } = [];
+        public ConcurrentQueue<(ActivityContext Context, ActivitySpanId ParentSpanId)> OperationContexts { get; } = new();
         public StorageMigrationService Service { get; }
         public bool RestartFails { get; set; }
         public bool PreflightFails { get; set; }
@@ -359,7 +430,14 @@ public sealed class StorageMigrationServiceTests
                         p.AccessKey = target.AccessKey; p.SecretKey = target.SecretKey; p.IsR2 = target.IsR2; }
                     if (LoseRelocationReply) throw new IOException("lost reply after commit"); return Task.CompletedTask; });
             control.Setup(x => x.RestartAndVerifyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns((string id, CancellationToken _) =>
-            { Events.Add("restart"); if (RestartFails) throw new InvalidOperationException("Restart failed"); Barriers.Single(x => x.MigrationId == id).State = "applied"; return Task.CompletedTask; });
+            {
+                Events.Add("restart");
+                if (Activity.Current is { } activity)
+                    OperationContexts.Enqueue((activity.Context, activity.ParentSpanId));
+                if (RestartFails) throw new InvalidOperationException("Restart failed");
+                Barriers.Single(x => x.MigrationId == id).State = "applied";
+                return Task.CompletedTask;
+            });
             Service = NewService();
         }
         public StorageMigrationService NewService(ILogger<StorageMigrationService>? logger = null)

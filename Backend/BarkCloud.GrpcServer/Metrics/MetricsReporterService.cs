@@ -1,3 +1,5 @@
+using BarkCloud.GrpcServer;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +34,7 @@ public class MetricsReporterService : BackgroundService
 
             if (snapshot.Count > 0)
             {
+                using var activity = BarkCloudDiagnostics.StartOperation("MetricsReporterService.Report");
                 _logger.LogInformation("ServiceMetrics {@Metrics}",
                     new { ServiceName = _serviceName, Metrics = snapshot, Timestamp = DateTime.UtcNow });
             }

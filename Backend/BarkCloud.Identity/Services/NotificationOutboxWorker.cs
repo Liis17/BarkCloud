@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Infrastructure;
@@ -74,19 +76,7 @@ public class NotificationOutboxWorker(
 
         foreach (var notification in claimed)
         {
-            try
-            {
-                await ProcessAsync(notification, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // Не удалось даже отложить строку (БД): lease истечёт сам, строка вернётся в очередь.
-                logger.LogError(ex, "Не удалось обновить состояние уведомления {NotificationId}", notification.Id);
-            }
+            await ProcessAsync(notification, cancellationToken);
         }
 
         return claimed.Count;
@@ -130,6 +120,26 @@ public class NotificationOutboxWorker(
     }
 
     private async Task ProcessAsync(PendingNotification notification, CancellationToken cancellationToken)
+    {
+        using var operation = BarkCloudDiagnostics.StartOperation(
+            "Identity.NotificationOutbox.Deliver", GetParentContext(notification));
+
+        try
+        {
+            await ProcessWithinOperationAsync(notification, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Lease истечёт сам, если не удалось обновить строку после ошибки доставки.
+            logger.LogError(ex, "Не удалось обновить состояние уведомления {NotificationId}", notification.Id);
+        }
+    }
+
+    private async Task ProcessWithinOperationAsync(PendingNotification notification, CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
@@ -210,6 +220,18 @@ public class NotificationOutboxWorker(
                     .SetProperty(x => x.LockedUntil, (DateTime?)null)
                     .SetProperty(x => x.LockToken, (Guid?)null), CancellationToken.None);
         }
+    }
+
+    private static ActivityContext GetParentContext(PendingNotification notification)
+    {
+        if (string.IsNullOrWhiteSpace(notification.TraceParent))
+        {
+            return default;
+        }
+
+        return ActivityContext.TryParse(notification.TraceParent, notification.TraceState, isRemote: true, out var context)
+            ? context
+            : default;
     }
 
     private static Task<int> Delete(IdentityContext context, Guid id, CancellationToken cancellationToken)
