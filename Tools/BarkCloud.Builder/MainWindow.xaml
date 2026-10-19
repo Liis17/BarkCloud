@@ -638,7 +638,7 @@
                         <ui:TextBox Text="{Binding LognaraAgentVersion, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:InfoBar Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="True"
                                     Title="Ручная регистрация и токены"
-                                    Message="Создайте relay и отдельный токен для каждого активного агента в Lognara Dock. Builder не регистрирует агентов автоматически. Все агенты отправляют данные во внутренний lognara-relay в сети BarkCloud." />
+                                    Message="Создайте relay и отдельный токен для каждого активного агента в Lognara Dock. Токены агентов можно вставлять как lna_… или LOGNARA_AGENT_TOKEN=lna_…. Builder не регистрирует агентов автоматически. Все агенты отправляют данные во внутренний cloud-relay в сети BarkCloud." />
                         <ui:InfoBar Margin="0,8,0,0" Severity="Warning" IsClosable="False"
                                     IsOpen="{Binding LegacyLognaraImport}"
                                     Title="Импорт старой Lognara-конфигурации"

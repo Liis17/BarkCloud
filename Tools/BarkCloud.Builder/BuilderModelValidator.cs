@@ -121,10 +121,10 @@ public static partial class BuilderModelValidator
         var agents = new List<(string Name, string Token, string SpoolPath)>();
         agents.AddRange(model.LognaraApplications
             .Where(x => model.IsApplicationIncluded(x) && x.LognaraEnable)
-            .Select(x => (x.DisplayName, x.Token, x.SpoolPath)));
+            .Select(x => (x.DisplayName, LognaraAgentToken.Normalize(x.Token), x.SpoolPath)));
         agents.AddRange(model.LognaraInfrastructure
             .Where(model.IsInfrastructureIncluded)
-            .Select(x => (x.DisplayName, x.Token, x.SpoolPath)));
+            .Select(x => (x.DisplayName, LognaraAgentToken.Normalize(x.Token), x.SpoolPath)));
 
         if (agents.Count > 0)
         {

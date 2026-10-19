@@ -204,7 +204,7 @@ public sealed class BuilderModel : INotifyPropertyChanged
         new("POSTGRES_CONTAINER_NAME", "cloud-postgres", PostgresContainerName, IncludePostgres),
         new("SEQ_CONTAINER_NAME", "cloud-seq", SeqContainerName, IncludeSeq),
         new("NGINX_CONTAINER_NAME", "cloud-nginx", NginxContainerName, IncludeNginx),
-        new("", "lognara-relay", "lognara-relay", IncludeLognara),
+        new("", "cloud-relay", "cloud-relay", IncludeLognara),
     ];
 
     private void Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
@@ -257,3 +257,13 @@ public sealed class LognaraInfrastructureSettings(string prefix, string displayN
 }
 
 public sealed record BuilderContainerName(string EnvironmentVariable, string ServiceAlias, string Name, bool Enabled);
+
+internal static class LognaraAgentToken
+{
+    public static string Normalize(string value)
+    {
+        const string prefix = "LOGNARA_AGENT_TOKEN=";
+        var token = value.Trim();
+        return token.StartsWith(prefix, StringComparison.Ordinal) ? token[prefix.Length..].Trim() : token;
+    }
+}
