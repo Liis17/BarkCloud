@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 using BarkCloud.Files.Consumers;
 using BarkCloud.Files.Domain;
@@ -23,6 +24,7 @@ internal sealed class ProcessingProbe : IConsumeObserver
 {
     public ConcurrentDictionary<Guid, Func<UploadSession, FilesContext, CancellationToken, Task>> Pipelines { get; } = new();
     public ConcurrentDictionary<Guid, ConcurrentQueue<int>> Deliveries { get; } = new();
+    public ConcurrentDictionary<Guid, ConcurrentQueue<ActivityContext>> Contexts { get; } = new();
     public ConcurrentDictionary<Guid, int> PipelineCalls { get; } = new();
     public ConcurrentDictionary<Guid, int> Cleanups { get; } = new();
     public ConcurrentQueue<Fault<ProcessUploadedFile>> Faults { get; } = new();
@@ -49,6 +51,7 @@ internal sealed class ProbePipeline(FilesContext database, ProcessingProbe probe
 {
     public async Task ProcessAsync(UploadSession session, CancellationToken cancellationToken)
     {
+        probe.Contexts.GetOrAdd(session.Id, _ => new()).Enqueue(Activity.Current?.Context ?? default);
         probe.PipelineCalls.AddOrUpdate(session.Id, 1, (_, count) => count + 1);
         var active = Interlocked.Increment(ref probe.Active);
         int previous;

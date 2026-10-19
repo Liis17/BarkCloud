@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using BarkCloud.GrpcServer.Metrics;
@@ -47,6 +48,23 @@ public class NotificationOutboxTests : IDisposable
         row.NextAttemptAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
         row.LockToken.Should().BeNull();
         _metrics.SnapshotAndReset().Should().NotContainKey("notification_outbox_enqueued");
+    }
+
+    [Fact]
+    public async Task EnqueueAsync_StoresCurrentW3cTraceContext()
+    {
+        using var activity = new Activity("request")
+            .SetIdFormat(ActivityIdFormat.W3C);
+        activity.TraceStateString = "vendor=value";
+        activity.Start();
+
+        await CreateSut().EnqueueAsync(
+            42, NotificationType.PasswordChanged, "t", new Dictionary<string, string>());
+
+        await using var reader = _database.CreateAdditionalContext();
+        var row = await reader.PendingNotifications.SingleAsync();
+        row.TraceParent.Should().Be(activity.Id);
+        row.TraceState.Should().Be("vendor=value");
     }
 
     [Fact]

@@ -20,6 +20,10 @@ public class PendingNotification
     /// <summary>JSON-словарь полей письма. Без <c>username</c> (и, если есть <c>ip</c>, без <c>location</c>) — их добавляет воркер.</summary>
     public string PayloadJson { get; set; } = null!;
 
+    public string? TraceParent { get; set; }
+
+    public string? TraceState { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime NextAttemptAt { get; set; }

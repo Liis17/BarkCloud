@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using BarkCloud.GrpcServer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using System.Text;
 
 using BarkCloud.Files.Domain;
@@ -73,11 +76,22 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
     [Fact]
     public async Task FilesRestart_PreservesRedeliveryAndFiresOverdueTimer()
     {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConsoleOutput"] = "false", ["SeqEnable"] = "false", ["LognaraEnable"] = "false"
+        });
+        await using var logging = await builder.AddBarkCloudSerilogAsync("Files.QuartzTraceTest");
         var id = await AddFailOnceAsync();
+        ActivityContext original;
         await using (var first = new UploadTestHost(_database, _probe))
         {
             await first.StartAsync();
-            await first.SendAsync(id);
+            using (var operation = BarkCloudDiagnostics.StartOperation("Files.UploadComplete"))
+            {
+                original = operation.Context;
+                await first.SendAsync(id);
+            }
             await WaitForPendingAsync(first);
         }
         await Task.Delay(TimeSpan.FromSeconds(12));
@@ -93,6 +107,9 @@ public sealed class UploadRedeliveryTests(ITestOutputHelper output) : IAsyncLife
         await WaitUntilAsync(async () => (await _database.ReadAsync(id)).Status == UploadSessionStatus.Ready);
 
         _probe.Deliveries[id].Should().Equal(0, 1);
+        _probe.Contexts[id].Should().HaveCount(2)
+            .And.OnlyContain(context => context.TraceId == original.TraceId && context.SpanId != default);
+        _probe.Contexts[id].Select(context => context.SpanId).Should().OnlyHaveUniqueItems();
         (await _database.ReadAsync(id)).ProcessingAttempts.Should().Be(2);
         await AssertNoPendingAsync(restarted);
     }

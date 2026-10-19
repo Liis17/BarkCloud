@@ -1,4 +1,5 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 namespace BarkCloud.Files.Services;
 
@@ -24,17 +25,20 @@ public class TrashCleanupService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            using (BarkCloudDiagnostics.StartOperation("files.trash-cleanup"))
             {
-                await PurgeExpiredAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка при зачистке просроченных записей корзины");
+                try
+                {
+                    await PurgeExpiredAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при зачистке просроченных записей корзины");
+                }
             }
 
             try

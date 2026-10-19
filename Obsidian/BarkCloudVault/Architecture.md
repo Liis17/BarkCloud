@@ -48,6 +48,8 @@ BarkCloud — самохостируемое облако файлов и мед
 
 ### Клиентский запрос
 
+Общий Serilog pipeline гарантирует нативные trace/span ID каждому событию всех семи приложений. Активный контекст передаётся штатными механизмами HTTP/gRPC и MassTransit; фоновые операции создают отдельные ограниченные scopes, а одиночные события получают собственные ID. Outbox писем Identity сохраняет W3C-контекст в БД для доставки после перезапуска. Контракт и исключения для раннего stderr описаны в [[Backend/GrpcServer]], durable-контекст писем — в [[Backend/IdentityNotificationOutbox]].
+
 Клиент → nginx (TLS) → gRPC-сервис по порту: `8000` Identity, `8001` Users, `8005` Files (gRPC + HTTP загрузок), `8007` Torrent; `443` — веб (`cloud-web:8080`) и HTTP-выдача файлов. JWT и заголовки устройства проверяются перехватчиками из `Shared/BarkCloud.Shared.Auth` и `BarkCloud.GrpcServer`. Подробнее: [[Platform/Infrastructure]].
 
 ### Межсервисные события

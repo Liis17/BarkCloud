@@ -110,4 +110,40 @@ public class BarkCloudDiagnosticsTests
         source.StartActivity("after-flush").Should().BeNull();
         source.Dispose();
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OperationRestoresAmbientAfterAwaitAndFailure(bool canceled)
+    {
+        using var listener = BarkCloudDiagnostics.CreateActivityListener();
+        ActivitySource.AddActivityListener(listener);
+        using var ambient = new Activity("ambient").SetIdFormat(ActivityIdFormat.W3C).Start();
+
+        async Task ExecuteAsync()
+        {
+            try
+            {
+                using var operation = BarkCloudDiagnostics.StartOperation("async-root");
+                await Task.Yield();
+                Activity.Current.Should().BeSameAs(operation.Activity);
+                operation.Context.TraceId.Should().NotBe(ambient!.TraceId);
+                if (canceled)
+                    throw new OperationCanceledException();
+                throw new InvalidOperationException();
+            }
+            catch
+            {
+                Activity.Current.Should().BeSameAs(ambient);
+                throw;
+            }
+        }
+
+        var error = await Record.ExceptionAsync(ExecuteAsync);
+        if (canceled)
+            error.Should().BeOfType<OperationCanceledException>();
+        else
+            error.Should().BeOfType<InvalidOperationException>();
+        Activity.Current.Should().BeSameAs(ambient);
+    }
 }
