@@ -69,6 +69,8 @@ x-common-variables: &common-variables
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
   CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
 
+name: barkcloud
+
 services:
   # === Основные микросервисы (prod-образы) ===
 
