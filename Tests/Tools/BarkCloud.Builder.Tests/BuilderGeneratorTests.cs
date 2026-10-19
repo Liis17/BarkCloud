@@ -488,7 +488,8 @@ public sealed class BuilderGeneratorTests
         var env = BackendComposeGenerator.BuildEnv(model);
 
         Assert.Empty(BuilderModelValidator.Validate(model));
-        Assert.Contains("image: ghcr.io/liis17/lognara-relay:master", compose);
+        Assert.Contains("image: docker.barkfluff.com/lognara-relay:master", compose);
+        Assert.DoesNotContain("ghcr.io", compose);
         Assert.Contains("LOGNARA_LISTEN_ADDR: \"0.0.0.0:7401\"", compose);
         Assert.Contains("LOGNARA_CORE_URL: \"${LOGNARA_CORE_URL}\"", compose);
         Assert.Contains("LOGNARA_CORE_TOKEN: \"${LOGNARA_RELAY_CORE_TOKEN}\"", compose);
