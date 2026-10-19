@@ -27,6 +27,8 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 
 `IdentityServerApi` целиком защищён service JWT. Его методы обслуживают административное чтение/удаление сессий и OTP, создание сессии пользователя и принудительную смену пароля. Отдельный service-only контракт `SessionRevocationApi` описан в [[Backend/SessionRevocation]].
 
+`ListOtpVerification` возвращает оба флага 2FA как `false`, если у пользователя ещё нет записи настроек. Чтение не создаёт запись и передаёт cancellation token в хранилище; ошибки хранилища передаются вызывающему коду.
+
 `FastAuth` объявлен в proto, но `IdentityApiService` не переопределяет этот RPC; обработчик gRPC не предоставлен.
 
 `ConfirmResetPassword` принимает `reset_id`, `otp_code`, `new_password` и optional `revoke_other_sessions`; отсутствующее поле трактуется как `true`. `SetPassword` требует `old_password`, если у пользователя уже есть сохранённый пароль. Остальные поля определены в `Shared/BarkCloud.Proto/identity_api.proto`.
