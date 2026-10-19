@@ -383,7 +383,7 @@ public sealed class BuilderGeneratorTests
         Assert.False(model.IncludeSeq);
         Assert.False(model.IncludeLognara);
         Assert.Empty(BackendComposeGenerator.BuildLognaraDockerfiles(model));
-        Assert.DoesNotContain("lognara-relay", compose);
+        Assert.DoesNotContain("cloud-relay", compose);
         Assert.DoesNotContain("LOGNARA_CORE_URL=", env);
         Assert.DoesNotContain("LOGNARA_CONFIGURATION_TOKEN=", env);
         Assert.DoesNotContain("entrypoint:", compose);
@@ -495,13 +495,16 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("LOGNARA_RELAY_MEMORY_MB: \"${LOGNARA_RELAY_MEMORY_MB:-2048}\"", compose);
         Assert.Contains("mem_limit: ${LOGNARA_RELAY_MEMORY_MB:-2048}m", compose);
         Assert.Contains("lognara_relay_spool:/var/lib/lognara-relay/spool", compose);
-        Assert.DoesNotContain("ports:", compose[compose.IndexOf("  lognara-relay:", StringComparison.Ordinal)..]);
+        Assert.Contains("  cloud-relay:", compose);
+        Assert.Contains("    container_name: cloud-relay", compose);
+        Assert.DoesNotContain("  lognara-relay:", compose);
+        Assert.DoesNotContain("ports:", compose[compose.IndexOf("  cloud-relay:", StringComparison.Ordinal)..]);
         Assert.Contains("LOGNARA_CORE_URL=https://logs.example.test/v1/batches", env);
         Assert.Contains("LOGNARA_RELAY_CORE_TOKEN=relay-core-token", env);
         Assert.Contains("LOGNARA_RELAY_MEMORY_MB=2048", env);
         Assert.Contains("LOGNARA_AGENT_VERSION=latest", env);
         Assert.Contains("LOGNARA_SERVICE: ${CONFIGURATION_CONTAINER_NAME}", compose);
-        Assert.Contains("LOGNARA_RELAY_URL: \"http://lognara-relay:7401/v1/batches\"", compose);
+        Assert.Contains("LOGNARA_RELAY_URL: \"http://cloud-relay:7401/v1/batches\"", compose);
         Assert.Contains("LOGNARA_RELAY_TOKEN: ${LOGNARA_CONFIGURATION_TOKEN}", compose);
         Assert.Contains("init: true", compose);
         Assert.Contains("stop_grace_period: 75s", compose);
@@ -605,6 +608,79 @@ public sealed class BuilderGeneratorTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Lognara_accepts_bare_and_assignment_tokens_for_all_agents(bool assignment)
+    {
+        var model = ValidLognaraModel();
+        model.NginxLocation = "Compose";
+        var prefix = assignment ? "LOGNARA_AGENT_TOKEN=" : "";
+        foreach (var application in model.LognaraApplications)
+            application.Token = $"  {prefix}lna_{application.Prefix}\r\n";
+        foreach (var service in model.LognaraInfrastructure)
+            service.Token = $"  {prefix}lna_{service.Prefix}\r\n";
+
+        Assert.Empty(BuilderModelValidator.Validate(model));
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model).Replace("\r\n", "\n");
+        var loaded = BuilderConfigLoader.Load(compose, env, BackendComposeGenerator.BuildNginxConf(model), ".");
+        Assert.DoesNotContain("LOGNARA_AGENT_TOKEN=", env);
+        foreach (var application in loaded.LognaraApplications)
+        {
+            Assert.Contains($"{application.TokenVariable}=lna_{application.Prefix}\n", env);
+            Assert.Equal($"lna_{application.Prefix}", application.Token);
+        }
+        foreach (var service in loaded.LognaraInfrastructure)
+        {
+            Assert.Contains($"{service.TokenVariable}=lna_{service.Prefix}\n", env);
+            Assert.Equal($"lna_{service.Prefix}", service.Token);
+        }
+    }
+
+    [Fact]
+    public void Lognara_rejects_duplicate_tokens_in_different_input_formats()
+    {
+        var model = ValidLognaraModel();
+        Infra(model, "MINIO").Token = $" LOGNARA_AGENT_TOKEN={App(model, "CONFIGURATION").Token}\r\n";
+
+        Assert.Contains(BuilderModelValidator.Validate(model), x => x.Contains("Токен Lognara используется несколькими агентами"));
+    }
+
+    [Theory]
+    [InlineData("LOGNARA_AGENT_TOKEN=")]
+    [InlineData("LOGNARA_AGENT_TOKEN=bad token")]
+    [InlineData("LOGNARA_AGENT_TOKEN=lna_one\nLOGNARA_AGENT_TOKEN=lna_two")]
+    public void Lognara_rejects_empty_or_invalid_assignment_tokens(string token)
+    {
+        var model = ValidLognaraModel();
+        App(model, "CONFIGURATION").Token = token;
+        Infra(model, "MINIO").Token = token;
+
+        var errors = BuilderModelValidator.Validate(model);
+        Assert.Contains(errors, x => x.Contains("Токен Lognara для Configuration"));
+        Assert.Contains(errors, x => x.Contains("Токен Lognara для MinIO"));
+    }
+
+    [Theory]
+    [InlineData("cloud-relay")]
+    [InlineData("lognara-relay")]
+    public void Lognara_imports_current_and_previous_relay_service_names(string relayService)
+    {
+        var model = ValidLognaraModel();
+        var compose = BackendComposeGenerator.BuildCompose(model)
+            .Replace("  cloud-relay:", $"  {relayService}:");
+        var loaded = BuilderConfigLoader.Load(compose, BackendComposeGenerator.BuildEnv(model), null, ".");
+
+        Assert.True(loaded.IncludeLognara);
+        Assert.False(loaded.LegacyLognaraImport);
+        Assert.Equal(model.LognaraCoreUrl, loaded.LognaraCoreUrl);
+        Assert.Equal(model.LognaraCoreToken, loaded.LognaraCoreToken);
+        var regenerated = BackendComposeGenerator.BuildCompose(loaded).Replace("\r\n", "\n");
+        Assert.Contains("  cloud-relay:\n", regenerated);
+        Assert.Contains("    container_name: cloud-relay\n", regenerated);
+    }
+
+    [Theory]
     [InlineData("/v1/batches")]
     [InlineData("ftp://core.example.test/v1/batches")]
     [InlineData("https://core.example.test/v1/logs")]
@@ -633,7 +709,7 @@ public sealed class BuilderGeneratorTests
     public void Relay_container_name_cannot_collide_with_a_BarkCloud_container()
     {
         var model = ValidLognaraModel();
-        model.IdentityContainerName = "lognara-relay";
+        model.IdentityContainerName = "cloud-relay";
 
         Assert.Contains(BuilderModelValidator.Validate(model), x => x.Contains("используется несколькими сервисами"));
     }
@@ -677,7 +753,7 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("logging_collector=off", compose);
         Assert.Contains("log_destination=stderr", compose);
         Assert.Contains("command: server /data --console-address \":9001\"", compose);
-        Assert.DoesNotContain("ports:", compose[compose.IndexOf("  lognara-relay:", StringComparison.Ordinal)..]);
+        Assert.DoesNotContain("ports:", compose[compose.IndexOf("  cloud-relay:", StringComparison.Ordinal)..]);
     }
 
     [Fact]

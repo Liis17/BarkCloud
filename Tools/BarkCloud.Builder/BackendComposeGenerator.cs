@@ -513,13 +513,13 @@ networks:
             foreach (var application in m.LognaraApplications
                          .Where(x => m.IsApplicationIncluded(x) && x.LognaraEnable))
             {
-                K(application.TokenVariable, application.Token);
+                K(application.TokenVariable, LognaraAgentToken.Normalize(application.Token));
                 K(application.SpoolVariable, application.SpoolPath);
             }
 
             foreach (var service in m.LognaraInfrastructure.Where(m.IsInfrastructureIncluded))
             {
-                K(service.TokenVariable, service.Token);
+                K(service.TokenVariable, LognaraAgentToken.Normalize(service.Token));
                 K(service.SpoolVariable, service.SpoolPath);
             }
         }
@@ -583,9 +583,9 @@ networks:
     }
 
     private const string LognaraRelayService = """
-  lognara-relay:
+  cloud-relay:
     image: ghcr.io/liis17/lognara-relay:master
-    container_name: lognara-relay
+    container_name: cloud-relay
     restart: always
     environment:
       LOGNARA_LISTEN_ADDR: "0.0.0.0:7401"
@@ -691,7 +691,7 @@ networks:
             ? model.LognaraApplications.Single(x => x.Prefix == prefix).TokenVariable
             : model.LognaraInfrastructure.Single(x => x.Prefix == prefix).TokenVariable;
 
-        sb.Append("\n      LOGNARA_RELAY_URL: \"http://lognara-relay:7401/v1/batches\"")
+        sb.Append("\n      LOGNARA_RELAY_URL: \"http://cloud-relay:7401/v1/batches\"")
             .Append("\n      LOGNARA_RELAY_TOKEN: ${").Append(tokenVariable).Append("}");
     }
 
