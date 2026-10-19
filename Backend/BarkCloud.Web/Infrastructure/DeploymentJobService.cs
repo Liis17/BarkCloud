@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading.Channels;
+
+using BarkCloud.GrpcServer;
 
 namespace BarkCloud.Web.Infrastructure;
 
@@ -10,6 +13,8 @@ namespace BarkCloud.Web.Infrastructure;
 /// </summary>
 public sealed class DeploymentJobService : BackgroundService
 {
+    private sealed record QueuedDeploymentJob(DeploymentJob Job, ActivityContext ParentContext);
+
     /// <summary>Порядок обработки: configuration первым, web последним.</summary>
     public static readonly string[] DeployOrder =
     [
@@ -24,7 +29,7 @@ public sealed class DeploymentJobService : BackgroundService
     public static readonly string[] FullDeployOrder = [.. DeployOrder, "web"];
     private static readonly HashSet<string> OptionalServices = ["notification", "torrent"];
 
-    private readonly Channel<DeploymentJob> _queue = Channel.CreateUnbounded<DeploymentJob>();
+    private readonly Channel<QueuedDeploymentJob> _queue = Channel.CreateUnbounded<QueuedDeploymentJob>();
     private readonly ConcurrentDictionary<Guid, DeploymentJob> _jobs = new();
     private readonly IDockerDeployment _docker;
     private readonly ComposeImageService _compose;
@@ -80,7 +85,7 @@ public sealed class DeploymentJobService : BackgroundService
 
         _jobs[job.Id] = job;
         TrimFinishedJobs();
-        _queue.Writer.TryWrite(job);
+        _queue.Writer.TryWrite(new(job, Activity.Current?.Context ?? default));
         _logger.LogInformation("Задача обслуживания {JobId} ({Kind}) поставлена в очередь: {Services}",
             job.Id, kind, string.Join(", ", ordered));
         return job;
@@ -125,8 +130,11 @@ public sealed class DeploymentJobService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var job in _queue.Reader.ReadAllAsync(stoppingToken))
-            await RunJobAsync(job, stoppingToken);
+        await foreach (var queued in _queue.Reader.ReadAllAsync(stoppingToken))
+        {
+            using (BarkCloudDiagnostics.StartOperation("web.deployment-job", queued.ParentContext))
+                await RunJobAsync(queued.Job, stoppingToken);
+        }
     }
 
     private async Task RunJobAsync(DeploymentJob job, CancellationToken ct)

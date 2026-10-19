@@ -35,6 +35,7 @@ Parent: [[Web/WebApp]] · See also: [[Platform/Infrastructure]] · [[Web/Setting
 - Для разблокировки нужны обычная пользовательская сессия и пароль `App:AdminPassword` (в compose приходит из `WEB_ADMIN_PASSWORD`). Успех выдаёт HttpOnly-cookie `bark_admin` сроком 30 минут, подписанную HMAC-SHA256 общим JWT-секретом.
 - На попытки разблокировки действует лимит: до 5 попыток за 15 минут на IP и до 20 за час суммарно; счётчики хранятся в памяти Web.
 - Очередь имеет одного обработчика и упорядочивает массовое обновление: Configuration, Identity, Users, Files, Notification, Torrent, затем Web.
+- При постановке задачи очередь сохраняет контекст текущего запроса во внутреннем элементе очереди; обработка и её журналы продолжают trace запроса без изменения DTO задачи.
 - Управляемые сервисы приложения: `configuration`, `identity`, `users`, `files`, `notification`, `torrent` и `web`. PostgreSQL, MinIO, RabbitMQ, Seq и reverse proxy в этот список не входят.
 - `Docker:ContainerNames:<service>` в конфигурации Web задаёт фактическое имя контейнера для обслуживания. Если параметр не задан, сохраняется прежнее имя `cloud-<service>`. Ключи Compose и DNS-алиасы `cloud-*` остаются фиксированными; имена проверяются на допустимый формат, дубли и конфликты с DNS-алиасами приложения и инфраструктуры.
 - Для доступа к Docker Web запускается с `docker.sock` и правами root. Compose хранит файл операции и журнал helper в томе `cloud-web-maintenance`; подключение задаётся в [[Platform/Infrastructure]].

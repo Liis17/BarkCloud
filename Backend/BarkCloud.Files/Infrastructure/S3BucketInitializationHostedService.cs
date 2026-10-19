@@ -1,3 +1,5 @@
+using BarkCloud.GrpcServer;
+
 using Microsoft.Extensions.Hosting;
 
 namespace BarkCloud.Files.Infrastructure;
@@ -25,30 +27,33 @@ public sealed class S3BucketInitializationHostedService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            using (BarkCloudDiagnostics.StartOperation("files.s3-bucket-initialization"))
             {
-                await _initializer.InitializeBucketsAsync(stoppingToken);
-                _logger.LogInformation("Фоновая инициализация S3 бакетов завершена");
-                return;
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex) when (S3BucketInitializer.IsTransientStartupException(ex))
-            {
-                _logger.LogError(
-                    ex,
-                    "MinIO пока недоступен. Files продолжит работу и повторит инициализацию через {DelaySeconds} с",
-                    RetryDelay.TotalSeconds);
-            }
-            catch (Exception ex)
-            {
-                // Ошибка конфигурации (например, неверные credentials) не должна
-                // перезапускать весь контейнер. Операции S3 сами вернут ошибку,
-                // а причина останется в stdout/Seq для исправления конфигурации.
-                _logger.LogError(ex, "Не удалось инициализировать S3-бакеты; повтор не выполняется");
-                return;
+                try
+                {
+                    await _initializer.InitializeBucketsAsync(stoppingToken);
+                    _logger.LogInformation("Фоновая инициализация S3 бакетов завершена");
+                    return;
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex) when (S3BucketInitializer.IsTransientStartupException(ex))
+                {
+                    _logger.LogError(
+                        ex,
+                        "MinIO пока недоступен. Files продолжит работу и повторит инициализацию через {DelaySeconds} с",
+                        RetryDelay.TotalSeconds);
+                }
+                catch (Exception ex)
+                {
+                    // Ошибка конфигурации (например, неверные credentials) не должна
+                    // перезапускать весь контейнер. Операции S3 сами вернут ошибку,
+                    // а причина останется в stdout/Seq для исправления конфигурации.
+                    _logger.LogError(ex, "Не удалось инициализировать S3-бакеты; повтор не выполняется");
+                    return;
+                }
             }
 
             try

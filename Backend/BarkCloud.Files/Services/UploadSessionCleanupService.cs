@@ -1,3 +1,4 @@
+using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 
 namespace BarkCloud.Files.Services;
@@ -15,6 +16,7 @@ public sealed class UploadSessionCleanupService(
         using var timer = new PeriodicTimer(Interval, time);
         do
         {
+            using var operation = BarkCloudDiagnostics.StartOperation("files.upload-session-cleanup");
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
