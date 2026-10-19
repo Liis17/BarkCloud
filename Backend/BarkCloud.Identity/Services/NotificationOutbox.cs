@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using BarkCloud.GrpcServer;
@@ -28,6 +29,8 @@ public class NotificationOutbox(
         }
 
         var now = DateTime.UtcNow;
+        var currentActivity = Activity.Current;
+        var w3cActivity = currentActivity is { IdFormat: ActivityIdFormat.W3C } ? currentActivity : null;
         var notification = new PendingNotification
         {
             Id = Guid.NewGuid(),
@@ -35,6 +38,8 @@ public class NotificationOutbox(
             Type = type,
             Title = title,
             PayloadJson = string.Empty,
+            TraceParent = w3cActivity?.Id,
+            TraceState = w3cActivity?.TraceStateString,
             CreatedAt = now,
             NextAttemptAt = now
         };

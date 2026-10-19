@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 
 using BarkCloud.GrpcServer.Metrics;
@@ -75,6 +76,7 @@ internal sealed class OutboxTestHost : IAsyncDisposable
 internal sealed class RabbitObserver : IAsyncDisposable
 {
     private readonly Channel<object> _messages = Channel.CreateUnbounded<object>();
+    private readonly Channel<ActivityContext> _contexts = Channel.CreateUnbounded<ActivityContext>();
     private readonly IBusControl _bus;
 
     public RabbitObserver()
@@ -97,9 +99,13 @@ internal sealed class RabbitObserver : IAsyncDisposable
 
     private Task Record(object message)
     {
+        _contexts.Writer.TryWrite(Activity.Current?.Context ?? default);
         _messages.Writer.TryWrite(message);
         return Task.CompletedTask;
     }
+
+    public async Task<ActivityContext> ReceiveContextAsync()
+        => await _contexts.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
 
     public async Task StartAsync()
     {

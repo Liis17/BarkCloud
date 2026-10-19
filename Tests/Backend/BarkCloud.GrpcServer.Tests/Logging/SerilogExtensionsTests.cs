@@ -75,11 +75,15 @@ public class SerilogExtensionsTests
 
             Count(consoleOutput.ToString(), marker).Should().Be(console ? 1 : 0);
 
+            SerializedTraceContext? seqTrace = null;
             if (seq)
             {
                 var request = await seqEndpoint.ReadAsync(TimeSpan.FromSeconds(3));
                 request.Method.Should().Be("POST");
                 Count(request.Body, marker).Should().Be(1);
+                seqTrace = ReadEvents(request, "@tr", "@sp").Single();
+                seqTrace.TraceId.Should().MatchRegex("^[a-f0-9]{32}$");
+                seqTrace.SpanId.Should().MatchRegex("^[a-f0-9]{16}$");
             }
             else
             {
@@ -96,6 +100,11 @@ public class SerilogExtensionsTests
                 payload.RootElement.ValueKind.Should().Be(JsonValueKind.Array);
                 payload.RootElement.GetArrayLength().Should().Be(1);
                 request.Body.Should().Contain(marker);
+                var lognaraTrace = ReadEvents(request, "trace_id", "span_id").Single();
+                lognaraTrace.TraceId.Should().MatchRegex("^[a-f0-9]{32}$");
+                lognaraTrace.SpanId.Should().MatchRegex("^[a-f0-9]{16}$");
+                if (seqTrace is not null)
+                    lognaraTrace.Should().Be(seqTrace);
                 lognaraEndpoint.Requests.TryRead(out _).Should().BeFalse();
                 Directory.GetFiles(temporaryDirectory, "*.txt", SearchOption.AllDirectories).Should().BeEmpty();
             }

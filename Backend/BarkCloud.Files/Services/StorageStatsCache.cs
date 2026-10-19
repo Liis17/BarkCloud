@@ -1,3 +1,7 @@
+using System.Diagnostics;
+
+using BarkCloud.GrpcServer;
+
 namespace BarkCloud.Files.Services;
 
 /// <summary>Один пересчёт на источник, последний успешный замер и отмена при остановке хоста.</summary>
@@ -28,7 +32,8 @@ internal sealed class StorageStatsCache<T>(
                 && !stoppingToken.IsCancellationRequested)
             {
                 _state = _value is null ? "loading" : "refreshing";
-                _refresh = Task.Run(RefreshAsync, CancellationToken.None);
+                var parentContext = Activity.Current?.Context ?? default;
+                _refresh = Task.Run(() => RefreshAsync(parentContext), CancellationToken.None);
             }
             refresh = _refresh;
         }
@@ -39,32 +44,35 @@ internal sealed class StorageStatsCache<T>(
         lock (_gate) return (_value, _state, _updatedAt);
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(ActivityContext parentContext)
     {
-        try
+        using (BarkCloudDiagnostics.StartOperation("files.storage-stats-refresh", parentContext))
         {
-            stoppingToken.ThrowIfCancellationRequested();
-            var value = await read(stoppingToken);
-            stoppingToken.ThrowIfCancellationRequested();
-            lock (_gate)
+            try
             {
-                _value = value;
-                _updatedAt = _attemptedAt = time.GetUtcNow();
-                _state = "ready";
+                stoppingToken.ThrowIfCancellationRequested();
+                var value = await read(stoppingToken);
+                stoppingToken.ThrowIfCancellationRequested();
+                lock (_gate)
+                {
+                    _value = value;
+                    _updatedAt = _attemptedAt = time.GetUtcNow();
+                    _state = "ready";
+                }
             }
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-            // Хост завершается; замер не публикуем.
-        }
-        catch (Exception exception)
-        {
-            lock (_gate)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                _attemptedAt = time.GetUtcNow();
-                _state = "error";
+                // Хост завершается; замер не публикуем.
             }
-            logger.LogWarning(exception, "Обновление статистики {Source} не выполнено; сохраняем последний замер", typeof(T).Name);
+            catch (Exception exception)
+            {
+                lock (_gate)
+                {
+                    _attemptedAt = time.GetUtcNow();
+                    _state = "error";
+                }
+                logger.LogWarning(exception, "Обновление статистики {Source} не выполнено; сохраняем последний замер", typeof(T).Name);
+            }
         }
     }
 }

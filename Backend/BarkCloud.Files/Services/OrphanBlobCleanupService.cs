@@ -1,4 +1,5 @@
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -35,17 +36,20 @@ public class OrphanBlobCleanupService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
+            using (BarkCloudDiagnostics.StartOperation("files.orphan-blob-cleanup"))
             {
-                await PurgeOrphansAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Ошибка при зачистке осиротевших блобов");
+                try
+                {
+                    await PurgeOrphansAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при зачистке осиротевших блобов");
+                }
             }
 
             try

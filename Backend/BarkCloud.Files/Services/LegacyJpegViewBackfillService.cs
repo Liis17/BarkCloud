@@ -2,6 +2,7 @@ using BarkCloud.Files.Domain;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -47,6 +48,7 @@ public class LegacyJpegViewBackfillService : BackgroundService
             return;
         }
 
+        using var operation = BarkCloudDiagnostics.StartOperation("files.legacy-jpeg-view-backfill");
         try
         {
             await RunBackfillAsync(stoppingToken);
@@ -94,16 +96,19 @@ public class LegacyJpegViewBackfillService : BackgroundService
             {
                 ct.ThrowIfCancellationRequested();
                 cursor = id;
-                try
+                using (BarkCloudDiagnostics.StartOperation("files.legacy-jpeg-view-backfill.file", System.Diagnostics.Activity.Current?.Context ?? default))
                 {
-                    using var scope = _scopeFactory.CreateScope();
-                    await ProcessFileAsync(scope.ServiceProvider, id, ct);
-                    processed++;
-                }
-                catch (Exception ex)
-                {
-                    failed++;
-                    _logger.LogError(ex, "Не удалось создать JpegView для файла {FileId}", id);
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        await ProcessFileAsync(scope.ServiceProvider, id, ct);
+                        processed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        _logger.LogError(ex, "Не удалось создать JpegView для файла {FileId}", id);
+                    }
                 }
             }
         }

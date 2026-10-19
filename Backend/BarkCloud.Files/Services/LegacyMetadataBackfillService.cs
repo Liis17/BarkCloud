@@ -2,6 +2,7 @@ using BarkCloud.Files.Domain;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 namespace BarkCloud.Files.Services;
 
@@ -43,6 +44,7 @@ public class LegacyMetadataBackfillService : BackgroundService
             return;
         }
 
+        using var operation = BarkCloudDiagnostics.StartOperation("files.legacy-metadata-backfill");
         try
         {
             await RunBackfillAsync(stoppingToken);
@@ -77,19 +79,22 @@ public class LegacyMetadataBackfillService : BackgroundService
             {
                 ct.ThrowIfCancellationRequested();
                 cursor = id;
-                try
+                using (BarkCloudDiagnostics.StartOperation("files.legacy-metadata-backfill.file", System.Diagnostics.Activity.Current?.Context ?? default))
                 {
-                    using var scope = _scopeFactory.CreateScope();
-                    var result = await ProcessFileAsync(scope.ServiceProvider, id, ct);
-                    if (result)
-                        processed++;
-                    else
-                        skipped++;
-                }
-                catch (Exception ex)
-                {
-                    failed++;
-                    _logger.LogError(ex, "Не удалось извлечь метаданные для файла {FileId}", id);
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var result = await ProcessFileAsync(scope.ServiceProvider, id, ct);
+                        if (result)
+                            processed++;
+                        else
+                            skipped++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        _logger.LogError(ex, "Не удалось извлечь метаданные для файла {FileId}", id);
+                    }
                 }
             }
         }

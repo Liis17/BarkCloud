@@ -30,6 +30,12 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
 
+## Корреляция серверных логов
+
+`BarkCloud.GrpcServer.Tests` проверяет нативные trace/span ID в HTTP payload Seq и Lognara, fallback для событий вне Activity, независимость sinks и shutdown. `BarkCloud.Files.Tests/Tracing/` проверяет реальную цепочку localhost HTTP → gRPC → MassTransit in-memory для sampled/unsampled контекста и сохранение заголовков Files bus outbox в SQLite без доставки. Тесты Identity покрывают сохранение контекста писем и отдельные spans повторных попыток; тесты Web — перенос контекста приватных очередей обслуживания и миграции.
+
+Проверки восстановления Users outbox и Quartz redelivery после перезапуска хостов находятся в соответствующих `BarkCloud.Users.IntegrationTests/OutboxTests.cs` и `BarkCloud.Files.IntegrationTests/UploadRedeliveryTests.cs`. Они требуют отдельных `BARKCLOUD_TEST_POSTGRES` и `BARKCLOUD_TEST_RABBITMQ`; in-memory транспорт и SQLite не заменяют эти проверки durable-доставки. Подробности контракта — [[Backend/GrpcServer]].
+
 ## BarkCloud Builder
 
 `Tests/Tools/BarkCloud.Builder.Tests` линкует чистые `BuilderModel`, `BuilderModelValidator` и `BackendComposeGenerator` из `Tools/BarkCloud.Builder/`, поэтому unit-тесты не требуют загрузки WPF. Они проверяют режимы без nginx/Compose/external, пользовательские Docker-имена и сеть, опциональные Seq/MinIO Console proxy, dynamic DNS upstream и отклонение конфликтующих имён и портов.

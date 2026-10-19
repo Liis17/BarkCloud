@@ -1,6 +1,7 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Infrastructure;
 using BarkCloud.Files.Persistence;
+using BarkCloud.GrpcServer;
 
 namespace BarkCloud.Files.Services;
 
@@ -40,6 +41,7 @@ public class LegacyVideoHdrBackfillService : BackgroundService
             return;
         }
 
+        using var operation = BarkCloudDiagnostics.StartOperation("files.legacy-video-hdr-backfill");
         try
         {
             await RunBackfillAsync(stoppingToken);
@@ -74,16 +76,19 @@ public class LegacyVideoHdrBackfillService : BackgroundService
             {
                 ct.ThrowIfCancellationRequested();
                 cursor = id;
-                try
+                using (BarkCloudDiagnostics.StartOperation("files.legacy-video-hdr-backfill.file", System.Diagnostics.Activity.Current?.Context ?? default))
                 {
-                    using var scope = _scopeFactory.CreateScope();
-                    await ProcessFileAsync(scope.ServiceProvider, id, ct);
-                    processed++;
-                }
-                catch (Exception ex)
-                {
-                    failed++;
-                    _logger.LogError(ex, "Не удалось определить HDR для видео {FileId}", id);
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        await ProcessFileAsync(scope.ServiceProvider, id, ct);
+                        processed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        _logger.LogError(ex, "Не удалось определить HDR для видео {FileId}", id);
+                    }
                 }
             }
         }
