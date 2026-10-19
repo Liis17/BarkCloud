@@ -7,8 +7,6 @@ using BarkCloud.Proto.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-using OtpNotCreatedException = BarkCloud.Identity.Persistence.Exceptions.OtpNotCreatedException;
-
 namespace BarkCloud.Identity.Tests.Features.ListOtpVerification;
 
 public class ListOtpVerificationCommandHandlerTests
@@ -20,28 +18,33 @@ public class ListOtpVerificationCommandHandlerTests
         UserContextFactory.Create(42), _authProps.Object, _logger);
 
     [Fact]
-    public async Task Handle_PropertiesMissing_Throws()
+    public async Task Handle_PropertiesMissing_ReturnsDisabledFlags()
     {
-        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
+        _authProps.Setup(s => s.GetUserAuthProperties(42, CancellationToken.None)).ReturnsAsync((AuthUserProperty?)null);
 
-        var act = () => CreateSut().Handle(new ListOtpVerificationCommand(), default);
+        var response = await CreateSut().Handle(new ListOtpVerificationCommand(), CancellationToken.None);
 
-        await act.Should().ThrowAsync<OtpNotCreatedException>();
+        response.AuthenticatorEnabled.Should().BeFalse();
+        response.EmailEnabled.Should().BeFalse();
     }
 
-    [Fact]
-    public async Task Handle_ReturnsFlags()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Handle_ReturnsConfiguredFlags(bool authenticatorEnabled, bool emailEnabled)
     {
-        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        _authProps.Setup(s => s.GetUserAuthProperties(42, CancellationToken.None)).ReturnsAsync(new AuthUserProperty
         {
             UserId = 42,
-            OtpEnabled = true,
-            EmailOtpEnabled = false
+            OtpEnabled = authenticatorEnabled,
+            EmailOtpEnabled = emailEnabled
         });
 
-        var response = await CreateSut().Handle(new ListOtpVerificationCommand(), default);
+        var response = await CreateSut().Handle(new ListOtpVerificationCommand(), CancellationToken.None);
 
-        response.AuthenticatorEnabled.Should().BeTrue();
-        response.EmailEnabled.Should().BeFalse();
+        response.AuthenticatorEnabled.Should().Be(authenticatorEnabled);
+        response.EmailEnabled.Should().Be(emailEnabled);
     }
 }
