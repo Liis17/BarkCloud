@@ -38,7 +38,11 @@ fun WelcomeScreen(onFinished: () -> Unit) {
         "Отправляйте ссылки на файлы и папки. Уже сохранённые на телефоне файлы доступны без интернета.",
     )
     BackHandler(pager.currentPage > 0) { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } }
-    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).windowInsetsPadding(WindowInsets.safeDrawing)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+        .background(MaterialTheme.colorScheme.tertiaryContainer)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+        .background(MaterialTheme.colorScheme.surface)) {
         val availableHeight = maxHeight
         Column(Modifier.widthIn(max = 480.dp).fillMaxWidth().fillMaxHeight().align(Alignment.Center)) {
             WelcomeArt(pager.currentPage, motion, Modifier.height(
