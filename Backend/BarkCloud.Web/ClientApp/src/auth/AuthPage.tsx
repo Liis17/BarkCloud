@@ -432,7 +432,7 @@ export function AuthPage({
       <div className="auth-layout">
         <section className="auth-story" aria-label="BarkCloud">
           <a className="auth-brand" href="/login" aria-label="BarkCloud — вход">
-            <img src="/barkcloud-icon-brand-b.png" alt="" width="48" height="48" />
+            <img src="/barkcloud-icon.png" alt="" width="48" height="48" />
             <span>BarkCloud</span>
           </a>
           <div className="auth-story-copy">
