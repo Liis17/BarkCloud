@@ -588,7 +588,7 @@ networks:
 
     private const string LognaraRelayService = """
   cloud-relay:
-    image: ghcr.io/liis17/lognara-relay:master
+    image: docker.barkfluff.com/lognara-relay:master
     container_name: cloud-relay
     restart: always
     environment:
