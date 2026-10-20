@@ -4,9 +4,14 @@ on:
   pull_request:
     branches:
       - dev
-      - nightly
       - master
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      force-all:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,10 +38,21 @@ jobs:
       shared: ${{ steps.filter.outputs.shared }}
       android: ${{ steps.filter.outputs.android }}
       drive: ${{ steps.filter.outputs.drive }}
+      all: ${{ steps.full.outputs.all }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: "Полный прогон нужен"
+        id: full
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          FORCE_ALL: ${{ inputs.force-all }}
+        run: |
+          all=false
+          [ "$BASE_REF" = "master" ] && all=true
+          [ "$FORCE_ALL" = "true" ] && all=true
+          echo "all=$all" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -91,7 +107,7 @@ jobs:
   test-configuration:
     name: "Configuration"
     needs: changes
-    if: ${{ needs.changes.outputs.configuration == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.configuration == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -110,7 +126,7 @@ jobs:
   test-files:
     name: "Files"
     needs: changes
-    if: ${{ needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
@@ -133,13 +149,13 @@ jobs:
 
   test-files-upload-integration:
     needs: changes
-    if: ${{ needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.files == 'true' || needs.changes.outputs.shared == 'true' }}
     uses: ./.github/workflows/files-upload-integration.yml
 
   test-grpcserver:
     name: "GrpcServer"
     needs: changes
-    if: ${{ needs.changes.outputs.grpcserver == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.grpcserver == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -158,7 +174,7 @@ jobs:
   test-identity:
     name: "Identity"
     needs: changes
-    if: ${{ needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -177,7 +193,7 @@ jobs:
   test-identity-integration:
     name: "Identity — PostgreSQL integration"
     needs: changes
-    if: ${{ needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.identity == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
@@ -201,7 +217,7 @@ jobs:
   test-notification:
     name: "Notification"
     needs: changes
-    if: ${{ needs.changes.outputs.notification == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.notification == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -220,7 +236,7 @@ jobs:
   test-users:
     name: "Users"
     needs: changes
-    if: ${{ needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
@@ -244,7 +260,7 @@ jobs:
   test-users-integration:
     name: "Users — PostgreSQL/RabbitMQ integration"
     needs: changes
-    if: ${{ needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.users == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     env:
       BARKCLOUD_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
@@ -270,7 +286,7 @@ jobs:
   test-web:
     name: "Web"
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.web == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -292,7 +308,7 @@ jobs:
   test-shared:
     name: "Shared"
     needs: changes
-    if: ${{ needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -319,7 +335,7 @@ jobs:
   android-tests:
     name: "Android unit tests"
     needs: changes
-    if: ${{ needs.changes.outputs.android == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.android == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
@@ -351,7 +367,7 @@ jobs:
   test-drive:
     name: "Drive (Windows)"
     needs: changes
-    if: ${{ needs.changes.outputs.drive == 'true' }}
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.drive == 'true' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7

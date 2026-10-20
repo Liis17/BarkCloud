@@ -14,7 +14,8 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/BarkCloud.TestKit/` | общие test helpers | gRPC-контекст, вызовы и логгер для тестов |
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Dokany callbacks, outbox/Upload 2.0, сессия, кеш, TLS, настройки и pipe |
 | `Mac/BarkCloudKit/Tests/BarkCloudKitTests/` | Swift package tests | Upload 2.0, восстановление частей, отмена, токены и реальные gRPC deadline-сценарии для iOS/macOS сетевого слоя |
-| `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске |
+| `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске; на PR в `master` и при `force-all` — полный прогон, вызывается из `release.yml` через `workflow_call` |
+| `.github/workflows/release.yml` | релизный pipeline | Push в `master`: полный прогон тестов → сборка APK/IPA/DMG/Drive ZIP/Builder ZIP → один релиз `v1.x.y` с автоинкрементом |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
 
@@ -66,7 +67,8 @@ dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests --filter "Category=WindowsI
 
 ## Зависимости и взаимодействия
 
-- Workflow `tests.yml` запускается для pull request в `dev`, `nightly` и `master`, а также вручную. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов.
+- Workflow `tests.yml` запускается для pull request в `dev` и `master`, а также вручную, по вызову через `workflow_call` (вход `force-all`) из `release.yml`. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов. PR в `master` всегда запускает полный набор тест-джоб независимо от путей.
+- Разработка ведётся в `dev`: рабочие ветки создаются от `dev`, PR направляются в `dev`. В `master` изменения продвигаются только PR из `dev` (или горячих фикс-веток от `master`); merge в `master` публикует релиз через `release.yml`.
 - В CI Files и Users получают PostgreSQL 18 и `BARKCLOUD_TEST_POSTGRES`. Интеграционный workflow Users также запускает RabbitMQ и передаёт `BARKCLOUD_TEST_RABBITMQ`.
 - PostgreSQL и RabbitMQ в CI запускает composite action `.github/actions/test-containers` (скрипт `.github/scripts/start-test-containers.sh`: `postgres:18`, `rabbitmq:4.1`), а не `services:` — так `docker pull` повторяется до 5 раз с паузой 20 с × номер попытки: Docker Hub отдаёт таймауты и `toomanyrequests`. Образов `postgres`/`rabbitmq` в `docker.barkfluff.com` нет, поэтому логин `REGISTRY_*` для них не помогает.
 - Тесты сервиса запускаются и при изменении `Backend/BarkCloud.GrpcServer/**` — это общий хост всех сервисов. SDK во всех .NET-джобах ставится через `actions/setup-dotnet`.
