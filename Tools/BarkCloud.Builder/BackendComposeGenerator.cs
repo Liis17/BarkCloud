@@ -112,6 +112,7 @@ services:
     environment:
       <<: *common-variables
       SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}{{AppVolumeSection("IDENTITY")}}
+      BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
     networks:
       - barkcloud-network
     depends_on:
@@ -207,6 +208,7 @@ services:
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
       Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
       Docker__ContainerNames__Users: "${USERS_CONTAINER_NAME}"
@@ -546,6 +548,9 @@ networks:
         K("EXTERNAL_USERS_HOST", m.ExternalUsersHost);
         K("EXTERNAL_FILES_HOST", m.ExternalFilesHost);
         K("EXTERNAL_TORRENT_HOST", m.ExternalTorrentHost);
+
+        Section("Android passkeys (optional; SHA-256 certificate fingerprint)");
+        K("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT", m.AndroidCertificateSha256Fingerprint);
 
         if (m.IncludeNotification)
         {

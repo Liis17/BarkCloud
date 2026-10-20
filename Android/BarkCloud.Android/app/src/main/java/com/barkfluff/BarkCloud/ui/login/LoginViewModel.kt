@@ -8,6 +8,7 @@ import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.AuthRepository
 import com.barkfluff.BarkCloud.data.AuthResult
 import com.barkfluff.BarkCloud.data.verificationDigits
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,53 @@ class LoginViewModel(
     }
 
     fun submit() = performSubmit()
+
+    fun loginWithPasskey(requestAssertion: suspend (String) -> String?) {
+        if (_state.value.isLoading || _state.value.otpRequired) return
+        _state.update { it.copy(isLoading = true, credentialsError = null, snackbarMessage = null) }
+
+        viewModelScope.launch {
+            try {
+                val options = authRepository.beginWebAuthnAssertion()
+                val assertion = requestAssertion(options.optionsJson)
+                if (assertion.isNullOrBlank()) {
+                    _state.update { it.copy(isLoading = false) }
+                    return@launch
+                }
+
+                when (val result = authRepository.completeWebAuthnAssertion(options.challengeId, assertion)) {
+                    AuthResult.Success -> {
+                        _state.update { it.copy(isLoading = false, password = "", otp = "") }
+                        _events.send(LoginEvent.NavigateToMain)
+                    }
+                    is AuthResult.OtherError -> _state.update {
+                        it.copy(
+                            isLoading = false,
+                            snackbarMessage = result.message.ifBlank { NETWORK_ERROR },
+                            retryAtMillis = result.retryAfterSeconds?.let {
+                                System.currentTimeMillis() + it * 1000L
+                            } ?: 0L,
+                        )
+                    }
+                    AuthResult.InvalidCredentials -> _state.update {
+                        it.copy(isLoading = false, credentialsError = INVALID_CREDENTIALS)
+                    }
+                    AuthResult.OtpRequired -> _state.update {
+                        it.copy(isLoading = false, snackbarMessage = NETWORK_ERROR)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        snackbarMessage = e.message?.takeIf(String::isNotBlank) ?: NETWORK_ERROR,
+                    )
+                }
+            }
+        }
+    }
 
     fun resendOtp() {
         val current = state.value
