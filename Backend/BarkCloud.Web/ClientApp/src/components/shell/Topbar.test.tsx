@@ -26,6 +26,11 @@ afterEach(() => {
 });
 
 describe('Topbar global search', () => {
+  it('не дублирует логотип из боковой панели', () => {
+    const { container } = renderTopbar();
+    expect(container.querySelector('.tb-logo')).toBeNull();
+  });
+
   it('открывает текстовый результат прямо в модалке', async () => {
     vi.useFakeTimers();
     const textHit = { ...hit('text-1'), kind: 'file', title: 'notes.txt' };

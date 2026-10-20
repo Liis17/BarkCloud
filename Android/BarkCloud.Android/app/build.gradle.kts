@@ -1,5 +1,9 @@
 import com.google.protobuf.gradle.id
 import com.google.protobuf.gradle.proto
+import java.io.FileInputStream
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.util.Base64
 
 plugins {
     alias(libs.plugins.android.application)
@@ -7,6 +11,65 @@ plugins {
     id("kotlin-kapt")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.protobuf)
+}
+
+val releaseSigningVariableNames = listOf(
+    "BARKCLOUD_ANDROID_KEYSTORE_BASE64",
+    "BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64",
+    "BARKCLOUD_ANDROID_KEY_ALIAS_BASE64",
+    "BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64",
+)
+val releaseSigningValues = releaseSigningVariableNames.associateWith {
+    System.getenv(it)?.takeIf(String::isNotBlank)
+}
+val missingReleaseSigningValues = releaseSigningValues.filterValues { it == null }.keys
+val releaseSigningConfigured = missingReleaseSigningValues.isEmpty()
+if (!releaseSigningConfigured && releaseSigningValues.values.any { it != null }) {
+    throw GradleException(
+        "Android release signing requires all Base64 environment variables: " +
+            missingReleaseSigningValues.joinToString(", ")
+    )
+}
+
+fun decodeReleaseSigningValue(name: String): ByteArray {
+    val encoded = releaseSigningValues[name]
+        ?: throw GradleException("Missing Android signing environment variable: $name")
+    return try {
+        Base64.getDecoder().decode(encoded.filterNot { it.isWhitespace() })
+    } catch (error: IllegalArgumentException) {
+        throw GradleException("$name must contain valid Base64.", error)
+    }
+}
+
+val releaseKeystoreBytes = if (releaseSigningConfigured) {
+    decodeReleaseSigningValue("BARKCLOUD_ANDROID_KEYSTORE_BASE64")
+} else {
+    null
+}
+val releaseKeystoreFile = releaseKeystoreBytes?.let { bytes ->
+    layout.buildDirectory.file("signing/android-release.keystore").get().asFile.apply {
+        parentFile.mkdirs()
+        writeBytes(bytes)
+    }
+}
+val releaseKeystoreType = releaseKeystoreBytes?.let { bytes ->
+    val jksMagic = byteArrayOf(0xFE.toByte(), 0xED.toByte(), 0xFE.toByte(), 0xED.toByte())
+    if (bytes.take(4).toByteArray().contentEquals(jksMagic)) "JKS" else "PKCS12"
+}
+val releaseStorePassword = if (releaseSigningConfigured) {
+    decodeReleaseSigningValue("BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64").toString(Charsets.UTF_8)
+} else {
+    null
+}
+val releaseKeyAlias = if (releaseSigningConfigured) {
+    decodeReleaseSigningValue("BARKCLOUD_ANDROID_KEY_ALIAS_BASE64").toString(Charsets.UTF_8)
+} else {
+    null
+}
+val releaseKeyPassword = if (releaseSigningConfigured) {
+    decodeReleaseSigningValue("BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64").toString(Charsets.UTF_8)
+} else {
+    null
 }
 
 android {
@@ -54,9 +117,24 @@ android {
         proto { srcDir("src/main/proto-local") }
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = requireNotNull(releaseKeystoreFile)
+                storeType = requireNotNull(releaseKeystoreType)
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -76,6 +154,44 @@ android {
 
     kotlinOptions {
         jvmTarget = "11"
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val packagesReleaseApk = allTasks.any { task ->
+        task.name.contains("Release", ignoreCase = true) &&
+            (task.name.startsWith("assemble") ||
+                task.name.startsWith("package") ||
+                task.name.startsWith("bundle"))
+    }
+    if (packagesReleaseApk && !releaseSigningConfigured) {
+        throw GradleException(
+            "Release APK signing is required. Set all Base64 environment variables: " +
+                releaseSigningVariableNames.joinToString(", ")
+        )
+    }
+}
+
+tasks.register("printReleaseCertificateFingerprint") {
+    group = "build"
+    description = "Prints the SHA-256 signing certificate fingerprint for server asset links."
+    doLast {
+        val keystoreFile = releaseKeystoreFile
+            ?: throw GradleException("Set all Android release signing environment variables first.")
+        val storeType = releaseKeystoreType
+            ?: throw GradleException("Android release keystore type could not be determined.")
+        val storePassword = releaseStorePassword
+            ?: throw GradleException("Android release keystore password is missing.")
+        val keyAlias = releaseKeyAlias
+            ?: throw GradleException("Android release key alias is missing.")
+        val keystore = KeyStore.getInstance(storeType)
+        FileInputStream(keystoreFile).use { keystore.load(it, storePassword.toCharArray()) }
+        val certificate = keystore.getCertificate(keyAlias)
+            ?: throw GradleException("No certificate found for the configured Android key alias.")
+        val fingerprint = MessageDigest.getInstance("SHA-256")
+            .digest(certificate.encoded)
+            .joinToString(":") { (it.toInt() and 0xff).toString(16).uppercase().padStart(2, '0') }
+        println("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT=$fingerprint")
     }
 }
 
@@ -162,6 +278,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
 
     implementation(libs.protobuf.javalite)
     implementation(libs.protobuf.kotlin.lite)

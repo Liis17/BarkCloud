@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       # Пути, правка которых пересобирает образ: по одному glob на строку.
-      # Совпадают с on.push.paths вызывающего воркфлоу за вычетом тестов
+      # Совпадают с push/pull_request paths вызывающего воркфлоу за вычетом тестов
       runtime-paths:
         required: true
         type: string
@@ -57,6 +57,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: barkcloud-image-${{ inputs.image-name }}-${{ github.ref_name }}
@@ -68,6 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       should_test: ${{ steps.decide.outputs.should_test }}
       should_build: ${{ steps.decide.outputs.should_build }}

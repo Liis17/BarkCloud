@@ -16,7 +16,7 @@ public sealed class ComposeImageService
     private const string RegistryPrefix = DockerRegistryService.RegistryHost + "/";
     private const int BackupsToKeep = 20;
 
-    public static readonly string[] Branches = ["master", "nightly", "dev"];
+    public static readonly string[] Branches = ["master", "dev"];
 
     private static readonly Regex TopLevelSectionRegex = new(
         @"^(?<name>[A-Za-z0-9._-]+):",
@@ -25,7 +25,7 @@ public sealed class ComposeImageService
         @"^  (?<name>[A-Za-z0-9._-]+):\s*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex ImageRegex = new(
-        @"^\s+image:\s*[""']?docker\.barkfluff\.com/(?<base>barkcloud-[a-z0-9-]+?)(?<suffix>-nightly|-dev)?:(?<tag>[^\s""']+)[""']?\s*$",
+        @"^\s+image:\s*[""']?docker\.barkfluff\.com/(?<base>barkcloud-[a-z0-9-]+?)(?<suffix>-dev)?:(?<tag>[^\s""']+)[""']?\s*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly SemaphoreSlim WriteGate = new(1, 1);
 
@@ -207,7 +207,6 @@ public sealed class ComposeImageService
 
     private static string BranchFromSuffix(string suffix) => suffix switch
     {
-        "-nightly" => "nightly",
         "-dev" => "dev",
         _ => "master",
     };

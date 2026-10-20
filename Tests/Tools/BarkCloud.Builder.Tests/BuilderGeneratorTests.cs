@@ -34,6 +34,8 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("POSTGRES_PORT=5432", env);
         Assert.DoesNotContain("SEQ_WEBPORT=", env);
         Assert.Contains("WEB_PORT=8080", env);
+        Assert.Contains("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT=", env);
+        Assert.Contains("BarkCloud__AndroidCertificateSha256Fingerprint: \"${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}\"", compose);
         Assert.Contains("MINIO_DATA_PATH=./data/minio", env);
         Assert.Contains("POSTGRES_DATA_PATH=./data/pgdata", env);
         Assert.Contains("BACKUP_PATH=./data/pgbackup", env);
@@ -488,7 +490,8 @@ public sealed class BuilderGeneratorTests
         var env = BackendComposeGenerator.BuildEnv(model);
 
         Assert.Empty(BuilderModelValidator.Validate(model));
-        Assert.Contains("image: ghcr.io/liis17/lognara-relay:master", compose);
+        Assert.Contains("image: docker.barkfluff.com/lognara-relay:master", compose);
+        Assert.DoesNotContain("ghcr.io", compose);
         Assert.Contains("LOGNARA_LISTEN_ADDR: \"0.0.0.0:7401\"", compose);
         Assert.Contains("LOGNARA_CORE_URL: \"${LOGNARA_CORE_URL}\"", compose);
         Assert.Contains("LOGNARA_CORE_TOKEN: \"${LOGNARA_RELAY_CORE_TOKEN}\"", compose);

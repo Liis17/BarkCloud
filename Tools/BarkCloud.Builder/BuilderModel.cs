@@ -41,9 +41,9 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public string SeqContainerName { get; set; } = "cloud-seq";
     public string NginxContainerName { get; set; } = "cloud-nginx";
 
-    // Образы: реестр фиксирован, выбирается только канал (Release/Nightly/Dev).
+    // Образы: реестр фиксирован, выбирается только канал (Release/Dev).
     public const string ImageRegistry = "docker.barkfluff.com";
-    public string ImageChannel { get; set; } = "Release"; // "Release" | "Nightly" | "Dev"
+    public string ImageChannel { get; set; } = "Release"; // "Release" | "Dev"
 
     // Общие
     public string ConfigurationAccessKey { get; set; } = "";
@@ -107,6 +107,7 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public bool WebCookieSecure { get; set; }
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebAdminPassword { get; set; } = "";
+    public string AndroidCertificateSha256Fingerprint { get; set; } = "27:85:31:F0:57:D2:28:2F:E0:47:1D:05:68:46:6B:91:2F:9C:31:16:E7:19:F4:27:20:40:BD:FF:63:34:E8:26";
 
     // Внешние адреса сервисов для клиентов (обязательны). Configuration пишет их в БД
     // на чистом старте. По умолчанию — единый домен + порт сервиса (как маршрутизирует nginx).
