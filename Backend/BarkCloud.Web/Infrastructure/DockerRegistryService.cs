@@ -183,12 +183,7 @@ public sealed class DockerRegistryService
 
         var branch = "master";
         var baseRepository = repository;
-        if (repository.EndsWith("-nightly", StringComparison.OrdinalIgnoreCase))
-        {
-            branch = "nightly";
-            baseRepository = repository[..^"-nightly".Length];
-        }
-        else if (repository.EndsWith("-dev", StringComparison.OrdinalIgnoreCase))
+        if (repository.EndsWith("-dev", StringComparison.OrdinalIgnoreCase))
         {
             branch = "dev";
             baseRepository = repository[..^"-dev".Length];
@@ -217,7 +212,6 @@ public sealed class DockerRegistryService
 
     public static string RepositoryForBranch(string baseRepository, string branch) => branch switch
     {
-        "nightly" => $"{baseRepository}-nightly",
         "dev" => $"{baseRepository}-dev",
         "master" => baseRepository,
         _ => throw new ArgumentException($"Неизвестный канал: {branch}", nameof(branch)),
