@@ -41,9 +41,9 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public string SeqContainerName { get; set; } = "cloud-seq";
     public string NginxContainerName { get; set; } = "cloud-nginx";
 
-    // Образы: реестр фиксирован, выбирается только канал (Release/Nightly/Dev).
+    // Образы: реестр фиксирован, выбирается только канал (Release/Dev).
     public const string ImageRegistry = "docker.barkfluff.com";
-    public string ImageChannel { get; set; } = "Release"; // "Release" | "Nightly" | "Dev"
+    public string ImageChannel { get; set; } = "Release"; // "Release" | "Dev"
 
     // Общие
     public string ConfigurationAccessKey { get; set; } = "";

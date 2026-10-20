@@ -11,10 +11,9 @@ public static class BackendComposeGenerator
 {
     public static string BuildCompose(BuilderModel m)
     {
-        // Образ приложения: docker.barkfluff.com/barkcloud-<svc>[-nightly|-dev]:latest
+        // Образ приложения: docker.barkfluff.com/barkcloud-<svc>[-dev]:latest
         string suffix = m.ImageChannel switch
         {
-            "Nightly" => "-nightly",
             "Dev" => "-dev",
             _ => "",
         };

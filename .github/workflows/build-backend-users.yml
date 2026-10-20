@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - nightly
       - master
     # Proto-контракты — не весь BarkCloud.Proto, а только свои + компилируемые в GrpcServer
     # (configuration_api, session_revocation_api) → правка одного .proto не пересобирает весь бэкенд.

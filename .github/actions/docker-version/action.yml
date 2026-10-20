@@ -50,7 +50,6 @@ runs:
 
         case "$REF_NAME" in
           master) suffix="" ;;
-          nightly) suffix="-nightly" ;;
           dev) suffix="-dev" ;;
           *) echo "Ветка $REF_NAME не поддерживает публикацию BarkCloud-образов" >&2; exit 1 ;;
         esac

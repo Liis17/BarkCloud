@@ -10,7 +10,7 @@ public sealed class BuilderConfigLoaderTests
     {
         var model = new BuilderModel
         {
-            ImageChannel = "Nightly",
+            ImageChannel = "Dev",
             IncludeTorrent = false,
             IncludeRabbitmq = false,
             IncludeSeq = true,
