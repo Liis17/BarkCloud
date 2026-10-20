@@ -1,0 +1,257 @@
+name: "🚀 BarkCloud Release"
+
+# Релизная точка: push в master публикует один релиз со сборками
+# всех приложений. Релиз создаётся только после успешного полного
+# прогона всех тестов (tests.yml с force-all).
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: barkcloud-release
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: "Полный прогон всех тестов"
+    uses: ./.github/workflows/tests.yml
+    with:
+      force-all: true
+    secrets: inherit
+
+  version:
+    name: "Версия релиза"
+    needs: tests
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: "Вычисление следующей версии v1.x.y"
+        id: version
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          latest="$(gh release list --limit 100 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          if [ -z "$latest" ]; then
+            version="v1.0.0"
+          else
+            major="$(printf '%s' "$latest" | cut -d. -f1)"
+            minor="$(printf '%s' "$latest" | cut -d. -f2)"
+            patch="$(printf '%s' "$latest" | cut -d. -f3)"
+            major="${major#v}"
+            version="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Коммит: ${SHA}, релиз: ${version}"
+
+  android:
+    name: "Android APK"
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: "Setup JDK 17"
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: "Setup Gradle"
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: "Сборка release APK"
+        working-directory: Android/BarkCloud.Android
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: "Артефакт: APK"
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: Android/BarkCloud.Android/app/build/outputs/apk/release/*.apk
+
+  ios:
+    name: "iOS IPA"
+    needs: tests
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: "Архив Xcode"
+        run: |
+          xcodebuild \
+            -project Ios/BarkCloud/BarkCloud.xcodeproj \
+            -scheme BarkCloud \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/BarkCloud.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            archive
+
+      - name: "Упаковка IPA"
+        run: |
+          mkdir -p Payload
+          cp -R "$RUNNER_TEMP/BarkCloud.xcarchive/Products/Applications/BarkCloud.app" Payload/
+          zip -qry BarkCloud.iOS.ipa Payload
+
+      - name: "Артефакт: IPA"
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-ipa
+          path: BarkCloud.iOS.ipa
+
+  macos:
+    name: "macOS DMG"
+    needs: tests
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: "Архив Xcode"
+        run: |
+          xcodebuild \
+            -project Mac/BarkCloudDrive/BarkCloudDrive.xcodeproj \
+            -scheme BarkCloudDrive \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/BarkCloudDrive.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            archive
+
+      - name: "Сборка DMG"
+        run: |
+          mkdir -p "$RUNNER_TEMP/dmg"
+          cp -R "$RUNNER_TEMP/BarkCloudDrive.xcarchive/Products/Applications/BarkCloudDrive.app" "$RUNNER_TEMP/dmg/"
+          hdiutil create -volname BarkCloud -srcfolder "$RUNNER_TEMP/dmg" -ov -format UDZO BarkCloud.Mac.dmg
+
+      - name: "Артефакт: DMG"
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: BarkCloud.Mac.dmg
+
+  drive:
+    name: "Windows Drive"
+    needs: tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # Прод-раскладка: App и Engine кладутся в одну папку (side-by-side),
+      # см. Drive/BarkCloud.Drive.App/EngineLauncher.cs
+      - name: "Publish App и Engine"
+        run: |
+          dotnet publish Drive/BarkCloud.Drive.App/BarkCloud.Drive.App.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP/Drive"
+          dotnet publish Drive/BarkCloud.Drive.Engine/BarkCloud.Drive.Engine.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP/Drive"
+
+      - name: "Проверка сборки"
+        run: |
+          foreach ($exe in @("$env:RUNNER_TEMP/Drive/BarkCloud.Drive.App.exe", "$env:RUNNER_TEMP/Drive/BarkCloud.Drive.Engine.exe")) {
+            if (-not (Test-Path -LiteralPath $exe)) { throw "Not published: $exe" }
+          }
+
+      - name: "Артефакт: ZIP"
+        run: Compress-Archive -Path "$env:RUNNER_TEMP/Drive/*" -DestinationPath "$env:RUNNER_TEMP/BarkCloud.Drive-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: drive-zip
+          path: ${{ runner.temp }}/BarkCloud.Drive-windows-x64.zip
+
+  builder:
+    name: "Windows Builder"
+    needs: tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: "Publish Builder (self-contained)"
+        run: dotnet publish Tools/BarkCloud.Builder/BarkCloud.Builder.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP/Builder"
+
+      - name: "Проверка сборки"
+        run: |
+          if (-not (Test-Path -LiteralPath "$env:RUNNER_TEMP/Builder/BarkCloud.Builder.exe")) {
+            throw "BarkCloud.Builder.exe was not published."
+          }
+
+      - name: "Артефакт: ZIP"
+        run: Compress-Archive -Path "$env:RUNNER_TEMP/Builder/*" -DestinationPath "$env:RUNNER_TEMP/BarkCloud.Builder-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: builder-zip
+          path: ${{ runner.temp }}/BarkCloud.Builder-windows-x64.zip
+
+  publish:
+    name: "Публикация релиза"
+    needs: [tests, version, android, ios, macos, drive, builder]
+    if: ${{ !cancelled() && success('tests', 'android', 'ios', 'macos', 'drive', 'builder') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: "Скачивание артефактов"
+        uses: actions/download-artifact@v7
+        with:
+          path: Artifacts
+
+      - name: "Именование артефактов"
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mv Artifacts/android-apk/*.apk        "Artifacts/BarkCloud.Android-${VERSION}.apk"
+          mv Artifacts/ios-ipa/*.ipa            "Artifacts/BarkCloud.iOS-${VERSION}.ipa"
+          mv Artifacts/macos-dmg/*.dmg          "Artifacts/BarkCloud.Mac-${VERSION}.dmg"
+          mv Artifacts/drive-zip/*.zip          "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip"
+          mv Artifacts/builder-zip/*.zip        "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip"
+          find Artifacts -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+          ls -lh Artifacts
+
+      - name: "Создание релиза"
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh release create "$VERSION" \
+            "Artifacts/BarkCloud.Android-${VERSION}.apk" \
+            "Artifacts/BarkCloud.iOS-${VERSION}.ipa" \
+            "Artifacts/BarkCloud.Mac-${VERSION}.dmg" \
+            "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip" \
+            "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip" \
+            --target "$SHA" \
+            --title "BarkCloud $VERSION" \
+            --generate-notes
