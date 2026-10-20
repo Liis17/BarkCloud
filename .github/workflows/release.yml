@@ -19,6 +19,9 @@ concurrency:
 jobs:
   tests:
     name: "Полный прогон всех тестов"
+    permissions:
+      contents: read
+      pull-requests: read
     uses: ./.github/workflows/tests.yml
     with:
       force-all: true
