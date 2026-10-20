@@ -38,6 +38,7 @@ jobs:
       shared: ${{ steps.filter.outputs.shared }}
       android: ${{ steps.filter.outputs.android }}
       drive: ${{ steps.filter.outputs.drive }}
+      ci: ${{ steps.filter.outputs.ci }}
       all: ${{ steps.full.outputs.all }}
     steps:
       - uses: actions/checkout@v7
@@ -100,6 +101,21 @@ jobs:
               - 'Directory.Build.props'
               - 'Tests/Directory.Build.props'
               - '.github/workflows/tests.yml'
+            ci:
+              - '.github/actions/docker-version/**'
+              - '.github/workflows/backend-service-ci.yml'
+              - '.github/workflows/build-backend-*.yml'
+              - 'Tests/CI/**'
+
+  test-docker-version:
+    name: "Docker image versioning"
+    needs: changes
+    if: ${{ needs.changes.outputs.all == 'true' || needs.changes.outputs.ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: "Test version selection"
+        run: bash Tests/CI/docker-version.test.sh
 
   # ═══════════════════════════════════════════════════════════════
   #  Backend — тесты per-микросервис (свой + изменения в Shared)
