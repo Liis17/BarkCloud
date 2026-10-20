@@ -43,17 +43,6 @@ public sealed class DockerRegistryServiceTests
     }
 
     [Fact]
-    public async Task GetVersionStatusAsync_KeepsNightlyRepository()
-    {
-        string? requestedPath = null;
-        var service = CreateService("{\"tags\":[\"1.0.10\"]}", request => requestedPath = request.RequestUri?.AbsolutePath);
-
-        await service.GetVersionStatusAsync("docker.barkfluff.com/barkcloud-users-nightly:1.0.0");
-
-        requestedPath.Should().Be("/v2/barkcloud-users-nightly/tags/list");
-    }
-
-    [Fact]
     public async Task GetVersionStatusAsync_DerivesInstalledVersionFromLatestImageDigest()
     {
         var service = CreateService(request => request.RequestUri?.AbsolutePath switch

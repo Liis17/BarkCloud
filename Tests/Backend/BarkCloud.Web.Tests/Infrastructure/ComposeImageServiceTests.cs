@@ -12,7 +12,7 @@ version: '3.8'
 
 services:
   cloud-configuration:
-    image: docker.barkfluff.com/barkcloud-configuration-nightly:1.0.7
+    image: docker.barkfluff.com/barkcloud-configuration:1.0.7
     container_name: cloud-configuration
 
   cloud-web:
@@ -30,14 +30,13 @@ services:
 
         images.Keys.Should().BeEquivalentTo("cloud-configuration", "cloud-web");
         images["cloud-configuration"].BaseRepository.Should().Be("barkcloud-configuration");
-        images["cloud-configuration"].Branch.Should().Be("nightly");
+        images["cloud-configuration"].Branch.Should().Be("master");
         images["cloud-configuration"].Tag.Should().Be("1.0.7");
         images["cloud-web"].Branch.Should().Be("dev");
     }
 
     [Theory]
     [InlineData("master", "docker.barkfluff.com/barkcloud-configuration:1.0.7")]
-    [InlineData("nightly", "docker.barkfluff.com/barkcloud-configuration-nightly:1.0.7")]
     [InlineData("dev", "docker.barkfluff.com/barkcloud-configuration-dev:1.0.7")]
     public void TryRewrite_SwitchesOnlyRepositorySuffixAndPreservesTag(string branch, string expectedImage)
     {
@@ -72,10 +71,10 @@ services:
             await using var openedBeforeWrite = new FileStream(composePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var service = CreateService(composePath, backupPath);
 
-            var previous = await service.SetBranchAsync("cloud-web", "nightly");
+            var previous = await service.SetBranchAsync("cloud-web", "master");
 
             previous.Should().Be(Compose);
-            (await File.ReadAllTextAsync(composePath)).Should().Contain("barkcloud-web-nightly:latest");
+            (await File.ReadAllTextAsync(composePath)).Should().Contain("image: docker.barkfluff.com/barkcloud-web:latest");
             Directory.GetFiles(backupPath).Should().ContainSingle();
 
             await service.RestoreAsync(previous);
@@ -89,7 +88,6 @@ services:
 
     [Theory]
     [InlineData("docker.barkfluff.com/barkcloud-users-dev:latest", "dev")]
-    [InlineData("docker.barkfluff.com/barkcloud-users-nightly:1.0.3", "nightly")]
     [InlineData("docker.barkfluff.com/barkcloud-users:latest", "master")]
     [InlineData("datalust/seq:latest", null)]
     public void BranchFromImage_DetectsChannel(string image, string? expected)

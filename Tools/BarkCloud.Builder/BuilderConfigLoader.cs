@@ -35,9 +35,7 @@ public static class BuilderConfigLoader
         m.IncludeLognara = hasLognaraRelay || m.LegacyLognaraImport;
         m.UseNginx = HasService("cloud-nginx") || nginxConf != null;
         m.NginxLocation = HasService("cloud-nginx") ? "Compose" : "External";
-        m.ImageChannel = compose.Contains("barkcloud-configuration-nightly:") ? "Nightly"
-            : compose.Contains("barkcloud-configuration-dev:") ? "Dev"
-            : "Release";
+        m.ImageChannel = compose.Contains("barkcloud-configuration-dev:") ? "Dev" : "Release";
 
         void Set(string key, Action<string> setter)
         {
