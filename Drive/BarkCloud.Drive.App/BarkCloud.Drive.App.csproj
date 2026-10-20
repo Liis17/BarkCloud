@@ -7,7 +7,12 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>
         <RootNamespace>BarkCloud.Drive.App</RootNamespace>
+        <ApplicationIcon>Assets\barkcloud.ico</ApplicationIcon>
     </PropertyGroup>
+
+    <ItemGroup>
+        <Resource Include="Assets\barkcloud.ico" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="DSInternals.Win32.WebAuthn" Version="3.4.0" />
