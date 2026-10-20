@@ -145,7 +145,7 @@ jobs:
       - name: "Сборка DMG"
         run: |
           mkdir -p "$RUNNER_TEMP/dmg"
-          cp -R "$RUNNER_TEMP/BarkCloudDrive.xcarchive/Products/Applications/BarkCloudDrive.app" "$RUNNER_TEMP/dmg/"
+          cp -R "$RUNNER_TEMP/BarkCloudDrive.xcarchive/Products/Applications/BarkCloud Drive.app" "$RUNNER_TEMP/dmg/"
           hdiutil create -volname BarkCloud -srcfolder "$RUNNER_TEMP/dmg" -ov -format UDZO BarkCloud.Mac.dmg
 
       - name: "Артефакт: DMG"
