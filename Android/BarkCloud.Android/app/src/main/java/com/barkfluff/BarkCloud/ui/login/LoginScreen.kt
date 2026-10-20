@@ -11,8 +11,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetPublicKeyCredentialOption
+import androidx.credentials.PublicKeyCredential
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.ui.auth.components.*
@@ -23,6 +30,8 @@ fun LoginScreen(onAuthenticated: () -> Unit, server: String, onRegister: () -> U
     viewModel: LoginViewModel = viewModel(factory = LoginViewModel.factory())) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var passkey by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val credentialManager = remember(context) { CredentialManager.create(context) }
     val retry = deadlineSeconds(state.retryAtMillis)
     LaunchedEffect(viewModel) { viewModel.events.collect { onAuthenticated() } }
     BackHandler(state.otpRequired) { viewModel.backFromOtp() }
@@ -31,9 +40,35 @@ fun LoginScreen(onAuthenticated: () -> Unit, server: String, onRegister: () -> U
         actions = {
             AuthError(state.credentialsError ?: state.snackbarMessage)
             if (retry > 0) Text("Повторить через $retry с", style = MaterialTheme.typography.bodySmall)
-            if (!passkey || state.otpRequired) AuthPrimaryButton(if (state.otpRequired) "Войти" else "Продолжить", viewModel::submit,
-                enabled = state.canSubmit && retry == 0L, loading = state.isLoading)
-            else AuthPrimaryButton("Войти с паролем", { passkey = false })
+            if (passkey && !state.otpRequired) {
+                AuthPrimaryButton(
+                    "Войти с ключом доступа",
+                    {
+                        viewModel.loginWithPasskey { optionsJson ->
+                            try {
+                                val response = credentialManager.getCredential(
+                                    context,
+                                    GetCredentialRequest(listOf(GetPublicKeyCredentialOption(optionsJson))),
+                                )
+                                (response.credential as? PublicKeyCredential)?.authenticationResponseJson
+                                    ?: throw IllegalStateException("Системный менеджер вернул неизвестный тип ключа.")
+                            } catch (_: GetCredentialCancellationException) {
+                                null
+                            } catch (e: NoCredentialException) {
+                                throw IllegalStateException(
+                                    "На устройстве нет ключа доступа для этого сервера.",
+                                    e,
+                                )
+                            }
+                        }
+                    },
+                    enabled = !state.isLoading && retry == 0L,
+                    loading = state.isLoading,
+                )
+            } else {
+                AuthPrimaryButton(if (state.otpRequired) "Войти" else "Продолжить", viewModel::submit,
+                    enabled = state.canSubmit && retry == 0L, loading = state.isLoading)
+            }
             if (!state.otpRequired) {
                 OutlinedButton(onRegister, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = !state.isLoading) { Text("Создать аккаунт") }
                 if (onResumeRegistration != null) TextButton(onResumeRegistration, enabled = !state.isLoading) { Text("Завершить регистрацию") }
@@ -57,7 +92,7 @@ fun LoginScreen(onAuthenticated: () -> Unit, server: String, onRegister: () -> U
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (key) {
                         Text("Вход ключом доступа", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        AuthInfo("Нативный вход ключом доступа пока недоступен в Android-клиенте. Используйте пароль для входа в аккаунт.")
+                        AuthInfo("Системный диалог Android предложит ключ, зарегистрированный для этого сервера.")
                     } else {
                         AuthTextField(state.login, viewModel::onLoginChange, "Почта или имя пользователя", enabled = !state.isLoading, autofillType = ContentType.Username)
                         PasswordField(state.password, viewModel::onPasswordChange, enabled = !state.isLoading, onDone = viewModel::submit)

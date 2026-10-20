@@ -25,6 +25,7 @@ public sealed class BuilderConfigLoaderTests
             ConfigurationAccessKey = "key=with=equals",
             WebCookieSecure = true,
             WebAdminPassword = "admin",
+            AndroidCertificateSha256Fingerprint = "AA:BB:CC:DD",
             IdentityPort = "9100",
             ArchiveTempPath = "",
             NginxSeqProxy = true,
