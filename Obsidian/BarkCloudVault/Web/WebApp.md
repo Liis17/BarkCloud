@@ -34,6 +34,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 | `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
 | `POST /login/resend`, `/register/resend`, `/forgot/resend` | Повторный запрос email-кода в исходном потоке; resend не продлевает 15-минутный срок потока |
 | `POST /login/webauthn/begin`, `POST /login/webauthn/complete` | WebAuthn; CSRF передаётся заголовком `X-CSRF-TOKEN`, assertion принимается как JSON object |
+| `GET /.well-known/assetlinks.json` | Публичная ассоциация Android Credential Manager (`delegate_permission/common.get_login_creds`) для `com.barkfluff.BarkCloud`; отвечает 404, если сертификат APK не настроен |
 | `GET /logout`, `POST /logout` | Выход; GET сохранён для совместимости, оба маршрута находятся в auth-группе с `no-store` |
 | `GET /api/me`, `GET /api/storage` | Данные оболочки приложения и отдельная статистика хранилища |
 | `/api/settings/*`, `/api/system/*` | API настроек и обслуживания; детали в [[Web/Settings]] и [[Web/SystemUpdates]] |

@@ -161,6 +161,46 @@ app.UseForwardedHeaders(fhOptions);
 // Бандл React-SPA из wwwroot (собирается Vite из ClientApp). Отдаём статику до эндпоинтов.
 app.UseStaticFiles();
 
+var androidCertificateFingerprint = app.Configuration["BarkCloud:AndroidCertificateSha256Fingerprint"];
+string? assetLinksFingerprint = null;
+if (!string.IsNullOrWhiteSpace(androidCertificateFingerprint))
+{
+    var fingerprintHex = androidCertificateFingerprint
+        .Replace(":", "", StringComparison.Ordinal)
+        .Replace(" ", "", StringComparison.Ordinal)
+        .Trim();
+    if (fingerprintHex.Length != 64 || !fingerprintHex.All(Uri.IsHexDigit))
+        throw new InvalidOperationException(
+            "BarkCloud:AndroidCertificateSha256Fingerprint must be a 32-byte SHA-256 fingerprint in hexadecimal.");
+
+    var normalizedFingerprint = Convert.ToHexString(Convert.FromHexString(fingerprintHex));
+    assetLinksFingerprint = string.Join(
+        ":",
+        Enumerable.Range(0, normalizedFingerprint.Length / 2)
+            .Select(index => normalizedFingerprint.Substring(index * 2, 2)));
+}
+
+app.MapGet("/.well-known/assetlinks.json", (HttpContext context) =>
+{
+    if (assetLinksFingerprint is null)
+        return Results.NotFound();
+
+    context.Response.Headers["Cache-Control"] = "public, max-age=300";
+    return Results.Json(new[]
+    {
+        new
+        {
+            relation = new[] { "delegate_permission/common.get_login_creds" },
+            target = new
+            {
+                @namespace = "android_app",
+                package_name = "com.barkfluff.BarkCloud",
+                sha256_cert_fingerprints = new[] { assetLinksFingerprint }
+            }
+        }
+    });
+});
+
 app.MapAuthEndpoints();
 app.MapWebEndpoints();
 app.MapCloudApiEndpoints();

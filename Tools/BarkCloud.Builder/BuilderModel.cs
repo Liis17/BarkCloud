@@ -107,6 +107,7 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public bool WebCookieSecure { get; set; }
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebAdminPassword { get; set; } = "";
+    public string AndroidCertificateSha256Fingerprint { get; set; } = "";
 
     // Внешние адреса сервисов для клиентов (обязательны). Configuration пишет их в БД
     // на чистом старте. По умолчанию — единый домен + порт сервиса (как маршрутизирует nginx).

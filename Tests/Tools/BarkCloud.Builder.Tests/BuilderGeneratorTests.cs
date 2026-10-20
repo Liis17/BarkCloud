@@ -34,6 +34,8 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("POSTGRES_PORT=5432", env);
         Assert.DoesNotContain("SEQ_WEBPORT=", env);
         Assert.Contains("WEB_PORT=8080", env);
+        Assert.Contains("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT=", env);
+        Assert.Contains("BarkCloud__AndroidCertificateSha256Fingerprint: \"${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}\"", compose);
         Assert.Contains("MINIO_DATA_PATH=./data/minio", env);
         Assert.Contains("POSTGRES_DATA_PATH=./data/pgdata", env);
         Assert.Contains("BACKUP_PATH=./data/pgbackup", env);

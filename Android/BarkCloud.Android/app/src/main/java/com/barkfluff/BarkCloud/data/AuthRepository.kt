@@ -2,6 +2,8 @@ package com.barkfluff.BarkCloud.data
 
 import barkcloud.identity.IdentityApiOuterClass.AuthRequest
 import barkcloud.identity.IdentityApiOuterClass.AuthResponse
+import barkcloud.identity.IdentityApiOuterClass.BeginWebAuthnAssertionRequest
+import barkcloud.identity.IdentityApiOuterClass.CompleteWebAuthnAssertionRequest
 import barkcloud.identity.IdentityApiOuterClass.LogoutRequest
 import com.barkfluff.BarkCloud.grpc.AuthErrorCodes
 import com.barkfluff.BarkCloud.grpc.GrpcManager
@@ -44,6 +46,39 @@ class AuthRepository(
                 AuthErrorCodes.INVALID_CREDENTIALS, "A4DAB334-1067-4838-A782-C4257DC838F7" -> AuthResult.InvalidCredentials
                 else -> failure.toAuthFlowException().let { AuthResult.OtherError(it.message, it.retryAfterSeconds) }
             }
+        }
+    }
+
+    suspend fun beginWebAuthnAssertion() = withContext(Dispatchers.IO) {
+        grpcManager.identityStub()
+            .withDeadlineAfter(15, TimeUnit.SECONDS)
+            .beginWebAuthnAssertion(BeginWebAuthnAssertionRequest.getDefaultInstance())
+    }
+
+    suspend fun completeWebAuthnAssertion(
+        challengeId: String,
+        assertionJson: String,
+    ): AuthResult = withContext(Dispatchers.IO) {
+        try {
+            val response = grpcManager.identityStub()
+                .withDeadlineAfter(15, TimeUnit.SECONDS)
+                .completeWebAuthnAssertion(
+                    CompleteWebAuthnAssertionRequest.newBuilder()
+                        .setChallengeId(challengeId)
+                        .setAssertionJson(assertionJson)
+                        .build()
+                )
+            persist(response)
+            AuthResult.Success
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val failure = e.grpcFailureOrNull()
+            AuthResult.OtherError(
+                failure?.toAuthFlowException()?.message
+                    ?: e.message
+                    ?: "Не удалось завершить вход ключом доступа"
+            )
         }
     }
 

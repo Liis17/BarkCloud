@@ -50,6 +50,23 @@ public class Program
         var webAuthnOrigins = string.IsNullOrWhiteSpace(webAuthnOriginsRaw)
             ? [$"https://{webAuthnRpId}"]
             : webAuthnOriginsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var androidCertificateFingerprint = builder.Configuration["BarkCloud:AndroidCertificateSha256Fingerprint"];
+        if (!string.IsNullOrWhiteSpace(androidCertificateFingerprint))
+        {
+            var fingerprintHex = androidCertificateFingerprint
+                .Replace(":", "", StringComparison.Ordinal)
+                .Replace(" ", "", StringComparison.Ordinal)
+                .Trim();
+            if (fingerprintHex.Length != 64 || !fingerprintHex.All(Uri.IsHexDigit))
+                throw new InvalidOperationException(
+                    "BarkCloud:AndroidCertificateSha256Fingerprint must be a 32-byte SHA-256 fingerprint in hexadecimal.");
+
+            var apkKeyHash = Convert.ToBase64String(Convert.FromHexString(fingerprintHex))
+                .TrimEnd('=')
+                .Replace("+", "-", StringComparison.Ordinal)
+                .Replace("/", "_", StringComparison.Ordinal);
+            webAuthnOrigins = [.. webAuthnOrigins, $"android:apk-key-hash:{apkKeyHash}"];
+        }
 
         builder.Services.AddSingleton<IFido2>(_ => new Fido2(new Fido2Configuration
         {
