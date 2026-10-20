@@ -272,7 +272,6 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Канал" />
                         <ComboBox SelectedValue="{Binding ImageChannel, Mode=TwoWay}" SelectedValuePath="Tag">
                             <ComboBoxItem Content="Релиз — barkcloud-*:latest" Tag="Release" />
-                            <ComboBoxItem Content="Ночной — barkcloud-*-nightly:latest" Tag="Nightly" />
                             <ComboBoxItem Content="Дев — barkcloud-*-dev:latest" Tag="Dev" />
                         </ComboBox>
                     </StackPanel>
@@ -737,6 +736,8 @@
                                     Message="Включайте, если WEB_PUBLIC_HOST доступен браузеру по HTTPS." />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_PUBLIC_HOST (пусто — из заголовка запроса)" />
                         <ui:TextBox Margin="0,0,0,6" Text="{Binding WebPublicHost, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT (сертификат официального APK; замените для своей подписи или очистите для отключения)" TextWrapping="Wrap" />
+                        <ui:TextBox Margin="0,0,0,6" Text="{Binding AndroidCertificateSha256Fingerprint, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Style="{StaticResource FieldLabel}" Text="WEB_ADMIN_PASSWORD (пусто — раздел «Обслуживание» недоступен)" />
                         <Grid>
                             <Grid.ColumnDefinitions>

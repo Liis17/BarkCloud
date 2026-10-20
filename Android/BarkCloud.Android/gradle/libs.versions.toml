@@ -24,6 +24,7 @@ graphicsShapes = "1.0.1"
 work = "2.10.5"
 room = "2.7.0"
 biometric = "1.1.0"
+credentials = "1.6.0"
 
 protobufPlugin = "0.9.4"
 protobufJava = "3.25.1"
@@ -54,6 +55,8 @@ androidx-lifecycle-process            = { module = "androidx.lifecycle:lifecycle
 androidx-navigation-compose           = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-security-crypto              = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 androidx-biometric                    = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+androidx-credentials                  = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 
 protobuf-javalite      = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobufJava" }
 protobuf-kotlin-lite   = { module = "com.google.protobuf:protobuf-kotlin-lite", version.ref = "protobufJava" }

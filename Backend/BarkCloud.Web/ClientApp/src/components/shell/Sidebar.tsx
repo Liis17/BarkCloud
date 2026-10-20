@@ -55,7 +55,7 @@ export function Sidebar({ profileError = false, storageError = false, statistics
     <aside className="sidebar">
       <div className="sb-brand">
         <div className="mark">
-          <Icon.cloud size={22} />
+          <img src="/barkcloud-icon.png" alt="" width="40" height="40" />
         </div>
         <div>
           <div className="name">BarkCloud</div>

@@ -4,11 +4,21 @@ on:
   push:
     branches:
       - dev
-      - nightly
+    # Keep these filters in sync with pull_request.paths and runtime-paths below.
+    paths:
+      - 'Backend/BarkCloud.Configuration/**'
+      - 'Backend/BarkCloud.GrpcServer/**'
+      - 'Shared/BarkCloud.Shared.*/**'
+      - 'Shared/BarkCloud.Proto/configuration_api.proto'
+      - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
+      - 'Backend/rebuild.trigger'
+      - 'Tests/Backend/BarkCloud.Configuration.Tests/**'
+      - 'Tests/BarkCloud.TestKit/**'
+  pull_request:
+    types:
+      - closed
+    branches:
       - master
-    # Proto-контракты — не весь BarkCloud.Proto, а только свои + компилируемые в GrpcServer
-    # (configuration_api, session_revocation_api) → правка одного .proto не пересобирает весь бэкенд.
-    # Те же пути без тестов передаются ниже в runtime-paths — меняй оба списка вместе.
     paths:
       - 'Backend/BarkCloud.Configuration/**'
       - 'Backend/BarkCloud.GrpcServer/**'
@@ -22,9 +32,16 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   ci:
+    if: >-
+      ${{ github.event_name == 'push' && github.ref_name == 'dev'
+          || github.event_name == 'workflow_dispatch' && github.ref_name == 'dev'
+          || github.event_name == 'pull_request' && github.event.pull_request.merged == true
+             && github.event.pull_request.head.ref == 'dev'
+             && github.event.pull_request.head.repo.full_name == github.repository }}
     uses: ./.github/workflows/backend-service-ci.yml
     with:
       service-name: BarkCloud.Configuration

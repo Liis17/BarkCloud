@@ -15,6 +15,7 @@ Compose-поток первого запуска, выбора сервера, �
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/grpc/ServerSettings.kt` | `ServerConfig`, `ServerSettings`, `validateServerConfig` | Валидация и сохранение сервера |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/grpc/ServerConnectionProbe.kt` | `ReflectionServerConnectionProbe` | Проверка gRPC reflection на портах |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/AuthRepository.kt` | `AuthRepository` | Вход, получение токенов и выход |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/ui/login/LoginScreen.kt`, `LoginViewModel.kt` | `LoginScreen`, `LoginViewModel` | Выбор пароля или системного входа ключом доступа |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/AuthFlowRepository.kt` | `AuthFlowRepository` | Регистрация, подтверждение и сброс пароля |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/TokenStore.kt`, `TokenRefresher.kt` | `TokenStore`, `TokenRefresher` | Шифрование и обновление сессии |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/grpc/GrpcManager.kt` | token-bound `usersStub` / `filesStub` | Стабы с заранее разрешённым access token |
@@ -41,6 +42,13 @@ Compose-поток первого запуска, выбора сервера, �
 - `TokenRefresher` сериализует параллельное обновление access-token и обновляет его за 60 секунд до истечения. Недействительный refresh очищает сессию.
 - `PendingRegistrationStore` хранит отдельную AES-GCM-запись с ключом сервера, профилем, registration refresh-token и сроком действия. Пароль туда не записывается, а pending-токен не включает основную сессию.
 - После успешной установки пароля токены сохраняются в обычную сессию, затем pending-запись удаляется. При повторном продолжении сначала проверяется, не был ли пароль уже принят сервером. Серверные контракты описаны в [[Backend/Identity]].
+
+## Вход по ключу доступа
+
+- Android получает `PublicKeyCredentialRequestOptions` и challenge через `BeginWebAuthnAssertion`, запускает Credential Manager, затем передаёт assertion и challenge ID в `CompleteWebAuthnAssertion`. Успешный `AuthResponse` сохраняется в обычную сессию.
+- Запрос discoverable credential не требует логина. Отмена системного диалога оставляет пользователя на форме входа.
+- Release APK подписывается из Base64-переменных окружения; сертификат задаётся для self-hosted Identity и связывается с доменом через `/.well-known/assetlinks.json`. Builder предзаполняет отпечаток сертификатом официального APK; при собственной подписи значение меняют, пустое отключает Android passkeys.
+- Asset links должны использовать отношение `delegate_permission/common.get_login_creds`; серверные настройки описаны в [[Backend/Identity]] и [[Web/WebApp]].
 
 ## Ограничения и важные детали
 
