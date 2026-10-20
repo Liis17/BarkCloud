@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0435A7448EE6DA6E43AA6CB2 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387B7BB1925CB3E77BDF3291 /* LoginView.swift */; };
+		4F0E0001000000000000AA02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4F0E0001000000000000AA01 /* Assets.xcassets */; };
 		0F1EDA12A36AA1A99E23CCC2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 95C19A02855B5D8E85C031DA /* Cocoa.framework */; };
 		15344A41DC88EEAB2EAFB27F /* BarkCloudDriveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1CF4D96395D3FA04F549C1A /* BarkCloudDriveApp.swift */; };
 		156B06671D1676B7D031CB26 /* BarkCloudKit in Frameworks */ = {isa = PBXBuildFile; productRef = 746E94F5EE782185AD663E94 /* BarkCloudKit */; };
@@ -88,6 +89,7 @@
 		766125E7C7420FAEC4EADAF8 /* ServerSetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ServerSetupView.swift; sourceTree = "<group>"; };
 		90041203061702053BB45DF5 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		95C19A02855B5D8E85C031DA /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		4F0E0001000000000000AA01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1E20C125965A765D71B83EF /* BarkCloud Drive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BarkCloud Drive.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C468E051320D94C908437B2A /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		F1CF4D96395D3FA04F549C1A /* BarkCloudDriveApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BarkCloudDriveApp.swift; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 			children = (
 				F1CF4D96395D3FA04F549C1A /* BarkCloudDriveApp.swift */,
 				148F920E9DFF103444D0F2B8 /* AppModel.swift */,
+				4F0E0001000000000000AA01 /* Assets.xcassets */,
 				523071DFD9CF395F2A8B51EC /* FileProviderDomainManager.swift */,
 				4F0E0001000000000000A006 /* StorageWidgetBridge.swift */,
 				766125E7C7420FAEC4EADAF8 /* ServerSetupView.swift */,
@@ -308,6 +311,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8554136BAF4CCD1EC1D6FF28 /* Localizable.xcstrings in Resources */,
+				4F0E0001000000000000AA02 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
