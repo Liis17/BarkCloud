@@ -141,6 +141,7 @@ public static class BuilderConfigLoader
         Set("WEB_COOKIE_SECURE", v => m.WebCookieSecure = v.Equals("true", StringComparison.OrdinalIgnoreCase));
         Set("WEB_PUBLIC_HOST", v => m.WebPublicHost = v);
         Set("WEB_ADMIN_PASSWORD", v => m.WebAdminPassword = v);
+        Set("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT", v => m.AndroidCertificateSha256Fingerprint = v);
 
         Set("EXTERNAL_IDENTITY_HOST", v => m.ExternalIdentityHost = v);
         Set("EXTERNAL_USERS_HOST", v => m.ExternalUsersHost = v);

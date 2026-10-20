@@ -69,12 +69,12 @@ class AuthUiTest {
         compose.onNodeWithText("Каждый порт должен быть числом от 1 до 65535").assertExists()
         compose.runOnIdle { assertFalse(connected) }
     }
-    @Test fun passkeyExplainsAvailabilityAndReturnsToPassword() {
+    @Test fun passkeyOffersNativeSignInAndCanReturnToPassword() {
         val vm = LoginViewModel(app.authRepository)
         compose.setContent { BarkCloudTheme { LoginScreen({}, "example.com", {}, {}, {}, viewModel = vm) } }
         compose.onNodeWithText("Ключ доступа").performClick()
-        compose.onNodeWithText("Нативный вход ключом доступа пока недоступен в Android-клиенте. Используйте пароль для входа в аккаунт.").assertExists()
-        compose.onNodeWithText("Войти с паролем").performScrollTo().performClick()
+        compose.onNodeWithText("Войти с ключом доступа").assertExists()
+        compose.onNodeWithText("Пароль").performClick()
         compose.onNodeWithText("Почта или имя пользователя").assertExists()
     }
     @Test fun registrationBackRetainsProfile() {

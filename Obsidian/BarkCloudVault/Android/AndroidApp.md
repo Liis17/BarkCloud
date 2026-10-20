@@ -34,6 +34,11 @@ Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] �
 
 ## Ограничения и важные детали
 
+- Release APK требует Base64-переменные `BARKCLOUD_ANDROID_KEYSTORE_BASE64`, `BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64`, `BARKCLOUD_ANDROID_KEY_ALIAS_BASE64`, `BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64`; строковые значения кодируются как UTF-8. Keystore декодируется в `app/build/signing/`, который не попадает в git. Release packaging останавливается, если значения отсутствуют.
+- Release workflow ожидает GitHub Secrets с теми же четырьмя именами и печатает публичный отпечаток сертификата в лог перед сборкой.
+- Gradle-задача `:app:printReleaseCertificateFingerprint` выводит публичный SHA-256 отпечаток сертификата для `BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT` в self-hosted `.env`.
+- Нативный вход реализован через AndroidX Credential Manager; связь с доменом и ограничение сервера описаны в [[Android/Authentication]].
+
 - Клиент поддерживает Android API 30 и выше; системные разрешения для медиатеки и широкого доступа к файлам запрашиваются отдельно.
 - Состояние очереди загрузок и присутствия медиа в облаке хранится локально в Room; оригиналы кешируются службой `FileCacheService`, превью — отдельным Coil disk cache.
 - Выход через `SessionManager` отзывает сессию и очищает токены, очередь, кеш,

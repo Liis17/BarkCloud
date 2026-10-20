@@ -72,7 +72,14 @@ jobs:
 
       - name: "Сборка release APK"
         working-directory: Android/BarkCloud.Android
-        run: ./gradlew :app:assembleRelease --stacktrace
+        env:
+          BARKCLOUD_ANDROID_KEYSTORE_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEYSTORE_BASE64 }}
+          BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64 }}
+          BARKCLOUD_ANDROID_KEY_ALIAS_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEY_ALIAS_BASE64 }}
+          BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64 }}
+        run: |
+          ./gradlew :app:printReleaseCertificateFingerprint --stacktrace
+          ./gradlew :app:assembleRelease --stacktrace
 
       - name: "Артефакт: APK"
         uses: actions/upload-artifact@v7
