@@ -66,7 +66,7 @@ dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests --filter "Category=WindowsI
 
 ## Зависимости и взаимодействия
 
-- Workflow `tests.yml` запускается для pull request в `dev`, `nightly` и `master`, а также вручную. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов.
+- Workflow `tests.yml` запускается для pull request в `dev` и `master`, а также вручную. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов.
 - В CI Files и Users получают PostgreSQL 18 и `BARKCLOUD_TEST_POSTGRES`. Интеграционный workflow Users также запускает RabbitMQ и передаёт `BARKCLOUD_TEST_RABBITMQ`.
 - PostgreSQL и RabbitMQ в CI запускает composite action `.github/actions/test-containers` (скрипт `.github/scripts/start-test-containers.sh`: `postgres:18`, `rabbitmq:4.1`), а не `services:` — так `docker pull` повторяется до 5 раз с паузой 20 с × номер попытки: Docker Hub отдаёт таймауты и `toomanyrequests`. Образов `postgres`/`rabbitmq` в `docker.barkfluff.com` нет, поэтому логин `REGISTRY_*` для них не помогает.
 - Тесты сервиса запускаются и при изменении `Backend/BarkCloud.GrpcServer/**` — это общий хост всех сервисов. SDK во всех .NET-джобах ставится через `actions/setup-dotnet`.
