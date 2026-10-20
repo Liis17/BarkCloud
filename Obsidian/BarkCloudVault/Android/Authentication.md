@@ -47,7 +47,7 @@ Compose-поток первого запуска, выбора сервера, �
 
 - Android получает `PublicKeyCredentialRequestOptions` и challenge через `BeginWebAuthnAssertion`, запускает Credential Manager, затем передаёт assertion и challenge ID в `CompleteWebAuthnAssertion`. Успешный `AuthResponse` сохраняется в обычную сессию.
 - Запрос discoverable credential не требует логина. Отмена системного диалога оставляет пользователя на форме входа.
-- Release APK подписывается из Base64-переменных окружения; сертификат задаётся для self-hosted Identity и связывается с доменом через `/.well-known/assetlinks.json`.
+- Release APK подписывается из Base64-переменных окружения; сертификат задаётся для self-hosted Identity и связывается с доменом через `/.well-known/assetlinks.json`. Builder предзаполняет отпечаток сертификатом официального APK; при собственной подписи значение меняют, пустое отключает Android passkeys.
 - Asset links должны использовать отношение `delegate_permission/common.get_login_creds`; серверные настройки описаны в [[Backend/Identity]] и [[Web/WebApp]].
 
 ## Ограничения и важные детали
