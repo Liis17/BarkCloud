@@ -33,10 +33,14 @@ public partial class MainWindow : FluentWindow
         _startHidden = startHidden;
         InitializeComponent();
 
-        // Иконка трея из системной (без бинарного ассета).
-        TrayIcon.Icon = Imaging.CreateBitmapSourceFromHIcon(
-            System.Drawing.SystemIcons.Application.Handle,
+        // Иконка трея — кадр 32px встроенного .ico (кадр выбирается по размеру).
+        using var icoStream = Application.GetResourceStream(
+            new Uri("pack://application:,,,/Assets/barkcloud.ico")).Stream;
+        using var appIcon = new System.Drawing.Icon(icoStream, new System.Drawing.Size(32, 32));
+        var iconSource = Imaging.CreateBitmapSourceFromHIcon(appIcon.Handle,
             Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        iconSource.Freeze();
+        TrayIcon.Icon = iconSource;
 
         ContentRendered += OnContentRendered;
 
