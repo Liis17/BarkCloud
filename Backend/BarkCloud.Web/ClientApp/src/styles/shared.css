@@ -349,8 +349,6 @@ img.avatar { object-fit: cover; }
   background: var(--md-surface);
 }
 
-.tb-logo { flex: none; }
-
 .tb-title {
   display: flex; flex-direction: column;
   gap: 2px;
