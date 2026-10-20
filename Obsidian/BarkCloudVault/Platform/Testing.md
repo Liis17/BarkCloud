@@ -16,7 +16,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Mac/BarkCloudKit/Tests/BarkCloudKitTests/` | Swift package tests | Upload 2.0, восстановление частей, отмена, токены и реальные gRPC deadline-сценарии для iOS/macOS сетевого слоя |
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске; на PR в `master` и при `force-all` — полный прогон, вызывается из `release.yml` через `workflow_call` |
 | `.github/workflows/release.yml` | релизный pipeline | Push в `master`: полный прогон тестов → сборка APK/IPA/DMG/Drive ZIP/Builder ZIP → один релиз `v1.x.y` с автоинкрементом |
-| `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа |
+| `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа; общий version action использует registry SemVer для dev/master |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
 
 ## Публичные контракты
@@ -30,6 +30,12 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests` | `net10.0-windows`; тесты запускаются в Windows-окружении, unit-сценарии используют фейки вместо сервера и Dokany |
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
+
+## Версии backend-образов
+
+`.github/actions/docker-version/` вычисляет независимую SemVer-версию для каждого из семи backend-образов. Сборка из `dev` выбирает максимум тегов master и dev и повышает patch, затем публикует `SemVer`, `latest` и SHA-теги в репозиторий `*-dev`. Сборка master использует последний SemVer dev-образа без повышения и публикует теги в master-репозиторий. Master workflow запускается только после слитого PR из `dev` в `master` с изменениями путей соответствующего сервиса. Изменение `Backend/rebuild.trigger` запускает все семь dev-сборок.
+
+Локальная проверка выбора версии: `bash Tests/CI/docker-version.test.sh`.
 
 ## Корреляция серверных логов
 
