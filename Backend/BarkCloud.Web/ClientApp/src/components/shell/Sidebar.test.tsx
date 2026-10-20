@@ -24,7 +24,8 @@ describe('Sidebar storage', () => {
   };
 
   it('показывает подсчёт без фиктивных процентов и нулевой статистики', () => {
-    renderSidebar(null);
+    const { container } = renderSidebar(null);
+    expect(container.querySelector('.sb-brand img')?.getAttribute('src')).toBe('/barkcloud-icon.png');
     expect(screen.getAllByText('Подсчитываем…').length).toBeGreaterThan(0);
     expect(screen.queryByText('0% использовано')).toBeNull();
     expect(screen.queryByText('недоступно')).toBeNull();

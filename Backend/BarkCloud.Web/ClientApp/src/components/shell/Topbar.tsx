@@ -99,7 +99,6 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
   const showMenu = open && query.length >= 2;
   return (
     <header className="topbar">
-      <img className="tb-logo" src="/barkcloud-icon.png" alt="" width="44" height="44" />
       <div className="tb-title">
         {kicker && <div className="tb-kicker">{kicker}</div>}
         <div className="tb-h1">{title}</div>

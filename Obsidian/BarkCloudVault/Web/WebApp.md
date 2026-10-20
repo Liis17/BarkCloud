@@ -28,7 +28,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 
 | Контракт | Поведение |
 |---|---|
-| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.14.1`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
+| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.14.5`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
 | Cookie `bark_at`, `bark_rt`, `bark_did` | Access-, refresh- и device-id cookie. Все HttpOnly, режим Secure задаётся `App:CookieSecure` |
 | `GET /login`, `GET /register`, `GET /forgot` | Отдают лёгкую HTML-оболочку и state для React auth entry. `Accept: application/json` возвращает сам state; успешная операция возвращает `{ "redirectTo": "/photos" }` |
 | `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
@@ -46,6 +46,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 - `AuthFlowStore` ограничен 1024 потоками и абсолютным TTL 15 минут. Поток привязан к HttpOnly `bark_did`, а per-flow lock сериализует подтверждение и resend. Секреты и Identity IDs хранятся на сервере; после рестарта процесса flow теряется. Регистрация использует атомарные `CreateAccountWithPassword` и `ConfirmAccountWithPassword`; экран `session-pending` повторяет только `CreateToken`.
 - Auth shell использует локальный Roboto Flex из Vite output, системный моноширинный шрифт для кода и устанавливает `bark_theme` до CSS.
 - При запуске Web получает адреса сервисов и общую конфигурацию через `await LoadConfigurationAsync(ServiceId.Web)`. Общий загрузчик сначала ждёт готовности Configuration: максимум 5 проверок с deadline 2 секунды и паузами 5 секунд; отдельного цикла повторов Web нет. См. [[Backend/GrpcServer]]. Внутренние gRPC-соединения идут по HTTP/2 без TLS внутри Docker-сети.
+- Брендовая иконка отображается в `Sidebar`; `Topbar` содержит заголовок и поиск без повторного логотипа.
 - Пользовательский access-токен проверяется локально. При истечении или отзыве Web запрашивает токены по refresh-cookie у Identity. Локальный кэш отзыва синхронизируется с Identity; см. [[Backend/SessionRevocation]].
 - Большинство `/api/*`-маршрутов требует пользовательскую сессию. Неизвестный `/api/*` возвращает 404; остальные маршруты SPA обслуживаются fallback-маршрутом и требуют сессию, кроме публичных страниц ссылок.
 - HTTP-клиент `files-upload` проксирует скачивание и просмотр файлов из Files со сроком по умолчанию (100 с, действует до получения заголовков). Legacy-прокси `POST /api/files/upload` отсутствует. Браузер управляет Upload 2.0 через `/api/files/uploads` и передаёт части прямо в Files через `/file-upload/`.
