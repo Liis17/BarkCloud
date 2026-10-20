@@ -58,7 +58,7 @@ Identity использует PostgreSQL, `BarkCloud.GrpcServer`, `BarkCloud.Sha
 
 ## Ограничения и важные детали
 
-- Android Credential Manager origin строится из `BarkCloud:AndroidCertificateSha256Fingerprint` (Compose: `BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT`): SHA-256 fingerprint сертификата преобразуется в `android:apk-key-hash:<base64url>`. Отпечаток должен совпадать с подписью APK и с ответом Web `/.well-known/assetlinks.json`.
+- Android Credential Manager origin строится из `BarkCloud:AndroidCertificateSha256Fingerprint` (Compose: `BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT`): SHA-256 fingerprint сертификата преобразуется в `android:apk-key-hash:<base64url>`. Отпечаток должен совпадать с подписью APK и с ответом Web `/.well-known/assetlinks.json`. Builder и `Backend/sample.env` по умолчанию задают сертификат официального APK; при собственной подписи нужен её публичный отпечаток.
 
 `CreateToken` проверяет наличие и срок действия refresh-записи и выпускает access для её `UserId`, `DeviceId` и ID; refresh в этом RPC не ротируется. Access lifetime задаёт `JwtSettings:ExpiryMinutes`; текущий refresh lifetime — 9999 дней, клиенты должны ориентироваться на `expiration_date` в ответе. Имена JWT claims, типы токенов и UTF-8 обработка секрета описаны в [[Shared/SharedLibraries]].
 
