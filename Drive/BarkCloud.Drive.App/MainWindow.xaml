@@ -33,76 +33,87 @@
             </tray:NotifyIcon.Menu>
         </tray:NotifyIcon>
 
-        <StackPanel Grid.Row="1" Margin="16,8,16,16">
-            <!-- Предупреждение: движок не запущен -->
-            <Border x:Name="EngineWarning" Visibility="Collapsed"
-                    Background="#33FF8C00" CornerRadius="6" Padding="12" Margin="0,0,0,12">
-                <StackPanel>
-                    <TextBlock Text="{loc:Tr Main_EngineWarningTitle}" FontWeight="Bold"/>
-                    <TextBlock Text="{loc:Tr Main_EngineWarningText}"
-                               TextWrapping="Wrap" Margin="0,2,0,8"/>
-                    <ui:Button Content="{loc:Tr Main_StartEngine}" Appearance="Primary" Click="StartEngineClick"/>
-                </StackPanel>
-            </Border>
-
-            <!-- Профиль -->
-            <ui:Card>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Ellipse x:Name="AvatarEllipse" Grid.Column="0" Width="48" Height="48"
-                             Margin="0,0,12,0" Visibility="Collapsed">
-                        <Ellipse.Fill>
-                            <ImageBrush x:Name="AvatarBrush" Stretch="UniformToFill"/>
-                        </Ellipse.Fill>
-                    </Ellipse>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock x:Name="UsernameText" FontWeight="Bold" FontSize="16" Text="—"/>
-                        <TextBlock x:Name="ServerText" Opacity="0.7" FontSize="12"/>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="16,8,16,16">
+                <!-- Предупреждение: движок не запущен -->
+                <Border x:Name="EngineWarning" Visibility="Collapsed"
+                        Background="#33FF8C00" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Tr Main_EngineWarningTitle}" FontWeight="Bold"/>
+                        <TextBlock Text="{loc:Tr Main_EngineWarningText}"
+                                   TextWrapping="Wrap" Margin="0,2,0,8"/>
+                        <ui:Button Content="{loc:Tr Main_StartEngine}" Appearance="Primary" Click="StartEngineClick"/>
                     </StackPanel>
-                </Grid>
-            </ui:Card>
+                </Border>
 
-            <!-- Хранилище -->
-            <ui:Card Margin="0,12,0,0">
-                <StackPanel>
-                    <Grid Margin="0,0,0,8">
-                        <TextBlock Text="{loc:Tr Main_Storage}" FontWeight="SemiBold" HorizontalAlignment="Left"/>
-                        <TextBlock x:Name="UsageText" Text="—" Opacity="0.7" HorizontalAlignment="Right"/>
+                <!-- Профиль -->
+                <ui:Card>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Ellipse x:Name="AvatarEllipse" Grid.Column="0" Width="48" Height="48"
+                                 Margin="0,0,12,0" Visibility="Collapsed">
+                            <Ellipse.Fill>
+                                <ImageBrush x:Name="AvatarBrush" Stretch="UniformToFill"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="UsernameText" FontWeight="Bold" FontSize="16" Text="—"/>
+                            <TextBlock x:Name="ServerText" Opacity="0.7" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
                     </Grid>
-                    <Border Height="6" CornerRadius="3" ClipToBounds="True"
-                            Background="{DynamicResource ControlFillColorSecondaryBrush}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="UsageOtherCol" Width="0*"/>
-                                <ColumnDefinition x:Name="UsageS3Col" Width="0*"/>
-                                <ColumnDefinition x:Name="UsageFreeCol" Width="1*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="{DynamicResource TextFillColorSecondaryBrush}"/>
-                            <Border Grid.Column="1" Background="#9A4F1E"/>
+                </ui:Card>
+
+                <!-- Хранилище -->
+                <ui:Card Margin="0,12,0,0">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="{loc:Tr Main_Storage}" FontWeight="SemiBold" HorizontalAlignment="Left"/>
+                            <TextBlock x:Name="UsageText" Text="—" TextWrapping="Wrap" Opacity="0.7"
+                                       HorizontalAlignment="Right" MaxWidth="260"/>
                         </Grid>
-                    </Border>
-                    <StackPanel x:Name="UsageLegend" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed">
-                        <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
-                                   Fill="{DynamicResource TextFillColorSecondaryBrush}"/>
-                        <TextBlock x:Name="LegendOtherText" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center"/>
-                        <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center" Fill="#9A4F1E"/>
-                        <TextBlock x:Name="LegendS3Text" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center"/>
-                        <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
-                                   Fill="{DynamicResource ControlFillColorSecondaryBrush}"
-                                   Stroke="{DynamicResource ControlStrokeColorDefaultBrush}" StrokeThickness="1"/>
-                        <TextBlock x:Name="LegendFreeText" Margin="6,0,0,0" FontSize="12" VerticalAlignment="Center"/>
+                        <Border Height="6" CornerRadius="3" ClipToBounds="True"
+                                Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition x:Name="UsageOtherCol" Width="0*"/>
+                                    <ColumnDefinition x:Name="UsageS3Col" Width="0*"/>
+                                    <ColumnDefinition x:Name="UsageFreeCol" Width="1*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Background="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                <Border Grid.Column="1" Background="#9A4F1E"/>
+                            </Grid>
+                        </Border>
+                        <StackPanel x:Name="UsageLegend" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed">
+                            <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
+                                       Fill="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock x:Name="LegendOtherText" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center" Fill="#9A4F1E"/>
+                            <TextBlock x:Name="LegendS3Text" Margin="6,0,16,0" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
+                                       Fill="{DynamicResource ControlFillColorSecondaryBrush}"
+                                       Stroke="{DynamicResource ControlStrokeColorDefaultBrush}" StrokeThickness="1"/>
+                            <TextBlock x:Name="LegendFreeText" Margin="6,0,0,0" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock x:Name="StorageStateText" Opacity="0.7" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Visibility="Collapsed"/>
+                        <!-- Группы квот S3 (внешние хранилища) -->
+                        <TextBlock x:Name="S3Header" Text="{loc:Tr Main_S3Header}" FontWeight="SemiBold"
+                                   Margin="0,12,0,0" Visibility="Collapsed"/>
+                        <StackPanel x:Name="S3GroupsPanel"/>
+                        <TextBlock x:Name="S3StateText" Opacity="0.7" Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Visibility="Collapsed"/>
+                        <TextBlock x:Name="DriveStateText" Opacity="0.7" Margin="0,8,0,0" Text="—"/>
                     </StackPanel>
-                    <TextBlock x:Name="DriveStateText" Opacity="0.7" Margin="0,6,0,0" Text="—"/>
-                </StackPanel>
-            </ui:Card>
+                </ui:Card>
 
-            <ui:Button x:Name="SettingsButton" Content="{loc:Tr Common_Settings}" HorizontalAlignment="Right"
-                       Margin="0,16,0,0" Click="OpenSettingsClick"/>
+                <ui:Button x:Name="SettingsButton" Content="{loc:Tr Common_Settings}" HorizontalAlignment="Right"
+                           Margin="0,16,0,0" Click="OpenSettingsClick"/>
 
-            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Opacity="0.7" Margin="0,12,0,0"/>
-        </StackPanel>
+                <TextBlock x:Name="StatusText" TextWrapping="Wrap" Opacity="0.7" Margin="0,12,0,0"/>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </ui:FluentWindow>

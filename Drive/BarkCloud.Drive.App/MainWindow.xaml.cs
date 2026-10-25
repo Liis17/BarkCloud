@@ -1,7 +1,10 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -11,6 +14,8 @@ using BarkCloud.Drive.Contracts.Localization;
 using StreamJsonRpc;
 
 using Wpf.Ui.Controls;
+
+using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace BarkCloud.Drive.App;
 
@@ -327,9 +332,31 @@ public partial class MainWindow : FluentWindow
             UsageOtherCol.Width = new GridLength(0, GridUnitType.Star);
             UsageS3Col.Width = new GridLength(0, GridUnitType.Star);
             UsageFreeCol.Width = new GridLength(1, GridUnitType.Star);
-            UsageText.Text = "—";
+            // Без входа — прочерк; после входа без снимка — загрузка или ошибка обновления.
+            UsageText.Text = !s.Authenticated
+                ? "—"
+                : s.StorageStatsError is { } error
+                    ? Loc.T("Main_StatsRefreshErrorFmt", error)
+                    : Loc.T("Main_StatsLoading");
             UsageLegend.Visibility = Visibility.Collapsed;
         }
+
+        // Состояние статистики физического диска: показываем только при наличии цифр —
+        // в противном случае сообщение уже выведено в UsageText.
+        if (s.DiskTotalBytes > 0 && s.Authenticated)
+        {
+            StorageStateText.Text = BuildStatsStateText(
+                s.PhysicalStatsState, s.PhysicalStatsUpdatedAt, s.StorageStatsError);
+            StorageStateText.Visibility = string.IsNullOrEmpty(StorageStateText.Text)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+        else
+        {
+            StorageStateText.Visibility = Visibility.Collapsed;
+        }
+
+        ApplyS3Groups(s);
 
         DriveStateText.Text = s.Mounted
             ? Loc.T("Main_DriveMountedFmt", s.DriveLetter ?? string.Empty, s.VolumeLabel ?? string.Empty)
@@ -340,6 +367,142 @@ public partial class MainWindow : FluentWindow
             : !string.IsNullOrEmpty(s.LastSyncError)
                 ? Loc.T("Main_SyncFmt", s.LastSyncError)
                 : (s.Message ?? string.Empty);
+    }
+
+    private void ApplyS3Groups(EngineStatus s)
+    {
+        S3GroupsPanel.Children.Clear();
+        if (!s.Authenticated)
+        {
+            S3Header.Visibility = Visibility.Collapsed;
+            S3StateText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        S3Header.Visibility = Visibility.Visible;
+        if (!s.AllS3StatsAvailable)
+        {
+            S3StateText.Text = s.AllS3StatsState switch
+            {
+                "loading" => Loc.T("Main_StatsLoading"),
+                "not_configured" => Loc.T("Main_S3NotConfigured"),
+                _ => Loc.T("Main_S3Unavailable"),
+            };
+            S3StateText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        foreach (var group in s.S3Groups ?? [])
+            S3GroupsPanel.Children.Add(BuildS3GroupRow(group));
+
+        S3StateText.Text = BuildStatsStateText(
+            s.AllS3StatsState, s.AllS3StatsUpdatedAt, s.StorageStatsError);
+        S3StateText.Visibility = string.IsNullOrEmpty(S3StateText.Text)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private static UIElement BuildS3GroupRow(S3GroupStatus group)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var name = new TextBlock
+        {
+            Text = group.IsUngrouped ? Loc.T("Main_S3Ungrouped") : group.Name,
+            FontWeight = FontWeights.SemiBold,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(name, 0);
+        var hasFiniteQuota = !group.IsUngrouped && group.QuotaBytes > 0;
+        var usage = new TextBlock
+        {
+            Text = group.IsUngrouped
+                ? Bytes(group.UsedBytes)
+                : hasFiniteQuota
+                    ? Loc.T("Main_StorageUsageFmt", Bytes(group.UsedBytes), Bytes(group.QuotaBytes))
+                    : Loc.T("Main_S3UsedUnlimitedFmt", Bytes(group.UsedBytes)),
+            Opacity = 0.7,
+            Margin = new Thickness(8, 0, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = 240,
+        };
+        Grid.SetColumn(usage, 1);
+        header.Children.Add(name);
+        header.Children.Add(usage);
+        panel.Children.Add(header);
+
+        var footnotes = new List<string>();
+        if (hasFiniteQuota)
+        {
+            var used = Math.Max(0, group.UsedBytes);
+            var free = Math.Max(0, group.QuotaBytes - used);
+            var bar = new Border
+            {
+                Height = 6,
+                CornerRadius = new CornerRadius(3),
+                ClipToBounds = true,
+                Background = (Brush)Application.Current.FindResource("ControlFillColorSecondaryBrush"),
+                Margin = new Thickness(0, 6, 0, 0),
+            };
+            var fill = new Grid();
+            fill.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(used, GridUnitType.Star) });
+            fill.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(free, GridUnitType.Star) });
+            var usedFill = new Border { Background = new SolidColorBrush(Color.FromRgb(0x9A, 0x4F, 0x1E)) };
+            Grid.SetColumn(usedFill, 0);
+            fill.Children.Add(usedFill);
+            bar.Child = fill;
+            panel.Children.Add(bar);
+            footnotes.Add(Loc.T("Main_S3PercentUsedFmt", Percent(group.UsedBytes, group.QuotaBytes)));
+        }
+        else if (!group.IsUngrouped)
+        {
+            footnotes.Add(Loc.T("Main_S3Unlimited"));
+        }
+
+        if (group.UnmeasuredBuckets > 0)
+            footnotes.Add(Loc.T("Main_S3UnmeasuredFmt", group.UnmeasuredBuckets));
+
+        if (footnotes.Count > 0)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = string.Join(" · ", footnotes),
+                FontSize = 12,
+                Opacity = 0.7,
+                Margin = new Thickness(0, 4, 0, 0),
+                TextWrapping = TextWrapping.Wrap,
+            });
+        }
+
+        return panel;
+    }
+
+    // Строка состояния статистики: состояние (loading/refreshing/error), время
+    // обновления или ошибка обновления, когда показаны сохранённые цифры.
+    private static string BuildStatsStateText(string? state, DateTime? updatedAt, string? refreshError)
+    {
+        if (refreshError is { } error)
+            return Loc.T("Main_StatsRefreshErrorFmt", error);
+
+        var parts = new List<string>();
+        var label = state switch
+        {
+            "loading" => Loc.T("Main_StatsLoading"),
+            "refreshing" => Loc.T("Main_StatsRefreshing"),
+            "error" => Loc.T("Main_StatsError"),
+            _ => null, // ready/пусто — покажем только время обновления
+        };
+        if (label is not null)
+            parts.Add(label);
+        if (updatedAt is { } at)
+            parts.Add(Loc.T("Main_StatsUpdatedAtFmt", at.ToLocalTime().ToString("HH:mm")));
+
+        return string.Join(" · ", parts);
     }
 
     private async Task LoadAvatarAsync()
@@ -758,5 +921,11 @@ public partial class MainWindow : FluentWindow
         }
 
         return $"{v:0.##} {units[i]}";
+    }
+
+    private static string Percent(long used, long total)
+    {
+        var pct = total > 0 ? (int)Math.Round(Math.Clamp(used, 0, total) * 100.0 / total) : 0;
+        return pct.ToString(CultureInfo.InvariantCulture);
     }
 }
