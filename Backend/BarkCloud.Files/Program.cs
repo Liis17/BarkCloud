@@ -93,6 +93,8 @@ public class Program
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddSingleton<AudioMetadataExtractor>();
         builder.Services.AddSingleton<HeicImageConverter>();
+        builder.Services.AddSingleton<ISvgProcessRunner, SvgProcessRunner>();
+        builder.Services.AddSingleton<ISvgRasterizer, SvgRasterizer>();
         builder.Services.AddSingleton<FileMetadataExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();

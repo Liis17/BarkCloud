@@ -24,6 +24,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
     private readonly VideoThumbnailExtractor _videoThumbnailExtractor;
     private readonly AudioMetadataExtractor? _audioMetadataExtractor;
     private readonly HeicImageConverter _heicConverter;
+    private readonly ISvgRasterizer _svgRasterizer;
     private readonly FileMetadataExtractor _metadataExtractor;
     private readonly PreviewPersistenceService _previewPersistence;
     private readonly FileActivityWriter _activity;
@@ -55,6 +56,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         ImageCompressor imageCompressor,
         VideoThumbnailExtractor videoThumbnailExtractor,
         HeicImageConverter heicConverter,
+        ISvgRasterizer svgRasterizer,
         FileMetadataExtractor metadataExtractor,
         PreviewPersistenceService previewPersistence,
         ILogger<UploadFileCommandHandler> logger,
@@ -71,6 +73,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         _videoThumbnailExtractor = videoThumbnailExtractor;
         _audioMetadataExtractor = audioMetadataExtractor;
         _heicConverter = heicConverter;
+        _svgRasterizer = svgRasterizer;
         _metadataExtractor = metadataExtractor;
         _previewPersistence = previewPersistence;
         _activity = activity ?? FileActivityWriter.Noop;
@@ -108,9 +111,12 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                               StringComparison.OrdinalIgnoreCase)
             ? request.ContentTypeOverride.Trim().ToLowerInvariant()
             : request.FileName.GetContentType();
+        var isSvgCandidate = file.Type == UploadFileType.CloudFile
+            && (Path.GetExtension(request.FileName).Equals(".svg", StringComparison.OrdinalIgnoreCase)
+                || contentType.Split(';', 2)[0].Trim().Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase));
 
         // Классифицируем медиа (фото / видео / документ / аудио) для галереи и альбомов
-        file.MediaKind = request.FileName.GetMediaKind();
+        file.MediaKind = isSvgCandidate ? MediaKind.Photo : request.FileName.GetMediaKind();
 
         var storageProfileId = string.IsNullOrWhiteSpace(request.StorageProfileIdOverride)
             ? _bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, isPreview: false)
@@ -219,6 +225,29 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
             }
         }
 
+        // SVG остаётся неизменным оригиналом. Для производных изображений рендерим только
+        // проверенный потоком XML, не передавая имя файла или base URI рендереру.
+        byte[]? svgPngBytes = null;
+        if (isSvgCandidate && originalStream.Length <= SvgRasterizer.MaximumInputBytes)
+        {
+            try
+            {
+                originalStream.Position = 0;
+                svgPngBytes = await _svgRasterizer.RasterizeUploadAsync(
+                    originalStream, request.FileName, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await originalStream.DisposeAsync();
+                CleanupTempFile();
+                throw;
+            }
+            finally
+            {
+                if (originalStream.CanSeek)
+                    originalStream.Position = 0;
+            }
+        }
         // HEIC оригинал НЕ конвертируем — храним как есть, чтобы его SHA256 совпадал
         // с тем, что считает клиент (иначе ломается дедуп и индикатор «уже в облаке»).
         // Но ImageSharp HEIC не декодирует, поэтому для размеров/превью и для JpegView
@@ -287,7 +316,10 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         // Превью генерируем только для облачных файлов с image/* контентом.
         // Resumable-аватар сохраняет исходный объект и не проходит через отдельное сжатие.
-        var isImageContent = contentType.StartsWith("image/");
+        MemoryStream? svgViewStream = svgPngBytes is null ? null : new MemoryStream(svgPngBytes, writable: false);
+        var isImageContent = isSvgCandidate
+            ? svgPngBytes is not null
+            : contentType.StartsWith("image/");
         var needsDimensions = ImageTypesForDimensions.Contains(file.Type) && isImageContent;
         var needsCloudPreviews = file.Type == UploadFileType.CloudFile && isImageContent;
 
@@ -295,7 +327,11 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
         // Источник для ImageSharp (размеры/превью/JpegView): HEIC → его JPEG-представление,
         // прочие изображения → сам оригинал. null — нечем декодировать (HEIC без конверсии).
-        Stream? imageViewStream = isHeic ? heicViewStream : (isImageContent ? originalStream : null);
+        Stream? imageViewStream = isHeic
+            ? heicViewStream
+            : isSvgCandidate
+                ? svgViewStream
+                : (isImageContent ? originalStream : null);
         if (isImageContent && imageViewStream is null)
         {
             needsDimensions = false;
@@ -327,7 +363,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Не удалось прочитать размеры изображения {FileId}", file.Id);
-                    if (request.DeferAvailability)
+                    if (request.DeferAvailability && !isSvgCandidate)
                         throw new FileIntegrityException("Заявленный формат изображения не удалось декодировать.");
                     needsCloudPreviews = false;
                 }
@@ -385,7 +421,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
 
             // 2a) EXIF для НЕ-HEIC изображений — после probing размеров, до S3-аплоада.
             // HEIC обработан выше отдельно (до конвертации), здесь не дублируем.
-            if (isImageContent && !isHeic && extractedMetadata is null)
+            if (isImageContent && !isHeic && !isSvgCandidate && extractedMetadata is null)
             {
                 try
                 {
@@ -587,6 +623,7 @@ public class UploadFileCommandHandler : IRequestHandler<UploadFileCommand, strin
         finally
         {
             await originalStream.DisposeAsync();
+            svgViewStream?.Dispose();
             CleanupTempFile();
         }
 

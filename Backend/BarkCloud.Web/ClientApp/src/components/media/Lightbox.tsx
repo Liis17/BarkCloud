@@ -6,6 +6,7 @@ import { apiGet, fetchClipboardImage, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { VideoPlayer } from './MediaPlayer';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
+import { isSvgFileName, selectPhotoViewSource } from '../../lib/imagePreviewSource';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
 import type { CardFile, MediaItem } from '../../lib/types';
 
@@ -42,6 +43,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const cur = list[i] || null;
   const fileId = cur && cur.id;
   const isVideo = !!cur && cur.kind === 'video';
+  const isSvg = !!cur && (isSvgFileName(cur.name) || isSvgFileName(cur.ext));
 
   React.useEffect(() => {
     if (!isVideo || !musicPlayer) return;
@@ -140,8 +142,8 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   // Оригинал (временная ссылка) — для скачивания, видео и фолбэка фото.
   const url = fileId ? urls[fileId] : null;
   // Для фото показываем JpegView (HEIC и пр. браузеро-недружелюбные форматы), если он есть.
-  const photoSrc = isVideo ? null : (cur.jpegViewUrl && cur.jpegViewUrl.length > 0 ? cur.jpegViewUrl : url);
-  const ready = isVideo ? !!url : !!photoSrc;
+  const photoSrc = isVideo ? null : selectPhotoViewSource(cur.name, cur.jpegViewUrl, cur.previews, url);
+  const ready = isVideo ? !!url : isSvg ? !!photoSrc || !!url : !!photoSrc;
   // Для действий панели: элементы галерей — MediaItem, у прочих entryIds может не быть.
   const curM = cur as MediaItem;
   const hasEntry = !!(curM.entryIds && curM.entryIds.length > 0);
@@ -239,18 +241,22 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
           />
         )}
         {ready && !isVideo && (
-          <img
-            src={photoSrc!}
-            alt={cur.name || ''}
-            draggable={false}
-            className={scale > 1 ? 'zoomed' : ''}
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
-            onMouseDown={onMouseDown}
-            onDoubleClick={() => {
-              setScale((s) => (s > 1 ? 1 : 2));
-              setPan({ x: 0, y: 0 });
-            }}
-          />
+          photoSrc ? (
+            <img
+              src={photoSrc}
+              alt={cur.name || ''}
+              draggable={false}
+              className={scale > 1 ? 'zoomed' : ''}
+              style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
+              onMouseDown={onMouseDown}
+              onDoubleClick={() => {
+                setScale((s) => (s > 1 ? 1 : 2));
+                setPan({ x: 0, y: 0 });
+              }}
+            />
+          ) : (
+            <div className="lb-msg">Безопасное превью недоступно</div>
+          )
         )}
       </div>
 
@@ -278,7 +284,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
               <Icon.download size={20} />
             </a>
           )}
-          {!isVideo && (
+          {!isVideo && photoSrc && (
             <button className="icon-btn" title="Скопировать в буфер обмена" onClick={copyImage}>
               <Icon.copy size={20} />
             </button>

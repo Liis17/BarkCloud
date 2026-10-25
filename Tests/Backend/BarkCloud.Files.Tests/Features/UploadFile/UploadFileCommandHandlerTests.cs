@@ -8,6 +8,9 @@ using BarkCloud.Files.Tests._Helpers;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
+using System.Security.Cryptography;
+using System.Text;
+
 using UploadFileEntity = BarkCloud.Files.Domain.UploadFile;
 
 namespace BarkCloud.Files.Tests.Features.UploadFile;
@@ -22,6 +25,7 @@ public class UploadFileCommandHandlerTests
     private readonly Mock<ImageCompressor> _imageCompressor;
     private readonly Mock<VideoThumbnailExtractor> _videoExtractor;
     private readonly Mock<HeicImageConverter> _heicConverter;
+    private readonly Mock<ISvgRasterizer> _svgRasterizer = new();
     private readonly Mock<FileMetadataExtractor> _metadataExtractor;
     private readonly Mock<PreviewPersistenceService> _previewPersistence;
 
@@ -49,11 +53,21 @@ public class UploadFileCommandHandlerTests
     private UploadFileCommandHandler CreateSut(IUploadTempFileProvider? tempFiles = null) => new(
         _files.Object, _hashes.Object, _metadata.Object, _s3.Object, _bucketRegistry.Object,
         _imageCompressor.Object, _videoExtractor.Object, _heicConverter.Object,
-        _metadataExtractor.Object, _previewPersistence.Object,
+        _svgRasterizer.Object, _metadataExtractor.Object, _previewPersistence.Object,
         NullLogger<UploadFileCommandHandler>.Instance,
         tempFiles: tempFiles);
 
     private static Stream MakeStream(string content = "hello") => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+
+    private static byte[] ReadFromStart(Stream stream)
+    {
+        var position = stream.Position;
+        stream.Position = 0;
+        using var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        stream.Position = position;
+        return copy.ToArray();
+    }
 
     [Fact]
     public async Task Handle_FileNotFound_Throws()
@@ -151,6 +165,150 @@ public class UploadFileCommandHandlerTests
             It.IsAny<UploadFileEntity>(),
             It.Is<IReadOnlyDictionary<Guid, byte[]>?>(bytes => bytes != null && bytes.ContainsKey(viewId) && bytes[viewId] == viewBytes),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SvgCloudFile_RasterizesDerivedImagesAndPreservesOriginalAndHash()
+    {
+        var id = Guid.NewGuid();
+        var original = Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\" />");
+        var raster = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3 };
+        var jpeg = Encoding.UTF8.GetBytes("jpeg-view");
+        var rasterizerInput = Array.Empty<byte>();
+        var s3Original = Array.Empty<byte>();
+        var imageInputs = new List<byte[]>();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _svgRasterizer.Setup(x => x.RasterizeUploadAsync(It.IsAny<Stream>(), "vector.svg", It.IsAny<CancellationToken>()))
+            .Callback<Stream, string, CancellationToken>((stream, _, _) => rasterizerInput = ReadFromStart(stream))
+            .ReturnsAsync(raster);
+        _s3.Setup(s => s.UploadAsync("test-bucket", id.ToString(), It.IsAny<Stream>(), "image/svg+xml"))
+            .Callback<string, string, Stream, string>((_, _, stream, _) =>
+            {
+                s3Original = ReadFromStart(stream);
+                stream.Position = 0;
+            })
+            .ReturnsAsync("svg-etag");
+        _imageCompressor.Setup(x => x.ProcessImageAllInOneAsync(
+                It.IsAny<Stream>(), false, null, It.IsAny<CancellationToken>()))
+            .Callback<Stream, bool, int?, CancellationToken>((stream, _, _, _) => imageInputs.Add(ReadFromStart(stream)))
+            .ReturnsAsync(new ImageProcessingResult(null, null, 12, 8));
+        var previews = new List<MultiPreviewItem> { new(1024, 12, 8, [1, 2, 3]) };
+        _imageCompressor.Setup(x => x.GenerateMultiplePreviewsAsync(
+                It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()))
+            .Callback<Stream, int[], CancellationToken>((stream, _, _) => imageInputs.Add(ReadFromStart(stream)))
+            .ReturnsAsync(previews);
+        _imageCompressor.Setup(x => x.EncodeFullJpegAsync(
+                It.IsAny<Stream>(), 90, It.IsAny<CancellationToken>()))
+            .Callback<Stream, int, CancellationToken>((stream, _, _) => imageInputs.Add(ReadFromStart(stream)))
+            .ReturnsAsync(jpeg);
+        var viewId = Guid.NewGuid();
+        _previewPersistence.Setup(x => x.PersistJpegViewAsync(
+                It.IsAny<UploadFileEntity>(), jpeg, It.IsAny<int>(), It.IsAny<int>(), "test-bucket", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((viewId, (byte[]?)jpeg));
+        _previewPersistence.Setup(x => x.PersistPreviewsAsync(
+                It.IsAny<UploadFileEntity>(), previews, "test-bucket", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var response = await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "vector.svg",
+            ContentTypeOverride = "image/svg+xml",
+            FileStream = new MemoryStream(original),
+        }, default);
+
+        response.Should().Be(id.ToString());
+        rasterizerInput.Should().BeEquivalentTo(original);
+        s3Original.Should().BeEquivalentTo(original);
+        imageInputs.Should().HaveCount(3).And.OnlyContain(bytes => bytes.SequenceEqual(raster));
+        _files.Verify(x => x.UpdateFile(It.Is<UploadFileEntity>(file =>
+            file.Id == id && file.Filename == "vector.svg" && file.Size == original.Length
+            && file.Etag == "svg-etag" && file.JpegViewFileId == viewId)), Times.Once);
+        _hashes.Verify(x => x.AddHash(It.Is<FileHash>(hash =>
+            hash.FileId == id && hash.Hash == Convert.ToHexString(SHA256.HashData(original)).ToLowerInvariant())), Times.Once);
+        _svgRasterizer.Verify(x => x.RasterizeUploadAsync(It.IsAny<Stream>(), "vector.svg", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SvgRasterizationFailure_DoesNotFailDeferredUploadOrGeneratePreview()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _svgRasterizer.Setup(x => x.RasterizeUploadAsync(It.IsAny<Stream>(), "broken.svg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
+
+        var result = await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "broken.svg",
+            ContentTypeOverride = "image/svg+xml",
+            FileStream = MakeStream("<svg"),
+            DeferAvailability = true,
+        }, default);
+
+        result.Should().Be(id.ToString());
+        _imageCompressor.Verify(x => x.ProcessImageAllInOneAsync(
+            It.IsAny<Stream>(), It.IsAny<bool>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _imageCompressor.Verify(x => x.GenerateMultiplePreviewsAsync(
+            It.IsAny<Stream>(), It.IsAny<int[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        _files.Verify(x => x.UpdateFile(It.Is<UploadFileEntity>(file =>
+            file.Etag == "etag-123" && file.UploadedAt == null && file.Filename == "broken.svg")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SvgMimeWithoutSvgExtension_IsRasterizedAndClassifiedAsPhoto()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _svgRasterizer.Setup(x => x.RasterizeUploadAsync(It.IsAny<Stream>(), "vector.bin", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
+
+        await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "vector.bin",
+            ContentTypeOverride = "image/svg+xml; charset=utf-8",
+            FileStream = MakeStream("<svg"),
+        }, default);
+
+        _svgRasterizer.Verify(x => x.RasterizeUploadAsync(It.IsAny<Stream>(), "vector.bin", It.IsAny<CancellationToken>()), Times.Once);
+        _files.Verify(x => x.UpdateFile(It.Is<UploadFileEntity>(file =>
+            file.MediaKind == MediaKind.Photo && file.Filename == "vector.bin" && file.Etag == "etag-123")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SvgPngDecodeFailure_DoesNotFailDeferredUpload()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id))
+            .ReturnsAsync(new UploadFileEntity { Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { 42 } });
+        _svgRasterizer.Setup(x => x.RasterizeUploadAsync(It.IsAny<Stream>(), "broken.svg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([1, 2, 3]);
+        _imageCompressor.Setup(x => x.ProcessImageAllInOneAsync(
+                It.IsAny<Stream>(), false, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("invalid PNG"));
+        _imageCompressor.Setup(x => x.EncodeFullJpegAsync(
+                It.IsAny<Stream>(), 90, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("invalid PNG"));
+
+        var result = await CreateSut().Handle(new UploadFileCommand
+        {
+            FileId = id,
+            FileName = "broken.svg",
+            ContentTypeOverride = "image/svg+xml",
+            FileStream = MakeStream("<svg"),
+            DeferAvailability = true,
+        }, default);
+
+        result.Should().Be(id.ToString());
+        _files.Verify(x => x.UpdateFile(It.Is<UploadFileEntity>(file =>
+            file.Etag == "etag-123" && file.UploadedAt == null && file.Filename == "broken.svg")), Times.Once);
+        _previewPersistence.Verify(x => x.PersistJpegViewAsync(
+            It.IsAny<UploadFileEntity>(), It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]

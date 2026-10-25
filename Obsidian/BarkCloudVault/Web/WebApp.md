@@ -28,7 +28,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 
 | Контракт | Поведение |
 |---|---|
-| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.15.1`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
+| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.16.0`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
 | Cookie `bark_at`, `bark_rt`, `bark_did` | Access-, refresh- и device-id cookie. Все HttpOnly, режим Secure задаётся `App:CookieSecure` |
 | `GET /login`, `GET /register`, `GET /forgot` | Отдают лёгкую HTML-оболочку и state для React auth entry. `Accept: application/json` возвращает сам state; успешная операция возвращает `{ "redirectTo": "/photos" }` |
 | `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
@@ -40,9 +40,11 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 | `/api/settings/*`, `/api/system/*` | API настроек и обслуживания; детали в [[Web/Settings]] и [[Web/SystemUpdates]] |
 | `/s/{token}`, `/v/{token}`, `/m/{token}`, `/f/{token}`, `/al/{token}`, `/mpl/{token}` | Публичные ссылки на файлы, медиа, папки, альбомы и музыкальные плейлисты |
 
-`GET /api/head/icon` и `GET /api/files/image` пропускают только JPEG, PNG, GIF, WebP, AVIF и BMP; MIME сравнивается без параметров и без учёта регистра. Остальные типы отклоняются HTTP 415 до чтения тела Files. Оба маршрута всегда возвращают `X-Content-Type-Options: nosniff` и CSP `default-src 'none'; sandbox; base-uri 'none'; form-action 'none'`. `/api/head/icon` ограничивает фактически прочитанное тело 2 МиБ; `/api/files/image` передаёт тело потоком. Это не позволяет браузеру интерпретировать загруженный SVG как активное содержимое.
+`GET /api/head/icon` и `GET /api/files/image` пропускают только JPEG, PNG, GIF, WebP, AVIF и BMP; MIME сравнивается без параметров и без учёта регистра. Остальные типы отклоняются HTTP 415 до чтения тела Files. Оба маршрута всегда возвращают `X-Content-Type-Options: nosniff` и CSP `default-src 'none'; sandbox; base-uri 'none'; form-action 'none'`. `/api/head/icon` ограничивает фактически прочитанное тело 2 МиБ; `/api/files/image` передаёт тело потоком. Директива `sandbox` ограничивает активные возможности документа согласно [MDN CSP sandbox](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox).
 
 `GET /api/files/view` сохраняет проверку пользовательской сессии и временную ссылку Files, но отдаёт оригинал как `application/octet-stream` с `Content-Disposition: attachment` и `nosniff`. Копирование изображения проверяет HTTP-статус `/api/files/image` до декодирования; HTTP 415 показывает сообщение о недоступности безопасного представления.
+
+Облачные SVG после безопасной растеризации Files имеют обычные JPEG-превью и `JpegView`. Приватный и публичный viewer используют только эти производные изображения; если их нет, показывают заглушку и не предлагают копирование. Скачивание по исходной временной ссылке остаётся доступно. Публичное копирование выбирает `previewUrl`, а не оригинал SVG; детали ограничений рендерера и backfill — [[Backend/Files]].
 
 ## Зависимости и взаимодействия
 
