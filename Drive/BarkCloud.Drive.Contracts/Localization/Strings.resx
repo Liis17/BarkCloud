@@ -182,6 +182,45 @@
   <data name="Main_StorageFree" xml:space="preserve">
     <value>Свободно</value>
   </data>
+  <data name="Main_StatsLoading" xml:space="preserve">
+    <value>Подсчитываем…</value>
+  </data>
+  <data name="Main_StatsRefreshing" xml:space="preserve">
+    <value>Обновляем…</value>
+  </data>
+  <data name="Main_StatsError" xml:space="preserve">
+    <value>Ошибка подсчёта</value>
+  </data>
+  <data name="Main_StatsUpdatedAtFmt" xml:space="preserve">
+    <value>обновлено {0}</value>
+  </data>
+  <data name="Main_StatsRefreshErrorFmt" xml:space="preserve">
+    <value>Ошибка обновления: {0}</value>
+  </data>
+  <data name="Main_S3Header" xml:space="preserve">
+    <value>S3-хранилища</value>
+  </data>
+  <data name="Main_S3NotConfigured" xml:space="preserve">
+    <value>не настроен</value>
+  </data>
+  <data name="Main_S3Unavailable" xml:space="preserve">
+    <value>недоступно</value>
+  </data>
+  <data name="Main_S3Ungrouped" xml:space="preserve">
+    <value>Без группы</value>
+  </data>
+  <data name="Main_S3Unlimited" xml:space="preserve">
+    <value>безлимит</value>
+  </data>
+  <data name="Main_S3UsedUnlimitedFmt" xml:space="preserve">
+    <value>{0} · безлимит</value>
+  </data>
+  <data name="Main_S3PercentUsedFmt" xml:space="preserve">
+    <value>{0}% использовано</value>
+  </data>
+  <data name="Main_S3UnmeasuredFmt" xml:space="preserve">
+    <value>учёт неполный: {0} бакет(ов) без доступа, свободное место — оценка</value>
+  </data>
   <data name="Main_DriveMountedFmt" xml:space="preserve">
     <value>Диск {0}: примонтирован ({1})</value>
   </data>

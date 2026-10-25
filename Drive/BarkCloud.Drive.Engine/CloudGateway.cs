@@ -27,6 +27,10 @@ internal sealed class ResolvedNode
     public DateTime? Updated { get; init; }
 }
 
+// Снимок статистики хранилища: данные и ошибка их обновления. RefreshError задан,
+// когда Info — последний сохранённый снимок, а свежее обновление не удалось.
+internal sealed record StorageSnapshot(GetUserStorageInfoResponse Info, ExceptionDispatchInfo? RefreshError);
+
 // Обёртка над CloudApi + FilesApi: листинги (TTL-кэш), резолв путей, чтение (гидрация
 // целиком) и запись (upload по HTTP + привязка/перемещение/удаление через gRPC).
 internal sealed partial class CloudGateway : IDisposable
@@ -81,7 +85,7 @@ internal sealed partial class CloudGateway : IDisposable
     private readonly object _storageLock = new();
     private (DateTime At, GetUserStorageInfoResponse Info)? _storage;
     private long _storageEpoch;
-    private TaskCompletionSource<GetUserStorageInfoResponse>? _storageLoad;
+    private TaskCompletionSource<StorageSnapshot>? _storageLoad;
     private long _storageLoadEpoch;
     private DateTime _storageRetryAfter;
     private ExceptionDispatchInfo? _storageFailure;
@@ -186,21 +190,25 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
-    public GetUserStorageInfoResponse GetStorage()
+    // Снимок статистики хранилища. TTL-кеш, объединение одновременных загрузок,
+    // негативный кеш ошибок и возврат последнего снимка с ошибкой обновления.
+    // Снимки запрашиваются с NonBlockingStats: сервер быстро отдаёт последний замер
+    // (физический диск и группы S3) и обновляет статистику в фоне.
+    public StorageSnapshot GetStorage()
     {
-        Task<GetUserStorageInfoResponse> pending;
-        TaskCompletionSource<GetUserStorageInfoResponse>? load = null;
+        Task<StorageSnapshot> pending;
+        TaskCompletionSource<StorageSnapshot>? load = null;
         var epoch = Volatile.Read(ref _accountEpoch);
         var startedAt = _time.GetUtcNow().UtcDateTime;
         lock (_storageLock)
         {
             if (_storage is { } cached && _storageEpoch == epoch && startedAt - cached.At < StorageTtl)
-                return cached.Info;
+                return new StorageSnapshot(cached.Info, null);
 
             if (startedAt < _storageRetryAfter)
             {
                 if (_storage is { } stale && _storageEpoch == epoch)
-                    return stale.Info;
+                    return new StorageSnapshot(stale.Info, _storageFailure);
                 if (_storageEpoch == epoch)
                     _storageFailure?.Throw();
             }
@@ -209,7 +217,7 @@ internal sealed partial class CloudGateway : IDisposable
                 pending = existingLoad.Task;
             else
             {
-                load = new TaskCompletionSource<GetUserStorageInfoResponse>(
+                load = new TaskCompletionSource<StorageSnapshot>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 _storageLoad = load;
                 _storageLoadEpoch = epoch;
@@ -222,7 +230,7 @@ internal sealed partial class CloudGateway : IDisposable
 
         try
         {
-            var info = _files.GetUserStorageInfo(new GetUserStorageInfoRequest(),
+            var info = _files.GetUserStorageInfo(new GetUserStorageInfoRequest { NonBlockingStats = true },
                 deadline: DateTime.UtcNow.Add(StorageRpcTimeout));
             lock (_storageLock)
             {
@@ -235,8 +243,9 @@ internal sealed partial class CloudGateway : IDisposable
                 info = _storage.Value.Info;
             }
 
-            load.TrySetResult(info);
-            return info;
+            var snapshot = new StorageSnapshot(info, null);
+            load.TrySetResult(snapshot);
+            return snapshot;
         }
         catch (Exception ex)
         {
@@ -255,8 +264,9 @@ internal sealed partial class CloudGateway : IDisposable
 
             if (stale is not null)
             {
-                load.TrySetResult(stale);
-                return stale;
+                var staleSnapshot = new StorageSnapshot(stale, ExceptionDispatchInfo.Capture(ex));
+                load.TrySetResult(staleSnapshot);
+                return staleSnapshot;
             }
 
             load.TrySetException(ex);

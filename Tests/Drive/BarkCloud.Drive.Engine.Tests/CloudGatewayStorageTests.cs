@@ -50,7 +50,7 @@ public sealed class CloudGatewayStorageTests
         var results = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
 
         secondWasWaitingForFirst.Should().BeTrue();
-        results.Select(result => result.StorageLimit).Should().Equal(1, 1);
+        results.Select(result => result.Info.StorageLimit).Should().Equal(1, 1);
         calls.Should().Be(1);
         var deadline = cloud.Invoker.Calls.Single().Deadline;
         deadline.Should().NotBeNull();
@@ -75,11 +75,11 @@ public sealed class CloudGatewayStorageTests
             });
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
 
-        gateway.GetStorage().StorageLimit.Should().Be(500);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(500);
         time.Advance(TimeSpan.FromSeconds(11));
 
-        gateway.GetStorage().StorageLimit.Should().Be(500);
-        gateway.GetStorage().StorageLimit.Should().Be(500);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(500);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(500);
 
         calls.Should().Be(2);
     }
@@ -126,12 +126,12 @@ public sealed class CloudGatewayStorageTests
         var oldRequest = StartLongRunning(gateway.GetStorage);
         await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         gateway.ClearCache();
-        gateway.GetStorage().StorageLimit.Should().Be(200);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(200);
         releaseFirst.TrySetResult();
 
         var act = async () => await oldRequest.WaitAsync(TimeSpan.FromSeconds(5));
         await act.Should().ThrowAsync<OperationCanceledException>();
-        gateway.GetStorage().StorageLimit.Should().Be(200);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(200);
         calls.Should().Be(2);
     }
 
@@ -161,7 +161,7 @@ public sealed class CloudGatewayStorageTests
             });
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
 
-        gateway.GetStorage().StorageLimit.Should().Be(100);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(100);
         time.Advance(TimeSpan.FromSeconds(11));
         var oldRequest = StartLongRunning(gateway.GetStorage);
         await failureStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -170,7 +170,65 @@ public sealed class CloudGatewayStorageTests
 
         var act = async () => await oldRequest.WaitAsync(TimeSpan.FromSeconds(5));
         await act.Should().ThrowAsync<RpcException>();
-        gateway.GetStorage().StorageLimit.Should().Be(200);
+        gateway.GetStorage().Info.StorageLimit.Should().Be(200);
+        calls.Should().Be(3);
+    }
+
+    [Fact]
+    public void GetStorage_requests_non_blocking_server_snapshots()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        GetUserStorageInfoRequest? seen = null;
+        cloud.Invoker.Handle<GetUserStorageInfoRequest, GetUserStorageInfoResponse>(
+            FakeCloudMethods.GetUserStorageInfo, request =>
+            {
+                seen = request;
+                return new GetUserStorageInfoResponse { StorageLimit = 500 };
+            });
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+
+        gateway.GetStorage().Info.StorageLimit.Should().Be(500);
+
+        seen.Should().NotBeNull();
+        seen!.NonBlockingStats.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GetStorage_keeps_stale_data_with_refresh_error_and_recovers()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var time = new FakeTimeProvider();
+        var calls = 0;
+        cloud.Invoker.Handle<GetUserStorageInfoRequest, GetUserStorageInfoResponse>(
+            FakeCloudMethods.GetUserStorageInfo, _ =>
+            {
+                var call = Interlocked.Increment(ref calls);
+                if (call == 2)
+                    throw new RpcException(new Status(StatusCode.Unavailable, "offline"));
+                return new GetUserStorageInfoResponse { StorageLimit = 100 + call };
+            });
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+
+        var fresh = gateway.GetStorage();
+        fresh.Info.StorageLimit.Should().Be(101);
+        fresh.RefreshError.Should().BeNull();
+
+        time.Advance(TimeSpan.FromSeconds(11));
+        var stale = gateway.GetStorage();
+        stale.Info.StorageLimit.Should().Be(101);
+        stale.RefreshError.Should().NotBeNull();
+        stale.RefreshError!.SourceException.Should().BeOfType<RpcException>();
+
+        // В окне негативного кеша повторный вызов отдаёт те же данные и ту же ошибку.
+        gateway.GetStorage().Info.StorageLimit.Should().Be(101);
+        calls.Should().Be(2);
+
+        time.Advance(TimeSpan.FromSeconds(11));
+        var recovered = gateway.GetStorage();
+        recovered.Info.StorageLimit.Should().Be(103);
+        recovered.RefreshError.Should().BeNull();
         calls.Should().Be(3);
     }
 
