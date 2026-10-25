@@ -9,6 +9,7 @@ import { usePublicShareActions } from '../components/public/usePublicShareAction
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
 import { VideoPlayer } from '../components/media/MediaPlayer';
+import { isSvgFileName } from '../lib/imagePreviewSource';
 
 interface ShareInfo {
   found: boolean;
@@ -31,7 +32,12 @@ export function PublicViewPage() {
   const headInfo = typeof state === 'object' ? state : null;
   const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
   const headIconUrl = headInfo?.previewUrl || null;
-  const { copyLink, copyImage, toastNode } = usePublicShareActions(headInfo?.downloadUrl || headInfo?.previewUrl);
+  const copyImageSource = headInfo
+    ? isSvgFileName(headInfo.name)
+      ? headInfo.previewUrl || undefined
+      : headInfo.downloadUrl || headInfo.previewUrl || undefined
+    : undefined;
+  const { copyLink, copyImage, toastNode } = usePublicShareActions(copyImageSource);
 
   useDocumentHead(
     () => ({ title: headTitle, iconUrl: headIconUrl }),
@@ -74,7 +80,8 @@ export function PublicViewPage() {
   const isVideo = info.mediaKind === 'video';
   const file = describePublicFile(info.name, info.mediaKind);
   const downloadHref = info.downloadPath || `/s/${token}`;
-  const isText = !!getTextFileKind(info.name);
+  const isSvg = isSvgFileName(info.name);
+  const isText = info.mediaKind !== 'photo' && !!getTextFileKind(info.name);
   return (
     <PublicShareShell>
       <PublicShareHeader
@@ -88,7 +95,7 @@ export function PublicViewPage() {
         <button className="public-fab public-st" type="button" title="Копировать ссылку" aria-label="Копировать ссылку" onClick={copyLink}>
           <Icon.link size={24} />
         </button>
-        {isPhoto && (
+        {isPhoto && copyImageSource && (
           <button className="public-fab public-st" type="button" title="Скопировать изображение" aria-label="Скопировать изображение" onClick={copyImage}>
             <Icon.copy size={24} />
           </button>
@@ -121,6 +128,7 @@ export function PublicViewPage() {
             ) : (
               <div className="public-stage-empty public-ph">
                 <span className="public-ph-tile">{isVideo ? <Icon.video size={36} /> : <Icon.photo size={36} />}</span>
+                {isSvg && <span>Безопасное превью недоступно</span>}
               </div>
             )}
           </div>

@@ -2121,6 +2121,11 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   padding: 12px 0 24px;
 }
 .public-viewer-media { display: grid; place-items: center; max-width: 100%; }
+.public-viewer-placeholder {
+  padding: 24px;
+  color: rgba(255,255,255,.8);
+  text-align: center;
+}
 .public-viewer-media img,
 .public-viewer-media video {
   display: block;
