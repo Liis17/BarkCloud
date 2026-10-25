@@ -35,7 +35,8 @@ public sealed class SvgRasterizerTests
         request!.FileName.Should().Be("/usr/bin/prlimit");
         request.Arguments.Should().Equal(
             "--as=1073741824", "--", "/usr/bin/rsvg-convert", "--format=png",
-            "--keep-aspect-ratio", "--width=2500", "--height=2500", "--output=-", "-");
+            "--keep-aspect-ratio", "--width=2500", "--height=2500", "-");
+        request.Arguments.Should().NotContain(arg => arg.StartsWith("--output", StringComparison.Ordinal));
         request.Arguments.Should().NotContain("--unlimited");
         request.InputBytes.Should().BeEquivalentTo(input);
         request.MaximumOutputBytes.Should().Be(32 * 1024 * 1024);
