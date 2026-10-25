@@ -18,6 +18,8 @@ data class ResetPasswordUiState(
     val password: String = "",
     val repeatedPassword: String = "",
     val revokeOtherSessions: Boolean = true,
+    val authenticatorRequired: Boolean = false,
+    val authenticatorCode: String = "",
     val loading: Boolean = false,
     val error: String? = null,
     val resendAt: Long = 0,
@@ -37,6 +39,7 @@ class ResetPasswordViewModel(
 
     fun loginChanged(value: String) { saved["login"] = value; change { it.copy(login = value) } }
     fun codeChanged(value: String) = change { it.copy(code = verificationDigits(value)) }
+    fun authenticatorChanged(value: String) = change { it.copy(authenticatorCode = verificationDigits(value)) }
     fun passwordChanged(value: String) = change { it.copy(password = value) }
     fun repeatChanged(value: String) = change { it.copy(repeatedPassword = value) }
     fun revokeChanged(value: Boolean) = change { it.copy(revokeOtherSessions = value) }
@@ -59,9 +62,11 @@ class ResetPasswordViewModel(
             2 -> when {
                 newPasswordError(s.password) != null -> error(newPasswordError(s.password)!!)
                 s.password != s.repeatedPassword -> error("Пароли не совпадают")
+                s.authenticatorRequired && s.authenticatorCode.length != 6 -> error("Введите 6 цифр кода из приложения-аутентификатора")
                 else -> runOperation {
-                    repository.confirmPasswordReset(checkNotNull(resetId), s.code, s.password, s.revokeOtherSessions)
-                    mutable.update { it.copy(password = "", repeatedPassword = "", code = "") }
+                    repository.confirmPasswordReset(checkNotNull(resetId), s.code, s.password, s.revokeOtherSessions,
+                        s.authenticatorCode)
+                    mutable.update { it.copy(password = "", repeatedPassword = "", code = "", authenticatorCode = "") }
                     completed.send(Unit)
                 }
             }
@@ -75,7 +80,8 @@ class ResetPasswordViewModel(
 
     private suspend fun sendCode() {
         resetId = repository.requestPasswordReset(state.value.login.trim())
-        mutable.update { it.copy(step = 1, code = "", resendAt = now() + 60_000) }
+        // Новый код — новый email-этап: требование TOTP и введённый код сбрасываются.
+        mutable.update { it.copy(step = 1, code = "", authenticatorRequired = false, authenticatorCode = "", resendAt = now() + 60_000) }
     }
 
     private fun runOperation(block: suspend () -> Unit) {
@@ -83,10 +89,21 @@ class ResetPasswordViewModel(
         viewModelScope.launch {
             try { block() }
             catch (e: AuthFlowException) {
-                mutable.update { it.copy(error = e.message,
-                    step = if (e.kind in setOf(AuthFailureKind.INVALID_CODE, AuthFailureKind.EXPIRED_CODE)) 1 else it.step,
-                    retryAt = e.retryAfterSeconds?.let { seconds -> now() + seconds * 1000L } ?: it.retryAt,
-                    resendAt = e.retryAfterSeconds?.let { seconds -> maxOf(it.resendAt, now() + seconds * 1000L) } ?: it.resendAt) }
+                mutable.update {
+                    // Email-код уже проверен сервером: неверный TOTP не возвращает к вводу email-кода.
+                    val expired = e.kind == AuthFailureKind.EXPIRED_CODE
+                    val toCodeEntry = expired || (e.kind == AuthFailureKind.INVALID_CODE && !it.authenticatorRequired)
+                    it.copy(error = e.message,
+                        authenticatorRequired = when {
+                            expired -> false
+                            e.kind == AuthFailureKind.AUTHENTICATOR_REQUIRED -> true
+                            else -> it.authenticatorRequired
+                        },
+                        authenticatorCode = if (expired) "" else it.authenticatorCode,
+                        step = if (toCodeEntry) 1 else it.step,
+                        retryAt = e.retryAfterSeconds?.let { seconds -> now() + seconds * 1000L } ?: it.retryAt,
+                        resendAt = e.retryAfterSeconds?.let { seconds -> maxOf(it.resendAt, now() + seconds * 1000L) } ?: it.resendAt)
+                }
             } finally { mutable.update { it.copy(loading = false) } }
         }
     }

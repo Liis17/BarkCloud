@@ -216,7 +216,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
             OtpCode = request.OtpCode,
             ResetId = Guid.Parse(request.ResetId),
             NewPassword = request.NewPassword,
-            RevokeOtherSessions = !request.HasRevokeOtherSessions || request.RevokeOtherSessions
+            RevokeOtherSessions = !request.HasRevokeOtherSessions || request.RevokeOtherSessions,
+            AuthenticatorCode = request.AuthenticatorCode
         };
 
         var result = await _mediator.Send(command, context.CancellationToken);

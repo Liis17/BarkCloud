@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.data
 
 import barkcloud.identity.IdentityApiGrpcKt.IdentityApiCoroutineStub
 import barkcloud.identity.IdentityApiOuterClass.*
+import com.barkfluff.BarkCloud.grpc.AuthErrorCodes
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.google.protobuf.Timestamp
 import io.grpc.*
@@ -95,8 +96,25 @@ class AuthFlowRepositoryTest {
         coEvery { public.confirmResetPassword(any(), any()) } returns ConfirmResetPasswordResponse.newBuilder()
             .setAccessToken(token("access")).setRefreshToken(token("refresh")).build()
         repository.confirmPasswordReset("reset", "123456", "password123", false)
-        coVerify { public.confirmResetPassword(match { it.resetId == "reset" && it.otpCode == "123456" && it.newPassword == "password123" && !it.revokeOtherSessions }, any()) }
+        coVerify { public.confirmResetPassword(match { it.resetId == "reset" && it.otpCode == "123456" && it.newPassword == "password123" && !it.revokeOtherSessions && it.authenticatorCode.isEmpty() }, any()) }
         verify { global.saveTokens("access", 10_000_000, "refresh", 10_000_000) }
+    }
+    @Test fun `reset sends authenticator code with email code when provided`() = runTest {
+        coEvery { public.confirmResetPassword(any(), any()) } returns ConfirmResetPasswordResponse.newBuilder()
+            .setAccessToken(token("access")).setRefreshToken(token("refresh")).build()
+        repository.confirmPasswordReset("reset", "123456", "password123", true, "654321")
+        coVerify { public.confirmResetPassword(match { it.otpCode == "123456" && it.authenticatorCode == "654321" }, any()) }
+        verify { global.saveTokens("access", 10_000_000, "refresh", 10_000_000) }
+    }
+    @Test fun `missing authenticator code maps to distinct failure kind`() = runTest {
+        val trailers = Metadata().apply {
+            put(Metadata.Key.of("x-error-code", Metadata.ASCII_STRING_MARSHALLER), AuthErrorCodes.OTP_REQUIRED)
+            put(Metadata.Key.of("x-otp-method", Metadata.ASCII_STRING_MARSHALLER), "authenticator")
+        }
+        coEvery { public.confirmResetPassword(any(), any()) } throws Status.FAILED_PRECONDITION.asException(trailers)
+        try { repository.confirmPasswordReset("reset", "123456", "password123", true); fail("Must fail") }
+        catch (e: AuthFlowException) { assertEquals(AuthFailureKind.AUTHENTICATOR_REQUIRED, e.kind) }
+        verify(exactly = 0) { global.saveTokens(any(), any(), any(), any()) }
     }
     @Test fun `cancellation is propagated instead of shown as form error`() = runTest {
         coEvery { public.resetPassword(any(), any()) } throws CancellationException("cancel")
