@@ -1,5 +1,5 @@
 import React from 'react';
-import { proxiedImageUrl } from '../../lib/api';
+import { fetchClipboardImage, proxiedImageUrl } from '../../lib/api';
 import { useToast } from '../../hooks/useToast';
 
 /** Действия публичных страниц без авторизации: копировать ссылку на страницу и (для фото) само изображение.
@@ -20,7 +20,7 @@ export function usePublicShareActions(imageSrc?: string) {
     try {
       if (!imageSrc) throw new Error();
       // Через same-origin прокси — иначе чужой origin Files даёт CORS/tainted-canvas.
-      const blob = await (await fetch(proxiedImageUrl(imageSrc))).blob();
+      const blob = await fetchClipboardImage(proxiedImageUrl(imageSrc));
       // Clipboard API принимает только PNG — перегоняем через canvas.
       const bitmap = await createImageBitmap(blob);
       const canvas = document.createElement('canvas');
@@ -32,8 +32,8 @@ export function usePublicShareActions(imageSrc?: string) {
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
       toast('Изображение скопировано');
-    } catch {
-      toast('Не удалось скопировать изображение', 'err');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не удалось скопировать изображение', 'err');
     }
   }, [imageSrc, toast]);
 

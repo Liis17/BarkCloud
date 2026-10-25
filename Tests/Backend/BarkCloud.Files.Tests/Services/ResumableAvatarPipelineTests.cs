@@ -79,6 +79,7 @@ public sealed class ResumableAvatarPipelineTests
             imageCompressor.Object,
             new Mock<VideoThumbnailExtractor>(NullLogger<VideoThumbnailExtractor>.Instance).Object,
             new Mock<HeicImageConverter>(NullLogger<HeicImageConverter>.Instance).Object,
+            Mock.Of<ISvgRasterizer>(),
             metadataExtractor.Object, previewPersistence, NullLogger<UploadFileCommandHandler>.Instance);
         var sender = new Mock<ISender>();
         sender.Setup(x => x.Send(It.IsAny<UploadFileCommand>(), It.IsAny<CancellationToken>()))

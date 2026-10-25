@@ -81,6 +81,7 @@ public class LegacyPreviewBackfillService : BackgroundService
                     .Where(f => f.Type == UploadFileType.CloudFile
                                 && f.MediaKind == MediaKind.Photo
                                 && f.Etag != null && f.Etag != ""
+                                && f.UploadedAt != null
                                 && f.Id > cursor
                                 && !context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
                                 && !context.FilePreviews.Any(p => p.OriginalFileId == f.Id))
@@ -105,6 +106,10 @@ public class LegacyPreviewBackfillService : BackgroundService
                         await ProcessFileAsync(scope.ServiceProvider, id, ct);
                         processed++;
                     }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         failed++;
@@ -118,7 +123,7 @@ public class LegacyPreviewBackfillService : BackgroundService
             _logger.LogInformation("Бэкафилл превью завершён: обработано {Processed}, ошибок {Failed}", processed, failed);
     }
 
-    private async Task ProcessFileAsync(IServiceProvider sp, Guid fileId, CancellationToken ct)
+    internal async Task ProcessFileAsync(IServiceProvider sp, Guid fileId, CancellationToken ct)
     {
         var filesStorage = sp.GetRequiredService<IUploadedFilesStorage>();
         var hashesStorage = sp.GetRequiredService<IFileHashesStorage>();
@@ -126,65 +131,81 @@ public class LegacyPreviewBackfillService : BackgroundService
         var bucketRegistry = sp.GetRequiredService<S3BucketRegistry>();
         var compressor = sp.GetRequiredService<ImageCompressor>();
         var heic = sp.GetRequiredService<HeicImageConverter>();
+        var svgRasterizer = sp.GetRequiredService<ISvgRasterizer>();
         var previewPersistence = sp.GetRequiredService<PreviewPersistenceService>();
 
         var file = await filesStorage.GetFile(fileId);
-        if (file is null || string.IsNullOrEmpty(file.Etag))
+        if (file is null || file.Type != UploadFileType.CloudFile || file.MediaKind != MediaKind.Photo
+            || file.UploadedAt is null || string.IsNullOrEmpty(file.Etag))
+            return;
+
+        var isSvg = Path.GetExtension(file.Filename ?? string.Empty).Equals(".svg", StringComparison.OrdinalIgnoreCase);
+        if (isSvg && file.Size > SvgRasterizer.MaximumInputBytes)
             return;
 
         var storageProfileId = bucketRegistry.ResolveReadProfileId(file);
         var previewProfileId = bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, true);
 
-        var tempPath = Path.GetTempFileName();
+        string? tempPath = isSvg ? null : Path.GetTempFileName();
         try
         {
-            // Скачиваем оригинал на диск (нужно для ffmpeg при HEIC).
-            await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
-            await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
-            {
-                await s3Stream.CopyToAsync(fs, ct);
-            }
-
             byte[] previewSource;
-            var isHeic = file.Filename.GetContentType() == "image/heic";
-
-            if (isHeic)
+            if (isSvg)
             {
-                var jpeg = await heic.ConvertToJpegAsync(tempPath, ct);
-
-                string newHash;
-                using (var sha256 = SHA256.Create())
-                    newHash = Convert.ToHexString(sha256.ComputeHash(jpeg)).ToLowerInvariant();
-
-                var hashOwner = await hashesStorage.GetFileIdByHash(newHash);
-
-                // Заменяем блоб в S3 на JPEG под тем же ключом.
-                using (var ms = new MemoryStream(jpeg))
-                    file.Etag = await s3.UploadAsync(storageProfileId, file.Id.ToString(), ms, "image/jpeg");
-
-                file.Filename = Path.ChangeExtension(file.Filename, ".jpg");
-                file.Size = jpeg.Length;
-
-                // Обновляем запись хеша только если этот JPEG ещё ни за кем не закреплён —
-                // иначе нарушим уникальность Hash (редкая коллизия с уже сконвертированным дублем).
-                if (hashOwner is null)
-                {
-                    await hashesStorage.DeleteHashByFileId(file.Id, ct);
-                    await hashesStorage.AddHash(new FileHash { FileId = file.Id, Hash = newHash });
-                }
-                else if (hashOwner != file.Id)
-                {
-                    _logger.LogWarning(
-                        "Хеш JPEG для {FileId} уже закреплён за {OwnerId}; запись хеша не обновлена",
-                        file.Id, hashOwner);
-                }
-
-                previewSource = jpeg;
-                _logger.LogInformation("Легаси-HEIC {FileId} сконвертирован в JPEG ({Size} байт)", file.Id, jpeg.Length);
+                await using var svgStream = await s3.DownloadAsync(storageProfileId, file.Id.ToString(), ct);
+                var svgPng = await svgRasterizer.RasterizeBackfillAsync(svgStream, file.Filename!, ct);
+                if (svgPng is null)
+                    return;
+                previewSource = svgPng;
             }
             else
             {
-                previewSource = await File.ReadAllBytesAsync(tempPath, ct);
+                // Скачиваем оригинал на диск (нужно для ffmpeg при HEIC).
+                await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
+                await using (var fs = new FileStream(tempPath!, FileMode.Create, FileAccess.Write))
+                {
+                    await s3Stream.CopyToAsync(fs, ct);
+                }
+
+                var isHeic = file.Filename!.GetContentType() == "image/heic";
+                if (isHeic)
+                {
+                    var jpeg = await heic.ConvertToJpegAsync(tempPath!, ct);
+
+                    string newHash;
+                    using (var sha256 = SHA256.Create())
+                        newHash = Convert.ToHexString(sha256.ComputeHash(jpeg)).ToLowerInvariant();
+
+                    var hashOwner = await hashesStorage.GetFileIdByHash(newHash);
+
+                    // Заменяем блоб в S3 на JPEG под тем же ключом.
+                    using (var ms = new MemoryStream(jpeg))
+                        file.Etag = await s3.UploadAsync(storageProfileId, file.Id.ToString(), ms, "image/jpeg");
+
+                    file.Filename = Path.ChangeExtension(file.Filename, ".jpg");
+                    file.Size = jpeg.Length;
+
+                    // Обновляем запись хеша только если этот JPEG ещё ни за кем не закреплён —
+                    // иначе нарушим уникальность Hash (редкая коллизия с уже сконвертированным дублем).
+                    if (hashOwner is null)
+                    {
+                        await hashesStorage.DeleteHashByFileId(file.Id, ct);
+                        await hashesStorage.AddHash(new FileHash { FileId = file.Id, Hash = newHash });
+                    }
+                    else if (hashOwner != file.Id)
+                    {
+                        _logger.LogWarning(
+                            "Хеш JPEG для {FileId} уже закреплён за {OwnerId}; запись хеша не обновлена",
+                            file.Id, hashOwner);
+                    }
+
+                    previewSource = jpeg;
+                    _logger.LogInformation("Легаси-HEIC {FileId} сконвертирован в JPEG ({Size} байт)", file.Id, jpeg.Length);
+                }
+                else
+                {
+                    previewSource = await File.ReadAllBytesAsync(tempPath!, ct);
+                }
             }
 
             // Восстанавливаем размеры оригинала, если их не было (типично для старых HEIC).
@@ -214,7 +235,7 @@ public class LegacyPreviewBackfillService : BackgroundService
         {
             try
             {
-                if (File.Exists(tempPath))
+                if (tempPath is not null && File.Exists(tempPath))
                     File.Delete(tempPath);
             }
             catch (Exception ex)
