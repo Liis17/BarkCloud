@@ -32,6 +32,13 @@ public class ConfirmOtpVerificationCommandHandlerTests : IDisposable
     private readonly ILogger<ConfirmOtpVerificationCommandHandler> _logger =
         NullLogger<ConfirmOtpVerificationCommandHandler>.Instance;
 
+    public ConfirmOtpVerificationCommandHandlerTests()
+    {
+        _authProps.Setup(s => s.GetUserAuthPropertiesSnapshot(42, It.IsAny<CancellationToken>()))
+            .Returns((long userId, CancellationToken cancellationToken) =>
+                _authProps.Object.GetUserAuthProperties(userId, cancellationToken));
+    }
+
     private ConfirmOtpVerificationCommandHandler CreateSut() => new(
         UserContextFactory.Create(42),
         _database.Context,

@@ -190,6 +190,15 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         return await _context.AuthUserProperties.Where(x => x.UserId == userId).FirstOrDefaultAsync(cancellationToken);
     }
 
+    /// <summary>Читает независимый снимок настроек, актуальный после ожидания блокировки владельца.</summary>
+    public async Task<AuthUserProperty?> GetUserAuthPropertiesSnapshot(long userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.AuthUserProperties.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task DisableOtp(long userId, CancellationToken cancellationToken = default)
     {
         var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);

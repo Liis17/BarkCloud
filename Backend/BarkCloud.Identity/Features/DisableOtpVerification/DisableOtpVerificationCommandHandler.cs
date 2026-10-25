@@ -184,7 +184,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
                 await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
                 if (disableEmail)
                 {
-                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthProperties(
+                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
                         _userContext.UserId, cancellationToken);
                     if (currentAuthProperties is not { EmailOtpEnabled: true }
                         || await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken)

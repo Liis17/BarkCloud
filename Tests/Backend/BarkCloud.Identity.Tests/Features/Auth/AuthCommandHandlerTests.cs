@@ -17,6 +17,7 @@ using MassTransit;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.EntityFrameworkCore;
 
 namespace BarkCloud.Identity.Tests.Features.Auth;
 
@@ -350,8 +351,45 @@ public class AuthCommandHandlerTests : IDisposable
             }));
 
         _authProps.Setup(s => s.GetUserAuthProperties(id, It.IsAny<CancellationToken>())).ReturnsAsync(props);
+        _authProps.Setup(s => s.GetUserAuthPropertiesSnapshot(id, It.IsAny<CancellationToken>())).ReturnsAsync(props);
         _passwords.Setup(s => s.GetUserPasswordHash(id, It.IsAny<CancellationToken>())).ReturnsAsync(PasswordHash);
         _passwords.Setup(s => s.GetSecurityStateVersion(id, It.IsAny<CancellationToken>())).ReturnsAsync(3);
+    }
+
+    [Fact]
+    public async Task Handle_AuthenticatorEnabledBetweenInitialReadAndSessionLock_RejectsSession()
+    {
+        SetupUser(1, new AuthUserProperty { UserId = 1 });
+        _database.Context.AuthUserProperties.Add(new AuthUserProperty { UserId = 1 });
+        await _database.Context.SaveChangesAsync();
+
+        var storage = new AuthPropertiesStorage(_database.Context);
+        var initialRead = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var continueAuthentication = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _authProps.Setup(s => s.GetUserAuthProperties(1, It.IsAny<CancellationToken>()))
+            .Returns(async (long userId, CancellationToken cancellationToken) =>
+            {
+                var properties = await storage.GetUserAuthProperties(userId, cancellationToken);
+                initialRead.TrySetResult(true);
+                await continueAuthentication.Task.WaitAsync(cancellationToken);
+                return properties;
+            });
+        _authProps.Setup(s => s.GetUserAuthPropertiesSnapshot(1, It.IsAny<CancellationToken>()))
+            .Returns((long userId, CancellationToken cancellationToken) =>
+                storage.GetUserAuthPropertiesSnapshot(userId, cancellationToken));
+
+        var authentication = CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+        await initialRead.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        using (var parallelContext = _database.CreateAdditionalContext())
+        {
+            var properties = await parallelContext.AuthUserProperties.SingleAsync(x => x.UserId == 1);
+            properties.OtpEnabled = true;
+            await parallelContext.SaveChangesAsync();
+        }
+
+        continueAuthentication.TrySetResult(true);
+        await Assert.ThrowsAsync<InvalidLoginOrPasswordException>(() => authentication);
     }
 
     [Fact]
