@@ -11,6 +11,7 @@ import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import { useConfirm, usePrompt } from '../hooks/useDialog';
 import { Switch as Toggle } from '../components/ui/Switch';
 import { Select } from '../components/ui/Select';
+import { TagsTab } from './TagsTab';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
@@ -1687,11 +1688,13 @@ const SECTIONS: NavItem[] = [
   { key: 'storage', label: 'Хранилище', icon: 'server' },
   { key: 'sessions', label: 'Устройства и сессии', icon: 'device' },
   { key: 'appearance', label: 'Внешний вид', icon: 'palette' },
+  { key: 'tags', label: 'Теги', icon: 'palette' },
   { key: 'system', label: 'Обслуживание', icon: 'server' },
   { key: 'server-settings', label: 'Настройки сервера', icon: 'settings' },
   { key: 'migration', label: 'Миграция', icon: 'server' },
 ];
 const SEARCH_ITEMS = [
+  ['tags', 'Теги', 'Создание, название и цвет меток файлов'],
   ['account', 'Профиль', 'Аватар, имя и фамилия'], ['account', 'Email', 'Адрес для входа'],
   ['account', 'Имя пользователя', 'Username'], ['account', 'О себе', 'Описание профиля'],
   ['account', 'Опасная зона', 'Удаление аккаунта'], ['security', 'Пароль', 'Смена пароля'],
@@ -1726,6 +1729,7 @@ function SettingsPanel({ section, active, admin, flash, onUnlockedChange }: {
   const resource = useApiResource<unknown>(SECTION_PATHS[section] || null, active,
     section === 'storage' ? settingsStoragePending : undefined);
   if (section === 'appearance') return <AppearanceTab />;
+  if (section === 'tags') return <TagsTab active={active} />;
   if (section === 'server-settings') return <React.Suspense fallback={<Loading label="Загрузка редактора…" />}>
     <ServerSettingsTab active={active} onAccessExpired={() => onUnlockedChange(false)} />
   </React.Suspense>;

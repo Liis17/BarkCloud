@@ -8,6 +8,8 @@ Parent: [[Web/WebApp]] · See also: [[Backend/Configuration]] · [[Backend/Ident
 
 ## Источники
 
+Раздел `/settings#tags` управляет личными поисковыми тегами через Files (`Backend/BarkCloud.Web/ClientApp/src/pages/TagsTab.tsx`): список с цветами и поиском, создание, изменение названия/цвета и удаление с подтверждением. AdminGate не требуется. Переименование и удаление распространяются на назначения тега всем файлам владельца.
+
 | Файл | Символ | Роль |
 |---|---|---|
 | `Backend/BarkCloud.Web/SettingsEndpoints.cs` | `MapSettingsEndpoints` | HTTP API страницы настроек |
@@ -20,6 +22,7 @@ Parent: [[Web/WebApp]] · See also: [[Backend/Configuration]] · [[Backend/Ident
 | Метод и путь | Поведение |
 |---|---|
 | `GET /api/settings/full` | Полный набор данных страницы |
+| `GET /api/settings/tags`, `POST /api/settings/tags/save`, `POST /api/settings/tags/delete` | Личный каталог Files: `{items:[{id,name,color}]}`; сохранение `{id?,name,color}` (пустой id создаёт), удаление `{id}`. Цвет — `#RRGGBB`, имя — до 50 символов; нормализованные дубликаты запрещены |
 | `GET /api/settings/context`, `GET /api/settings/profile`, `GET /api/settings/storage`, `GET /api/settings/system` | Раздельные данные для контекста доступа и соответствующих разделов |
 | `POST /api/settings/profile/name`, `POST /api/settings/profile/bio`, `POST /api/settings/profile/username`; `GET /api/settings/profile/username-available?u=` | Изменение имени, биографии и username; проверка доступности username |
 | `GET/POST /api/settings/privacy` | Чтение и изменение видимости профиля, email, last seen и поиска по username |
