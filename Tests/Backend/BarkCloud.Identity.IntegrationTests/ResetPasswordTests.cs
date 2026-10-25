@@ -25,7 +25,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using DomainResetPassword = BarkCloud.Identity.Domain.ResetPassword;
+using DomainAuthUserProperty = BarkCloud.Identity.Domain.AuthUserProperty;
 using OtpType = BarkCloud.Identity.Domain.OtpType;
+
+using OtpNet;
 
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
@@ -237,6 +240,82 @@ public class ResetPasswordTests
         (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
         PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
             .Should().BeTrue();
+    }
+
+    /// <summary>Включает действующий Authenticator; возвращает ключ для генерации TOTP.</summary>
+    private static async Task<byte[]> EnableAuthenticator(IdentityContext context)
+    {
+        var key = KeyGeneration.GenerateRandomKey(20);
+        context.AuthUserProperties.Add(new DomainAuthUserProperty
+        {
+            UserId = 42, OtpEnabled = true, OtpSecret = Base32Encoding.ToString(key)
+        });
+        await context.SaveChangesAsync();
+        return key;
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithAuthenticatorEnabled_RequiresTotpAndKeepsAccountIntact()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var reset = await Seed(setup);
+        // Authenticator включён после создания reset — подтверждение всё равно требует TOTP.
+        await EnableAuthenticator(setup);
+
+        await using var context = database.CreateContext();
+        await FluentActions.Awaiting(() => CreateHandler(context).Handle(Command(reset.Id), default))
+            .Should().ThrowAsync<OtpCodeNeedException>();
+
+        await using var reader = database.CreateContext();
+        (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
+        PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
+            .Should().BeTrue();
+        (await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42)).Select(x => x.Value)
+            .Should().BeEquivalentTo("old-current", "old-other");
+        (await reader.RevokedSessions.AnyAsync()).Should().BeFalse();
+        (await reader.PendingNotifications.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithAuthenticatorEnabled_WrongTotpKeepsAccountIntact()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var reset = await Seed(setup);
+        await EnableAuthenticator(setup);
+
+        await using var context = database.CreateContext();
+        var wrongTotp = Command(reset.Id);
+        wrongTotp.AuthenticatorCode = "000000";
+        await FluentActions.Awaiting(() => CreateHandler(context).Handle(wrongTotp, default))
+            .Should().ThrowAsync<NotValidOtpCodeException>();
+
+        await using var reader = database.CreateContext();
+        (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
+        PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ResetPassword_WithAuthenticatorEnabled_ConfirmsWithBothCodes()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var reset = await Seed(setup);
+        var key = await EnableAuthenticator(setup);
+
+        await using var context = database.CreateContext();
+        var request = Command(reset.Id);
+        request.AuthenticatorCode = new Totp(key).ComputeTotp();
+        var response = await CreateHandler(context).Handle(request, default);
+
+        await using var reader = database.CreateContext();
+        (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeTrue();
+        PasswordHasher.VerifyPassword("new-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
+            .Should().BeTrue();
+        (await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42))
+            .Should().Contain(t => t.Value == response.RefreshToken.Value);
     }
 
     // Кэш наполняется так же, как в сервисах: из фида Identity.

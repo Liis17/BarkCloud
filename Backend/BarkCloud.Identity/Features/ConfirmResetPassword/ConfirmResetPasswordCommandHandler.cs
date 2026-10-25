@@ -175,6 +175,39 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
                 _metrics.Increment("otp_email_verified");
                 _logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", resetPasswordInfo.UserId);
+
+                // Email-код подтверждает первый фактор; включённый Authenticator — второй.
+                // Настройки читаются на момент подтверждения: даже reset, созданный до включения
+                // Authenticator, не даёт сменить пароль без TOTP. Проверка идёт до проверок нового
+                // пароля, чтобы ответы не раскрывали совпадение с текущим паролем.
+                var authProperties = await _authPropertiesStorage.GetUserAuthProperties(resetPasswordInfo.UserId, cancellationToken);
+
+                if (authProperties is { OtpEnabled: true })
+                {
+                    if (string.IsNullOrEmpty(request.AuthenticatorCode))
+                    {
+                        _metrics.Increment("auth_otp_required");
+                        _logger.LogInformation(
+                            "Для подтверждения email-сброса пароля требуется код Authenticator, пользователь {UserId}",
+                            resetPasswordInfo.UserId
+                        );
+                        throw new OtpCodeNeedException("authenticator");
+                    }
+
+                    if (!VerifyAuthenticatorCode(authProperties.OtpSecret, request.AuthenticatorCode))
+                    {
+                        _metrics.Increment("password_reset_confirmation_failed");
+                        _metrics.Increment("otp_authenticator_failed");
+                        _logger.LogWarning(
+                            "Неверный код Authenticator при email-сбросе пароля для пользователя {UserId}",
+                            resetPasswordInfo.UserId
+                        );
+                        throw new NotValidOtpCodeException();
+                    }
+
+                    _metrics.Increment("otp_authenticator_verified");
+                    _logger.LogDebug("Код Authenticator успешно проверен для пользователя {UserId}", resetPasswordInfo.UserId);
+                }
             }
 
             if (string.IsNullOrEmpty(request.NewPassword))
@@ -286,5 +319,26 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             => !string.IsNullOrEmpty(stored)
                && CryptographicOperations.FixedTimeEquals(
                    Encoding.UTF8.GetBytes(stored), Encoding.UTF8.GetBytes(provided ?? string.Empty));
+
+        // Отсутствующий или повреждённый секрет активного Authenticator безопасно отклоняет запрос:
+        // окно проверки то же, что при обычном входе (VerificationWindow.RfcSpecifiedNetworkDelay).
+        private static bool VerifyAuthenticatorCode(string? secret, string code)
+        {
+            if (string.IsNullOrEmpty(secret))
+            {
+                return false;
+            }
+
+            try
+            {
+                var totp = new Totp(Base32Encoding.ToBytes(secret));
+                return totp.VerifyTotp(code, out _, VerificationWindow.RfcSpecifiedNetworkDelay);
+            }
+            catch (ArgumentException)
+            {
+                // Повреждённый секрет (не Base32) не должен превращаться в 500.
+                return false;
+            }
+        }
     }
 }

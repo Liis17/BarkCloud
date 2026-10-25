@@ -169,6 +169,66 @@ describe('auth screen states', () => {
     expect((screen.getByRole('textbox', { name: 'Шестизначный код' }) as HTMLInputElement).value).toBe('123456');
   });
 
+  it('shows the authenticator field on the reset screen only when the server requires it', () => {
+    render(<AuthPage initialState={state({ screen: 'reset', flowId: 'reset-flow' })} />);
+    expect(screen.queryByRole('textbox', { name: 'Код приложения-аутентификатора' })).toBeNull();
+  });
+
+  it('resubmits the email code together with the authenticator code', async () => {
+    const request = requestReturning(state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+      fieldErrors: { authenticator: 'Введите код из приложения-аутентификатора, чтобы завершить восстановление.' },
+    }));
+    render(<AuthPage initialState={state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+    })} request={request} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Код приложения-аутентификатора' }), { target: { value: '654321' } });
+    fireEvent.change(screen.getByLabelText('Новый пароль'), { target: { value: 'another1' } });
+
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Сменить пароль' }).closest('form')!));
+
+    const formData = request.mock.calls[0][1]?.body as FormData;
+    expect(formData.get('otp')).toBe('123456');
+    expect(formData.get('authenticator_code')).toBe('654321');
+    expect(formData.get('password')).toBe('another1');
+  });
+
+  it('requires six digits of the authenticator code before submitting', async () => {
+    const request = requestReturning(state({ screen: 'reset', flowId: 'reset-flow', authenticatorRequired: true }));
+    render(<AuthPage initialState={state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+    })} request={request} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Код приложения-аутентификатора' }), { target: { value: '654' } });
+    fireEvent.change(screen.getByLabelText('Новый пароль'), { target: { value: 'another1' } });
+
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Сменить пароль' }).closest('form')!));
+
+    expect(request).not.toHaveBeenCalled();
+    expect(screen.getByText('Введите все шесть цифр кода из приложения.')).not.toBeNull();
+  });
+
+  it('clears the authenticator code when a resend restarts the email step', async () => {
+    const request = requestReturning(state({ screen: 'reset', flowId: 'reset-flow' }));
+    render(<AuthPage initialState={state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+    })} request={request} />);
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Отправить код повторно' })));
+
+    expect(request.mock.calls[0][0]).toBe('/forgot/resend');
+    expect(screen.queryByRole('textbox', { name: 'Код приложения-аутентификатора' })).toBeNull();
+  });
+
   it('submits a pending registration retry with only flow and CSRF fields', async () => {
     const request = requestReturning(state({ screen: 'session-pending', flowId: 'pending-flow' }));
     render(<AuthPage initialState={state({ screen: 'session-pending', flowId: 'pending-flow' })} request={request} />);

@@ -622,6 +622,7 @@ public static class AuthEndpoints
             flow.FormMessage = null;
             flow.FieldErrors.Clear();
             flow.RevokeOtherSessions = true;
+            flow.AuthenticatorRequired = false;
             using var cancellation = lease is null
                 ? CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted, flow.LifetimeCancellation.Token)
                 : LinkRequestAndFlow(http, lease);
@@ -679,7 +680,8 @@ public static class AuthEndpoints
             flow.FieldErrors.Clear();
             using var cancellation = LinkRequestAndFlow(http, lease);
             var result = await reset.ConfirmAsync(http, flow.ResetId, form["otp"].ToString(),
-                form["password"].ToString(), revokeSessions, cancellation.Token);
+                form["password"].ToString(), revokeSessions, form["authenticator_code"].ToString(),
+                cancellation.Token);
             if (result.Outcome == PasswordResetOutcome.Success)
             {
                 flows.Complete(flow);
@@ -687,8 +689,26 @@ public static class AuthEndpoints
             }
 
             flow.FormError = result.Message;
+            if (result.Outcome == PasswordResetOutcome.AuthenticatorRequired)
+            {
+                // Email-код проверен: показываем поле TOTP, не трогая введённые значения.
+                flow.AuthenticatorRequired = true;
+                flow.FieldErrors["authenticator"] = result.Message ?? "Введите код из приложения-аутентификатора.";
+                return await RenderStateAsync(http, pages, State(http, antiforgery, configuration,
+                    registrationEnabled, "reset", flow));
+            }
+
             if (result.Outcome is PasswordResetOutcome.CodeInvalid or PasswordResetOutcome.CodeExpired)
             {
+                if (flow.AuthenticatorRequired)
+                {
+                    // Оба кода перепроверяются целиком: не очищаем email-код и не запускаем
+                    // почтовый cooldown — вероятнее всего ошиблись в TOTP.
+                    flow.FieldErrors["authenticator"] = result.Message ?? "Код недействителен или истёк. Запросите новый.";
+                    return await RenderStateAsync(http, pages, State(http, antiforgery, configuration,
+                        registrationEnabled, "reset", flow));
+                }
+
                 flow.FieldErrors["otp"] = result.Message ?? "Код недействителен или истёк.";
                 flow.RetryAt = timeProvider.GetUtcNow().AddSeconds(DefaultResendCooldownSeconds);
                 return await RenderStateAsync(http, pages, State(http, antiforgery, configuration,
@@ -739,6 +759,8 @@ public static class AuthEndpoints
                 flow.FormError = null;
                 flow.FormMessage = "Если аккаунт существует, мы отправим письмо с кодом для восстановления.";
                 flow.FieldErrors.Clear();
+                // Новый код означает новый email-этап: требование TOTP снимается до новой проверки кода.
+                flow.AuthenticatorRequired = false;
             }
             else
             {
@@ -856,7 +878,8 @@ public static class AuthEndpoints
             formError ?? flow?.FormError,
             formMessage ?? flow?.FormMessage,
             new AuthPageFeatures(registrationEnabled, configuration.EmailEnabled()),
-            clearOtp);
+            clearOtp,
+            flow?.AuthenticatorRequired ?? false);
     }
 
     private static AuthPageValues ValuesFromFlow(AuthFlow? flow)
