@@ -1,8 +1,7 @@
 import Foundation
 
-/// Делегат, доверяющий self-signed TLS-сертификату сервера BarkCloud
-/// (зеркалит `allowSelfSigned` в `GrpcManager`). Без состояния — потокобезопасен.
-private final class SelfSignedTrustDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
+/// Принимает любой TLS-сертификат только для filesHost при включённом обходе.
+private final class TlsBypassTrustDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     nonisolated func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
@@ -19,20 +18,21 @@ private final class SelfSignedTrustDelegate: NSObject, URLSessionDelegate, @unch
     }
 }
 
-/// Общий `URLSession`, доверяющий self-signed сертификату сервера. Нужен для HTTP
-/// upload/download и загрузки превью: стандартный `AsyncImage`/`URLSession` отвергает
-/// self-signed TLS, на котором работает файловый сервис (:7025/web/...).
+/// Общий `URLSession` для HTTP upload/download и превью. При включённом обходе
+/// принимает любой TLS-сертификат только от `filesHost`.
 public enum InsecureHTTP {
     public static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 600
-        return URLSession(configuration: config, delegate: SelfSignedTrustDelegate(), delegateQueue: nil)
+        return URLSession(configuration: config, delegate: TlsBypassTrustDelegate(), delegateQueue: nil)
     }()
 
     /// Сбросить URL-кэш, куки и хранилище учётных данных сессии. Вызывается при
     /// выходе из аккаунта, чтобы не осталось закэшированных ответов файлового сервиса.
-    public static func clearCaches() {
-        session.reset {}
+    public static func clearCaches() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            session.reset { continuation.resume() }
+        }
     }
 }

@@ -277,6 +277,74 @@
     "Отключить" : {
 
     },
+    "Отключить проверку" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfung deaktivieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable verification"
+          }
+        }
+      }
+    },
+    "Отключить проверку TLS-сертификата (небезопасно)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TLS-Zertifikatsprüfung deaktivieren (unsicher)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable TLS certificate verification (unsafe)"
+          }
+        }
+      }
+    },
+    "Отключить проверку сертификата?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zertifikatsprüfung deaktivieren?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable certificate verification?"
+          }
+        }
+      }
+    },
+    "Отмена" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbrechen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
     "Открыть BarkCloud Drive" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -343,6 +411,23 @@
         }
       }
     },
+    "Приложение будет принимать любой сертификат для указанных серверов. Злоумышленник может перехватить пароль, коды подтверждения, токены и файлы. Продолжайте, только если понимаете этот риск" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App akzeptiert jedes Zertifikat für die angegebenen Server. Ein Angreifer könnte Ihr Passwort, Bestätigungscodes, Tokens und Dateien abfangen. Fahren Sie nur fort, wenn Sie dieses Risiko verstehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app will accept any certificate for the specified servers. An attacker could intercept your password, verification codes, tokens, and files. Continue only if you understand this risk."
+          }
+        }
+      }
+    },
     "Примонтировать" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -377,6 +462,23 @@
         }
       }
     },
+    "Проверка сертификатов отключена. Приложение принимает любой сертификат от указанных серверов, поэтому передаваемые данные могут быть перехвачены." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Zertifikatsprüfung ist deaktiviert. Die App akzeptiert jedes Zertifikat der angegebenen Server, sodass übertragene Daten abgefangen werden können."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificate verification is disabled. The app accepts any certificate from the specified servers, so transmitted data could be intercepted."
+          }
+        }
+      }
+    },
     "Размонтировать" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -390,23 +492,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unmount"
-          }
-        }
-      }
-    },
-    "Разрешить self-signed сертификат" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selbstsigniertes Zertifikat zulassen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Allow self-signed certificate"
           }
         }
       }

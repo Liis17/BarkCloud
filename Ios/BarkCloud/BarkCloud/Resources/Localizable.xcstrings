@@ -7669,25 +7669,140 @@
         }
       }
     },
-    "server_setup_self_signed" : {
+    "server_setup_tls_bypass_toggle" : {
       "extractionState" : "manual",
       "localizations" : {
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Разрешить самоподписанный сертификат"
+            "value" : "Отключить проверку TLS-сертификата (небезопасно)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Allow self-signed certificate"
+            "value" : "Disable TLS certificate verification (unsafe)"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selbstsigniertes Zertifikat zulassen"
+            "value" : "TLS-Zertifikatsprüfung deaktivieren (unsicher)"
+          }
+        }
+      }
+    },
+    "server_setup_tls_bypass_cancel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмена"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbrechen"
+          }
+        }
+      }
+    },
+    "server_setup_tls_bypass_confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключить проверку"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable verification"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfung deaktivieren"
+          }
+        }
+      }
+    },
+    "server_setup_tls_bypass_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение будет принимать любой сертификат для указанных серверов. Злоумышленник может перехватить пароль, коды подтверждения, токены и файлы. Продолжайте, только если понимаете этот риск"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app will accept any certificate for the specified servers. An attacker could intercept your password, verification codes, tokens, and files. Continue only if you understand this risk."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App akzeptiert jedes Zertifikat für die angegebenen Server. Ein Angreifer könnte Ihr Passwort, Bestätigungscodes, Tokens und Dateien abfangen. Fahren Sie nur fort, wenn Sie dieses Risiko verstehen."
+          }
+        }
+      }
+    },
+    "server_setup_tls_bypass_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключить проверку сертификата?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable certificate verification?"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zertifikatsprüfung deaktivieren?"
+          }
+        }
+      }
+    },
+    "server_setup_tls_bypass_warning" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка TLS-сертификатов отключена. Приложение принимает любой сертификат для указанных серверов. Злоумышленник может перехватить пароль, коды подтверждения, токены и файлы."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TLS certificate verification is disabled. The app accepts any certificate from the specified servers. An attacker could intercept your password, verification codes, tokens, and files."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die TLS-Zertifikatsprüfung ist deaktiviert. Die App akzeptiert jedes Zertifikat der angegebenen Server. Ein Angreifer könnte Ihr Passwort, Bestätigungscodes, Tokens und Dateien abfangen."
           }
         }
       }
