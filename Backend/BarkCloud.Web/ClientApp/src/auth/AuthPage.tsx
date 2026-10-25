@@ -189,11 +189,15 @@ export function AuthPage({
   const [newPasswordVisible, setNewPasswordVisible] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState<string>();
+  const [authenticatorCode, setAuthenticatorCode] = useState('');
+  const [authenticatorError, setAuthenticatorError] = useState<string>();
   const [networkError, setNetworkError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [otpFocusRequest, setOtpFocusRequest] = useState(0);
+  const [authenticatorFocusRequest, setAuthenticatorFocusRequest] = useState(0);
   const busyRef = useRef(false);
   const otpRef = useRef<HTMLInputElement>(null);
+  const authenticatorRef = useRef<HTMLInputElement>(null);
   const retrySeconds = useCooldown(page.retryAt);
 
   useEffect(() => {
@@ -204,6 +208,10 @@ export function AuthPage({
   useEffect(() => {
     if (otpFocusRequest > 0) otpRef.current?.focus();
   }, [otpFocusRequest]);
+
+  useEffect(() => {
+    if (authenticatorFocusRequest > 0) authenticatorRef.current?.focus();
+  }, [authenticatorFocusRequest]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -248,6 +256,14 @@ export function AuthPage({
       if (merged.screen === 'login-otp' || merged.screen === 'register-otp' || merged.screen === 'reset') {
         setOtpFocusRequest((previousRequest) => previousRequest + 1);
       }
+    }
+    // Повторная отправка письма (или переход) снимает требование TOTP — очищаем введённый код.
+    if (screenChanged || next.clearOtp || (previous.authenticatorRequired && !merged.authenticatorRequired)) {
+      setAuthenticatorCode('');
+      setAuthenticatorError(undefined);
+    }
+    if (!previous.authenticatorRequired && merged.authenticatorRequired && merged.screen === 'reset') {
+      setAuthenticatorFocusRequest((previousRequest) => previousRequest + 1);
     }
     if (screenChanged) {
       setPassword('');
@@ -322,6 +338,12 @@ export function AuthPage({
     if ((page.screen === 'login-otp' || page.screen === 'register-otp' || page.screen === 'reset') && !/^[0-9]{6}$/.test(otp)) {
       setOtpError('Введите все шесть цифр кода.');
       otpRef.current?.focus();
+      return;
+    }
+
+    if (page.screen === 'reset' && page.authenticatorRequired && !/^[0-9]{6}$/.test(authenticatorCode)) {
+      setAuthenticatorError('Введите все шесть цифр кода из приложения.');
+      authenticatorRef.current?.focus();
       return;
     }
 
@@ -632,6 +654,28 @@ export function AuthPage({
                 <OtpInput ref={otpRef} value={otp} disabled={busy} error={otpError || fieldError('otp')} onChange={setOtp} onInvalid={setOtpError} />
                 {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error" role={(otpError || fieldError('otp')) === page.formError ? 'alert' : undefined}>{otpError || fieldError('otp')}</p>}
               </div>
+              {page.authenticatorRequired && (
+                <div className="auth-field">
+                  <label htmlFor="auth-authenticator">Код из приложения-аутентификатора</label>
+                  <OtpInput
+                    ref={authenticatorRef}
+                    id="auth-authenticator"
+                    name="authenticator_code"
+                    ariaLabel="Код приложения-аутентификатора"
+                    value={authenticatorCode}
+                    disabled={busy}
+                    error={authenticatorError || fieldError('authenticator')}
+                    onChange={setAuthenticatorCode}
+                    onInvalid={setAuthenticatorError}
+                  />
+                  {(authenticatorError || fieldError('authenticator')) && (
+                    <p className="auth-field-error" id="auth-authenticator-error" role={(authenticatorError || fieldError('authenticator')) === page.formError ? 'alert' : undefined}>
+                      {authenticatorError || fieldError('authenticator')}
+                    </p>
+                  )}
+                  <p className="auth-inline-note">Аккаунт защищён двухфакторной аутентификацией: введите текущий код из приложения.</p>
+                </div>
+              )}
               <div className="auth-field">
                 <label htmlFor="auth-new-password">Новый пароль</label>
                 <div className="auth-password-wrap">

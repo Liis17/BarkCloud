@@ -31,7 +31,7 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 
 `FastAuth` объявлен в proto, но `IdentityApiService` не переопределяет этот RPC; обработчик gRPC не предоставлен.
 
-`ConfirmResetPassword` принимает `reset_id`, `otp_code`, `new_password` и optional `revoke_other_sessions`; отсутствующее поле трактуется как `true`. `SetPassword` требует `old_password`, если у пользователя уже есть сохранённый пароль. Остальные поля определены в `Shared/BarkCloud.Proto/identity_api.proto`.
+`ConfirmResetPassword` принимает `reset_id`, `otp_code`, `new_password`, optional `revoke_other_sessions` (отсутствующее поле трактуется как `true`) и `authenticator_code`. При email-сбросе с включённым Authenticator второй фактор обязателен: после проверки email-кода и до проверок нового пароля сервер читает актуальные настройки 2FA — отсутствующий код возвращает OTP-required error (`x-otp-method=authenticator`), неверный/повреждённый секрет — ошибку кода. Требование действует и для reset, созданного до включения Authenticator; повторная отправка обоих кодов перепроверяет их целиком. Отдельный сброс только через Authenticator (`otp_type=Authenticator`) берёт код из `otp_code` и не меняется. `SetPassword` требует `old_password`, если у пользователя уже есть сохранённый пароль. Остальные поля определены в `Shared/BarkCloud.Proto/identity_api.proto`.
 
 Новые `CreateAccountWithPassword` и `ConfirmAccountWithPassword` требуют непустой первоначальный пароль минимум из 6 символов. Поле `initial_password` добавлено как optional к общим request-сообщениям; старые RPC его игнорируют.
 

@@ -58,6 +58,7 @@ public enum PasswordResetOutcome
 {
     Success,
     PendingConfirmation,
+    AuthenticatorRequired,
     ValidationError,
     CodeInvalid,
     CodeExpired,

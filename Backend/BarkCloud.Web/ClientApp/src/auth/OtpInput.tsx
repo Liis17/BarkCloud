@@ -4,6 +4,9 @@ interface OtpInputProps {
   value: string;
   disabled: boolean;
   error?: string;
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
   onChange: (value: string) => void;
   onInvalid: (message?: string) => void;
 }
@@ -34,7 +37,7 @@ function restoreSelection(input: HTMLInputElement, start: number, end: number) {
 }
 
 export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function OtpInput(
-  { value, disabled, error, onChange, onInvalid },
+  { value, disabled, error, id = 'auth-otp', name = 'otp', ariaLabel = 'Шестизначный код', onChange, onInvalid },
   forwardedRef,
 ) {
   const [selection, setSelection] = useState({ start: 0, end: 0 });
@@ -89,14 +92,14 @@ export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function Otp
       <div className="auth-otp-cells" aria-hidden="true">{cells}</div>
       <input
         ref={forwardedRef}
-        id="auth-otp"
+        id={id}
         type="text"
         inputMode="numeric"
         autoComplete="one-time-code"
-        name="otp"
-        aria-label="Шестизначный код"
+        name={name}
+        aria-label={ariaLabel}
         aria-invalid={error ? 'true' : undefined}
-        aria-describedby={error ? 'auth-otp-error' : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         value={value}
         disabled={disabled}
         spellCheck={false}

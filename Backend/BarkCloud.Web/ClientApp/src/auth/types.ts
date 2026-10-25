@@ -28,6 +28,7 @@ export interface AuthPageState {
   retryAt?: string;
   otpMethod?: 'email' | 'authenticator';
   otpMailStatus?: 'sent' | 'existing';
+  authenticatorRequired?: boolean;
   values: AuthValues;
   fieldErrors: Record<string, string>;
   formError?: string;
