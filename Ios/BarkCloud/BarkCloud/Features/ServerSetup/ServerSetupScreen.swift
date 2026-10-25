@@ -17,10 +17,10 @@ struct ServerSetupScreen: View {
     @State private var usersPort = ""
     @State private var filesHost = ""
     @State private var filesPort = ""
-    @State private var useTLS = true
-    @State private var allowSelfSigned = true
+    @State private var tlsBypass = TlsBypassConsent(configuration: .production)
     @State private var loaded = false
     @State private var showError = false
+    @State private var showTLSBypassConfirmation = false
     @State private var saving = false
 
     var body: some View {
@@ -57,13 +57,42 @@ struct ServerSetupScreen: View {
                 )
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("server_setup_tls", isOn: $useTLS)
+                    Toggle("server_setup_tls", isOn: Binding(
+                        get: { tlsBypass.isTLSEnabled },
+                        set: { tlsBypass.setTLSEnabled($0) }
+                    ))
                         .font(AppTypography.bodyLarge)
                         .tint(AppColors.accent)
-                    if useTLS {
-                        Toggle("server_setup_self_signed", isOn: $allowSelfSigned)
-                            .font(AppTypography.bodyLarge)
-                            .tint(AppColors.accent)
+                    if tlsBypass.isTLSEnabled {
+                        Toggle("server_setup_tls_bypass_toggle", isOn: Binding(
+                            get: { tlsBypass.isBypassEnabled },
+                            set: { enabled in
+                                if enabled {
+                                    showTLSBypassConfirmation = true
+                                } else {
+                                    tlsBypass.disableBypass()
+                                }
+                            }
+                        ))
+                        .font(AppTypography.bodyLarge)
+                        .tint(AppColors.accent)
+                        .confirmationDialog(
+                            "server_setup_tls_bypass_title",
+                            isPresented: $showTLSBypassConfirmation,
+                            titleVisibility: .visible
+                        ) {
+                            Button("server_setup_tls_bypass_cancel", role: .cancel) {}
+                            Button("server_setup_tls_bypass_confirm", role: .destructive) {
+                                tlsBypass.confirmBypass()
+                            }
+                        } message: {
+                            Text("server_setup_tls_bypass_message")
+                        }
+                        if tlsBypass.isBypassEnabled {
+                            Text("server_setup_tls_bypass_warning")
+                                .font(AppTypography.bodySmall)
+                                .foregroundStyle(AppColors.error)
+                        }
                     }
                 }
 
@@ -77,9 +106,10 @@ struct ServerSetupScreen: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
-            .animation(.easeInOut(duration: 0.2), value: useTLS)
+            .animation(.easeInOut(duration: 0.2), value: tlsBypass.isTLSEnabled)
         }
         .onAppear(perform: loadIfNeeded)
+        .onChange(of: addressFields) { _, _ in updateAddressConsent() }
     }
 
     @ViewBuilder
@@ -131,8 +161,7 @@ struct ServerSetupScreen: View {
         usersPort = String(c.usersPort)
         filesHost = c.filesHost
         filesPort = String(c.filesPort)
-        useTLS = c.useTLS
-        allowSelfSigned = c.allowSelfSigned
+        tlsBypass.load(c)
         loaded = true
     }
 
@@ -148,17 +177,36 @@ struct ServerSetupScreen: View {
         }
         showError = false
         saving = true
-        let config = ServerConfig(
+        var config = ServerConfig(
             identityHost: iHost, identityPort: identity,
             usersHost: uHost, usersPort: users,
             filesHost: fHost, filesPort: files,
-            useTLS: useTLS, allowSelfSigned: useTLS ? allowSelfSigned : false
+            useTLS: tlsBypass.isTLSEnabled,
+            allowSelfSigned: tlsBypass.isBypassEnabled
         )
+        config.allowSelfSigned = tlsBypass.allowsBypass(for: config)
         env.serverConfig.save(config)
         // Сбросить закэшированные gRPC-соединения к старому адресу.
         await env.grpcManager.shutdown()
+        await InsecureHTTP.clearCaches()
+        await BackgroundUploadCoordinator.shared.resetSession()
         saving = false
         onComplete()
+    }
+
+    private var addressFields: [String] {
+        [identityHost, identityPort, usersHost, usersPort, filesHost, filesPort]
+    }
+
+    private func updateAddressConsent() {
+        tlsBypass.updateAddresses(
+            identityHost: identityHost,
+            identityPort: identityPort,
+            usersHost: usersHost,
+            usersPort: usersPort,
+            filesHost: filesHost,
+            filesPort: filesPort
+        )
     }
 
     /// Нормализованный хост: без схемы, слешей и пробелов. Нил — пустой.

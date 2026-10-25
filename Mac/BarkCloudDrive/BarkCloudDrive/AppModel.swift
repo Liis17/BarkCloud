@@ -47,8 +47,10 @@ final class AppModel {
 
     // MARK: - Server setup
 
-    func saveServer(_ config: ServerConfig) {
+    func saveServer(_ config: ServerConfig) async {
         config.persist()
+        await grpc.shutdown()
+        await InsecureHTTP.clearCaches()
         otpRequired = false
         errorMessage = nil
         refreshPhase()
@@ -90,7 +92,7 @@ final class AppModel {
     private func clearSession() async {
         await auth.logout()
         session.clearSession()
-        InsecureHTTP.clearCaches()
+        await InsecureHTTP.clearCaches()
         await grpc.shutdown()
         await domain.purge()
         AppModel.clearProviderCache()
