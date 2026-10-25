@@ -11,9 +11,6 @@ using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
 
-using OtpNet;
-
-
 using OtpNotCreatedException = BarkCloud.Identity.Persistence.Exceptions.OtpNotCreatedException;
 using OtpType = BarkCloud.Identity.Domain.OtpType;
 
@@ -24,6 +21,7 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
     private readonly UserContext _userContext;
     private readonly IdentityContext _context;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
+    private readonly IPasswordsStorage _passwordsStorage;
     private readonly INotificationOutbox _notificationOutbox;
     private readonly RequestContext _requestContext;
     private readonly MetricsCollector _metrics;
@@ -31,12 +29,13 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
     private readonly ILogger<ConfirmOtpVerificationCommandHandler> _logger;
 
     public ConfirmOtpVerificationCommandHandler(UserContext userContext, IdentityContext context, IAuthPropertiesStorage authPropertiesStorage,
-        INotificationOutbox notificationOutbox, RequestContext requestContext, MetricsCollector metrics,
+        IPasswordsStorage passwordsStorage, INotificationOutbox notificationOutbox, RequestContext requestContext, MetricsCollector metrics,
         IAuthRateLimiter rateLimiter, ILogger<ConfirmOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _context = context;
         _authPropertiesStorage = authPropertiesStorage;
+        _passwordsStorage = passwordsStorage;
         _notificationOutbox = notificationOutbox;
         _requestContext = requestContext;
         _metrics = metrics;
@@ -55,10 +54,14 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
         string newMethod;
         ValidatedEmailAuthCode? validatedEmailCode = null;
         string? verifiedSecret = null;
+        ValidatedTotpCode? verifiedTotp = null;
+        long pendingSecurityVersion = 0;
 
         try
         {
             var otpConfigs = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId, cancellationToken);
+            if (otpConfigs is null)
+                throw new BarkCloud.Shared.Exceptions.Identity.OtpNotCreatedException();
 
             // Определяем предыдущий метод 2FA до активации нового
             if (otpConfigs.OtpEnabled) oldMethod = "Authenticator приложение";
@@ -83,11 +86,14 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
                 // Шестизначный код под токеном: перебор ограничен по аккаунту.
                 await _rateLimiter.EnsureTotpAttemptAsync(_userContext.UserId);
 
-                var totp = new Totp(Base32Encoding.ToBytes(pendingSecret));
+                var securityVersion = await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken);
+                pendingSecurityVersion = otpConfigs.PendingOtpSecurityStateVersion;
+                if (securityVersion != otpConfigs.PendingOtpSecurityStateVersion)
+                    throw new NotValidOtpCodeException();
+                verifiedTotp = TotpVerificationService.Verify(_userContext.UserId, pendingSecret,
+                    otpConfigs.OtpSecretGeneration + 1, request.OtpCode);
 
-                var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
-
-                if (!isValid)
+                if (verifiedTotp is null)
                 {
                     _metrics.Increment("otp_authenticator_failed");
                     _metrics.Increment("otp_confirmation_failed");
@@ -145,6 +151,19 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
                 await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
+                    await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
+                    var currentSecurityVersion = await _passwordsStorage.GetSecurityStateVersion(
+                        _userContext.UserId, cancellationToken);
+                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+                        _userContext.UserId, cancellationToken);
+                    if (verifiedSecret is not null
+                        && (currentSecurityVersion != pendingSecurityVersion
+                            || currentAuthProperties?.SelectedOtpType != OtpType.Authenticator))
+                        throw new NotValidOtpCodeException();
+                    if (validatedEmailCode is not null
+                        && currentAuthProperties?.SelectedOtpType != OtpType.Email)
+                        throw new NotValidOtpCodeException();
+
                     if (validatedEmailCode is not null
                         && !await _authPropertiesStorage.TryConsumeValidatedEmailAuthCode(validatedEmailCode, cancellationToken))
                     {
@@ -153,7 +172,8 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
 
                     if (verifiedSecret is not null
                         && !await _authPropertiesStorage.ActivatePendingOtpSecret(
-                            _userContext.UserId, verifiedSecret, cancellationToken))
+                            _userContext.UserId, verifiedSecret, cancellationToken,
+                            verifiedTotp?.TimeStep ?? -1, currentSecurityVersion))
                     {
                         _metrics.Increment("otp_authenticator_failed");
                         _metrics.Increment("otp_confirmation_failed");

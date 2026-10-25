@@ -72,7 +72,7 @@ public sealed class PasswordResetGateway
     }
 
     public async Task<PasswordResetResult> ConfirmAsync(
-        HttpContext http, string resetId, string code, string newPassword, bool revokeOtherSessions,
+        HttpContext http, string resetId, string code, string newPassword, bool revokeOtherSessions, bool resetPasskeys,
         string? authenticatorCode = null, CancellationToken cancellationToken = default)
     {
         if (!IsSixDigitCode(code))
@@ -92,6 +92,7 @@ public sealed class PasswordResetGateway
                 OtpCode = code,
                 NewPassword = newPassword,
                 RevokeOtherSessions = revokeOtherSessions,
+                ResetPasskeys = resetPasskeys,
                 AuthenticatorCode = authenticatorCode ?? string.Empty
             }, device.ToMetadata(), cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();

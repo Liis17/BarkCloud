@@ -4,6 +4,7 @@ using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.EnableOtpVerification;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Tests._Helpers;
@@ -12,8 +13,6 @@ using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 using BarkCloud.TestKit;
-
-using MassTransit;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -25,7 +24,7 @@ using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 namespace BarkCloud.Identity.Tests.Features.EnableOtpVerification;
 
-public class EnableOtpVerificationCommandHandlerTests
+public class EnableOtpVerificationCommandHandlerTests : IDisposable
 {
     private const string Password = "correct-password";
     private static readonly string PasswordHash = PasswordHasher.HashPassword(Password);
@@ -33,20 +32,19 @@ public class EnableOtpVerificationCommandHandlerTests
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
-    private readonly Mock<NotificationQueueSender> _notifications;
-    private readonly Mock<LocationClient> _location;
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
+    private readonly Mock<INotificationOutbox> _notificationOutbox = new();
+    private readonly SqliteIdentityContext _database = new();
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger = NullLogger<EnableOtpVerificationCommandHandler>.Instance;
 
     public EnableOtpVerificationCommandHandlerTests()
     {
-        _notifications = new Mock<NotificationQueueSender>(Mock.Of<IPublishEndpoint>(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
-        _notifications.Setup(n => n.SendNotification(It.IsAny<Notification>())).Returns(Task.CompletedTask);
-        _location = new Mock<LocationClient>(new HttpClient(), new MetricsCollector(), NullLogger<LocationClient>.Instance);
-        _location.Setup(c => c.GetLocation(It.IsAny<string>())).ReturnsAsync((IpLocation?)null);
         _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync(PasswordHash);
         _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
+        _authProps.Setup(s => s.GetUserAuthPropertiesSnapshot(42, It.IsAny<CancellationToken>()))
+            .Returns((long userId, CancellationToken cancellationToken) =>
+                _authProps.Object.GetUserAuthProperties(userId, cancellationToken));
     }
 
     private static IConfiguration EmailConfig(bool enabled) => new ConfigurationBuilder()
@@ -56,15 +54,18 @@ public class EnableOtpVerificationCommandHandlerTests
     private EnableOtpVerificationCommandHandler CreateSut(RequestContext? ctx = null, UserContext? user = null, bool emailEnabled = true)
         => new(user ?? UserContextFactory.Create(42),
             _authProps.Object,
+            _passwords.Object,
+            _database.Context,
             new ReauthPasswordVerifier(_authProps.Object, _passwords.Object),
             _usersClient.Object,
-            _notifications.Object,
+            _notificationOutbox.Object,
             ctx ?? FullContext(),
-            _location.Object,
             _metrics,
             _rateLimiter.Object,
             EmailConfig(emailEnabled),
             _logger);
+
+    public void Dispose() => _database.Dispose();
 
     private static RequestContext FullContext() => new()
     {
@@ -135,6 +136,8 @@ public class EnableOtpVerificationCommandHandlerTests
             OtpEnabled = true,
             OtpSecret = Base32Encoding.ToString(activeKey)
         });
+        _authProps.Setup(s => s.TryConsumeTotpStep(42, Base32Encoding.ToString(activeKey), 0,
+            It.IsAny<long>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var response = await CreateSut().Handle(new EnableOtpVerificationCommand
         {
@@ -279,17 +282,25 @@ public class EnableOtpVerificationCommandHandlerTests
             }));
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
         _authProps
-            .Setup(s => s.TryIssueEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, It.IsAny<string>()))
+            .Setup(s => s.TryIssueEmailAuthCodeWithSnapshot(42, EmailAuthCodePurpose.EnableEmailOtp,
+                It.IsAny<string>(), It.IsAny<CancellationToken>(), null))
+            .ReturnsAsync(new EmailAuthCodeIssueResult(true, DateTime.UtcNow, 60));
+        _notificationOutbox
+            .Setup(s => s.EnqueueAsync(42, NotificationType.ConfirmationOtpEmail, "Код подтверждения для привязки",
+                It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var response = await CreateSut().Handle(
             new EnableOtpVerificationCommand { OptType = OtpTypeId.Email }, default);
 
         response.OtpQr.Should().BeEmpty();
-        _authProps.Verify(s => s.TryIssueEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, It.IsAny<string>()), Times.Once);
+        _authProps.Verify(s => s.TryIssueEmailAuthCodeWithSnapshot(42, EmailAuthCodePurpose.EnableEmailOtp,
+            It.IsAny<string>(), It.IsAny<CancellationToken>(), null), Times.Once);
         _authProps.Verify(s => s.UpdateOptType(OtpType.Email, 42), Times.Once);
-        _notifications.Verify(n => n.SendNotification(It.Is<EmailNotification>(
-            e => e.Type == NotificationType.ConfirmationOtpEmail)), Times.Once);
+        _notificationOutbox.Verify(s => s.EnqueueAsync(42, NotificationType.ConfirmationOtpEmail,
+            "Код подтверждения для привязки",
+            It.Is<Dictionary<string, string>>(payload => payload.ContainsKey("confirmation_code")),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -307,14 +318,16 @@ public class EnableOtpVerificationCommandHandlerTests
             }));
         _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync((AuthUserProperty?)null);
         _authProps
-            .Setup(s => s.TryIssueEmailAuthCode(42, EmailAuthCodePurpose.EnableEmailOtp, It.IsAny<string>()))
-            .ReturnsAsync(false);
+            .Setup(s => s.TryIssueEmailAuthCodeWithSnapshot(42, EmailAuthCodePurpose.EnableEmailOtp,
+                It.IsAny<string>(), It.IsAny<CancellationToken>(), null))
+            .ReturnsAsync(new EmailAuthCodeIssueResult(false, DateTime.UtcNow, 30));
 
         var response = await CreateSut().Handle(
             new EnableOtpVerificationCommand { OptType = OtpTypeId.Email }, default);
 
         response.OtpQr.Should().BeEmpty();
-        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _notificationOutbox.Verify(s => s.EnqueueAsync(It.IsAny<long>(), It.IsAny<NotificationType>(),
+            It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -329,7 +342,8 @@ public class EnableOtpVerificationCommandHandlerTests
 
         await act.Should().ThrowAsync<EmailServiceDisabledException>();
         _authProps.Verify(s => s.UpdateOptType(OtpType.Email, It.IsAny<long>()), Times.Never);
-        _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
+        _notificationOutbox.Verify(s => s.EnqueueAsync(It.IsAny<long>(), It.IsAny<NotificationType>(),
+            It.IsAny<string>(), It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

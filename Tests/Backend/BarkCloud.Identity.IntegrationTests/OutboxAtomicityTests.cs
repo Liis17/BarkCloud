@@ -38,7 +38,8 @@ public class OutboxAtomicityTests
         var metrics = new MetricsCollector();
         var outbox = new NotificationOutbox(context, new ConfigurationBuilder().Build(), metrics,
             NullLogger<NotificationOutbox>.Instance);
-        var handler = new ForceSetPasswordServerCommandHandler(new PasswordsStorage(context), outbox,
+        var handler = new ForceSetPasswordServerCommandHandler(new PasswordsStorage(context),
+            new WebAuthnStorage(context), new RefreshTokensStorage(context, new JwtSettings()), outbox,
             NullLogger<ForceSetPasswordServerCommandHandler>.Instance, context, metrics);
 
         await FluentActions.Awaiting(() => handler.Handle(
@@ -104,6 +105,7 @@ public class OutboxAtomicityTests
         var handler = new SetPasswordCommandHandler(
             UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, new RequestContext()), metrics,
             NullLogger<SetPasswordCommandHandler>.Instance, context);
 
@@ -140,6 +142,7 @@ public class OutboxAtomicityTests
             new PasswordsStorage(context),
             new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, requestContext),
             metrics,
             NullLogger<SetPasswordCommandHandler>.Instance,
@@ -179,6 +182,7 @@ public class OutboxAtomicityTests
         var handler = new SetPasswordCommandHandler(
             UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, new RequestContext()), metrics,
             NullLogger<SetPasswordCommandHandler>.Instance, context);
 
@@ -218,6 +222,7 @@ public class OutboxAtomicityTests
         var handler = new SetPasswordCommandHandler(
             UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, new RequestContext()), metrics,
             NullLogger<SetPasswordCommandHandler>.Instance, context);
 

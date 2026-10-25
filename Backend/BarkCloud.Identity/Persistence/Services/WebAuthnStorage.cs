@@ -50,6 +50,9 @@ public class WebAuthnStorage : IWebAuthnStorage
         return deleted > 0;
     }
 
+    public Task<int> RemoveAllCredentials(long userId, CancellationToken cancellationToken = default)
+        => _context.WebAuthnCredentials.Where(x => x.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+
     public async Task<byte[]> GetOrCreateUserHandle(long userId)
     {
         var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId);

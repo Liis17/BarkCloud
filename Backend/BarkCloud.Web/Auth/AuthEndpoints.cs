@@ -622,6 +622,7 @@ public static class AuthEndpoints
             flow.FormMessage = null;
             flow.FieldErrors.Clear();
             flow.RevokeOtherSessions = true;
+            flow.ResetPasskeys = true;
             flow.AuthenticatorRequired = false;
             using var cancellation = lease is null
                 ? CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted, flow.LifetimeCancellation.Token)
@@ -674,13 +675,15 @@ public static class AuthEndpoints
                     registrationEnabled, flow.Screen, flow, formError: "Начните восстановление заново."));
 
             var revokeSessions = IsChecked(form, "revoke_sessions");
+            var resetPasskeys = IsChecked(form, "reset_passkeys");
             flow.RevokeOtherSessions = revokeSessions;
+            flow.ResetPasskeys = resetPasskeys;
             flow.FormError = null;
             flow.FormMessage = null;
             flow.FieldErrors.Clear();
             using var cancellation = LinkRequestAndFlow(http, lease);
             var result = await reset.ConfirmAsync(http, flow.ResetId, form["otp"].ToString(),
-                form["password"].ToString(), revokeSessions, form["authenticator_code"].ToString(),
+                form["password"].ToString(), revokeSessions, resetPasskeys, form["authenticator_code"].ToString(),
                 cancellation.Token);
             if (result.Outcome == PasswordResetOutcome.Success)
             {
@@ -891,7 +894,7 @@ public static class AuthEndpoints
             AuthFlowKind.Registration => new AuthPageValues(
                 Username: flow.Username, Email: flow.Email, FirstName: flow.FirstName, LastName: flow.LastName),
             AuthFlowKind.PasswordReset => new AuthPageValues(
-                Login: flow.Login, RevokeSessions: flow.RevokeOtherSessions),
+                Login: flow.Login, RevokeSessions: flow.RevokeOtherSessions, ResetPasskeys: flow.ResetPasskeys),
             AuthFlowKind.SessionPending => new AuthPageValues(
                 Username: flow.Username, Email: flow.Email, FirstName: flow.FirstName, LastName: flow.LastName),
             _ => new AuthPageValues()

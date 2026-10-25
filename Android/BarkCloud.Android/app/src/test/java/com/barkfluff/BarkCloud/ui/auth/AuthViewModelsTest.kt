@@ -68,6 +68,30 @@ class AuthViewModelsTest {
         time = 121001; vm.next(); advanceUntilIdle()
         coVerify(exactly = 2) { repository.requestPasswordReset(any()) }
     }
+    @Test fun `reset choices default on and survive errors and resend`() = runTest {
+        coEvery { repository.requestPasswordReset("alice") } returns "reset"
+        coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any(), any()) } throws
+            AuthFlowException(AuthFailureKind.INVALID_CODE, "bad code")
+        var time = 1000L
+        val vm = ResetPasswordViewModel(repository, now = { time })
+        assertTrue(vm.state.value.resetPasskeys)
+        assertTrue(vm.state.value.revokeOtherSessions)
+
+        vm.loginChanged("alice"); vm.next(); advanceUntilIdle()
+        vm.codeChanged("123456"); vm.next()
+        vm.passwordChanged("password123"); vm.repeatChanged("password123")
+        vm.resetPasskeysChanged(false); vm.revokeChanged(false)
+        vm.next(); advanceUntilIdle()
+
+        assertFalse(vm.state.value.resetPasskeys)
+        assertFalse(vm.state.value.revokeOtherSessions)
+        coVerify { repository.confirmPasswordReset("reset", "123456", "password123", false, "", false) }
+
+        time = 61001L
+        vm.resend(); advanceUntilIdle()
+        assertFalse(vm.state.value.resetPasskeys)
+        assertFalse(vm.state.value.revokeOtherSessions)
+    }
     @Test fun `authenticator requirement keeps password step and resubmits both codes`() = runTest {
         coEvery { repository.requestPasswordReset("alice") } returns "reset"
         coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any()) } throws
