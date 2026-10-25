@@ -3,6 +3,7 @@ using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Identity;
 
 using Grpc.Core;
+using Google.Protobuf.WellKnownTypes;
 
 using Microsoft.AspNetCore.Authorization;
 
@@ -27,4 +28,13 @@ public class SearchApiService(UnifiedSearchService search) : SearchApi.SearchApi
         => Guid.TryParse(value, out var fileId)
             ? fileId
             : throw new RpcException(new Status(StatusCode.InvalidArgument, "Некорректный id файла"));
+
+    public override Task<UserTagList> ListUserTags(Empty request, ServerCallContext context)
+        => search.ListUserTags(context.CancellationToken);
+
+    public override Task<UserTagData> SaveUserTag(SaveUserTagRequest request, ServerCallContext context)
+        => search.SaveUserTag(request, context.CancellationToken);
+
+    public override Task<Empty> DeleteUserTag(DeleteUserTagRequest request, ServerCallContext context)
+        => search.DeleteUserTag(request.Id, context.CancellationToken);
 }

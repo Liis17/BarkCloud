@@ -28,7 +28,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 
 | Контракт | Поведение |
 |---|---|
-| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.14.7`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
+| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.15.0`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
 | Cookie `bark_at`, `bark_rt`, `bark_did` | Access-, refresh- и device-id cookie. Все HttpOnly, режим Secure задаётся `App:CookieSecure` |
 | `GET /login`, `GET /register`, `GET /forgot` | Отдают лёгкую HTML-оболочку и state для React auth entry. `Accept: application/json` возвращает сам state; успешная операция возвращает `{ "redirectTo": "/photos" }` |
 | `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
@@ -54,6 +54,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 - Большинство `/api/*`-маршрутов требует пользовательскую сессию. Неизвестный `/api/*` возвращает 404; остальные маршруты SPA обслуживаются fallback-маршрутом и требуют сессию, кроме публичных страниц ссылок.
 - HTTP-клиент `files-upload` проксирует скачивание и просмотр файлов из Files со сроком по умолчанию (100 с, действует до получения заголовков). Legacy-прокси `POST /api/files/upload` отсутствует. Браузер управляет Upload 2.0 через `/api/files/uploads` и передаёт части прямо в Files через `/file-upload/`.
 - Настройки, обслуживание, просмотр текста и поток загрузки описаны отдельно: [[Web/Settings]], [[Web/SystemUpdates]], [[Web/TextViewer]], [[Backend/ResumableUpload]].
+- Свойства файла (`ClientApp/src/components/ui/PropertiesModal.tsx`, `SearchMetadataEditor.tsx`) показывают имя заголовком, однострочный поисковый алиас и цветные бейджи тегов. Кнопка «+» открывает личный каталог с поиском первой строкой, исключая назначенные теги; снятие бейджа и выбор применяются вместе с алиасом через `PUT /api/files/{fileId}/search-metadata` по кнопке «Сохранить». Лимит — 20 тегов и 120 символов алиаса.
 
 ## Очередь загрузок в шапке
 

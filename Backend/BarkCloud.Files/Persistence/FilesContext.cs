@@ -69,6 +69,7 @@ public class FilesContext : DbContext
     public DbSet<FileSearchAlias> FileSearchAliases { get; set; }
 
     public DbSet<FileTag> FileTags { get; set; }
+    public DbSet<UserTag> UserTags { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -326,6 +327,15 @@ public class FilesContext : DbContext
             b.Property(x => x.NormalizedValue).HasMaxLength(120);
             b.HasIndex(x => new { x.OwnerId, x.NormalizedValue });
             b.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserTag>(b =>
+        {
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.OwnerId, x.NormalizedName }).IsUnique();
+            b.Property(x => x.Name).HasMaxLength(50);
+            b.Property(x => x.NormalizedName).HasMaxLength(50);
+            b.Property(x => x.Color).HasMaxLength(7);
         });
 
         modelBuilder.Entity<FileTag>(b =>
