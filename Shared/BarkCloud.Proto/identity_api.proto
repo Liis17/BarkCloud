@@ -146,6 +146,7 @@ message ConfirmResetPasswordRequest {
   string otp_code = 2; // код подтверждения
   string new_password = 3; // новый пароль — устанавливается атомарно при подтверждении
   optional bool revoke_other_sessions = 4; // завершить остальные сессии (если не передано — true)
+  string authenticator_code = 5; // код Authenticator (TOTP); обязателен для email-сброса при включённом Authenticator
 }
 
 message ConfirmResetPasswordResponse {

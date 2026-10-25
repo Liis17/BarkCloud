@@ -628,6 +628,101 @@ public sealed class AuthEndpointsTests
             It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
+    [Fact]
+    public async Task ResetWithAuthenticatorRequiredShowsTotpFieldAndCompletesWithBothCodes()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Identity.Setup(x => x.ResetPasswordAsync(It.IsAny<ResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ResetPasswordResponse { ResetId = "reset-with-2fa" }));
+        fixture.Identity.SetupSequence(x => x.ConfirmResetPasswordAsync(It.IsAny<ConfirmResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Throws(OtpRequired(string.Empty, 0, method: "authenticator"))
+            .Throws(RpcFailure(new NotValidOtpCodeException().ErrorCode))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmResetPasswordResponse
+            {
+                AccessToken = new Token { Value = "private-access-token" },
+                RefreshToken = new Token
+                {
+                    Value = "private-refresh-token",
+                    ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(30))
+                }
+            }));
+
+        using var initial = await fixture.GetStateAsync("/forgot");
+        var csrf = initial.RootElement.GetProperty("csrfToken").GetString()!;
+        using var begin = await fixture.PostStateAsync("/forgot", csrf,
+            Fields(("login", "known@example.test")));
+        var flowId = begin.Json.RootElement.GetProperty("flowId").GetString()!;
+
+        using var needsTotp = await fixture.PostStateAsync("/forgot/confirm",
+            begin.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("password", "new-secret-password")));
+        var state = needsTotp.Json.RootElement;
+        state.GetProperty("screen").GetString().Should().Be("reset");
+        state.GetProperty("authenticatorRequired").GetBoolean().Should().BeTrue();
+        state.GetProperty("formError").GetString().Should().Be("Введите код из приложения-аутентификатора, чтобы завершить восстановление.");
+        state.GetProperty("fieldErrors").GetProperty("authenticator").GetString().Should().NotBeNullOrEmpty();
+        state.TryGetProperty("clearOtp", out _).Should().BeFalse("email-код уже проверен и не очищается");
+        state.TryGetProperty("fieldErrors", out var errors).Should().BeTrue();
+        errors.TryGetProperty("otp", out _).Should().BeFalse();
+
+        // Неверный TOTP: состояние сохраняется, email-код не сбрасывается, cooldown не запускается.
+        using var wrongTotp = await fixture.PostStateAsync("/forgot/confirm",
+            needsTotp.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("authenticator_code", "000000"),
+                ("password", "new-secret-password")));
+        var invalidState = wrongTotp.Json.RootElement;
+        invalidState.GetProperty("screen").GetString().Should().Be("reset");
+        invalidState.GetProperty("authenticatorRequired").GetBoolean().Should().BeTrue();
+        invalidState.TryGetProperty("clearOtp", out _).Should().BeFalse();
+        invalidState.GetProperty("fieldErrors").TryGetProperty("otp", out _).Should().BeFalse();
+        invalidState.GetProperty("fieldErrors").GetProperty("authenticator").GetString().Should().NotBeNullOrEmpty();
+
+        using var done = await fixture.PostStateAsync("/forgot/confirm",
+            wrongTotp.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("authenticator_code", "654321"),
+                ("password", "new-secret-password")));
+        done.Json.RootElement.GetProperty("redirectTo").GetString().Should().Be("/photos");
+
+        fixture.Identity.Verify(x => x.ConfirmResetPasswordAsync(
+            It.Is<ConfirmResetPasswordRequest>(request =>
+                request.OtpCode == "123456" && request.AuthenticatorCode == "654321"
+                && request.ResetId == "reset-with-2fa"),
+            It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetResendClearsAuthenticatorRequirement()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Identity.SetupSequence(x => x.ResetPasswordAsync(It.IsAny<ResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ResetPasswordResponse { ResetId = "reset-a" }))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ResetPasswordResponse { ResetId = "reset-b" }));
+        fixture.Identity.Setup(x => x.ConfirmResetPasswordAsync(It.IsAny<ConfirmResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Throws(OtpRequired(string.Empty, 0, method: "authenticator"));
+
+        using var initial = await fixture.GetStateAsync("/forgot");
+        using var begin = await fixture.PostStateAsync("/forgot",
+            initial.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("login", "known@example.test")));
+        var flowId = begin.Json.RootElement.GetProperty("flowId").GetString()!;
+
+        using var needsTotp = await fixture.PostStateAsync("/forgot/confirm",
+            begin.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("password", "new-secret-password")));
+        needsTotp.Json.RootElement.GetProperty("authenticatorRequired").GetBoolean().Should().BeTrue();
+
+        using var resend = await fixture.PostStateAsync("/forgot/resend",
+            needsTotp.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId)));
+        var resent = resend.Json.RootElement;
+        resent.GetProperty("screen").GetString().Should().Be("reset");
+        resent.TryGetProperty("authenticatorRequired", out _).Should().BeFalse("новый код начинает email-этап заново");
+    }
+
     private static AuthResponse SuccessAuthResponse() => new()
     {
         AccessToken = new Token { Value = "private-access-token", ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddHours(1)) },

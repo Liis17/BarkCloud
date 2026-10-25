@@ -13,5 +13,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         public string NewPassword { get; set; }
 
         public bool RevokeOtherSessions { get; set; } = true;
+
+        /// <summary>Код Authenticator (TOTP). Требуется для email-сброса при включённом Authenticator.</summary>
+        public string? AuthenticatorCode { get; set; }
     }
 }

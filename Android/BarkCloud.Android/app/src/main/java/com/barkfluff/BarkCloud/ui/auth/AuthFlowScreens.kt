@@ -116,6 +116,11 @@ fun ResetPasswordScreen(viewModel: ResetPasswordViewModel, server: String, onBac
                     ResendCode(maxOf(state.resendAt, state.retryAt), !state.loading, viewModel::resend)
                 }
                 2 -> {
+                    if (state.authenticatorRequired) {
+                        Text("Аккаунт защищён двухфакторной аутентификацией. Введите текущий код из приложения.",
+                            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        VerificationCodeField(state.authenticatorCode, viewModel::authenticatorChanged, !state.loading)
+                    }
                     PasswordField(state.password, viewModel::passwordChanged, "Новый пароль", !state.loading, true)
                     PasswordStrength(state.password)
                     PasswordField(state.repeatedPassword, viewModel::repeatChanged, "Повторите пароль", !state.loading, true, viewModel::next)
