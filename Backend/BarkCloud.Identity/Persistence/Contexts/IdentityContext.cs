@@ -28,6 +28,8 @@ public class IdentityContext : DbContext
 
     public DbSet<PendingNotification> PendingNotifications { get; set; }
 
+    public DbSet<ReauthPermission> ReauthPermissions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -57,5 +59,12 @@ public class IdentityContext : DbContext
 
         modelBuilder.Entity<PendingNotification>()
             .HasIndex(x => x.NextAttemptAt);
+
+        modelBuilder.Entity<ReauthPermission>()
+            .HasIndex(x => x.PermissionTokenHash)
+            .IsUnique();
+
+        modelBuilder.Entity<ReauthPermission>()
+            .HasIndex(x => x.ExpiresAt);
     }
 }

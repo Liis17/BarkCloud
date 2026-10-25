@@ -34,7 +34,8 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     /// <summary>
     /// Сохраняет секрет Authenticator как ожидающий подтверждения. Действующие <c>OtpSecret</c>/<c>OtpEnabled</c> не меняются.
     /// </summary>
-    public async Task SetPendingOtpSecret(long userId, string secretKey, DateTime expiresAt, CancellationToken cancellationToken = default)
+    public async Task SetPendingOtpSecret(long userId, string secretKey, DateTime expiresAt,
+        CancellationToken cancellationToken = default, long securityStateVersion = 0)
     {
         var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
@@ -45,7 +46,8 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
                 OtpEnabled = false,
                 UserId = userId,
                 PendingOtpSecret = secretKey,
-                PendingOtpSecretExpiresAt = expiresAt
+                PendingOtpSecretExpiresAt = expiresAt,
+                PendingOtpSecurityStateVersion = securityStateVersion
             };
 
             await _context.AuthUserProperties.AddAsync(props, cancellationToken);
@@ -56,6 +58,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
 
         props.PendingOtpSecret = secretKey;
         props.PendingOtpSecretExpiresAt = expiresAt;
+        props.PendingOtpSecurityStateVersion = securityStateVersion;
 
         await _context.SaveChangesAsync(cancellationToken);
     }
@@ -64,15 +67,36 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     /// Атомарно делает подтверждённый ожидающий секрет действующим и включает Authenticator.
     /// Возвращает false, если ожидающий секрет успели заменить или сбросить после проверки кода.
     /// </summary>
-    public async Task<bool> ActivatePendingOtpSecret(long userId, string verifiedSecret, CancellationToken cancellationToken = default)
+    public async Task<bool> ActivatePendingOtpSecret(long userId, string verifiedSecret,
+        CancellationToken cancellationToken = default, long acceptedTotpStep = -1,
+        long expectedSecurityStateVersion = 0)
     {
         var updated = await _context.AuthUserProperties
-            .Where(x => x.UserId == userId && x.PendingOtpSecret == verifiedSecret)
+            .Where(x => x.UserId == userId && x.PendingOtpSecret == verifiedSecret
+                        && x.SelectedOtpType == OtpType.Authenticator
+                        && x.PendingOtpSecurityStateVersion == expectedSecurityStateVersion
+                        && x.PendingOtpSecretExpiresAt > DateTime.UtcNow)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.OtpSecret, x => x.PendingOtpSecret)
                 .SetProperty(x => x.OtpEnabled, true)
+                .SetProperty(x => x.OtpSecretGeneration, x => x.OtpSecretGeneration + 1)
+                .SetProperty(x => x.LastAcceptedTotpStep,
+                    acceptedTotpStep < 0 ? (long?)null : acceptedTotpStep)
                 .SetProperty(x => x.PendingOtpSecret, (string?)null)
-                .SetProperty(x => x.PendingOtpSecretExpiresAt, (DateTime?)null), cancellationToken);
+                .SetProperty(x => x.PendingOtpSecretExpiresAt, (DateTime?)null)
+                .SetProperty(x => x.PendingOtpSecurityStateVersion, 0), cancellationToken);
+
+        return updated == 1;
+    }
+
+    public async Task<bool> TryConsumeTotpStep(long userId, string secret, long generation, long timeStep,
+        CancellationToken cancellationToken = default)
+    {
+        var updated = await _context.AuthUserProperties
+            .Where(x => x.UserId == userId && x.OtpEnabled && x.OtpSecret == secret
+                        && x.OtpSecretGeneration == generation
+                        && (x.LastAcceptedTotpStep == null || x.LastAcceptedTotpStep < timeStep))
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastAcceptedTotpStep, timeStep), cancellationToken);
 
         return updated == 1;
     }
@@ -166,6 +190,15 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         return await _context.AuthUserProperties.Where(x => x.UserId == userId).FirstOrDefaultAsync(cancellationToken);
     }
 
+    /// <summary>Читает независимый снимок настроек, актуальный после ожидания блокировки владельца.</summary>
+    public async Task<AuthUserProperty?> GetUserAuthPropertiesSnapshot(long userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.AuthUserProperties.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task DisableOtp(long userId, CancellationToken cancellationToken = default)
     {
         var props = await _context.AuthUserProperties.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
@@ -209,7 +242,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     }
 
     public async Task<EmailAuthCodeIssueResult> TryIssueEmailAuthCodeWithSnapshot(long userId,
-        EmailAuthCodePurpose purpose, string code, CancellationToken cancellationToken = default)
+        EmailAuthCodePurpose purpose, string code, CancellationToken cancellationToken = default, Guid? requestId = null)
     {
         var now = DateTime.UtcNow;
         var cooldownBorder = now - EmailAuthCodeResendCooldown;
@@ -218,11 +251,13 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         var updated = await _context.AuthUserProperties
             .Where(x => x.UserId == userId
                         && (x.EmailAuthCodePurpose != purpose
+                            || x.EmailAuthCodeRequestId != requestId
                             || x.EmailAuthCodeIssuedAt == null
                             || x.EmailAuthCodeIssuedAt <= cooldownBorder))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.LastEmailAuthCode, code)
                 .SetProperty(x => x.EmailAuthCodePurpose, (EmailAuthCodePurpose?)purpose)
+                .SetProperty(x => x.EmailAuthCodeRequestId, requestId)
                 .SetProperty(x => x.EmailAuthCodeIssuedAt, (DateTime?)now)
                 .SetProperty(x => x.EmailAuthCodeExpiresAt, (DateTime?)expiresAt)
                 .SetProperty(x => x.EmailAuthCodeAttempts, 0), cancellationToken);
@@ -234,6 +269,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
 
         var existingIssue = await _context.AuthUserProperties.AsNoTracking()
             .Where(x => x.UserId == userId && x.EmailAuthCodePurpose == purpose
+                        && x.EmailAuthCodeRequestId == requestId
                         && x.EmailAuthCodeIssuedAt != null)
             .Select(x => x.EmailAuthCodeIssuedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -251,6 +287,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
             UserId = userId,
             LastEmailAuthCode = code,
             EmailAuthCodePurpose = purpose,
+            EmailAuthCodeRequestId = requestId,
             EmailAuthCodeIssuedAt = now,
             EmailAuthCodeExpiresAt = expiresAt
         }, cancellationToken);
@@ -266,7 +303,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
     /// Резервирует попытку для неизменяемого снимка выдачи и возвращает его, только если введённый код совпал.
     /// </summary>
     public async Task<ValidatedEmailAuthCode?> TryValidateAndReserveEmailAuthCode(long userId, EmailAuthCodePurpose purpose,
-        string? code, CancellationToken cancellationToken = default)
+        string? code, CancellationToken cancellationToken = default, Guid? requestId = null)
     {
         if (string.IsNullOrEmpty(code))
         {
@@ -278,6 +315,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         var issuance = await _context.AuthUserProperties
             .AsNoTracking()
             .Where(x => x.UserId == userId && x.EmailAuthCodePurpose == purpose
+                        && x.EmailAuthCodeRequestId == requestId
                         && x.LastEmailAuthCode != null && x.EmailAuthCodeIssuedAt != null
                         && x.EmailAuthCodeExpiresAt > now && x.EmailAuthCodeAttempts < EmailAuthCodeMaxAttempts)
             .Select(x => new
@@ -297,6 +335,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         var reserved = await _context.AuthUserProperties
             .Where(x => x.UserId == userId
                         && x.EmailAuthCodePurpose == purpose
+                        && x.EmailAuthCodeRequestId == requestId
                         && x.LastEmailAuthCode == issuance.LastEmailAuthCode
                         && x.EmailAuthCodeIssuedAt == issuance.IssuedAt
                         && x.EmailAuthCodeExpiresAt == issuance.ExpiresAt
@@ -315,7 +354,8 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
             return null;
         }
 
-        return new ValidatedEmailAuthCode(userId, purpose, issuance.LastEmailAuthCode!, issuance.IssuedAt, issuance.ExpiresAt);
+        return new ValidatedEmailAuthCode(userId, purpose, issuance.LastEmailAuthCode!, issuance.IssuedAt,
+            issuance.ExpiresAt, requestId);
     }
 
     /// <summary>Потребляет только ранее проверенную выдачу внутри транзакции владельца операции.</summary>
@@ -326,6 +366,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
         var consumed = await _context.AuthUserProperties
             .Where(x => x.UserId == validatedCode.UserId
                         && x.EmailAuthCodePurpose == validatedCode.Purpose
+                        && x.EmailAuthCodeRequestId == validatedCode.RequestId
                         && x.LastEmailAuthCode == validatedCode.Code
                         && x.EmailAuthCodeIssuedAt == validatedCode.IssuedAt
                         && x.EmailAuthCodeExpiresAt == validatedCode.ExpiresAt
@@ -334,6 +375,7 @@ public class AuthPropertiesStorage : IAuthPropertiesStorage
             .ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.LastEmailAuthCode, (string?)null)
                 .SetProperty(x => x.EmailAuthCodePurpose, (EmailAuthCodePurpose?)null)
+                .SetProperty(x => x.EmailAuthCodeRequestId, (Guid?)null)
                 .SetProperty(x => x.EmailAuthCodeIssuedAt, (DateTime?)null)
                 .SetProperty(x => x.EmailAuthCodeExpiresAt, (DateTime?)null)
                 .SetProperty(x => x.EmailAuthCodeAttempts, 0), cancellationToken);

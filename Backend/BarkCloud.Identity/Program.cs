@@ -107,6 +107,7 @@ public class Program
         builder.Services.AddScoped<SessionIssuer>();
         builder.Services.AddScoped<PasswordChangedNotifier>();
         builder.Services.AddScoped<ReauthPasswordVerifier>();
+        builder.Services.AddScoped<ReauthenticationService>();
         builder.Services.AddScoped<IAuthRateLimiter, AuthRateLimiter>();
         builder.Services.AddTransient<IAttemptCountersStorage, AttemptCountersStorage>();
         builder.Services.AddTransient<JwtService>();

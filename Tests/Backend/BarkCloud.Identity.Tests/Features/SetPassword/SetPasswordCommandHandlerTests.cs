@@ -1,5 +1,6 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
+using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.SetPassword;
 using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Identity.Persistence.Contexts;
@@ -24,6 +25,7 @@ public class SetPasswordCommandHandlerTests : IDisposable
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
+    private readonly Mock<IWebAuthnStorage> _webAuthn = new();
     private readonly Mock<PasswordChangedNotifier> _notifier;
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<SetPasswordCommandHandler> _logger = NullLogger<SetPasswordCommandHandler>.Instance;
@@ -36,6 +38,7 @@ public class SetPasswordCommandHandlerTests : IDisposable
         _notifier = new Mock<PasswordChangedNotifier>(Mock.Of<INotificationOutbox>(), new RequestContext());
         _notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).ReturnsAsync(true);
         _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
+        _webAuthn.Setup(s => s.GetCredentialsByUserId(42)).ReturnsAsync([]);
     }
 
     private SetPasswordCommandHandler CreateSut() => new(
@@ -43,6 +46,8 @@ public class SetPasswordCommandHandlerTests : IDisposable
         _passwords.Object,
         _authProps.Object,
         _refreshTokens.Object,
+        _webAuthn.Object,
+        new ReauthenticationService(_database.Context, _passwords.Object),
         _notifier.Object,
         _metrics,
         _logger,
@@ -102,6 +107,21 @@ public class SetPasswordCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_OrdinaryPasswordChangeKeepsPasskeys()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42))
+            .ReturnsAsync(PasswordHasher.HashPassword("oldp"));
+        _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(false);
+        _webAuthn.Setup(s => s.GetCredentialsByUserId(42)).ReturnsAsync([
+            new WebAuthnCredential { Id = 17, UserId = 42, Name = "ключ" }
+        ]);
+
+        await CreateSut().Handle(new SetPasswordCommand { OldPassword = "oldp", NewPassword = "newp" }, default);
+
+        _webAuthn.Verify(s => s.RemoveAllCredentials(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_OutboxStorageBroken_ThrowsAndRollsBack()
     {
         // F19: письмо ставится в очередь после записи пароля; сбой очереди не должен превращаться в ошибку клиенту.
@@ -112,6 +132,7 @@ public class SetPasswordCommandHandlerTests : IDisposable
             NullLogger<NotificationOutbox>.Instance);
         var sut = new SetPasswordCommandHandler(
             UserContextFactory.Create(42), _passwords.Object, _authProps.Object, _refreshTokens.Object,
+            _webAuthn.Object, new ReauthenticationService(database.Context, _passwords.Object),
             new PasswordChangedNotifier(outbox, new RequestContext()), _metrics, _logger, database.Context);
         _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
         _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(false);
@@ -132,6 +153,7 @@ public class SetPasswordCommandHandlerTests : IDisposable
             NullLogger<NotificationOutbox>.Instance);
         var sut = new SetPasswordCommandHandler(
             UserContextFactory.Create(42), _passwords.Object, _authProps.Object, _refreshTokens.Object,
+            _webAuthn.Object, new ReauthenticationService(database.Context, _passwords.Object),
             new PasswordChangedNotifier(outbox, new RequestContext()), _metrics, _logger, database.Context);
         _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
         _passwords.Setup(s => s.UpdateUserPasswordHash(42, It.IsAny<string>())).ReturnsAsync(false);
@@ -158,6 +180,20 @@ public class SetPasswordCommandHandlerTests : IDisposable
         var snap = _metrics.SnapshotAndReset();
         snap.Should().ContainKey("password_changes");
         snap.Should().ContainKey("password_changes_initial");
+    }
+
+    [Fact]
+    public async Task Handle_InitialPasswordWithExistingPasskey_RequiresReauthentication()
+    {
+        _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync((string?)null);
+        _webAuthn.Setup(s => s.GetCredentialsByUserId(42)).ReturnsAsync([
+            new WebAuthnCredential { Id = 17, UserId = 42, Name = "ключ" }
+        ]);
+
+        var act = () => CreateSut().Handle(new SetPasswordCommand { NewPassword = "newp" }, default);
+
+        await act.Should().ThrowAsync<ReauthenticationRequiredException>();
+        _passwords.Verify(s => s.UpdateUserPasswordHash(It.IsAny<long>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

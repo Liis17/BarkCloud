@@ -2,7 +2,9 @@ using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Infrastructure;
+using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
@@ -28,29 +30,32 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
     private readonly UserContext _userContext;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
+    private readonly IPasswordsStorage _passwordsStorage;
+    private readonly IdentityContext _context;
     private readonly ReauthPasswordVerifier _reauthPassword;
     private readonly BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient _usersClient;
-    private readonly NotificationQueueSender _notificationQueueSender;
+    private readonly INotificationOutbox _notificationOutbox;
     private readonly RequestContext _requestContext;
-    private readonly LocationClient _locationClient;
     private readonly MetricsCollector _metrics;
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EnableOtpVerificationCommandHandler> _logger;
 
     public EnableOtpVerificationCommandHandler(UserContext userContext, IAuthPropertiesStorage authPropertiesStorage,
-        ReauthPasswordVerifier reauthPassword, UsersServerApi.UsersServerApiClient usersClient,
-        NotificationQueueSender notificationQueueSender, RequestContext requestContext, LocationClient locationClient,
+        IPasswordsStorage passwordsStorage, IdentityContext context, ReauthPasswordVerifier reauthPassword,
+        UsersServerApi.UsersServerApiClient usersClient,
+        INotificationOutbox notificationOutbox, RequestContext requestContext,
         MetricsCollector metrics, IAuthRateLimiter rateLimiter, IConfiguration configuration,
         ILogger<EnableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _authPropertiesStorage = authPropertiesStorage;
+        _passwordsStorage = passwordsStorage;
+        _context = context;
         _reauthPassword = reauthPassword;
         _usersClient = usersClient;
-        _notificationQueueSender = notificationQueueSender;
+        _notificationOutbox = notificationOutbox;
         _requestContext = requestContext;
-        _locationClient = locationClient;
         _metrics = metrics;
         _rateLimiter = rateLimiter;
         _configuration = configuration;
@@ -98,6 +103,8 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             // Повторная аутентификация владельца: пароль всегда, а при замене действующего Authenticator — ещё и его текущий код.
             // Проверки идут до любых записей: отказ не меняет ни активный, ни ожидающий секрет.
+            var reauthSecurityVersion = await _passwordsStorage.GetSecurityStateVersion(
+                _userContext.UserId, cancellationToken);
             try
             {
                 await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password, cancellationToken);
@@ -113,15 +120,60 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
                 throw;
             }
 
+            ValidatedEmailAuthCode? validatedEmailCode = null;
+            if (oldOptOptions is { OtpEnabled: false, EmailOtpEnabled: true })
+            {
+                if (string.IsNullOrEmpty(request.CurrentEmailCode))
+                {
+                    var code = CodeGenerator.GenerateDigitalCode(6);
+                    await using var emailTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                    await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
+                    if (await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken)
+                        != reauthSecurityVersion)
+                        throw new ReauthenticationRequiredException();
+                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+                        _userContext.UserId, cancellationToken);
+                    if ((currentAuthProperties?.OtpEnabled ?? false) != (oldOptOptions.OtpEnabled)
+                        || (currentAuthProperties?.EmailOtpEnabled ?? false) != oldOptOptions.EmailOtpEnabled
+                        || currentAuthProperties?.SelectedOtpType != oldOptOptions.SelectedOtpType)
+                        throw new ReauthenticationRequiredException();
+                    var issue = await _authPropertiesStorage.TryIssueEmailAuthCodeWithSnapshot(
+                        _userContext.UserId, Domain.EmailAuthCodePurpose.EnableAuthenticator, code, cancellationToken);
+                    if (issue.Sent)
+                    {
+                        var enqueued = await _notificationOutbox.EnqueueAsync(_userContext.UserId,
+                            NotificationType.ConfirmationAuth, "Код подтверждения смены метода 2FA",
+                            new Dictionary<string, string>
+                            {
+                                ["confirmation_code"] = code,
+                                ["ip"] = _requestContext.IpAddress ?? string.Empty,
+                                ["devicename"] = _requestContext.DeviceName,
+                                ["os"] = _requestContext.OperationSystem,
+                                ["appname"] = $"{_requestContext.AppName} v.{_requestContext.AppVersion}",
+                                ["datetime"] = DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")
+                            }, cancellationToken);
+                        if (enqueued) _metrics.Increment("notification_outbox_enqueued");
+                    }
+                    await emailTransaction.CommitAsync(cancellationToken);
+                    throw new OtpCodeNeedException("email", issue.RetryAfterSeconds,
+                        issue.Sent ? "sent" : "existing");
+                }
+
+                validatedEmailCode = await _authPropertiesStorage.TryValidateAndReserveEmailAuthCode(
+                    _userContext.UserId, Domain.EmailAuthCodePurpose.EnableAuthenticator,
+                    request.CurrentEmailCode, cancellationToken);
+                if (validatedEmailCode is null)
+                    throw new NotValidOtpCodeException();
+            }
+            ValidatedTotpCode? verifiedCurrentTotp = null;
             if (oldOptOptions is { OtpEnabled: true })
             {
                 // Шестизначный код под токеном: перебор ограничен по аккаунту.
                 await _rateLimiter.EnsureTotpAttemptAsync(_userContext.UserId);
+                verifiedCurrentTotp = TotpVerificationService.Verify(_userContext.UserId, oldOptOptions.OtpSecret,
+                    oldOptOptions.OtpSecretGeneration, request.CurrentOtpCode);
 
-                var activeTotp = new Totp(Base32Encoding.ToBytes(oldOptOptions.OtpSecret));
-
-                if (string.IsNullOrEmpty(request.CurrentOtpCode) ||
-                    !activeTotp.VerifyTotp(request.CurrentOtpCode, out _, VerificationWindow.RfcSpecifiedNetworkDelay))
+                if (verifiedCurrentTotp is null)
                 {
                     _metrics.Increment("otp_authenticator_failed");
                     _metrics.Increment("otp_setup_failed_invalid_otp");
@@ -136,16 +188,45 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
             var key = KeyGeneration.GenerateRandomKey(20);
             var base32Secret = Base32Encoding.ToString(key);
 
-            var optUri = new OtpUri(OtpType.Totp, base32Secret, userInfo.User.Username, "BarkCloud");
+            var optUri = new OtpUri(OtpNet.OtpType.Totp, base32Secret, userInfo.User.Username, "BarkCloud");
 
             var uri = optUri.ToString();
 
             _logger.LogDebug("Генерация QR кода для Authenticator 2FA");
 
-            // Новый секрет ждёт подтверждения кодом (Confirm) и не заменяет действующий OtpSecret.
-            await _authPropertiesStorage.SetPendingOtpSecret(
-                _userContext.UserId, base32Secret, DateTime.UtcNow + PendingSecretLifetime, cancellationToken);
-            await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Authenticator, userInfo.User.Id, cancellationToken);
+            try
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
+                var securityVersion = await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken);
+                var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+                    _userContext.UserId, cancellationToken);
+                if (securityVersion != reauthSecurityVersion
+                    || (currentAuthProperties?.OtpEnabled ?? false) != (oldOptOptions?.OtpEnabled ?? false)
+                    || (currentAuthProperties?.EmailOtpEnabled ?? false) != (oldOptOptions?.EmailOtpEnabled ?? false)
+                    || currentAuthProperties?.SelectedOtpType != oldOptOptions?.SelectedOtpType)
+                    throw new ReauthenticationRequiredException();
+                if (validatedEmailCode is not null
+                    && !await _authPropertiesStorage.TryConsumeValidatedEmailAuthCode(validatedEmailCode,
+                        cancellationToken))
+                    throw new NotValidOtpCodeException();
+                if (verifiedCurrentTotp is not null
+                    && !await _authPropertiesStorage.TryConsumeTotpStep(verifiedCurrentTotp.UserId,
+                        verifiedCurrentTotp.Secret, verifiedCurrentTotp.Generation, verifiedCurrentTotp.TimeStep,
+                        cancellationToken))
+                    throw new NotValidOtpCodeException();
+
+                // Новый секрет ждёт подтверждения кодом (Confirm) и не заменяет действующий OtpSecret.
+                await _authPropertiesStorage.SetPendingOtpSecret(_userContext.UserId, base32Secret,
+                    DateTime.UtcNow + PendingSecretLifetime, cancellationToken, securityVersion);
+                await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Authenticator, userInfo.User.Id, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                _context.ChangeTracker.Clear();
+                throw;
+            }
 
             var qrGenerator = new QRCodeGenerator();
             var qrCodeData = qrGenerator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
@@ -180,6 +261,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             _logger.LogDebug("Настройка Email 2FA для пользователя {UserId}", _userContext.UserId);
             // Получаем старый метод 2FA
+            var securityVersion = await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken);
             var oldOptOptions = await _authPropertiesStorage.GetUserAuthProperties(_userContext.UserId, cancellationToken);
             string oldMethod = "Отключена";
             if (oldOptOptions != null)
@@ -194,44 +276,42 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
 
             _logger.LogDebug("Генерация кода подтверждения для Email 2FA");
 
-            var issued = await _authPropertiesStorage.TryIssueEmailAuthCode(
-                userContactInfo.User.Id, Domain.EmailAuthCodePurpose.EnableEmailOtp, code, cancellationToken);
-
-            await _authPropertiesStorage.UpdateOptType(Domain.OtpType.Email, userContactInfo.User.Id, cancellationToken);
-
-            // issued == false — прежний код выдан совсем недавно и остаётся в силе: письмо не отправляем.
-            if (issued)
+            var notificationEnqueued = false;
+            EmailAuthCodeIssueResult issue;
+            await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
             {
-                var locationInfo = await _locationClient.GetLocationString(_requestContext.IpAddress);
+                await IdentityOwnerLock.AcquireAsync(_context, userContactInfo.User.Id, cancellationToken);
+                var currentSecurityVersion = await _passwordsStorage.GetSecurityStateVersion(
+                    _userContext.UserId, cancellationToken);
+                var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+                    _userContext.UserId, cancellationToken);
+                if (currentSecurityVersion != securityVersion
+                    || (currentAuthProperties?.OtpEnabled ?? false) != (oldOptOptions?.OtpEnabled ?? false)
+                    || (currentAuthProperties?.EmailOtpEnabled ?? false) != (oldOptOptions?.EmailOtpEnabled ?? false)
+                    || currentAuthProperties?.SelectedOtpType != oldOptOptions?.SelectedOtpType)
+                    throw new ReauthenticationRequiredException();
 
-                var emailNotification = new EmailNotification()
+                issue = await _authPropertiesStorage.TryIssueEmailAuthCodeWithSnapshot(
+                    userContactInfo.User.Id, Domain.EmailAuthCodePurpose.EnableEmailOtp, code, cancellationToken);
+                await _authPropertiesStorage.UpdateOptType(
+                    Domain.OtpType.Email, userContactInfo.User.Id, cancellationToken);
+
+                // Код и письмо фиксируются атомарно; при cooldown активная выдача остаётся действующей.
+                if (issue.Sent)
                 {
-                    OwnerId = userInfo.User.Id,
-                    Address = userContactInfo.Contact.Email,
-                    CreatedAt = DateTime.UtcNow,
-                    Payload = new Dictionary<string, string>()
-                    {
-                        {"username", userInfo.User.Username},
-                        {"confirmation_code", code},
-                        {"ip", _requestContext.IpAddress ?? string.Empty},
-                        {"devicename", _requestContext.DeviceName},
-                        {"os", _requestContext.OperationSystem},
-                        {"location", locationInfo},
-                        {"appname", $"{_requestContext.AppName} v.{_requestContext.AppVersion}"},
-                        {"datetime", DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")}
-                    },
-                    ServiceId = ServiceId.Identity,
-                    Title = "Код подтверждения для привязки",
-                    Type = NotificationType.ConfirmationOtpEmail
-                };
+                    var payload = NotificationPayload.Device(_requestContext);
+                    payload["confirmation_code"] = code;
+                    notificationEnqueued = await _notificationOutbox.EnqueueAsync(userContactInfo.User.Id,
+                        NotificationType.ConfirmationOtpEmail, "Код подтверждения для привязки", payload,
+                        cancellationToken);
+                }
 
-                _logger.LogDebug(
-                    "Отправка кода подтверждения на адрес {Email}",
-                    userContactInfo.Contact.Email
-                );
+                await transaction.CommitAsync(cancellationToken);
+            }
 
-                await _notificationQueueSender.SendNotification(emailNotification);
-
+            if (notificationEnqueued)
+            {
+                _metrics.Increment("notification_outbox_enqueued");
                 _metrics.Increment("otp_email_codes_sent");
             }
 

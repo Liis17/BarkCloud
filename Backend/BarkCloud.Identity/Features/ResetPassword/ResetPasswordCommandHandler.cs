@@ -21,7 +21,6 @@ namespace BarkCloud.Identity.Features.ResetPassword;
 public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand, ResetPasswordResponse>
 {
     private readonly IResetPasswordsStorage _resetPasswordsStorage;
-    private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly UsersServerApi.UsersServerApiClient _usersClient;
     private readonly RequestContext _requestContext;
     private readonly NotificationQueueSender _notificationQueueSender;
@@ -32,13 +31,12 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
     public ResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage,
-        IAuthPropertiesStorage authPropertiesStorage, UsersServerApi.UsersServerApiClient usersApiClient,
+        UsersServerApi.UsersServerApiClient usersApiClient,
         RequestContext requestContext, NotificationQueueSender notificationQueueSender, LocationClient locationClient,
         MetricsCollector metrics, IAuthRateLimiter rateLimiter, IConfiguration configuration,
         ILogger<ResetPasswordCommandHandler> logger)
     {
         _resetPasswordsStorage = resetPasswordsStorage;
-        _authPropertiesStorage = authPropertiesStorage;
         _usersClient = usersApiClient;
         _requestContext = requestContext;
         _notificationQueueSender = notificationQueueSender;
@@ -60,6 +58,11 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
             login,
             request.OtpType
         );
+        if (request.OtpType == OtpType.Authenticator)
+        {
+            _logger.LogWarning("Сброс пароля только через Authenticator запрещён");
+            throw new NotValidOtpCodeException();
+        }
         if (string.IsNullOrEmpty(username) && string.IsNullOrEmpty(email))
         {
             throw new NotSetUsernameOrEmailException();
@@ -80,9 +83,8 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
             throw new XAppInfoIsRequiedException();
         }
 
-        // Режим без почты: сброс пароля по email-коду невозможен (доставить некуда).
-        // Сброс через Authenticator (TOTP) не зависит от почты — его не блокируем.
-        if (request.OtpType != OtpType.Authenticator && !_configuration.EmailEnabled())
+        // Режим без почты доступен только через ForceSetPasswordServer.
+        if (!_configuration.EmailEnabled())
         {
             _logger.LogWarning("Сброс пароля по email отклонён — почта на сервере не настроена");
             throw new EmailServiceDisabledException();
@@ -129,46 +131,6 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
         }
 
         _logger.LogDebug("Пользователь {UserId} найден, проверка настроек OTP", user.User.Id);
-
-        var enableOtp = await _authPropertiesStorage.CheckOtpEnabled(user.User.Id);
-
-        if (request.OtpType == OtpType.Authenticator && !enableOtp)
-        {
-            _logger.LogWarning(
-                "Запрос сброса пароля с Authenticator OTP, но OTP не настроен для пользователя {UserId}",
-                user.User.Id
-            );
-            throw new OtpNotCreatedException();
-        }
-
-        if (request.OtpType == OtpType.Authenticator)
-        {
-            _logger.LogInformation(
-                "Создание запроса на сброс пароля с Authenticator OTP для пользователя {UserId}",
-                user.User.Id
-            );
-
-            var resetPassword = new Domain.ResetPassword()
-            {
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-                IsApproved = false,
-                OtpType = request.OtpType,
-                UserId = user.User.Id
-            };
-
-            var resp = await _resetPasswordsStorage.AddResetPassword(resetPassword);
-
-            _metrics.Increment("password_reset_initiated_authenticator");
-
-            _logger.LogInformation(
-                "Запрос на сброс пароля создан. ResetId: {ResetId}, UserId: {UserId}",
-                resp.Id,
-                user.User.Id
-            );
-
-            return new ResetPasswordResponse { ResetId = resp.Id.ToString() };
-        }
 
         _logger.LogInformation(
             "Создание запроса на сброс пароля с Email OTP для пользователя {UserId}",

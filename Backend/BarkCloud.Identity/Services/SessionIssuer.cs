@@ -79,6 +79,7 @@ public class SessionIssuer(
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
+                await IdentityOwnerLock.AcquireAsync(context, userId, cancellationToken);
                 if (completeAuthentication is not null)
                 {
                     await completeAuthentication(cancellationToken);

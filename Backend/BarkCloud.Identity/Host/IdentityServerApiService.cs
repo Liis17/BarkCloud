@@ -102,7 +102,9 @@ public class IdentityServerApiService : IdentityServerApi.IdentityServerApiBase
         return _mediator.Send(new ForceSetPasswordServerCommand
         {
             UserId = request.UserId,
-            NewPassword = request.NewPassword
+            NewPassword = request.NewPassword,
+            ResetPasskeys = !request.HasResetPasskeys || request.ResetPasskeys,
+            RevokeOtherSessions = !request.HasRevokeOtherSessions || request.RevokeOtherSessions
         });
     }
 }

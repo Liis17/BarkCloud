@@ -21,6 +21,12 @@ public class AuthUserProperty
 
     public DateTime? PendingOtpSecretExpiresAt { get; set; }
 
+    public long PendingOtpSecurityStateVersion { get; set; }
+
+    public long OtpSecretGeneration { get; set; }
+
+    public long? LastAcceptedTotpStep { get; set; }
+
     // Лимит попыток ввода пароля при повторной аутентификации (изменение 2FA): число попыток в текущем окне
     // и момент его окончания. После окончания окна счётчик начинается заново.
     public int ReauthPasswordAttempts { get; set; }
@@ -38,6 +44,8 @@ public class AuthUserProperty
     public DateTime? EmailAuthCodeExpiresAt { get; set; }
 
     public int EmailAuthCodeAttempts { get; set; }
+
+    public Guid? EmailAuthCodeRequestId { get; set; }
 
     // Случайный непубличный user handle WebAuthn (один на пользователя, общий для всех его ключей).
     // Генерится при первой привязке ключа.

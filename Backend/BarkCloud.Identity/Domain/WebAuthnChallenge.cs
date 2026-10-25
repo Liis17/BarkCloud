@@ -17,10 +17,17 @@ public class WebAuthnChallenge
     public string OptionsJson { get; set; } = string.Empty;
 
     public DateTime ExpiresAt { get; set; }
+
+    public long? SessionId { get; set; }
+
+    public long SecurityStateVersion { get; set; }
+
+    public Guid? ReauthPermissionId { get; set; }
 }
 
 public enum WebAuthnChallengeType
 {
     Registration = 0,
-    Assertion = 1
+    Assertion = 1,
+    ReauthenticationAssertion = 2
 }

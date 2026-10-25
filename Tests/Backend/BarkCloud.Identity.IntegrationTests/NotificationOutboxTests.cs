@@ -215,6 +215,7 @@ public class NotificationOutboxTests
             var handler = new SetPasswordCommandHandler(
                 UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
                 new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+                new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
                 new PasswordChangedNotifier(outbox, new RequestContext { DeviceName = "Phone", IpAddress = "1.1.1.1" }),
                 metrics, NullLogger<SetPasswordCommandHandler>.Instance, context);
 

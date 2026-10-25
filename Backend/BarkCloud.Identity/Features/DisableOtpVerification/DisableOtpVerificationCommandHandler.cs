@@ -1,17 +1,16 @@
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
+using BarkCloud.Identity.Infrastructure;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
-
-using OtpNet;
-
 
 using OtpNotCreatedException = BarkCloud.Identity.Persistence.Exceptions.OtpNotCreatedException;
 
@@ -22,6 +21,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly UserContext _userContext;
     private readonly IdentityContext _context;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
+    private readonly IPasswordsStorage _passwordsStorage;
     private readonly ReauthPasswordVerifier _reauthPassword;
     private readonly INotificationOutbox _notificationOutbox;
     private readonly RequestContext _requestContext;
@@ -30,12 +30,13 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
     private readonly ILogger<DisableOtpVerificationCommandHandler> _logger;
 
     public DisableOtpVerificationCommandHandler(UserContext userContext, IdentityContext context, IAuthPropertiesStorage authPropertiesStorage,
-        ReauthPasswordVerifier reauthPassword, INotificationOutbox notificationOutbox, RequestContext requestContext,
+        IPasswordsStorage passwordsStorage, ReauthPasswordVerifier reauthPassword, INotificationOutbox notificationOutbox, RequestContext requestContext,
         MetricsCollector metrics, IAuthRateLimiter rateLimiter, ILogger<DisableOtpVerificationCommandHandler> logger)
     {
         _userContext = userContext;
         _context = context;
         _authPropertiesStorage = authPropertiesStorage;
+        _passwordsStorage = passwordsStorage;
         _reauthPassword = reauthPassword;
         _notificationOutbox = notificationOutbox;
         _requestContext = requestContext;
@@ -66,6 +67,9 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
         string oldMethod = "Неизвестно";
         var disableAuthenticator = false;
         var disableEmail = false;
+        long? reauthSecurityVersion = null;
+        ValidatedTotpCode? validatedTotp = null;
+        ValidatedEmailAuthCode? validatedEmailCode = null;
         if (request.OptType == OtpTypeId.Authenticator)
         {
             if (!otpConfigs.OtpEnabled)
@@ -84,11 +88,10 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             // Шестизначный код под токеном: перебор ограничен по аккаунту.
             await _rateLimiter.EnsureTotpAttemptAsync(_userContext.UserId);
 
-            var totp = new Totp(Base32Encoding.ToBytes(otpConfigs.OtpSecret));
+            validatedTotp = TotpVerificationService.Verify(_userContext.UserId, otpConfigs.OtpSecret,
+                otpConfigs.OtpSecretGeneration, request.OtpCode);
 
-            var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
-
-            if (!isValid)
+            if (validatedTotp is null)
             {
                 _metrics.Increment("otp_authenticator_failed");
                 _metrics.Increment("otp_disable_failed");
@@ -107,6 +110,7 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
         if (request.OptType == OtpTypeId.Email)
         {
             // Повторная аутентификация владельца: сессии недостаточно, чтобы снять email-2FA.
+            reauthSecurityVersion = await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken);
             try
             {
                 await _reauthPassword.VerifyAsync(_userContext.UserId, request.Password, cancellationToken);
@@ -120,6 +124,45 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
                     _userContext.UserId
                 );
                 throw;
+            }
+
+            if (otpConfigs.EmailOtpEnabled)
+            {
+                if (string.IsNullOrEmpty(request.CurrentEmailCode))
+                {
+                    var code = CodeGenerator.GenerateDigitalCode(6);
+                    await using var emailTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                    await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
+                    if (await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken)
+                        != reauthSecurityVersion)
+                        throw new ReauthenticationRequiredException();
+                    var issue = await _authPropertiesStorage.TryIssueEmailAuthCodeWithSnapshot(
+                        _userContext.UserId, EmailAuthCodePurpose.DisableEmailOtp, code, cancellationToken);
+                    if (issue.Sent)
+                    {
+                        var enqueued = await _notificationOutbox.EnqueueAsync(_userContext.UserId,
+                            NotificationType.ConfirmationAuth, "Код подтверждения отключения Email 2FA",
+                            new Dictionary<string, string>
+                            {
+                                ["confirmation_code"] = code,
+                                ["ip"] = _requestContext.IpAddress ?? string.Empty,
+                                ["devicename"] = _requestContext.DeviceName ?? string.Empty,
+                                ["os"] = _requestContext.OperationSystem ?? string.Empty,
+                                ["appname"] = $"{_requestContext.AppName} v.{_requestContext.AppVersion}",
+                                ["datetime"] = DateTime.UtcNow.ToString("dd.MM.yyyy HH:mm:ss")
+                            }, cancellationToken);
+                        if (enqueued) _metrics.Increment("notification_outbox_enqueued");
+                    }
+                    await emailTransaction.CommitAsync(cancellationToken);
+                    throw new OtpCodeNeedException("email", issue.RetryAfterSeconds,
+                        issue.Sent ? "sent" : "existing");
+                }
+
+                validatedEmailCode = await _authPropertiesStorage.TryValidateAndReserveEmailAuthCode(
+                    _userContext.UserId, EmailAuthCodePurpose.DisableEmailOtp, request.CurrentEmailCode,
+                    cancellationToken);
+                if (validatedEmailCode is null)
+                    throw new NotValidOtpCodeException();
             }
 
             _logger.LogDebug("Отключение Email 2FA для пользователя {UserId}", _userContext.UserId);
@@ -138,6 +181,25 @@ public class DisableOtpVerificationCommandHandler : IRequestHandler<DisableOtpVe
             await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
+                await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
+                if (disableEmail)
+                {
+                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+                        _userContext.UserId, cancellationToken);
+                    if (currentAuthProperties is not { EmailOtpEnabled: true }
+                        || await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken)
+                            != reauthSecurityVersion)
+                        throw new ReauthenticationRequiredException();
+                }
+                if (validatedEmailCode is not null
+                    && !await _authPropertiesStorage.TryConsumeValidatedEmailAuthCode(validatedEmailCode,
+                        cancellationToken))
+                    throw new NotValidOtpCodeException();
+                if (validatedTotp is not null
+                    && !await _authPropertiesStorage.TryConsumeTotpStep(validatedTotp.UserId,
+                        validatedTotp.Secret, validatedTotp.Generation, validatedTotp.TimeStep, cancellationToken))
+                    throw new NotValidOtpCodeException();
+
                 if (disableAuthenticator)
                 {
                     await _authPropertiesStorage.DisableOtp(_userContext.UserId, cancellationToken);

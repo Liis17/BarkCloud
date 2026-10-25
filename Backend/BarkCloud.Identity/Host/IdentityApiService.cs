@@ -18,6 +18,8 @@ using BarkCloud.Identity.Features.BeginWebAuthnAssertion;
 using BarkCloud.Identity.Features.CompleteWebAuthnAssertion;
 using BarkCloud.Identity.Features.ListWebAuthnCredentials;
 using BarkCloud.Identity.Features.RemoveWebAuthnCredential;
+using BarkCloud.Identity.Features.BeginReauthentication;
+using BarkCloud.Identity.Features.CompleteReauthentication;
 using BarkCloud.Identity.Services;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Shared.Identity;
@@ -156,7 +158,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         {
             OptType = request.OtpType,
             Password = request.Password,
-            CurrentOtpCode = request.CurrentOtpCode
+            CurrentOtpCode = request.CurrentOtpCode,
+            CurrentEmailCode = request.CurrentEmailCode
         };
 
         return _mediator.Send(command);
@@ -180,7 +183,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         {
             OtpCode = request.OtpCode,
             OptType = request.OtpType,
-            Password = request.Password
+            Password = request.Password,
+            CurrentEmailCode = request.CurrentEmailCode
         };
 
         return _mediator.Send(command);
@@ -217,6 +221,7 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
             ResetId = Guid.Parse(request.ResetId),
             NewPassword = request.NewPassword,
             RevokeOtherSessions = !request.HasRevokeOtherSessions || request.RevokeOtherSessions,
+            ResetPasskeys = !request.HasResetPasskeys || request.ResetPasskeys,
             AuthenticatorCode = request.AuthenticatorCode
         };
 
@@ -231,7 +236,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         var command = new SetPasswordCommand
         {
             NewPassword = request.Password,
-            OldPassword = request.OldPassword
+            OldPassword = request.OldPassword,
+            PermissionToken = request.PermissionToken
         };
 
         await _mediator.Send(command);
@@ -248,7 +254,8 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
     [Authorize(Policy = nameof(TokenType.User))]
     public override Task<BeginWebAuthnRegistrationResponse> BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest request, ServerCallContext context)
     {
-        return _mediator.Send(new BeginWebAuthnRegistrationCommand());
+        return _mediator.Send(new BeginWebAuthnRegistrationCommand { PermissionToken = request.PermissionToken },
+            context.CancellationToken);
     }
 
     [Authorize(Policy = nameof(TokenType.User))]
@@ -258,8 +265,9 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
         {
             ChallengeId = request.ChallengeId,
             AttestationJson = request.AttestationJson,
-            CredentialName = request.CredentialName
-        });
+            CredentialName = request.CredentialName,
+            PermissionToken = request.PermissionToken
+        }, context.CancellationToken);
     }
 
     // Публичный (вход без токена), как Auth.
@@ -291,7 +299,34 @@ public class IdentityApiService : BarkCloud.Proto.Identity.IdentityApi.IdentityA
     {
         return _mediator.Send(new RemoveWebAuthnCredentialCommand
         {
-            CredentialId = request.CredentialId
-        });
+            CredentialId = request.CredentialId,
+            PermissionToken = request.PermissionToken
+        }, context.CancellationToken);
+    }
+
+    [Authorize(Policy = nameof(TokenType.User))]
+    public override Task<BeginReauthenticationResponse> BeginReauthentication(BeginReauthenticationRequest request,
+        ServerCallContext context)
+    {
+        return _mediator.Send(new BeginReauthenticationCommand
+        {
+            Action = request.Action,
+            CredentialId = request.CredentialId,
+            Password = request.Password,
+            OtpCode = request.OtpCode,
+            ChallengeId = request.ChallengeId
+        }, context.CancellationToken);
+    }
+
+    [Authorize(Policy = nameof(TokenType.User))]
+    public override Task<CompleteReauthenticationResponse> CompleteReauthentication(
+        CompleteReauthenticationRequest request, ServerCallContext context)
+    {
+        return _mediator.Send(new CompleteReauthenticationCommand
+        {
+            ChallengeId = request.ChallengeId,
+            AssertionJson = request.AssertionJson,
+            EmailCode = request.EmailCode
+        }, context.CancellationToken);
     }
 }

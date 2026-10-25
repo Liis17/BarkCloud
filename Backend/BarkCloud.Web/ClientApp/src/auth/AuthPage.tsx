@@ -74,6 +74,7 @@ function safeValuesFromForm(form: FormData, current: AuthValues): AuthValues {
   }
   if (form.has('remember')) values.remember = String(form.get('remember')) === 'true';
   if (form.has('revoke_sessions')) values.revoke_sessions = String(form.get('revoke_sessions')) === 'true';
+  if (form.has('reset_passkeys')) values.reset_passkeys = String(form.get('reset_passkeys')) === 'true';
   return values;
 }
 
@@ -82,6 +83,7 @@ function withDefaultChoices(values: AuthValues): AuthValues {
     ...values,
     remember: values.remember ?? true,
     revoke_sessions: values.revoke_sessions ?? true,
+    reset_passkeys: values.reset_passkeys ?? true,
   };
 }
 
@@ -277,7 +279,7 @@ export function AuthPage({
   async function consumeResponse(
     response: Response,
     submittedValues: AuthValues,
-    preserveValues: ('remember' | 'revoke_sessions')[] = [],
+    preserveValues: ('remember' | 'revoke_sessions' | 'reset_passkeys')[] = [],
   ) {
     const body = await responseJson(response);
     if (typeof body.redirectTo === 'string') {
@@ -292,6 +294,9 @@ export function AuthPage({
         }
         if (key === 'revoke_sessions' && submittedValues.revoke_sessions !== undefined) {
           nextState.values.revoke_sessions = submittedValues.revoke_sessions;
+        }
+        if (key === 'reset_passkeys' && submittedValues.reset_passkeys !== undefined) {
+          nextState.values.reset_passkeys = submittedValues.reset_passkeys;
         }
       }
       applyPageState(nextState, submittedValues);
@@ -380,7 +385,7 @@ export function AuthPage({
         headers: { Accept: 'application/json' },
         body: formData,
       });
-      await consumeResponse(response, values, page.screen === 'reset' ? ['revoke_sessions'] : []);
+      await consumeResponse(response, values, page.screen === 'reset' ? ['revoke_sessions', 'reset_passkeys'] : []);
     });
   }
 
@@ -700,9 +705,19 @@ export function AuthPage({
                 {fieldError('password') && <p className="auth-field-error" id="auth-new-password-error" role={fieldError('password') === page.formError ? 'alert' : undefined}>{fieldError('password')}</p>}
               </div>
               <label className="auth-checkbox">
-                <input type="checkbox" name="revoke_sessions" value="true" checked={values.revoke_sessions ?? false} disabled={busy} onChange={(event) => updateValue('revoke_sessions', event.currentTarget.checked)} />
-                <span>Завершить остальные сеансы</span>
+                <input type="checkbox" name="reset_passkeys" value="true" checked={values.reset_passkeys ?? true} disabled={busy} onChange={(event) => updateValue('reset_passkeys', event.currentTarget.checked)} />
+                <span>Сбросить все passkey</span>
               </label>
+              {values.reset_passkeys !== false ? (
+                <p className="auth-inline-note">При сбросе пароля будут удалены все ключи доступа (passkey). Их потребуется добавить заново.</p>
+              ) : (
+                <p className="auth-inline-note">Passkey сохранятся и продолжат работать после смены пароля.</p>
+              )}
+              <label className="auth-checkbox">
+                <input type="checkbox" name="revoke_sessions" value="true" checked={values.revoke_sessions ?? true} disabled={busy} onChange={(event) => updateValue('revoke_sessions', event.currentTarget.checked)} />
+                <span>Выйти с других устройств</span>
+              </label>
+              <p className="auth-inline-note">Выход с устройств не удаляет passkey.</p>
               <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Сохраняем…' : 'Сменить пароль'}</button>
               <button className="auth-resend-button" type="button" disabled={busy || retrySeconds > 0} onClick={resendCode}>
                 {busy ? 'Отправляем…' : retrySeconds > 0 ? 'Отправить код повторно через ' + formatSeconds(retrySeconds) : 'Отправить код повторно'}
