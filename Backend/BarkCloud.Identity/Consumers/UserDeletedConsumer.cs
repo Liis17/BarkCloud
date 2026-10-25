@@ -5,6 +5,8 @@ using BarkCloud.Shared.Queue.Users;
 
 using MassTransit;
 
+using Microsoft.EntityFrameworkCore;
+
 namespace BarkCloud.Identity.Consumers;
 
 /// <summary>
@@ -41,6 +43,12 @@ public class UserDeletedConsumer(
         await authPropertiesStorage.DeleteByUserId(userId);
         await resetPasswordsStorage.DeleteByUserId(userId);
         await confirmationCodesStorage.DeleteByOwnerId(userId, context.CancellationToken);
+        await identityContext.ReauthPermissions.Where(x => x.UserId == userId)
+            .ExecuteDeleteAsync(context.CancellationToken);
+        await identityContext.WebAuthnChallenges.Where(x => x.UserId == userId)
+            .ExecuteDeleteAsync(context.CancellationToken);
+        await identityContext.WebAuthnCredentials.Where(x => x.UserId == userId)
+            .ExecuteDeleteAsync(context.CancellationToken);
         await transaction.CommitAsync(context.CancellationToken);
 
         metrics.Increment("accounts_cleaned_identity");

@@ -349,8 +349,24 @@ public class AuthCommandHandlerTests : IDisposable
                 Contact = new UserContact { Email = "u@e" }
             }));
 
-        _authProps.Setup(s => s.GetUserAuthProperties(id)).ReturnsAsync(props);
-        _passwords.Setup(s => s.GetUserPasswordHash(id)).ReturnsAsync(PasswordHash);
+        _authProps.Setup(s => s.GetUserAuthProperties(id, It.IsAny<CancellationToken>())).ReturnsAsync(props);
+        _passwords.Setup(s => s.GetUserPasswordHash(id, It.IsAny<CancellationToken>())).ReturnsAsync(PasswordHash);
+        _passwords.Setup(s => s.GetSecurityStateVersion(id, It.IsAny<CancellationToken>())).ReturnsAsync(3);
+    }
+
+    [Fact]
+    public async Task Handle_PasswordChangedAfterVerification_DoesNotIssueSession()
+    {
+        SetupUser(42, null);
+        var reads = 0;
+        _passwords.Setup(s => s.GetSecurityStateVersion(42, It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(++reads == 1 ? 3L : 4L));
+
+        var act = () => CreateSut().Handle(new AuthCommand { Username = "u", Password = "p" }, default);
+
+        await act.Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        _sessions.Verify(s => s.IssueAsync(It.IsAny<long>(), It.IsAny<CancellationToken>(),
+            It.IsAny<Func<CancellationToken, Task>?>()), Times.Once);
     }
 
     [Fact]

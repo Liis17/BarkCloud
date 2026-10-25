@@ -11,4 +11,6 @@ public class DisableOtpVerificationCommand : IRequest<DisableOtpVerificationResp
     public string? OtpCode { get; set; }
 
     public string? Password { get; set; }
+
+    public string? CurrentEmailCode { get; set; }
 }

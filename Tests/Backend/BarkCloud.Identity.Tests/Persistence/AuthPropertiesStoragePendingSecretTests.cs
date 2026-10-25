@@ -29,6 +29,7 @@ public class AuthPropertiesStoragePendingSecretTests : IDisposable
     private async Task SeedActiveAuthenticator()
     {
         await _sut.SetPendingOtpSecret(UserId, "OLD", DateTime.UtcNow.AddMinutes(10));
+        await _sut.UpdateOptType(OtpType.Authenticator, UserId);
         (await _sut.ActivatePendingOtpSecret(UserId, "OLD")).Should().BeTrue();
     }
 
@@ -101,6 +102,7 @@ public class AuthPropertiesStoragePendingSecretTests : IDisposable
     public async Task Activate_Twice_SucceedsOnlyOnce()
     {
         await _sut.SetPendingOtpSecret(UserId, "NEW", DateTime.UtcNow.AddMinutes(10));
+        await _sut.UpdateOptType(OtpType.Authenticator, UserId);
 
         (await _sut.ActivatePendingOtpSecret(UserId, "NEW")).Should().BeTrue();
         (await _sut.ActivatePendingOtpSecret(UserId, "NEW")).Should().BeFalse();

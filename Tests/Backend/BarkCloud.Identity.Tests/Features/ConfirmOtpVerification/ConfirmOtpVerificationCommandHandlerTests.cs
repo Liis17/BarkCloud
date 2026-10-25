@@ -25,6 +25,7 @@ public class ConfirmOtpVerificationCommandHandlerTests : IDisposable
 {
     private readonly SqliteIdentityContext _database = new();
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
+    private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<INotificationOutbox> _outbox = new();
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
     private readonly MetricsCollector _metrics = new();
@@ -35,6 +36,7 @@ public class ConfirmOtpVerificationCommandHandlerTests : IDisposable
         UserContextFactory.Create(42),
         _database.Context,
         _authProps.Object,
+        _passwords.Object,
         _outbox.Object,
         new RequestContext { DeviceName = "Pixel", OperationSystem = "Android", IpAddress = "1.1.1.1" },
         _metrics,
@@ -154,12 +156,14 @@ public class ConfirmOtpVerificationCommandHandlerTests : IDisposable
             PendingOtpSecret = secret,
             PendingOtpSecretExpiresAt = DateTime.UtcNow.AddMinutes(5)
         });
-        _authProps.Setup(s => s.ActivatePendingOtpSecret(42, secret)).ReturnsAsync(true);
+        _authProps.Setup(s => s.ActivatePendingOtpSecret(42, secret, It.IsAny<CancellationToken>(),
+            It.IsAny<long>(), It.IsAny<long>())).ReturnsAsync(true);
 
         var response = await CreateSut().Handle(new ConfirmOtpVerificationCommand { OtpCode = validCode }, default);
 
         response.Should().NotBeNull();
-        _authProps.Verify(s => s.ActivatePendingOtpSecret(42, secret), Times.Once);
+        _authProps.Verify(s => s.ActivatePendingOtpSecret(42, secret, It.IsAny<CancellationToken>(),
+            It.Is<long>(step => step >= 0), It.IsAny<long>()), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_enabled_authenticator");
     }
 

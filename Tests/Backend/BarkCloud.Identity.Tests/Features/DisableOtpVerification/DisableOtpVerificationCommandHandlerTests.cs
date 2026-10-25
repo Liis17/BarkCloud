@@ -48,6 +48,7 @@ public class DisableOtpVerificationCommandHandlerTests : IDisposable
         UserContextFactory.Create(42),
         _database.Context,
         _authProps.Object,
+        _passwords.Object,
         new ReauthPasswordVerifier(_authProps.Object, _passwords.Object),
         _outbox.Object,
         new RequestContext { DeviceName = "Pixel", OperationSystem = "Android", IpAddress = "1.1.1.1" },
@@ -117,6 +118,8 @@ public class DisableOtpVerificationCommandHandlerTests : IDisposable
             OtpEnabled = true,
             OtpSecret = secret
         });
+        _authProps.Setup(s => s.TryConsumeTotpStep(42, secret, 0, It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         await CreateSut().Handle(
             new DisableOtpVerificationCommand { OptType = OtpTypeId.Authenticator, OtpCode = validCode },
@@ -139,15 +142,50 @@ public class DisableOtpVerificationCommandHandlerTests : IDisposable
             EmailOtpEnabled = true
         });
 
-        await CreateSut().Handle(
-            new DisableOtpVerificationCommand { OptType = OtpTypeId.Email, Password = Password },
-            default);
+        var now = DateTime.UtcNow;
+        var validatedCode = new ValidatedEmailAuthCode(42, EmailAuthCodePurpose.DisableEmailOtp, "654321",
+            now, now.AddMinutes(5));
+        _authProps.Setup(s => s.TryValidateAndReserveEmailAuthCode(42, EmailAuthCodePurpose.DisableEmailOtp,
+            "654321", It.IsAny<CancellationToken>(), null)).ReturnsAsync(validatedCode);
+        _authProps.Setup(s => s.TryConsumeValidatedEmailAuthCode(validatedCode, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await CreateSut().Handle(new DisableOtpVerificationCommand
+        {
+            OptType = OtpTypeId.Email, Password = Password, CurrentEmailCode = "654321"
+        }, default);
 
         _authProps.Verify(s => s.DisableEmailOtp(42), Times.Once);
         _outbox.Verify(o => o.EnqueueAsync(
             42, NotificationType.TwoFactorMethodChanged, It.IsAny<string>(),
             It.Is<Dictionary<string, string>>(p => p["old_method"] == "Email" && p["new_method"] == "Отключена")), Times.Once);
         _metrics.SnapshotAndReset().Should().ContainKey("otp_disabled_email");
+    }
+
+    [Fact]
+    public async Task Handle_EmailType_RequiresCurrentEmailCode()
+    {
+        _authProps.Setup(s => s.GetUserAuthProperties(42)).ReturnsAsync(new AuthUserProperty
+        {
+            UserId = 42,
+            EmailOtpEnabled = true
+        });
+        _authProps.Setup(s => s.TryIssueEmailAuthCodeWithSnapshot(42, EmailAuthCodePurpose.DisableEmailOtp,
+            It.IsAny<string>(), It.IsAny<CancellationToken>(), null))
+            .ReturnsAsync(new EmailAuthCodeIssueResult(true, DateTime.UtcNow, 60));
+        _outbox.Setup(s => s.EnqueueAsync(42, NotificationType.ConfirmationAuth, It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var act = () => CreateSut().Handle(new DisableOtpVerificationCommand
+        {
+            OptType = OtpTypeId.Email, Password = Password
+        }, default);
+
+        await act.Should().ThrowAsync<OtpCodeNeedException>()
+            .Where(e => e.ErrorMetadata["x-otp-method"] == "email");
+        _authProps.Verify(s => s.DisableEmailOtp(It.IsAny<long>()), Times.Never);
+        _outbox.Verify(s => s.EnqueueAsync(42, NotificationType.ConfirmationAuth, It.IsAny<string>(),
+            It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]

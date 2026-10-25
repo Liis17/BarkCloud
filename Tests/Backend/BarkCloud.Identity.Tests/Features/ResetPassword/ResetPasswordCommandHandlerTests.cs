@@ -24,7 +24,6 @@ namespace BarkCloud.Identity.Tests.Features.ResetPassword;
 public class ResetPasswordCommandHandlerTests
 {
     private readonly Mock<IResetPasswordsStorage> _resets = new();
-    private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersClient = new();
     private readonly Mock<NotificationQueueSender> _notifications;
     private readonly Mock<LocationClient> _location;
@@ -46,7 +45,7 @@ public class ResetPasswordCommandHandlerTests
         .Build();
 
     private ResetPasswordCommandHandler CreateSut(RequestContext? ctx = null, bool emailEnabled = true) => new(
-        _resets.Object, _authProps.Object, _usersClient.Object,
+        _resets.Object, _usersClient.Object,
         ctx ?? FullContext(), _notifications.Object, _location.Object, _metrics, _rateLimiter.Object, EmailConfig(emailEnabled), _logger);
 
     private static RequestContext FullContext() => new()
@@ -104,35 +103,33 @@ public class ResetPasswordCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AuthenticatorRequestedButNotEnabled_Throws()
+    public async Task Handle_AuthenticatorOnlyResetIsRejectedBeforeUserLookup()
     {
         _usersClient
             .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = 42 } }));
-        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(false);
-
         var act = () => CreateSut().Handle(
             new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
 
-        await act.Should().ThrowAsync<OtpNotCreatedException>();
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _usersClient.Verify(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
+        _resets.Verify(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_AuthenticatorEnabled_CreatesResetWithoutNotification()
+    public async Task Handle_AuthenticatorOnlyResetIsRejectedEvenWhenAuthenticatorIsEnabled()
     {
         _usersClient
             .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = 42 } }));
-        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(true);
-        _resets.Setup(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()))
-            .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
-
-        var response = await CreateSut().Handle(
+        var act = () => CreateSut().Handle(
             new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
 
-        response.ResetId.Should().NotBeNullOrEmpty();
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _usersClient.Verify(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
+        _resets.Verify(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()), Times.Never);
         _notifications.Verify(n => n.SendNotification(It.IsAny<Notification>()), Times.Never);
-        _metrics.SnapshotAndReset().Should().ContainKey("password_reset_initiated_authenticator");
+        _rateLimiter.Verify(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -148,7 +145,6 @@ public class ResetPasswordCommandHandlerTests
                 User = new User { Id = 42, Username = "u" },
                 Contact = new UserContact { Email = "u@e" }
             }));
-        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(false);
         _resets.Setup(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()))
             .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
 
@@ -183,7 +179,6 @@ public class ResetPasswordCommandHandlerTests
                 User = new User { Id = 42, Username = "u" },
                 Contact = new UserContact { Email = "u@e" }
             }));
-        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(false);
         _resets.Setup(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()))
             .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
     }
@@ -246,17 +241,20 @@ public class ResetPasswordCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AuthenticatorType_DoesNotSpendMailBudget()
+    public async Task Handle_AuthenticatorOnlyResetIsRejectedWithoutSpendingMailBudget()
     {
         _usersClient
             .Setup(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default))
             .Returns(GrpcCallHelpers.AsyncUnary(new FindByLoginResponse { User = new User { Id = 42 } }));
-        _authProps.Setup(s => s.CheckOtpEnabled(42)).ReturnsAsync(true);
         _resets.Setup(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()))
             .ReturnsAsync((DomainResetPassword r) => { r.Id = Guid.NewGuid(); return r; });
 
-        await CreateSut().Handle(new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
+        var act = () => CreateSut().Handle(
+            new ResetPasswordCommand { Username = "u", OtpType = OtpType.Authenticator }, default);
 
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _usersClient.Verify(c => c.FindByLoginAsync(It.IsAny<FindByLoginRequest>(), null, null, default), Times.Never);
+        _resets.Verify(s => s.AddResetPassword(It.IsAny<DomainResetPassword>()), Times.Never);
         _rateLimiter.Verify(l => l.TryReserveAsync(It.IsAny<AuthLimits.Policy>(), It.IsAny<string>()), Times.Never);
     }
 }

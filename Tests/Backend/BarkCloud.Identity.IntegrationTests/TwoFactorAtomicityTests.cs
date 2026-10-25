@@ -53,6 +53,11 @@ public class TwoFactorAtomicityTests
         properties.OtpEnabled.Should().BeTrue();
         properties.PendingOtpSecret.Should().BeNull();
         properties.PendingOtpSecretExpiresAt.Should().BeNull();
+        var setupCode = TotpVerificationService.Verify(42, properties.OtpSecret,
+            properties.OtpSecretGeneration, new Totp(key).ComputeTotp());
+        setupCode.Should().NotBeNull();
+        (await new AuthPropertiesStorage(observer).TryConsumeTotpStep(42, properties.OtpSecret!,
+            properties.OtpSecretGeneration, setupCode!.TimeStep)).Should().BeFalse();
         var notification = await observer.PendingNotifications.AsNoTracking().SingleAsync();
         notification.UserId.Should().Be(42);
         notification.Type.Should().Be(NotificationType.TwoFactorMethodChanged);
@@ -312,7 +317,7 @@ public class TwoFactorAtomicityTests
     {
         var requestContext = RequestContext();
         return new ConfirmOtpVerificationCommandHandler(UserContext(), context, new AuthPropertiesStorage(context),
-            CreateOutbox(context, metrics), requestContext, metrics,
+            new PasswordsStorage(context), CreateOutbox(context, metrics), requestContext, metrics,
             new AuthRateLimiter(new AttemptCountersStorage(context), requestContext,
                 NullLogger<AuthRateLimiter>.Instance), NullLogger<ConfirmOtpVerificationCommandHandler>.Instance);
     }
@@ -327,7 +332,8 @@ public class TwoFactorAtomicityTests
         {
             ["Features:EmailEnabled"] = emailEnabled.ToString()
         }).Build();
-        return new DisableOtpVerificationCommandHandler(UserContext(), context, properties, verifier,
+        return new DisableOtpVerificationCommandHandler(UserContext(), context, properties,
+            new PasswordsStorage(context), verifier,
             new NotificationOutbox(context, configuration, metrics, NullLogger<NotificationOutbox>.Instance),
             requestContext, metrics, new AuthRateLimiter(new AttemptCountersStorage(context), requestContext,
                 NullLogger<AuthRateLimiter>.Instance), NullLogger<DisableOtpVerificationCommandHandler>.Instance);

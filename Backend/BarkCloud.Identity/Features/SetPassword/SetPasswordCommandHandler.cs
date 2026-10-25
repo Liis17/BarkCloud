@@ -4,6 +4,7 @@ namespace BarkCloud.Identity.Features.SetPassword;
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Identity.Persistence.Contexts;
+using BarkCloud.Proto.Identity;
 
 using GrpcServer.XAuth;
 
@@ -21,19 +22,25 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
     private readonly IPasswordsStorage _passwordsStorage;
     private readonly IAuthPropertiesStorage _authPropertiesStorage;
     private readonly IRefreshTokensStorage refreshTokensStorage;
+    private readonly IWebAuthnStorage _webAuthnStorage;
+    private readonly ReauthenticationService _reauthenticationService;
     private readonly PasswordChangedNotifier _passwordChangedNotifier;
     private readonly MetricsCollector _metrics;
     private readonly ILogger<SetPasswordCommandHandler> _logger;
     private readonly IdentityContext _context;
 
     public SetPasswordCommandHandler(UserContext userContext, IPasswordsStorage passwordsStorage,
-        IAuthPropertiesStorage authPropertiesStorage, IRefreshTokensStorage refreshTokensStorage, PasswordChangedNotifier passwordChangedNotifier,
+        IAuthPropertiesStorage authPropertiesStorage, IRefreshTokensStorage refreshTokensStorage,
+        IWebAuthnStorage webAuthnStorage, ReauthenticationService reauthenticationService,
+        PasswordChangedNotifier passwordChangedNotifier,
         MetricsCollector metrics, ILogger<SetPasswordCommandHandler> logger, IdentityContext context)
     {
         _userContext = userContext;
         _passwordsStorage = passwordsStorage;
         _authPropertiesStorage = authPropertiesStorage;
         this.refreshTokensStorage = refreshTokensStorage;
+        _webAuthnStorage = webAuthnStorage;
+        _reauthenticationService = reauthenticationService;
         _passwordChangedNotifier = passwordChangedNotifier;
         _metrics = metrics;
         _logger = logger;
@@ -47,6 +54,7 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
             _userContext.UserId
         );
 
+        var securityVersion = await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken);
         var currentHash = await _passwordsStorage.GetUserPasswordHash(_userContext.UserId, cancellationToken);
         if (currentHash != null)
         {
@@ -90,6 +98,24 @@ public class SetPasswordCommandHandler : IRequestHandler<SetPasswordCommand>
             await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
+                    await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
+                    if (await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken)
+                        != securityVersion)
+                        throw new InvalidOldPasswordException();
+
+                    if (currentHash is null)
+                    {
+                        var credentials = await _webAuthnStorage.GetCredentialsByUserId(_userContext.UserId);
+                        if (credentials.Count > 0)
+                        {
+                            if (_userContext.SessionId is not { } sessionId
+                                || !await _reauthenticationService.TryConsumeGrantedAsync(request.PermissionToken,
+                                    _userContext.UserId, sessionId,
+                                    (int)ReauthenticationAction.SetInitialPassword, null, cancellationToken))
+                                throw new ReauthenticationRequiredException();
+                        }
+                    }
+
                 isNewUser = await _passwordsStorage.UpdateUserPasswordHash(_userContext.UserId, passwordHash, cancellationToken);
 
                 if (!isNewUser)

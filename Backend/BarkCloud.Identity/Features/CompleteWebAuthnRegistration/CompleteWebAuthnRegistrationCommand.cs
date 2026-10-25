@@ -11,4 +11,6 @@ public class CompleteWebAuthnRegistrationCommand : IRequest<CompleteWebAuthnRegi
     public string AttestationJson { get; set; } = string.Empty;
 
     public string CredentialName { get; set; } = string.Empty;
+
+    public string PermissionToken { get; set; } = string.Empty;
 }
