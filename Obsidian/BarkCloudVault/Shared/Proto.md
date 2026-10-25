@@ -22,6 +22,10 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 
 `IdentityApi` предоставляет отдельные `CreateAccountWithPassword` и `ConfirmAccountWithPassword` для регистрации с первоначальным паролем. Они используют request-типы `CreateAccountRequest` и `ConfirmAccountRequest` с optional `initial_password` (поля 5 и 3 соответственно); legacy `CreateAccount` и `ConfirmAccount` это поле игнорируют. Сервер проверяет пароль нового контракта до побочных эффектов.
 
+`ConfirmResetPasswordRequest` получил additive optional `reset_passkeys` (поле 6); существующее optional `revoke_other_sessions` (поле 4) сохранено. При отсутствии каждого поля сервер считает выбор включённым. `ForceSetPasswordServerRequest` получил optional `reset_passkeys` и `revoke_other_sessions` (поля 3 и 4); этот служебный путь не выдаёт новую сессию.
+
+`IdentityApi` добавил авторизованные `BeginReauthentication` и `CompleteReauthentication` для выдачи одноразового разрешения управления passkey. `BeginWebAuthnRegistrationRequest`, `CompleteWebAuthnRegistrationRequest` и `RemoveWebAuthnCredentialRequest` принимают additive optional `permission_token`; старые вызовы без него отклоняются сервером. Разрешение связано с действием и, при удалении, конкретным credential. Подробный поток описан в [[Backend/Identity]].
+
 `FilesApi.CreateUploadSessionRequest.file_type` — optional enum на поле 6: без него сервер выбирает `CLOUD_FILE`; явные `CLOUD_FILE` и `USER_AVATAR` поддержаны, `UNKNOWN` и неизвестные значения отклоняются. Для аватара действует лимит 20 MiB.
 
 ## Генерация и взаимодействия
