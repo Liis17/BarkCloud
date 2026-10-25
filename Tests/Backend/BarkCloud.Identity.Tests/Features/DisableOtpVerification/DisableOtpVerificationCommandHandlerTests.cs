@@ -39,6 +39,9 @@ public class DisableOtpVerificationCommandHandlerTests : IDisposable
     {
         _passwords.Setup(p => p.GetUserPasswordHash(42)).ReturnsAsync(PasswordHash);
         _authProps.Setup(s => s.TryReserveReauthPasswordAttempt(42)).ReturnsAsync(true);
+        _authProps.Setup(s => s.GetUserAuthPropertiesSnapshot(42, It.IsAny<CancellationToken>()))
+            .Returns((long userId, CancellationToken cancellationToken) =>
+                _authProps.Object.GetUserAuthProperties(userId, cancellationToken));
     }
 
     private void VerifyNothingQueued() => _outbox.Verify(o => o.EnqueueAsync(

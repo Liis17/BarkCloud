@@ -237,7 +237,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                         || !FixedTimeEquals(lockedReset.OtpCode, request.OtpCode))
                         throw new NotValidOtpCodeException();
 
-                    var lockedAuthProperties = await _authPropertiesStorage.GetUserAuthProperties(
+                    var lockedAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
                         resetPasswordInfo.UserId, cancellationToken);
                     if (lockedAuthProperties is { OtpEnabled: true })
                     {

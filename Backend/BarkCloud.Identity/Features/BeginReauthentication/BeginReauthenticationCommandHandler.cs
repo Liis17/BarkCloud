@@ -121,7 +121,8 @@ public sealed class BeginReauthenticationCommandHandler(
         if (await passwordsStorage.GetSecurityStateVersion(userContext.UserId, cancellationToken) != securityVersion
             || !await reauthenticationService.IsSessionActive(userContext.UserId, sessionId, cancellationToken))
             throw new ReauthenticationRequiredException();
-        var currentAuthProperties = await authPropertiesStorage.GetUserAuthProperties(userContext.UserId, cancellationToken);
+        var currentAuthProperties = await authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+            userContext.UserId, cancellationToken);
         if (currentAuthProperties is { OtpEnabled: true })
             throw new OtpCodeNeedException("authenticator");
         if (currentAuthProperties is { EmailOtpEnabled: true })
@@ -150,7 +151,7 @@ public sealed class BeginReauthenticationCommandHandler(
         if (await passwordsStorage.GetSecurityStateVersion(userContext.UserId, cancellationToken) != securityVersion
             || !await reauthenticationService.IsSessionActive(userContext.UserId, sessionId, cancellationToken))
             throw new ReauthenticationRequiredException();
-        if (await authPropertiesStorage.GetUserAuthProperties(userContext.UserId, cancellationToken)
+        if (await authPropertiesStorage.GetUserAuthPropertiesSnapshot(userContext.UserId, cancellationToken)
             is { OtpEnabled: true })
             throw new OtpCodeNeedException("authenticator");
 
@@ -165,14 +166,24 @@ public sealed class BeginReauthenticationCommandHandler(
         }
         else
         {
-            permission = new ReauthPermission
+            var now = DateTime.UtcNow;
+            permission = await context.ReauthPermissions.AsNoTracking().FirstOrDefaultAsync(x =>
+                x.UserId == userContext.UserId && x.SessionId == sessionId
+                && x.Action == (int)action && x.CredentialId == credentialId
+                && x.SecurityStateVersion == securityVersion
+                && x.Status == ReauthPermissionStatus.EmailPending && x.ExpiresAt > now,
+                cancellationToken);
+            if (permission is null)
             {
-                Id = Guid.NewGuid(), UserId = userContext.UserId, SessionId = sessionId,
-                Action = (int)action, CredentialId = credentialId, SecurityStateVersion = securityVersion,
-                Status = ReauthPermissionStatus.EmailPending, CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow + PermissionLifetime
-            };
-            context.ReauthPermissions.Add(permission);
+                permission = new ReauthPermission
+                {
+                    Id = Guid.NewGuid(), UserId = userContext.UserId, SessionId = sessionId,
+                    Action = (int)action, CredentialId = credentialId, SecurityStateVersion = securityVersion,
+                    Status = ReauthPermissionStatus.EmailPending, CreatedAt = now,
+                    ExpiresAt = now + PermissionLifetime
+                };
+                context.ReauthPermissions.Add(permission);
+            }
         }
 
         var issue = await authPropertiesStorage.TryIssueEmailAuthCodeWithSnapshot(userContext.UserId,

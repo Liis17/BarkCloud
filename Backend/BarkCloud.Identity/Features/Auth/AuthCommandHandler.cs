@@ -268,7 +268,7 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
                 != securityStateVersion)
                 throw new InvalidLoginOrPasswordException();
 
-            var currentAuthProperties = await authPropertiesStorage.GetUserAuthProperties(user.User.Id,
+            var currentAuthProperties = await authPropertiesStorage.GetUserAuthPropertiesSnapshot(user.User.Id,
                 transactionToken);
             if ((currentAuthProperties?.OtpEnabled ?? false) != (optOptions?.OtpEnabled ?? false)
                 || (currentAuthProperties?.EmailOtpEnabled ?? false) != (optOptions?.EmailOtpEnabled ?? false))

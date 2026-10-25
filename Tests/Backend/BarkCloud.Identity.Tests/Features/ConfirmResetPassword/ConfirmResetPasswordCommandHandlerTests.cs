@@ -51,6 +51,9 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
         _webAuthn.Setup(s => s.RemoveAllCredentials(42, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _resets.Setup(s => s.TryApprove(It.IsAny<Guid>())).ReturnsAsync(true);
         _resets.Setup(s => s.TryReserveOtpAttempt(It.IsAny<Guid>(), It.IsAny<int>())).ReturnsAsync(true);
+        _authProps.Setup(s => s.GetUserAuthPropertiesSnapshot(42, It.IsAny<CancellationToken>()))
+            .Returns((long userId, CancellationToken cancellationToken) =>
+                _authProps.Object.GetUserAuthProperties(userId, cancellationToken));
         _mediator
             .Setup(m => m.Send(It.IsAny<CreateTokenCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CreateTokenResponse { AccessToken = new Token { Value = "access" } });

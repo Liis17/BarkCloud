@@ -154,7 +154,7 @@ public class ConfirmOtpVerificationCommandHandler : IRequestHandler<ConfirmOtpVe
                     await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
                     var currentSecurityVersion = await _passwordsStorage.GetSecurityStateVersion(
                         _userContext.UserId, cancellationToken);
-                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthProperties(
+                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
                         _userContext.UserId, cancellationToken);
                     if (verifiedSecret is not null
                         && (currentSecurityVersion != pendingSecurityVersion

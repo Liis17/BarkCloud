@@ -131,7 +131,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
                     if (await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken)
                         != reauthSecurityVersion)
                         throw new ReauthenticationRequiredException();
-                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthProperties(
+                    var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
                         _userContext.UserId, cancellationToken);
                     if ((currentAuthProperties?.OtpEnabled ?? false) != (oldOptOptions.OtpEnabled)
                         || (currentAuthProperties?.EmailOtpEnabled ?? false) != oldOptOptions.EmailOtpEnabled
@@ -199,7 +199,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
                 await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 await IdentityOwnerLock.AcquireAsync(_context, _userContext.UserId, cancellationToken);
                 var securityVersion = await _passwordsStorage.GetSecurityStateVersion(_userContext.UserId, cancellationToken);
-                var currentAuthProperties = await _authPropertiesStorage.GetUserAuthProperties(
+                var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
                     _userContext.UserId, cancellationToken);
                 if (securityVersion != reauthSecurityVersion
                     || (currentAuthProperties?.OtpEnabled ?? false) != (oldOptOptions?.OtpEnabled ?? false)
@@ -283,7 +283,7 @@ public class EnableOtpVerificationCommandHandler : IRequestHandler<EnableOtpVeri
                 await IdentityOwnerLock.AcquireAsync(_context, userContactInfo.User.Id, cancellationToken);
                 var currentSecurityVersion = await _passwordsStorage.GetSecurityStateVersion(
                     _userContext.UserId, cancellationToken);
-                var currentAuthProperties = await _authPropertiesStorage.GetUserAuthProperties(
+                var currentAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
                     _userContext.UserId, cancellationToken);
                 if (currentSecurityVersion != securityVersion
                     || (currentAuthProperties?.OtpEnabled ?? false) != (oldOptOptions?.OtpEnabled ?? false)
