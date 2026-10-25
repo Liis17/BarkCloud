@@ -13,18 +13,24 @@ public class ForceSetPasswordServerCommandHandler : IRequestHandler<ForceSetPass
 {
     private readonly IPasswordsStorage _passwordsStorage;
     private readonly INotificationOutbox _notificationOutbox;
+    private readonly IWebAuthnStorage _webAuthnStorage;
+    private readonly IRefreshTokensStorage _refreshTokensStorage;
     private readonly ILogger<ForceSetPasswordServerCommandHandler> _logger;
     private readonly IdentityContext _context;
     private readonly MetricsCollector _metrics;
 
     public ForceSetPasswordServerCommandHandler(
         IPasswordsStorage passwordsStorage,
+        IWebAuthnStorage webAuthnStorage,
+        IRefreshTokensStorage refreshTokensStorage,
         INotificationOutbox notificationOutbox,
         ILogger<ForceSetPasswordServerCommandHandler> logger,
         IdentityContext context,
         MetricsCollector metrics)
     {
         _passwordsStorage = passwordsStorage;
+        _webAuthnStorage = webAuthnStorage;
+        _refreshTokensStorage = refreshTokensStorage;
         _notificationOutbox = notificationOutbox;
         _logger = logger;
         _context = context;
@@ -42,7 +48,12 @@ public class ForceSetPasswordServerCommandHandler : IRequestHandler<ForceSetPass
             await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
+                await IdentityOwnerLock.AcquireAsync(_context, request.UserId, cancellationToken);
                 await _passwordsStorage.UpdateUserPasswordHash(request.UserId, passwordHash, cancellationToken);
+                if (request.ResetPasskeys)
+                    await _webAuthnStorage.RemoveAllCredentials(request.UserId, cancellationToken);
+                if (request.RevokeOtherSessions)
+                    await _refreshTokensStorage.RevokeAllSessions(request.UserId, cancellationToken: cancellationToken);
 
                 // Адрес и имя подберёт воркер outbox; нет адреса — письмо не отправляется.
                 notificationEnqueued = await _notificationOutbox.EnqueueAsync(

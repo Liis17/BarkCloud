@@ -5,4 +5,5 @@ public sealed record ValidatedEmailAuthCode(
     EmailAuthCodePurpose Purpose,
     string Code,
     DateTime IssuedAt,
-    DateTime ExpiresAt);
+    DateTime ExpiresAt,
+    Guid? RequestId = null);

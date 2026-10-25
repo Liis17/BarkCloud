@@ -8,4 +8,6 @@ public class ForceSetPasswordServerCommand : IRequest<ForceSetPasswordServerResp
 {
     public long UserId { get; set; }
     public string NewPassword { get; set; } = string.Empty;
+    public bool ResetPasskeys { get; set; } = true;
+    public bool RevokeOtherSessions { get; set; } = true;
 }

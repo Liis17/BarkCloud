@@ -6,5 +6,8 @@ namespace BarkCloud.Identity.Domain;
 public enum EmailAuthCodePurpose
 {
     Login = 1,
-    EnableEmailOtp = 2
+    EnableEmailOtp = 2,
+    Reauthentication = 3,
+    EnableAuthenticator = 4,
+    DisableEmailOtp = 5
 }

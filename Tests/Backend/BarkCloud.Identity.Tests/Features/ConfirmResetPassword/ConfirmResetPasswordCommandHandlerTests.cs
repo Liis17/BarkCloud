@@ -32,6 +32,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
     private readonly Mock<IAuthPropertiesStorage> _authProps = new();
     private readonly Mock<IPasswordsStorage> _passwords = new();
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
+    private readonly Mock<IWebAuthnStorage> _webAuthn = new();
     private readonly Mock<IMediator> _mediator = new();
     private readonly Mock<PasswordChangedNotifier> _notifier;
     private readonly Mock<IAuthRateLimiter> _rateLimiter = new();
@@ -47,6 +48,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
         _notifier.Setup(n => n.NotifyAsync(It.IsAny<long>())).ReturnsAsync(true);
 
         _refreshTokens.Setup(s => s.RevokeAllSessions(42, "device-1", default)).ReturnsAsync(0);
+        _webAuthn.Setup(s => s.RemoveAllCredentials(42, It.IsAny<CancellationToken>())).ReturnsAsync(0);
         _resets.Setup(s => s.TryApprove(It.IsAny<Guid>())).ReturnsAsync(true);
         _resets.Setup(s => s.TryReserveOtpAttempt(It.IsAny<Guid>(), It.IsAny<int>())).ReturnsAsync(true);
         _mediator
@@ -56,7 +58,8 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
 
     private ConfirmResetPasswordCommandHandler CreateSut(RequestContext? ctx = null) => new(
         _resets.Object, _authProps.Object, _passwords.Object, _refreshTokens.Object,
-        _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _rateLimiter.Object, _logger, _db.Context);
+        _webAuthn.Object, _mediator.Object, _notifier.Object, ctx ?? FullContext(), _metrics, _rateLimiter.Object,
+        _logger, _db.Context);
 
     private static DomainResetPassword ValidEmailReset(Guid id) => new()
     {
@@ -270,6 +273,46 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
         _passwords.Verify(s => s.UpdateUserPasswordHash(42, It.IsAny<string>()), Times.Once);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Handle_ResetChoices_ApplyBothFlags(bool resetPasskeys, bool revokeSessions)
+    {
+        var id = Guid.NewGuid();
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
+
+        await CreateSut().Handle(new ConfirmResetPasswordCommand
+        {
+            ResetId = id,
+            OtpCode = "123456",
+            NewPassword = "newp",
+            ResetPasskeys = resetPasskeys,
+            RevokeOtherSessions = revokeSessions
+        }, default);
+
+        _webAuthn.Verify(s => s.RemoveAllCredentials(42, It.IsAny<CancellationToken>()),
+            resetPasskeys ? Times.Once : Times.Never);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(42, "device-1", It.IsAny<CancellationToken>()),
+            revokeSessions ? Times.Once : Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_ResetPasskeysByDefault_RemovesKeysAndRevokesSessions()
+    {
+        var id = Guid.NewGuid();
+        _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
+
+        await CreateSut().Handle(new ConfirmResetPasswordCommand
+        {
+            ResetId = id, OtpCode = "123456", NewPassword = "newp"
+        }, default);
+
+        _webAuthn.Verify(s => s.RemoveAllCredentials(42, It.IsAny<CancellationToken>()), Times.Once);
+        _refreshTokens.Verify(s => s.RevokeAllSessions(42, "device-1", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task Handle_NotificationFails_Throws()
     {
@@ -432,6 +475,8 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
         _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(ValidEmailReset(id));
         var (secret, totp) = AuthenticatorSecret();
         SetupAuthenticator(secret);
+        _authProps.Setup(s => s.TryConsumeTotpStep(42, secret, 0, It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
 
         var response = await CreateSut().Handle(new ConfirmResetPasswordCommand
@@ -497,6 +542,7 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
         }, default);
 
         await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _resets.Verify(s => s.TryReserveOtpAttempt(id, It.IsAny<int>()), Times.Once);
         _resets.Verify(s => s.TryApprove(It.IsAny<Guid>()), Times.Never);
     }
 
@@ -547,9 +593,9 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_AuthenticatorOnlyReset_IgnoresAuthenticatorCodeField()
+    public async Task Handle_PreviouslyIssuedAuthenticatorOnlyResetIsRejected()
     {
-        // Отдельный сброс только по Authenticator не меняется: код берётся из otp_code.
+        // Ранее созданный reset ID также не должен позволять сбросить пароль одним TOTP.
         var id = Guid.NewGuid();
         var (secret, totp) = AuthenticatorSecret();
         _resets.Setup(s => s.GetResetPassword(id)).ReturnsAsync(new DomainResetPassword
@@ -559,12 +605,13 @@ public class ConfirmResetPasswordCommandHandlerTests : IDisposable
         _authProps.Setup(s => s.GetOtpSecretKey(42)).ReturnsAsync(secret);
         _passwords.Setup(s => s.GetUserPasswordHash(42)).ReturnsAsync(PasswordHasher.HashPassword("oldp"));
 
-        var response = await CreateSut().Handle(new ConfirmResetPasswordCommand
+        var act = () => CreateSut().Handle(new ConfirmResetPasswordCommand
         {
             ResetId = id, OtpCode = totp.ComputeTotp(), NewPassword = "newp", AuthenticatorCode = "000000"
         }, default);
 
-        response.AccessToken.Value.Should().Be("access");
-        _resets.Verify(s => s.TryApprove(id), Times.Once);
+        await act.Should().ThrowAsync<NotValidOtpCodeException>();
+        _resets.Verify(s => s.TryReserveOtpAttempt(id, It.IsAny<int>()), Times.Never);
+        _resets.Verify(s => s.TryApprove(id), Times.Never);
     }
 }

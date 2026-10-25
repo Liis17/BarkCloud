@@ -11,6 +11,7 @@ public interface IWebAuthnStorage
     Task<bool> IsCredentialIdUnique(byte[] credentialId);
     Task<bool> TryUpdateCounter(long id, long expectedCounter, long verifiedCounter, CancellationToken cancellationToken = default);
     Task<bool> RemoveCredential(long userId, long id);
+    Task<int> RemoveAllCredentials(long userId, CancellationToken cancellationToken = default);
 
     // === User handle (на пользователя, в AuthUserProperty) ===
     Task<byte[]> GetOrCreateUserHandle(long userId);

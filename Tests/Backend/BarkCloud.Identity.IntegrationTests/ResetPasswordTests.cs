@@ -26,11 +26,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using DomainResetPassword = BarkCloud.Identity.Domain.ResetPassword;
 using DomainAuthUserProperty = BarkCloud.Identity.Domain.AuthUserProperty;
+using DomainWebAuthnCredential = BarkCloud.Identity.Domain.WebAuthnCredential;
 using OtpType = BarkCloud.Identity.Domain.OtpType;
 
 using OtpNet;
 
 using System.Data.Common;
+using Npgsql;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace BarkCloud.Identity.IntegrationTests;
@@ -93,17 +95,25 @@ public class ResetPasswordTests
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task ResetPassword_CommitsNewPasswordAndTokens_AndHonorsRevocationChoice(bool revoke)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ResetPassword_CommitsNewPasswordAndTokens_AndHonorsBothChoices(bool revoke, bool resetPasskeys)
     {
         await using var database = await PostgresIdentityDatabase.CreateAsync();
         await using var context = database.CreateContext();
         var reset = await Seed(context);
+        context.WebAuthnCredentials.Add(new DomainWebAuthnCredential
+        {
+            UserId = 42, CredentialId = [1, 2, 3], PublicKey = [4, 5, 6],
+            Name = "existing key", CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
         await using var beforeReset = database.CreateContext();
         var oldIds = (await new RefreshTokensStorage(beforeReset, new JwtSettings()).GetRefreshTokens(42))
             .ToDictionary(x => x.Value, x => x.Id);
-        var response = await CreateHandler(context).Handle(Command(reset.Id, revoke), default);
+        var response = await CreateHandler(context).Handle(Command(reset.Id, revoke, resetPasskeys), default);
 
         await using var reader = database.CreateContext();
         PasswordHasher.VerifyPassword("new-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
@@ -111,6 +121,7 @@ public class ResetPasswordTests
         var tokens = await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42);
         tokens.Should().Contain(t => t.Value == response.RefreshToken.Value && t.DeviceId == "current");
         tokens.Count.Should().Be(revoke ? 1 : 3);
+        (await reader.WebAuthnCredentials.CountAsync(x => x.UserId == 42)).Should().Be(resetPasskeys ? 0 : 1);
         (await reader.PendingNotifications.SingleAsync()).Type.Should().Be(NotificationType.PasswordChanged);
         var revoked = await reader.RevokedSessions.ToListAsync();
         if (revoke)
@@ -213,6 +224,60 @@ public class ResetPasswordTests
         await using var reader = database.CreateContext();
         (await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42)).Should().ContainSingle();
         (await reader.RevokedSessions.Select(x => x.DeviceId).ToListAsync()).Should().BeEquivalentTo("other", "current");
+    }
+
+    [Fact]
+    public async Task ResetPassword_ExpiresWhileWaitingForOwnerLock_IsRejectedAfterLock()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var reset = await Seed(setup);
+        var expiresAt = DateTime.UtcNow.AddSeconds(5);
+        await setup.ResetPasswords.Where(x => x.Id == reset.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, expiresAt));
+
+        await using var lockContext = database.CreateContext();
+        await using var ownerTransaction = await lockContext.Database.BeginTransactionAsync();
+        await IdentityOwnerLock.AcquireAsync(lockContext, reset.UserId);
+
+        await using var waitingContext = database.CreateContext();
+        var confirmation = CreateHandler(waitingContext).Handle(Command(reset.Id), default);
+        await WaitForOwnerLockWait(database.ConnectionString);
+        var remaining = expiresAt - DateTime.UtcNow;
+        if (remaining > TimeSpan.Zero)
+            await Task.Delay(remaining + TimeSpan.FromMilliseconds(100));
+        await ownerTransaction.CommitAsync();
+
+        await FluentActions.Awaiting(() => confirmation)
+            .Should().ThrowAsync<ResetIdExpiredException>();
+        await using var reader = database.CreateContext();
+        (await new ResetPasswordsStorage(reader).GetResetPassword(reset.Id))!.IsApproved.Should().BeFalse();
+        PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(reader).GetUserPasswordHash(42))
+            .Should().BeTrue();
+    }
+
+    private static async Task WaitForOwnerLockWait(string connectionString)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        await using var command = new NpgsqlCommand("""
+            SELECT EXISTS (
+                SELECT 1 FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND wait_event_type = 'Lock'
+                  AND wait_event = 'advisory'
+                  AND query LIKE '%pg_advisory_xact_lock%'
+            )
+            """, connection);
+        while (DateTime.UtcNow < deadline)
+        {
+            if ((bool)(await command.ExecuteScalarAsync())!)
+                return;
+            await Task.Delay(TimeSpan.FromMilliseconds(25));
+        }
+
+        throw new TimeoutException("Confirmation did not wait for the owner advisory lock.");
     }
 
     [Fact]
@@ -355,9 +420,10 @@ public class ResetPasswordTests
         });
     }
 
-    internal static ConfirmResetPasswordCommand Command(Guid resetId, bool revoke = true) => new()
+    internal static ConfirmResetPasswordCommand Command(Guid resetId, bool revoke = true, bool resetPasskeys = true) => new()
     {
-        ResetId = resetId, OtpCode = "123456", NewPassword = "new-password", RevokeOtherSessions = revoke
+        ResetId = resetId, OtpCode = "123456", NewPassword = "new-password",
+        RevokeOtherSessions = revoke, ResetPasskeys = resetPasskeys
     };
 
     internal static ConfirmResetPasswordCommandHandler CreateHandler(IdentityContext context, JwtService? jwt = null)
@@ -385,7 +451,7 @@ public class ResetPasswordTests
             NullLogger<NotificationOutbox>.Instance);
         var notifier = new PasswordChangedNotifier(outbox, request);
         return new ConfirmResetPasswordCommandHandler(new ResetPasswordsStorage(context), new AuthPropertiesStorage(context),
-            new PasswordsStorage(context), refreshTokens,
+            new PasswordsStorage(context), refreshTokens, new WebAuthnStorage(context),
             mediator.Object, notifier, request, metrics,
             new AuthRateLimiter(new AttemptCountersStorage(context), request, NullLogger<AuthRateLimiter>.Instance),
             NullLogger<ConfirmResetPasswordCommandHandler>.Instance, context);

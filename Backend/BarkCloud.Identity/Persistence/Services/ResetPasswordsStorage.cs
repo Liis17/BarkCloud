@@ -30,7 +30,8 @@ public class ResetPasswordsStorage(IdentityContext context) : IResetPasswordsSto
     public async Task<bool> TryApprove(Guid resetId, CancellationToken cancellationToken = default)
     {
         var updated = await context.ResetPasswords
-            .Where(x => x.Id == resetId && !x.IsApproved)
+            .Where(x => x.Id == resetId && x.OtpType == OtpType.Email && !x.IsApproved
+                        && x.ExpiresAt > DateTime.UtcNow)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsApproved, true), cancellationToken);
 
         return updated == 1;
