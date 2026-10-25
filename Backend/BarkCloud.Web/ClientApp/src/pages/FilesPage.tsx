@@ -247,7 +247,7 @@ export function FilesPage() {
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const directDirectoryId = new URLSearchParams(location.search).get('dir') || '';
   const smartFolderId = new URLSearchParams(location.search).get('smart') || '';
-  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : (navState.stack || []));
+  const stack = directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : (navState.stack ?? []);
   const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
@@ -336,14 +336,6 @@ export function FilesPage() {
       });
   }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
-  React.useEffect(() => {
-    if (directDirectoryId) setStack([{ id: directDirectoryId, name: 'Папка' }]);
-    else if (navState.stack) setStack(navState.stack);
-    else setStack([]);
-    // location.key меняется при навигации, но не при переходах по локальным хлебным крошкам.
-    // Поэтому стек синхронизируется с URL/state и не сбрасывается при обычном открытии подпапки.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.key, directDirectoryId, navState.stack]);
   const loadRef = React.useRef(load);
   loadRef.current = load;
   React.useEffect(() => { loadRef.current(); }, [attachVersion]);
@@ -425,8 +417,11 @@ export function FilesPage() {
     return () => observer.disconnect();
   }, [directoryCursor, searchQuery]);
 
-  const openDir = (dir: DirInfo) => setStack((s) => [...s, { id: dir.id, name: dir.name }]);
-  const gotoIndex = (i: number) => setStack((s) => s.slice(0, i + 1));
+  const openDir = (dir: DirInfo) => navigate('/files', { state: { stack: [...stack, { id: dir.id, name: dir.name }] } });
+  const gotoIndex = (i: number) => {
+    if (i < 0 && !stack.length) return;
+    navigate('/files', { state: { stack: stack.slice(0, i + 1) } });
+  };
 
   const startRename = (target: DirInfo | Entry, isDir: boolean) => {
     setName(target.name);
