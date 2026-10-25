@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilesPage } from './FilesPage';
 
@@ -73,6 +73,150 @@ function fileEntry(entryId: string, name: string) {
 function triggerDirectoryEnd() {
   intersectionCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
 }
+
+function LocationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return <>
+    <output data-testid="route-location">{JSON.stringify({ pathname: location.pathname, search: location.search, state: location.state })}</output>
+    <button onClick={() => navigate(-1)}>Browser Back</button>
+    <button onClick={() => navigate(1)}>Browser Forward</button>
+  </>;
+}
+
+function renderFilesHistory(initialEntries: Array<string | { pathname: string; search?: string; state?: unknown }>) {
+  render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <LocationProbe />
+      <Routes>
+        <Route path="/files" element={<FilesPage />} />
+        <Route path="/photos" element={<div>Фотографии</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+function currentRoute() {
+  return JSON.parse(screen.getByTestId('route-location').textContent || '{}');
+}
+
+function mockDirectoryListings(listings: Record<string, unknown>) {
+  mocks.apiGet.mockImplementation((url: string) => {
+    if (url.startsWith('/api/cloud/list')) {
+      const dir = new URL(url, 'http://localhost').searchParams.get('dir') || '';
+      return Promise.resolve(listings[dir] || { dirs: [], files: [] });
+    }
+    if (url === '/api/albums') return Promise.resolve({ albums: [] });
+    if (url === '/api/dynamic-folders') return Promise.resolve({ folders: [] });
+    return Promise.resolve({});
+  });
+}
+
+describe('FilesPage folder history', () => {
+  it('supports browser Back and Forward across folders and the previous page', async () => {
+    mockDirectoryListings({
+      '': { dirs: [{ id: 'dir-a', name: 'Папка А', updatedAt: '2026-01-01T00:00:00Z' }], files: [] },
+      'dir-a': { dirs: [{ id: 'dir-b', name: 'Папка Б', updatedAt: '2026-01-01T00:00:00Z' }], files: [] },
+      'dir-b': { dirs: [], files: [fileEntry('entry-b', 'Файл B')] },
+    });
+    renderFilesHistory(['/photos', '/files']);
+
+    fireEvent.click(await screen.findByText('Папка А'));
+    fireEvent.click(await screen.findByText('Папка Б'));
+    expect(await screen.findByText('Файл B')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Back' }));
+    expect(await screen.findByText('Папка Б')).toBeTruthy();
+    expect(screen.queryByText('Файл B')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Back' }));
+    expect(await screen.findByText('Папка А')).toBeTruthy();
+    expect(screen.queryByText('Папка Б')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Back' }));
+    expect(await screen.findByText('Фотографии')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Forward' }));
+    expect(await screen.findByText('Папка А')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Forward' }));
+    expect(await screen.findByText('Папка Б')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Forward' }));
+    expect(await screen.findByText('Файл B')).toBeTruthy();
+  });
+
+  it('pushes breadcrumb navigation into browser history', async () => {
+    mockDirectoryListings({
+      '': { dirs: [{ id: 'dir-a', name: 'Папка А', updatedAt: '2026-01-01T00:00:00Z' }], files: [] },
+      'dir-a': { dirs: [{ id: 'dir-b', name: 'Папка Б', updatedAt: '2026-01-01T00:00:00Z' }], files: [] },
+      'dir-b': { dirs: [], files: [fileEntry('entry-b', 'Файл B')] },
+    });
+    renderFilesHistory(['/files']);
+
+    fireEvent.click(await screen.findByText('Папка А'));
+    fireEvent.click(await screen.findByText('Папка Б'));
+    expect(await screen.findByText('Файл B')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Папка А'));
+    expect(await screen.findByText('Папка Б')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Back' }));
+    expect(await screen.findByText('Файл B')).toBeTruthy();
+  });
+
+  it('does not add a history entry when the root breadcrumb is already current', async () => {
+    mockDirectoryListings({ '': { dirs: [], files: [] } });
+    renderFilesHistory(['/photos', '/files']);
+
+    await screen.findByText('Папка пуста');
+    fireEvent.click(document.querySelector('.files-bar .breadcrumb > a')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Back' }));
+
+    expect(await screen.findByText('Фотографии')).toBeTruthy();
+  });
+
+  it('keeps a direct directory query as the parent entry when opening a child', async () => {
+    mockDirectoryListings({
+      'dir-d': { dirs: [{ id: 'dir-child', name: 'Дочерняя', updatedAt: '2026-01-01T00:00:00Z' }], files: [] },
+      'dir-child': { dirs: [], files: [] },
+    });
+    renderFilesHistory(['/files?dir=dir-d']);
+
+    fireEvent.click(await screen.findByText('Дочерняя'));
+    expect(currentRoute()).toEqual({
+      pathname: '/files',
+      search: '',
+      state: { stack: [{ id: 'dir-d', name: 'Папка' }, { id: 'dir-child', name: 'Дочерняя' }] },
+    });
+    expect(mocks.apiGet).toHaveBeenCalledWith('/api/cloud/list?dir=dir-child&limit=50');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Browser Back' }));
+    expect(await screen.findByText('Папка')).toBeTruthy();
+    expect(currentRoute()).toMatchObject({ pathname: '/files', search: '?dir=dir-d' });
+    expect(mocks.apiGet).toHaveBeenCalledWith('/api/cloud/list?dir=dir-d&limit=50');
+  });
+
+  it('uses incoming stack and initial selection without copying selectEntryId into child navigation', async () => {
+    mockDirectoryListings({
+      'dir-a': {
+        dirs: [{ id: 'dir-b', name: 'Папка Б', updatedAt: '2026-01-01T00:00:00Z' }],
+        files: [fileEntry('entry-selected', 'Выбранный файл')],
+      },
+      'dir-b': { dirs: [], files: [fileEntry('entry-b', 'Файл B')] },
+    });
+    renderFilesHistory([{
+      pathname: '/files',
+      state: { stack: [{ id: 'dir-a', name: 'Папка А' }], selectEntryId: 'entry-selected' },
+    }]);
+
+    const selectedRow = (await screen.findAllByText('Выбранный файл'))[0].closest('tr')!;
+    await waitFor(() => expect(selectedRow.className).toContain('selected'));
+    fireEvent.click(screen.getByText('Папка Б'));
+    expect(await screen.findByText('Файл B')).toBeTruthy();
+    expect(currentRoute().state).toEqual({
+      stack: [{ id: 'dir-a', name: 'Папка А' }, { id: 'dir-b', name: 'Папка Б' }],
+    });
+    expect(currentRoute().state).not.toHaveProperty('selectEntryId');
+  });
+});
 
 describe('FilesPage drag-and-drop', () => {
   it('shows the current folder and uploads a drop there', async () => {
