@@ -24,7 +24,7 @@ interface Props {
 export function PublicViewer({ file, onClose }: Props) {
   const isVideo = file.mediaKind === 'video';
   const isSvg = isSvgFileName(file.name);
-  const imageSrc = isVideo ? null : file.previewUrl || null;
+  const imageSrc = isVideo ? null : isSvg ? file.previewUrl || null : file.downloadUrl || null;
   const { copyLink, copyImage, toastNode } = usePublicShareActions(imageSrc || undefined);
 
   React.useEffect(() => {

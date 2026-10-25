@@ -32,4 +32,30 @@ describe('PublicViewer SVG safety', () => {
     expect(container.querySelector('img')?.getAttribute('src')).toBe('/preview.jpg');
     expect(screen.getByRole('button', { name: 'Скопировать изображение' })).toBeTruthy();
   });
+
+  it('uses the original image and allows copying when a non-SVG photo has no preview', () => {
+    const { container } = render(<PublicViewer file={{
+      name: 'photo.jpg',
+      mediaKind: 'photo',
+      downloadUrl: '/original.jpg',
+      previewUrl: '',
+      fileSize: 20,
+    }} onClose={vi.fn()} />);
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/original.jpg');
+    expect(screen.getByRole('button', { name: 'Скопировать изображение' })).toBeTruthy();
+  });
+
+  it('uses the original animated GIF instead of its static preview', () => {
+    const { container } = render(<PublicViewer file={{
+      name: 'animated.gif',
+      mediaKind: 'photo',
+      downloadUrl: '/original.gif',
+      previewUrl: '/preview.jpg',
+      fileSize: 20,
+    }} onClose={vi.fn()} />);
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/original.gif');
+    expect(screen.getByRole('button', { name: 'Скопировать изображение' })).toBeTruthy();
+  });
 });

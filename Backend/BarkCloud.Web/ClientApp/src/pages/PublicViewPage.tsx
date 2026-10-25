@@ -32,7 +32,11 @@ export function PublicViewPage() {
   const headInfo = typeof state === 'object' ? state : null;
   const headTitle = headInfo ? headInfo.name : state === 'notfound' ? 'Ссылка недоступна' : 'Публичный файл';
   const headIconUrl = headInfo?.previewUrl || null;
-  const copyImageSource = headInfo?.previewUrl || undefined;
+  const copyImageSource = headInfo
+    ? isSvgFileName(headInfo.name)
+      ? headInfo.previewUrl || undefined
+      : headInfo.downloadUrl || headInfo.previewUrl || undefined
+    : undefined;
   const { copyLink, copyImage, toastNode } = usePublicShareActions(copyImageSource);
 
   useDocumentHead(

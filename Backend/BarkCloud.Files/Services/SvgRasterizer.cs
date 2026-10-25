@@ -99,7 +99,6 @@ public sealed class SvgRasterizer : ISvgRasterizer
                         "--keep-aspect-ratio",
                         $"--width={MaximumDimension}",
                         $"--height={MaximumDimension}",
-                        "--output=-",
                         "-",
                     ],
                     Environment: new Dictionary<string, string>

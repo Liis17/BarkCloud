@@ -58,4 +58,17 @@ describe('PublicViewPage SVG safety', () => {
     expect(screen.getByText('Безопасное превью недоступно')).toBeTruthy();
     expect(usePublicShareActions).toHaveBeenLastCalledWith(undefined);
   });
+
+  it('copies a non-SVG photo from its original when no preview exists', async () => {
+    renderPublicView({
+      ...shareInfo,
+      name: 'photo.jpg',
+      previewUrl: '',
+      downloadUrl: '/s/token/download.jpg',
+    });
+
+    expect(await screen.findByRole('heading', { name: 'photo.jpg' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Скопировать изображение' })).toBeTruthy();
+    expect(usePublicShareActions).toHaveBeenLastCalledWith('/s/token/download.jpg');
+  });
 });
