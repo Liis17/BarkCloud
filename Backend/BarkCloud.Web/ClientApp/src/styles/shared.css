@@ -1078,6 +1078,7 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   border-radius: var(--r-md);
   box-shadow: var(--el-3);
 }
+.ctx-sub.flip { left: auto; right: 100%; margin-left: 0; margin-right: 4px; }
 
 /* ============ Модалки: подтверждение / свойства ============ */
 .confirm-msg { font-size: 14px; color: var(--md-on-surface-variant); padding: 4px 0 8px; }
