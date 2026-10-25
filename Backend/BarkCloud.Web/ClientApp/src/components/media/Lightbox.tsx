@@ -2,7 +2,7 @@ import React from 'react';
 import { Icon } from '../Icon';
 import { useContextMenu } from '../ui/ContextMenu';
 import { useOptionalAudioPlayer } from '../../hooks/useAudioPlayer';
-import { apiGet, proxiedImageUrl } from '../../lib/api';
+import { apiGet, fetchClipboardImage, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { VideoPlayer } from './MediaPlayer';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
@@ -187,7 +187,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     try {
       if (!photoSrc) throw new Error('Изображение ещё не загружено');
       // Через same-origin прокси — иначе чужой origin Files даёт CORS/tainted-canvas.
-      const blob = await (await fetch(proxiedImageUrl(photoSrc))).blob();
+      const blob = await fetchClipboardImage(proxiedImageUrl(photoSrc));
       // Clipboard API принимает только PNG — перегоняем через canvas.
       const bitmap = await createImageBitmap(blob);
       const canvas = document.createElement('canvas');
@@ -199,8 +199,8 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
       actions.toast('Изображение скопировано');
-    } catch {
-      actions.toast('Не удалось скопировать изображение', 'err');
+    } catch (e) {
+      actions.toast(e instanceof Error ? e.message : 'Не удалось скопировать изображение', 'err');
     }
   }
 
