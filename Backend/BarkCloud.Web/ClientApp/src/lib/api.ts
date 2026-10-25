@@ -17,6 +17,15 @@ export function proxiedImageUrl(url: string): string {
   return '/api/files/image?url=' + encodeURIComponent(url);
 }
 
+export async function fetchClipboardImage(url: string): Promise<Blob> {
+  const response = await fetch(url);
+  if (response.status === 415)
+    throw new Error('Безопасное представление изображения недоступно для копирования');
+  if (!response.ok)
+    throw new Error('Не удалось загрузить изображение для копирования');
+  return response.blob();
+}
+
 export async function api<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     credentials: 'same-origin',
