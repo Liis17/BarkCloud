@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 import { ShellContext } from '../../hooks/useShell';
 import type { Shell } from '../../lib/types';
 
-function renderSidebar(storage: Shell['storage']) {
+function renderSidebar(storage: Shell['storage'], collapsed = false, onToggle = vi.fn()) {
   const shell: Shell = {
     user: { initials: 'BC', displayName: 'Bark Cloud', role: 'admin', avatarUrl: '' },
     storage,
@@ -13,7 +13,7 @@ function renderSidebar(storage: Shell['storage']) {
     server: { host: 'cloud.example' },
     sync: { status: 'Синхронизировано', lastAt: '12:00' },
   };
-  return render(<MemoryRouter><ShellContext.Provider value={shell}><Sidebar /></ShellContext.Provider></MemoryRouter>);
+  return render(<MemoryRouter><ShellContext.Provider value={shell}><Sidebar collapsed={collapsed} onToggle={onToggle} /></ShellContext.Provider></MemoryRouter>);
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -70,5 +70,25 @@ describe('Sidebar storage', () => {
     expect(screen.getByText('не настроен')).toBeTruthy();
     expect(screen.getAllByText('S3')).toHaveLength(1);
     expect(screen.queryAllByRole('progressbar', { name: /S3/ })).toHaveLength(0);
+  });
+
+  it('переключает панель доступной кнопкой с актуальным aria-expanded', () => {
+    const onToggle = vi.fn();
+    renderSidebar(null, false, onToggle);
+
+    const button = screen.getByRole('button', { name: 'Свернуть панель' });
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('title')).toBe('Свернуть панель');
+    fireEvent.click(button);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('в свёрнутом виде скрывает подписи классом, сохраняя доступные ссылки', () => {
+    const { container } = renderSidebar(null, true);
+
+    expect(container.querySelector('.sidebar')?.classList.contains('collapsed')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Развернуть панель' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('link', { name: 'Фото' }).getAttribute('title')).toBe('Фото');
+    expect(screen.getByRole('link', { name: 'Настройки' }).getAttribute('aria-label')).toBe('Настройки');
   });
 });

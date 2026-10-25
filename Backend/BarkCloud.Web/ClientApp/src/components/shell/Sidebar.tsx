@@ -41,7 +41,13 @@ function NavRow({ item }: { item: NavItem }) {
   );
 }
 
-export function Sidebar({ profileError = false, storageError = false, statistics }: { profileError?: boolean; storageError?: boolean; statistics?: SidebarStorage | null }) {
+export function Sidebar({ collapsed, onToggle, profileError = false, storageError = false, statistics }: {
+  collapsed: boolean;
+  onToggle: () => void;
+  profileError?: boolean;
+  storageError?: boolean;
+  statistics?: SidebarStorage | null;
+}) {
   const shell = useShell();
   const user = shell?.user;
   const storage = statistics === undefined ? shell?.storage : statistics;
@@ -52,17 +58,22 @@ export function Sidebar({ profileError = false, storageError = false, statistics
   const app = shell?.app;
 
   return (
-    <aside className="sidebar">
+    <aside className={'sidebar' + (collapsed ? ' collapsed' : '')}>
       <div className="sb-brand">
         <div className="mark">
           <img src="/barkcloud-icon.png" alt="" width="40" height="40" />
         </div>
-        <div>
+        <div className="sb-brand-text">
           <div className="name">BarkCloud</div>
           <div className="v">
             {app?.version} · {app?.edition}
           </div>
         </div>
+        <button className="sb-collapse" type="button" aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Развернуть панель' : 'Свернуть панель'}
+          title={collapsed ? 'Развернуть панель' : 'Свернуть панель'} onClick={onToggle}>
+          <Icon.sidebar size={20} />
+        </button>
       </div>
 
       <nav className="sb-nav">

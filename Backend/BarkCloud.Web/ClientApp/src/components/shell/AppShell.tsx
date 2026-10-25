@@ -10,6 +10,7 @@ import { AudioPlayerProvider } from '../../hooks/useAudioPlayer';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import { MiniPlayer } from '../music/MiniPlayer';
 import { useApiResource } from '../../hooks/useApiResource';
+import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed';
 import { storagePending } from '../ui/StorageStatsStatus';
 import type { Shell, SidebarStorage } from '../../lib/types';
 
@@ -19,12 +20,17 @@ export function AppShell() {
   const profile = useApiResource<Shell>('/api/me?includeStorage=false');
   const storage = useApiResource<SidebarStorage>('/api/storage', true, storagePending);
   const shell = React.useMemo(() => profile.data ? { ...profile.data, storage: storage.data } : null, [profile.data, storage.data]);
+  const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed();
   const [header, setHeader] = React.useState<PageHeader>({ title: '' });
   const { pathname } = useLocation();
   const previousPath = React.useRef(pathname);
   React.useEffect(() => {
     if (previousPath.current !== pathname) { previousPath.current = pathname; void storage.reload(); }
   }, [pathname, storage.reload]);
+  React.useEffect(() => {
+    document.documentElement.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  }, [sidebarCollapsed]);
+  React.useEffect(() => () => document.documentElement.classList.remove('sidebar-collapsed'), []);
 
   const headerCtx = React.useMemo(() => ({ header, setHeader }), [header]);
   const documentTitle = header.documentTitle ?? (typeof header.title === 'string' ? header.title : '');
@@ -41,7 +47,7 @@ export function AppShell() {
         <AudioPlayerProvider>
           <PageHeaderContext.Provider value={headerCtx}>
             <div className={'app' + (header.contentClass === 'settings-content' ? ' app-settings' : '')}>
-              <Sidebar statistics={storage.data} profileError={!!profile.error} storageError={!!storage.error} />
+              <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} statistics={storage.data} profileError={!!profile.error} storageError={!!storage.error} />
               <div className="main">
                 <Topbar {...header} />
                 <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>

@@ -1181,15 +1181,6 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   .settings-context-error { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
-  .app-settings { grid-template-columns: 72px minmax(0, 1fr); }
-  .app-settings .sidebar { padding: 8px 8px 0; }
-  .app-settings .sb-brand { padding: 8px 0 16px; justify-content: center; }
-  .app-settings .sb-brand > div:nth-child(2), .app-settings .sb-section-label,
-  .app-settings .sb-item > span:not(.ico), .app-settings .sb-storage,
-  .app-settings .sb-user :is(.who, .chev) { display: none; }
-  .app-settings .sb-nav { gap: 8px; }
-  .app-settings .sb-item { padding: 0; justify-content: center; }
-  .app-settings .sb-user { padding: 12px 0; justify-content: center; }
   .app-settings :is(.topbar, .footbar) { padding-inline: 16px; }
   .app-settings .footbar .right, .app-settings .footbar .left > span:nth-child(2) { display: none; }
   .app-settings .content { padding: 12px 16px 24px; }
