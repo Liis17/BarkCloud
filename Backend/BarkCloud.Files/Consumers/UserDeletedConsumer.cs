@@ -50,6 +50,7 @@ public class UserDeletedConsumer(
         var favorites = await context.FavoriteFiles.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var aliases = await context.FileSearchAliases.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var tags = await context.FileTags.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
+        await context.UserTags.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var shares = await context.ShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         var folderShares = await context.FolderShareLinks.Where(x => x.OwnerId == userId).ExecuteDeleteAsync();
         // Гранты доступа, где пользователь — владелец ИЛИ получатель (не оставляем висящие доступы на/от удалённого).

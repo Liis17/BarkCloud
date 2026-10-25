@@ -1,4 +1,5 @@
 syntax = "proto3";
+import "google/protobuf/empty.proto";
 
 option csharp_namespace = "BarkCloud.Proto.Files";
 
@@ -195,6 +196,9 @@ service SearchApi {
   rpc ResolveHit                (SearchHitReference)               returns (SearchHit);
   rpc GetFileSearchMetadata     (GetFileSearchMetadataRequest)     returns (FileSearchMetadata);
   rpc ReplaceFileSearchMetadata (ReplaceFileSearchMetadataRequest) returns (FileSearchMetadata);
+  rpc ListUserTags (google.protobuf.Empty) returns (UserTagList);
+  rpc SaveUserTag (SaveUserTagRequest) returns (UserTagData);
+  rpc DeleteUserTag (DeleteUserTagRequest) returns (google.protobuf.Empty);
 }
 
 service DynamicFolderApi {
@@ -1285,6 +1289,19 @@ message SearchHit {
   string owner_name = 14;
   FilePlaceholderInfo placeholder = 15;
 }
+
+message UserTagData {
+  string id = 1;
+  string name = 2;
+  string color = 3;
+}
+message UserTagList { repeated UserTagData items = 1; }
+message SaveUserTagRequest {
+  string id = 1; // Пустой id создаёт тег.
+  string name = 2;
+  string color = 3; // #RRGGBB
+}
+message DeleteUserTagRequest { string id = 1; }
 
 message GetFileSearchMetadataRequest {
   string file_id = 1;

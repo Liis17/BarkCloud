@@ -166,6 +166,7 @@ public partial class UnifiedSearchService
             throw new RpcException(new Status(StatusCode.InvalidArgument, $"Можно указать не больше {MaxTags} тегов"));
 
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await LockUserTags(cancellationToken);
         var existingAlias = await _context.FileSearchAliases
             .FirstOrDefaultAsync(x => x.OwnerId == ownerId && x.FileId == fileId, cancellationToken);
         if (alias.Length == 0)
@@ -191,6 +192,17 @@ public partial class UnifiedSearchService
             existingAlias.UpdatedAt = DateTime.UtcNow;
         }
 
+        // Старые клиенты по-прежнему передают строки: новые имена добавляются в личный каталог.
+        var normalizedTags = tags.Keys.ToArray();
+        var catalog = await _context.UserTags.Where(x => x.OwnerId == ownerId && normalizedTags.Contains(x.NormalizedName))
+            .ToDictionaryAsync(x => x.NormalizedName, cancellationToken);
+        foreach (var (normalized, value) in tags.ToArray())
+        {
+            if (catalog.TryGetValue(normalized, out var known))
+                tags[normalized] = known.Name;
+            else
+                _context.UserTags.Add(new UserTag { Id = Guid.NewGuid(), OwnerId = ownerId, Name = value, NormalizedName = normalized });
+        }
         await _context.FileTags.Where(x => x.OwnerId == ownerId && x.FileId == fileId).ExecuteDeleteAsync(cancellationToken);
         var now = DateTime.UtcNow;
         foreach (var (normalized, value) in tags)
