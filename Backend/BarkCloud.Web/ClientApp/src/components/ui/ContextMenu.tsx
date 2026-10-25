@@ -21,8 +21,10 @@ interface ContextMenuProps {
 /** Меню по координатам (x,y). */
 export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const ref = React.useRef<HTMLDivElement | null>(null);
+  const subRef = React.useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = React.useState({ x, y });
   const [openSub, setOpenSub] = React.useState<number | null>(null);
+  const [subPlacement, setSubPlacement] = React.useState<{ index: number; flip: boolean; left: number | null } | null>(null);
 
   React.useLayoutEffect(() => {
     const el = ref.current;
@@ -34,6 +36,31 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     if (y + r.height > window.innerHeight - 8) ny = Math.max(8, window.innerHeight - r.height - 8);
     setPos({ x: nx, y: ny });
   }, [x, y, items]);
+
+  React.useLayoutEffect(() => {
+    if (openSub === null) return;
+    const subEl = subRef.current;
+    const itemEl = subEl?.parentElement;
+    if (!subEl || !itemEl) return;
+    const width = subEl.getBoundingClientRect().width;
+    const itemRect = itemEl.getBoundingClientRect();
+    const rightEdge = window.innerWidth - 8;
+    if (itemRect.right + 4 + width <= rightEdge) {
+      setSubPlacement(null);
+      return;
+    }
+    if (itemRect.left - 4 - width >= 8) {
+      setSubPlacement({ index: openSub, flip: true, left: null });
+      return;
+    }
+    const leftSpace = itemRect.left - 12;
+    const rightSpace = rightEdge - itemRect.right - 4;
+    if (leftSpace >= rightSpace) {
+      setSubPlacement({ index: openSub, flip: false, left: Math.max(-width - 4, 8 - itemRect.left) });
+    } else {
+      setSubPlacement({ index: openSub, flip: false, left: Math.min(itemRect.width + 4, rightEdge - width - itemRect.left) });
+    }
+  }, [openSub]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,7 +115,10 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                 (it.disabled ? ' disabled' : '') +
                 (hasSub ? ' has-sub' : '')
               }
-              onMouseEnter={() => setOpenSub(hasSub ? idx : null)}
+              onMouseEnter={() => {
+                setOpenSub(hasSub ? idx : null);
+                setSubPlacement(null);
+              }}
               onClick={() => runItem(it)}
             >
               <span className="ci-ico">{IconC ? <IconC size={17} /> : null}</span>
@@ -99,7 +129,11 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                 </span>
               )}
               {hasSub && openSub === idx && (
-                <div className="ctx-sub">
+                <div
+                  className={'ctx-sub' + (subPlacement?.index === idx && subPlacement.flip ? ' flip' : '')}
+                  ref={subRef}
+                  style={subPlacement?.index === idx && subPlacement.left !== null ? { left: subPlacement.left, marginLeft: 0 } : undefined}
+                >
                   {it.submenu!.map((s, j) => (
                     <div
                       key={j}
