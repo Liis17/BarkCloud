@@ -15,6 +15,7 @@ export interface AuthValues {
   last_name?: string;
   remember?: boolean;
   revoke_sessions?: boolean;
+  reset_passkeys?: boolean;
 }
 
 export interface AuthPageState {

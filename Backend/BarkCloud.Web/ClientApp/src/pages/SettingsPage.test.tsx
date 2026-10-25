@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage';
 import { jsonResponse, profile, serverSettings, system } from '../test/settingsFixtures';
 
+vi.mock('../lib/webauthn', () => ({
+  webauthnAuthenticate: vi.fn(),
+  webauthnRegister: vi.fn(),
+  webauthnSupported: () => true,
+}));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -44,6 +50,32 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
     await waitFor(() => expect(document.querySelector('.avatar-big img')?.getAttribute('src')).toBe(profile.avatarUrl));
     expect(fetchMock.mock.calls.map(([path]) => path).sort()).toEqual(['/api/settings/context', '/api/settings/profile']);
+  });
+
+  it('запрашивает reauth перед добавлением passkey и показывает обязательный второй фактор', async () => {
+    const fetchMock = mockSettings();
+    fetchMock.mockImplementation((path) => {
+      if (path === '/api/settings/security/reauth/begin')
+        return Promise.resolve(jsonResponse({ message: 'Введите код приложения-аутентификатора', otpMethod: 'authenticator' }, 400));
+      const data: Record<string, unknown> = {
+        '/api/settings/context': { admin: { enabled: false, unlocked: false } },
+        '/api/settings/profile': profile,
+        '/api/settings/security/2fa': { authenticator: true, email: false },
+        '/api/settings/security/webauthn': { keys: [{ id: 'key-1', name: 'Ключ', createdAt: null, lastUsedAt: null }] },
+      };
+      return Promise.resolve(jsonResponse(data[path] ?? {}));
+    });
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Безопасность' }));
+    await screen.findByText('Ключи безопасности');
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить ключ' }));
+    fireEvent.change(await screen.findByPlaceholderText('Пароль'), { target: { value: 'current-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить паролем' }));
+
+    expect(await screen.findByPlaceholderText('Код из приложения-аутентификатора')).toBeTruthy();
+    const beginCall = fetchMock.mock.calls.find(([path]) => path === '/api/settings/security/reauth/begin');
+    expect(JSON.parse(beginCall?.[1]?.body as string)).toMatchObject({ action: 1, password: 'current-password' });
+    expect(fetchMock.mock.calls.some(([path]) => path === '/api/settings/security/webauthn/register/begin')).toBe(false);
   });
 
   it('общий поиск открывает пункт и переводит к нему фокус', async () => {

@@ -7,7 +7,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
 import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
-import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
+import { webauthnAuthenticate, webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import { useConfirm, usePrompt } from '../hooks/useDialog';
 import { Switch as Toggle } from '../components/ui/Switch';
 import { Select } from '../components/ui/Select';
@@ -1122,9 +1122,27 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   const [disableCode, setDisableCode] = React.useState('');
   const [disableBusy, setDisableBusy] = React.useState(false);
   // Повторное подтверждение паролем: настройка Authenticator и отключение email-2FA.
-  const [reauthDlg, setReauthDlg] = React.useState<'enableAuth' | 'disableEmail' | null>(null);
+  const [reauthDlg, setReauthDlg] = React.useState<'enableAuth' | 'disableEmail' | 'passkeyAdd' | 'passkeyRemove' | 'setInitialPassword' | null>(null);
   const [reauthPwd, setReauthPwd] = React.useState('');
   const [reauthBusy, setReauthBusy] = React.useState(false);
+  const [reauthOtpCode, setReauthOtpCode] = React.useState('');
+  const [reauthEmailCode, setReauthEmailCode] = React.useState('');
+  const [reauthChallengeId, setReauthChallengeId] = React.useState('');
+  const [reauthEmailRequired, setReauthEmailRequired] = React.useState(false);
+  const [reauthOtpRequired, setReauthOtpRequired] = React.useState(false);
+  const [reauthRetryAt, setReauthRetryAt] = React.useState(0);
+  const [reauthNow, setReauthNow] = React.useState(Date.now());
+  const [reauthCredentialId, setReauthCredentialId] = React.useState('');
+  const [confirmNode, confirm] = useConfirm();
+
+  React.useEffect(() => {
+    if (!reauthDlg) return;
+    const timer = window.setInterval(() => setReauthNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [reauthDlg]);
+  const reauthRetrySeconds = Math.max(0, Math.ceil((reauthRetryAt - reauthNow) / 1000));
+  const passkeyReauth = reauthDlg === 'passkeyAdd' || reauthDlg === 'passkeyRemove' || reauthDlg === 'setInitialPassword';
+  const reauthEmailPrompt = reauthEmailRequired && (!passkeyReauth || Boolean(reauthChallengeId));
 
   async function refresh2fa() {
     const res = await sGet<{ authenticator: boolean; email: boolean }>('/api/settings/security/2fa');
@@ -1133,7 +1151,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       setEmail2fa(res.data.email);
     }
   }
-  async function savePassword() {
+  async function savePassword(permissionToken?: string) {
     if (newPwd.length < 6) {
       flash('err', 'Пароль слишком короткий (мин. 6)');
       return;
@@ -1143,39 +1161,255 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       return;
     }
     setSavingPwd(true);
-    const res = await sPost('/api/settings/security/password', { oldPassword: oldPwd, newPassword: newPwd });
+    const res = await sPost<{ reauthenticationRequired?: boolean }>('/api/settings/security/password', {
+      oldPassword: oldPwd, newPassword: newPwd, permissionToken: permissionToken || '',
+    });
     setSavingPwd(false);
     if (res.ok) {
       setPwdOpen(false);
       setOldPwd('');
       setNewPwd('');
       setConfirmPwd('');
+      if (permissionToken) closeReauth();
       flash('ok', 'Пароль изменён');
+    } else if (res.data?.reauthenticationRequired) {
+      setReauthCredentialId('');
+      setReauthPwd('');
+      setReauthOtpCode('');
+      setReauthEmailCode('');
+      setReauthChallengeId('');
+      setReauthEmailRequired(false);
+      setReauthOtpRequired(false);
+      setReauthDlg('setInitialPassword');
     } else flash('err', errMsg(res));
   }
+  function reauthErrorInfo(res: ApiResp) {
+    return res.data && typeof res.data === 'object'
+      ? res.data as { otpMethod?: string; retryAfterSeconds?: number; reauthenticationRequired?: boolean }
+      : {};
+  }
+
+  function showReauthFactors(res: ApiResp) {
+    const info = reauthErrorInfo(res);
+    if (info.otpMethod === 'authenticator') {
+      setReauthOtpRequired(true);
+      setReauthEmailRequired(false);
+      setReauthChallengeId('');
+    }
+    if (info.otpMethod === 'email') {
+      setReauthEmailRequired(true);
+      setReauthOtpRequired(false);
+    }
+    if (info.retryAfterSeconds) setReauthRetryAt(Date.now() + info.retryAfterSeconds * 1000);
+  }
+
+  function closeReauth() {
+    setReauthDlg(null);
+    setReauthPwd('');
+    setReauthOtpCode('');
+    setReauthEmailCode('');
+    setReauthChallengeId('');
+    setReauthEmailRequired(false);
+    setReauthOtpRequired(false);
+  }
+
+  async function finishPasskeyAction(permissionToken: string) {
+    if (reauthDlg === 'setInitialPassword') {
+      await savePassword(permissionToken);
+      return;
+    }
+    if (reauthDlg === 'passkeyAdd') {
+      const begin = await sPost<{ optionsJson: string; challengeId: string }>('/api/settings/security/webauthn/register/begin', { permissionToken });
+      if (!begin.ok || !begin.data) {
+        flash('err', errMsg(begin));
+        return;
+      }
+      const attestationJson = await webauthnRegister(begin.data.optionsJson);
+      const name = (await prompt({ title: 'Название ключа', label: 'Название', initial: 'Ключ безопасности' })) || 'Ключ безопасности';
+      const complete = await sPost('/api/settings/security/webauthn/register/complete', {
+        challengeId: begin.data.challengeId,
+        attestation: JSON.parse(attestationJson),
+        name,
+        permissionToken,
+      });
+      if (complete.ok) {
+        flash('ok', 'Ключ привязан');
+        loadKeys();
+        closeReauth();
+      } else flash('err', errMsg(complete));
+      return;
+    }
+
+    const removed = await sPost('/api/settings/security/webauthn/remove', {
+      credentialId: reauthCredentialId,
+      permissionToken,
+    });
+    if (removed.ok) {
+      flash('ok', 'Ключ удалён');
+      loadKeys();
+      closeReauth();
+    } else flash('err', errMsg(removed));
+  }
+
+  async function completePasskeyReauth(permissionToken?: string) {
+    if (permissionToken) {
+      await finishPasskeyAction(permissionToken);
+      return;
+    }
+    const begin = await sPost<{ optionsJson: string; challengeId: string; permissionToken: string }>('/api/settings/security/reauth/begin', {
+      action: reauthDlg === 'passkeyAdd' ? 1 : reauthDlg === 'passkeyRemove' ? 2 : 3,
+      credentialId: reauthCredentialId,
+    });
+    if (!begin.ok || !begin.data) {
+      showReauthFactors(begin);
+      flash('err', errMsg(begin));
+      return;
+    }
+    const assertion = await webauthnAuthenticate(begin.data.optionsJson);
+    const complete = await sPost<{ permissionToken: string }>('/api/settings/security/reauth/complete', {
+      challengeId: begin.data.challengeId,
+      assertion: JSON.parse(assertion),
+    });
+    if (complete.ok && complete.data) await finishPasskeyAction(complete.data.permissionToken);
+    else flash('err', errMsg(complete));
+  }
+
+  async function useExistingPasskey() {
+    setReauthBusy(true);
+    try {
+      await completePasskeyReauth();
+    } catch (e) {
+      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Подтверждение ключом отменено' : 'Не удалось подтвердить действие');
+    } finally {
+      setReauthBusy(false);
+    }
+  }
+
+  async function resendReauthEmail() {
+    if (!reauthDlg || !reauthChallengeId || reauthRetrySeconds > 0) return;
+    setReauthBusy(true);
+    const res = await sPost<{ retryAfterSeconds: number }>('/api/settings/security/reauth/begin', {
+      action: reauthDlg === 'passkeyAdd' ? 1 : reauthDlg === 'passkeyRemove' ? 2 : 3,
+      credentialId: reauthCredentialId,
+      challengeId: reauthChallengeId,
+    });
+    setReauthBusy(false);
+    if (res.ok && res.data?.retryAfterSeconds) setReauthRetryAt(Date.now() + res.data.retryAfterSeconds * 1000);
+    else if (!res.ok) flash('err', errMsg(res));
+  }
+
+  async function resendFactorEmail() {
+    if (reauthRetrySeconds > 0) return;
+    setReauthBusy(true);
+    try {
+      if (reauthDlg === 'enableAuth') {
+        const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', {
+          otpType: 1, password: reauthPwd, currentOtpCode: reauthOtpCode.trim(), currentEmailCode: '',
+        });
+        if (res.ok && res.data) {
+          closeReauth();
+          setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      } else if (reauthDlg === 'disableEmail') {
+        const res = await sPost('/api/settings/security/2fa/disable', {
+          otpType: 2, otpCode: '', password: reauthPwd, currentEmailCode: '',
+        });
+        if (res.ok) {
+          closeReauth();
+          flash('ok', 'Email-2FA отключена');
+          refresh2fa();
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      }
+    } finally {
+      setReauthBusy(false);
+    }
+  }
+
   async function submitReauth() {
     if (!reauthDlg) return;
     setReauthBusy(true);
-    if (reauthDlg === 'enableAuth') {
-      const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', { otpType: 1, password: reauthPwd });
-      if (res.ok && res.data) {
-        setReauthDlg(null);
-        setEnableCode('');
-        setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
-      } else flash('err', errMsg(res));
-    } else {
-      const res = await sPost('/api/settings/security/2fa/disable', { otpType: 2, otpCode: '', password: reauthPwd });
-      if (res.ok) {
-        setReauthDlg(null);
-        flash('ok', 'Email-2FA отключена');
-        refresh2fa();
-      } else flash('err', errMsg(res));
+    try {
+      if (reauthDlg === 'passkeyAdd' || reauthDlg === 'passkeyRemove' || reauthDlg === 'setInitialPassword') {
+        if (reauthEmailRequired && reauthChallengeId) {
+          const complete = await sPost<{ permissionToken: string }>('/api/settings/security/reauth/complete', {
+            challengeId: reauthChallengeId,
+            emailCode: reauthEmailCode.trim(),
+          });
+          if (complete.ok && complete.data) await finishPasskeyAction(complete.data.permissionToken);
+          else {
+            showReauthFactors(complete);
+            flash('err', errMsg(complete));
+          }
+          return;
+        }
+
+        const begin = await sPost<{ permissionToken: string; challengeId: string; retryAfterSeconds: number }>('/api/settings/security/reauth/begin', {
+          action: reauthDlg === 'passkeyAdd' ? 1 : reauthDlg === 'passkeyRemove' ? 2 : 3,
+          credentialId: reauthCredentialId,
+          password: reauthPwd,
+          otpCode: reauthOtpCode.trim(),
+          challengeId: reauthChallengeId,
+        });
+        if (!begin.ok || !begin.data) {
+          showReauthFactors(begin);
+          flash('err', errMsg(begin));
+          return;
+        }
+        if (begin.data.permissionToken) await finishPasskeyAction(begin.data.permissionToken);
+        else if (begin.data.challengeId) {
+          setReauthChallengeId(begin.data.challengeId);
+          setReauthEmailRequired(true);
+          if (begin.data.retryAfterSeconds) setReauthRetryAt(Date.now() + begin.data.retryAfterSeconds * 1000);
+        }
+        return;
+      }
+
+      if (reauthDlg === 'enableAuth') {
+        const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', {
+          otpType: 1,
+          password: reauthPwd,
+          currentOtpCode: reauthOtpCode.trim(),
+          currentEmailCode: reauthEmailCode.trim(),
+        });
+        if (res.ok && res.data) {
+          closeReauth();
+          setEnableCode('');
+          setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      } else {
+        const res = await sPost('/api/settings/security/2fa/disable', {
+          otpType: 2,
+          otpCode: '',
+          password: reauthPwd,
+          currentEmailCode: reauthEmailCode.trim(),
+        });
+        if (res.ok) {
+          closeReauth();
+          flash('ok', 'Email-2FA отключена');
+          refresh2fa();
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      }
+    } catch (e) {
+      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Подтверждение ключом отменено' : 'Не удалось подтвердить действие');
+    } finally {
+      setReauthBusy(false);
     }
-    setReauthBusy(false);
   }
   async function startEnable(otpType: number) {
     if (otpType === 1) {
-      setReauthPwd('');
+      closeReauth();
       setReauthDlg('enableAuth');
       return;
     }
@@ -1199,7 +1433,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }
   async function startDisable(otpType: number) {
     if (otpType === 2) {
-      setReauthPwd('');
+      closeReauth();
       setReauthDlg('disableEmail');
       return;
     }
@@ -1219,7 +1453,6 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }
 
   const [keys, setKeys] = React.useState<WebAuthnKey[]>([]);
-  const [keyBusy, setKeyBusy] = React.useState(false);
   const canWebAuthn = webauthnSupported();
 
   async function loadKeys() {
@@ -1231,42 +1464,33 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }, []);
 
   async function addKey() {
-    setKeyBusy(true);
-    try {
-      const begin = await sPost<{ optionsJson: string; challengeId: string }>('/api/settings/security/webauthn/register/begin');
-      if (!begin.ok || !begin.data) {
-        flash('err', errMsg(begin));
-        return;
-      }
-      const attestationJson = await webauthnRegister(begin.data.optionsJson);
-      const name = (await prompt({ title: 'Название ключа', label: 'Название', initial: 'Ключ безопасности' })) || 'Ключ безопасности';
-      const complete = await sPost('/api/settings/security/webauthn/register/complete', {
-        challengeId: begin.data.challengeId,
-        attestation: JSON.parse(attestationJson),
-        name,
-      });
-      if (complete.ok) {
-        flash('ok', 'Ключ привязан');
-        loadKeys();
-      } else flash('err', errMsg(complete));
-    } catch (e) {
-      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Отменено' : 'Не удалось привязать ключ');
-    } finally {
-      setKeyBusy(false);
-    }
+    setReauthCredentialId('');
+    setReauthPwd('');
+    setReauthOtpCode('');
+    setReauthEmailCode('');
+    setReauthChallengeId('');
+    setReauthEmailRequired(false);
+    setReauthOtpRequired(false);
+    setReauthDlg('passkeyAdd');
   }
 
   async function removeKey(id: string) {
-    const res = await sPost('/api/settings/security/webauthn/remove', { credentialId: id });
-    if (res.ok) {
-      flash('ok', 'Ключ удалён');
-      loadKeys();
-    } else flash('err', errMsg(res));
+    const accepted = await confirm({ title: 'Удалить ключ?', message: 'Для удаления потребуется повторное подтверждение паролем или другим passkey.', confirmLabel: 'Продолжить', danger: true });
+    if (!accepted) return;
+    setReauthCredentialId(id);
+    setReauthPwd('');
+    setReauthOtpCode('');
+    setReauthEmailCode('');
+    setReauthChallengeId('');
+    setReauthEmailRequired(false);
+    setReauthOtpRequired(false);
+    setReauthDlg('passkeyRemove');
   }
 
   return (
     <>
       {promptNode}
+      {confirmNode}
       <div className="set-card">
         <div className="set-card-head">
           <h3>Пароль</h3>
@@ -1313,15 +1537,15 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
               label={k.name}
               help={k.lastUsedAt ? 'использован ' + new Date(k.lastUsedAt).toLocaleDateString() : 'не использовался'}
               end={
-                <button className="btn text" onClick={() => removeKey(k.id)} disabled={keyBusy}>
+                <button className="btn text" onClick={() => removeKey(k.id)} disabled={reauthBusy}>
                   Удалить
                 </button>
               }
             />
           ))}
           {canWebAuthn ? (
-            <button className="btn" onClick={addKey} disabled={keyBusy} style={{ marginTop: 8 }}>
-              {keyBusy ? <span className="spin" /> : <Icon.key size={16} />} Добавить ключ
+            <button className="btn" onClick={addKey} disabled={reauthBusy} style={{ marginTop: 8 }}>
+              {reauthBusy ? <span className="spin" /> : <Icon.key size={16} />} Добавить ключ
             </button>
           ) : (
             <div className="sub">Браузер не поддерживает ключи безопасности</div>
@@ -1353,18 +1577,48 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       </div>
 
       {reauthDlg && (
-        <div className="sys-scrim" onClick={() => !reauthBusy && setReauthDlg(null)}>
+        <div className="sys-scrim" onClick={() => !reauthBusy && closeReauth()}>
           <div className="sys-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>{reauthDlg === 'enableAuth' ? 'Настройка аутентификатора' : 'Отключить email-2FA'}</h3>
-            <div className="sub">Введите текущий пароль, чтобы подтвердить изменение двухфакторной защиты.</div>
-            <input className="dlg-input" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
+            <h3>{reauthDlg === 'enableAuth' ? 'Настройка аутентификатора' : reauthDlg === 'disableEmail' ? 'Отключить email-2FA' : reauthDlg === 'passkeyAdd' ? 'Добавить passkey' : reauthDlg === 'passkeyRemove' ? 'Удалить passkey' : 'Подтвердите установку пароля'}</h3>
+            <div className="sub">{reauthDlg === 'setInitialPassword'
+              ? 'Для аккаунта с passkey первую установку пароля нужно подтвердить существующим ключом.'
+              : reauthDlg === 'passkeyAdd' || reauthDlg === 'passkeyRemove'
+                ? 'Подтвердите действие паролем и активным вторым фактором или существующим passkey.'
+              : 'Введите текущий пароль, чтобы подтвердить изменение двухфакторной защиты.'}</div>
+            {reauthDlg !== 'setInitialPassword' && (reauthDlg !== 'passkeyAdd' && reauthDlg !== 'passkeyRemove' || !reauthEmailRequired || !reauthChallengeId) ? (
+              <input className="dlg-input" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
+            ) : null}
+            {reauthOtpRequired && <input className="dlg-input" value={reauthOtpCode} onChange={(e) => setReauthOtpCode(e.target.value)} placeholder="Код из приложения-аутентификатора" inputMode="numeric" autoComplete="one-time-code" />}
+            {reauthEmailPrompt && (
+              <>
+                <input className="dlg-input" value={reauthEmailCode} onChange={(e) => setReauthEmailCode(e.target.value)} placeholder="Код из письма" inputMode="numeric" autoComplete="one-time-code" />
+                {passkeyReauth ? (
+                  <button className="btn text" onClick={resendReauthEmail} disabled={reauthBusy || reauthRetrySeconds > 0}>
+                    {reauthRetrySeconds > 0 ? `Повторная отправка через ${reauthRetrySeconds} с` : 'Отправить код повторно'}
+                  </button>
+                ) : (
+                  <button className="btn text" onClick={resendFactorEmail} disabled={reauthBusy || reauthRetrySeconds > 0}>
+                    {reauthRetrySeconds > 0 ? `Повторная отправка через ${reauthRetrySeconds} с` : 'Отправить код повторно'}
+                  </button>
+                )}
+              </>
+            )}
             <div className="dlg-actions two">
-              <button className="btn text" onClick={() => setReauthDlg(null)} disabled={reauthBusy}>
+              <button className="btn text" onClick={closeReauth} disabled={reauthBusy}>
                 Отмена
               </button>
-              <button className="btn primary" onClick={submitReauth} disabled={reauthBusy || !reauthPwd}>
-                {reauthBusy ? <span className="spin" /> : null} Продолжить
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {passkeyReauth ? (
+                  keys.length > 0 && canWebAuthn && <button className="btn" onClick={useExistingPasskey} disabled={reauthBusy}>
+                    Подтвердить passkey
+                  </button>
+                ) : null}
+                {reauthDlg !== 'setInitialPassword' && (
+                  <button className="btn primary" onClick={submitReauth} disabled={reauthBusy || !reauthPwd && !reauthEmailPrompt}>
+                    {reauthBusy ? <span className="spin" /> : null} {reauthEmailPrompt ? 'Подтвердить код' : passkeyReauth ? 'Подтвердить паролем' : 'Продолжить'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

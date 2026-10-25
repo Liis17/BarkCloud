@@ -29,6 +29,7 @@ public sealed record AuthPageValues(
     [property: JsonPropertyName("first_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FirstName = null,
     [property: JsonPropertyName("last_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LastName = null,
     [property: JsonPropertyName("remember"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Remember = null,
-    [property: JsonPropertyName("revoke_sessions"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? RevokeSessions = null);
+    [property: JsonPropertyName("revoke_sessions"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? RevokeSessions = null,
+    [property: JsonPropertyName("reset_passkeys"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ResetPasskeys = null);
 
 public sealed record AuthPageFeatures(bool RegistrationEnabled, bool EmailEnabled);

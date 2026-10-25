@@ -17,6 +17,7 @@ data class ResetPasswordUiState(
     val code: String = "",
     val password: String = "",
     val repeatedPassword: String = "",
+    val resetPasskeys: Boolean = true,
     val revokeOtherSessions: Boolean = true,
     val authenticatorRequired: Boolean = false,
     val authenticatorCode: String = "",
@@ -42,6 +43,7 @@ class ResetPasswordViewModel(
     fun authenticatorChanged(value: String) = change { it.copy(authenticatorCode = verificationDigits(value)) }
     fun passwordChanged(value: String) = change { it.copy(password = value) }
     fun repeatChanged(value: String) = change { it.copy(repeatedPassword = value) }
+    fun resetPasskeysChanged(value: Boolean) = change { it.copy(resetPasskeys = value) }
     fun revokeChanged(value: Boolean) = change { it.copy(revokeOtherSessions = value) }
     private fun change(transform: (ResetPasswordUiState) -> ResetPasswordUiState) {
         if (!state.value.loading) mutable.update { transform(it).copy(error = null) }
@@ -65,7 +67,7 @@ class ResetPasswordViewModel(
                 s.authenticatorRequired && s.authenticatorCode.length != 6 -> error("Введите 6 цифр кода из приложения-аутентификатора")
                 else -> runOperation {
                     repository.confirmPasswordReset(checkNotNull(resetId), s.code, s.password, s.revokeOtherSessions,
-                        s.authenticatorCode)
+                        s.authenticatorCode, s.resetPasskeys)
                     mutable.update { it.copy(password = "", repeatedPassword = "", code = "", authenticatorCode = "") }
                     completed.send(Unit)
                 }

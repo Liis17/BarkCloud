@@ -99,10 +99,10 @@ class AuthFlowRepository(
     }
 
     suspend fun confirmPasswordReset(resetId: String, code: String, password: String, revokeOthers: Boolean,
-                                    authenticatorCode: String = "") = request {
+                                    authenticatorCode: String = "", resetPasskeys: Boolean = true) = request {
         val response = identity().confirmResetPassword(ConfirmResetPasswordRequest.newBuilder()
             .setResetId(resetId).setOtpCode(code).setNewPassword(password).setRevokeOtherSessions(revokeOthers)
-            .setAuthenticatorCode(authenticatorCode).build())
+            .setResetPasskeys(resetPasskeys).setAuthenticatorCode(authenticatorCode).build())
         persist(response.accessToken, response.refreshToken)
         pendingStore.clear()
     }
