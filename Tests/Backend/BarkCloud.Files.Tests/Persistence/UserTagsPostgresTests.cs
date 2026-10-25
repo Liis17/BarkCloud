@@ -10,6 +10,29 @@ namespace BarkCloud.Files.Tests.Persistence;
 public class UserTagsPostgresTests
 {
     [PostgresFact]
+    public async Task Rename_ConflictingLegacyAssignment_ReturnsConflictAndRollsBack()
+    {
+        await using var database = await PostgresFilesDatabase.CreateAsync();
+        var tagId = Guid.NewGuid();
+        await using (var context = database.CreateContext())
+        {
+            var fileId = Guid.NewGuid();
+            context.UploadedFiles.Add(new UploadFile { Id = fileId });
+            context.UserTags.Add(new UserTag { Id = tagId, OwnerId = 42, Name = "X", NormalizedName = "x" });
+            context.FileTags.AddRange(
+                new FileTag { OwnerId = 42, FileId = fileId, Value = "X", NormalizedValue = "x" },
+                new FileTag { OwnerId = 42, FileId = fileId, Value = "Y", NormalizedValue = "y" });
+            await context.SaveChangesAsync();
+            var service = new UnifiedSearchService(context, UserContextFactory.Create(42), new RunSettings(), TestConfiguration.Empty());
+            var act = () => service.SaveUserTag(new SaveUserTagRequest { Id = tagId.ToString(), Name = "Y", Color = "#123456" }, default);
+            (await act.Should().ThrowAsync<Grpc.Core.RpcException>()).Which.StatusCode.Should().Be(Grpc.Core.StatusCode.AlreadyExists);
+        }
+        await using var check = database.CreateContext();
+        (await check.UserTags.SingleAsync()).Name.Should().Be("X");
+        (await check.FileTags.OrderBy(x => x.NormalizedValue).Select(x => x.Value).ToListAsync()).Should().Equal("X", "Y");
+    }
+
+    [PostgresFact]
     public async Task Migration_ImportsExistingTagsPerOwnerWithoutChangingAssignments()
     {
         await using var database = await PostgresFilesDatabase.CreateAsync("20261012223000_AddCloudDirectoryVisibility");

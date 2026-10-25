@@ -45,15 +45,19 @@ public partial class UnifiedSearchService
         if (await _context.UserTags.AnyAsync(x => x.OwnerId == tag.OwnerId && x.NormalizedName == normalized && x.Id != tag.Id, cancellationToken))
             throw new RpcException(new Status(StatusCode.AlreadyExists, "Тег с таким названием уже существует"));
 
-        if (!string.IsNullOrEmpty(request.Id))
-            await _context.FileTags.Where(x => x.OwnerId == tag.OwnerId && x.NormalizedValue == tag.NormalizedName)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Value, name).SetProperty(x => x.NormalizedValue, normalized), cancellationToken);
-        tag.Name = name;
-        tag.NormalizedName = normalized;
-        tag.Color = request.Color.ToUpperInvariant();
         try
         {
+            if (!string.IsNullOrEmpty(request.Id))
+                await _context.FileTags.Where(x => x.OwnerId == tag.OwnerId && x.NormalizedValue == tag.NormalizedName)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.Value, name).SetProperty(x => x.NormalizedValue, normalized), cancellationToken);
+            tag.Name = name;
+            tag.NormalizedName = normalized;
+            tag.Color = request.Color.ToUpperInvariant();
             await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new RpcException(new Status(StatusCode.AlreadyExists, "Тег с таким названием уже существует"));
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
