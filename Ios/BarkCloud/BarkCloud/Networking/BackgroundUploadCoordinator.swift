@@ -147,6 +147,12 @@ final class BackgroundUploadCoordinator: NSObject, URLSessionDelegate, URLSessio
         await UploadLiveActivityController.shared.notifyChanged()
     }
 
+    func resetSession() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            session.reset { continuation.resume() }
+        }
+    }
+
     func cancelActiveJobs(source: UploadJobSource) async {
         let jobs = await queueStore.activeJobs().filter { $0.source == source }
         guard !jobs.isEmpty else { return }
