@@ -92,7 +92,8 @@ struct DashboardView: View {
     }
 }
 
-/// Аватар профиля с подкачкой по self-signed TLS (`InsecureHTTP`). Плейсхолдер —
+/// Аватар профиля с подкачкой через `InsecureHTTP` (обход TLS ограничен filesHost).
+/// Плейсхолдер —
 /// системная иконка, пока картинка не загружена / нет URL.
 struct RemoteAvatar: View {
     let urlString: String?

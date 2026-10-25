@@ -16,9 +16,8 @@ final class RemoteImageCache {
     func clear() { cache.removeAllObjects() }
 }
 
-/// Async-картинка по URL через `InsecureHTTP.session` (доверяет self-signed TLS
-/// сервера) с кэшем в памяти. Замена `AsyncImage`, который отвергает self-signed
-/// сертификат файлового сервиса.
+/// Async-картинка через `InsecureHTTP.session`; при включённом обходе допускает
+/// любой TLS-сертификат только для filesHost. Результат кэшируется в памяти.
 struct RemoteImage<Placeholder: View>: View {
     let fileId: String?
     let variant: CacheVariant?
