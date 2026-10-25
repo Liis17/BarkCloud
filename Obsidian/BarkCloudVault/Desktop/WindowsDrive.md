@@ -11,7 +11,7 @@ Parent: [[Architecture]] · Files API: [[Backend/Files]] · Resumable upload: [[
 | Файл | Символ | Роль |
 |---|---|---|
 | `Drive/BarkCloud.Drive.Contracts/IDriveEngine.cs` | `IDriveEngine` | Контракты IPC входа, управления диском, статуса, настроек и завершения Engine |
-| `Drive/BarkCloud.Drive.Contracts/EngineStatus.cs` | `EngineStatus` | DTO состояния IPC; `PendingUploads` и `LastSyncError` — поля статуса |
+| `Drive/BarkCloud.Drive.Contracts/EngineStatus.cs` | `EngineStatus`, `S3GroupStatus` | DTO состояния IPC; `PendingUploads` и `LastSyncError` — поля статуса; `S3Groups`, состояния статистики и `StorageStatsError` — снимок хранилища |
 | `Drive/BarkCloud.Drive.Contracts/WebAuthnChallenge.cs` | `WebAuthnChallenge` | Options, challenge ID, RP ID и ошибка passwordless-входа |
 | `Drive/BarkCloud.Drive.Contracts/EnginePipe.cs` | `EnginePipe` | Имя pipe и общие параметры доступа |
 | `Drive/BarkCloud.Drive.Contracts/ServerConfig.cs` | `ServerConfig` | Адреса self-hosted сервера и флаг проверки сертификата |
@@ -63,7 +63,8 @@ Parent: [[Architecture]] · Files API: [[Backend/Files]] · Resumable upload: [[
 - `BarkCloudFileSystem` ведёт общие `LocalFile` для хэндлов одного пути. Outbox-файлы восстанавливаются как `Pending` по `(DirectoryId, Name)`; Pending доступен для чтения, но блокирует запись, удаление и перенос.
 - Reader-хэндл хранит `ResolvedNode` со снимочным `EntryId`. После сохранения новой версии `DeleteOnClose` на старом хэндле ставит удаление старой записи; актуальная версия остаётся.
 - `PersistOperation.Stage` проходит `Upload` (при ожидании сервера — `Processing`), `DeleteOld`, `Attach`, `Done`. При подтверждённой ошибке `Attach` после удаления старой записи она восстанавливается через `RestoreFromTrash`.
-- При `StorageLimit == 0` (сервер отдаёт `LimitBytes ?? 0`) квоты нет: общий объём равен `TotalAvailableStorage`, занято — `DiskUsedStorage + S3UsedStorage`; при лимите общий объём равен `StorageLimit`, занято — `TotalUsedStorage + ReservedStorage`. Отрицательный остаток ограничивается нулём.
+- При `StorageLimit == 0` (сервер отдаёт `LimitBytes ?? 0`) квоты нет: если статистика S3 доступна и есть группы с конечными квотами (`S3QuotaGroupUsage.QuotaBytes > 0`, кроме `IsUngrouped`), общий объём диска — сумма квот, свободное — сумма неотрицательных остатков групп; иначе прежний расчёт по физическому диску: объём `TotalAvailableStorage`, занято `DiskUsedStorage + S3UsedStorage`. При лимите общий объём равен `StorageLimit`, занято — `TotalUsedStorage + ReservedStorage`. Отрицательный остаток ограничивается нулём; безлимитные группы, «Без группы» и диск хоста в сумму S3 не входят.
+- `CloudGateway.GetStorage` возвращает `StorageSnapshot` (данные + `RefreshError`): снимки запрашиваются с `NonBlockingStats`, TTL кеша 10 с, одновременные загрузки объединяются, при сбое отдаётся последний снимок с ошибкой обновления, без снимка — исключение. `DriveEngine.Status` переносит группы S3, состояния и время статистики в `EngineStatus.S3Groups`/`PhysicalStats*`/`AllS3Stats*` и ошибку обновления в `StorageStatsError` отдельно от сохранённых цифр; смена сессии сбрасывает снимок через `ClearCache`.
 - `CloudGateway.ClearCache` увеличивает эпоху аккаунта и удаляет только свои артефакты кеша (`<guid>`, `<guid>.blocks`, `.part`); каталоги `write` и `outbox` исключены. HTTP Range-чтение использует блоки 1 МиБ; при неподдерживаемом Range `CloudGateway` скачивает файл целиком. Кеш листингов имеет TTL 5 с. Лимит дискового кеша — 5 ГиБ, очистка целится в 80%; write/outbox не вытесняются.
 - `Cleanup` уменьшает `ActiveCount` и вызывает `Persist` для изменённого файла, когда активных хэндлов не осталось; `CloseFile` уменьшает `OpenCount` и сохраняет оставшиеся изменения при последнем закрытии. Paging-запись после `Cleanup` помечается `DirtyAfterPersist` и повторно сохраняется при `CloseFile`.
 - `CloudGateway.QueueDeleteFileEntry` сразу скрывает запись тумбстоном и буферизует удаление пачкой; при ошибке отправки пачка возвращается в очередь с тумбстонами до успеха или исчерпания попыток. `MoveFile` синхронно вызывает `FlushPending(throwOnFailure: true)` при цели с тумбстоном и не перемещает источник, если удаление не доставлено.
@@ -73,12 +74,14 @@ Parent: [[Architecture]] · Files API: [[Backend/Files]] · Resumable upload: [[
 ## Жизненный цикл App
 
 - `MainWindow` не допускает параллельных операций подключения/опроса. Потеря IPC освобождает proxy и инициирует переподключение через `EngineLauncher`; закрытие окна скрывает его в трей, где статус обновляется раз в 30 с.
+- Карточка «Хранилище» показывает физический диск хоста (шкала «другие/S3/свободно»), его состояние и время обновления, ниже — все группы квот S3 как в вебе: конечные квоты со шкалой и процентом, безлимитные с подписью, «Без группы» с занятым местом; при недоступной статистике S3 — строку состояния (`loading`/`not_configured`/`недоступно`). При сбое обновления сохраняются последние цифры с ошибкой (`StorageStatsError`), при отсутствии снимка — ошибка или «Подсчитываем…» вместо нулей. Содержимое окна прокручивается, длинные подписи переносятся.
 - Перезапуск отправляет `ShutdownAsync`, ждёт до 60 с, затем может завершить только процесс текущей установки и сеанса и подключиться заново. Если закрыть App во время перезапуска, он завершается без отправки собственного `ShutdownAsync`; уже поднятый к этому моменту новый Engine продолжит работу без UI.
 - В трее нет balloon API: подсказка показывает `LastSyncError`, иначе количество `PendingUploads`; пункт outbox доступен при наличии ожидающих файлов.
 - `EngineSettingsStore`, `ServerConfig.Save` и `AppSettings.Save` сохраняют настройки во временный файл с заменой через `File.Move(overwrite: true)`. `EngineLog` ротирует `engine.log` в `engine.log.1` при размере свыше 5 МиБ.
 
 ## Ограничения
 
+- Для S3-групп с неизмеренными бакетами (`UnmeasuredBuckets > 0`) занятое и свободное место — оценка и может быть занижено/завышено; Проводник показывает ёмкость по таким квотам как есть. Приложение помечает это подписью «учёт неполный».
 - Новые пустые файлы остаются runtime-заготовками и исчезают после перезапуска Engine; пустая правка существующего файла не загружается.
 - Сохранение создаёт новый `fileId`, поэтому привязанные к старому ID ссылки и избранное не переносятся.
 - Имена разрешаются без учёта регистра; совпадения, отличающиеся регистром, независимо не адресуются, побеждает первое в листинге.

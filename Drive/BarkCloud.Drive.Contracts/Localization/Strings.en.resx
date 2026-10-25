@@ -182,6 +182,45 @@
   <data name="Main_StorageFree" xml:space="preserve">
     <value>Free</value>
   </data>
+  <data name="Main_StatsLoading" xml:space="preserve">
+    <value>Calculating…</value>
+  </data>
+  <data name="Main_StatsRefreshing" xml:space="preserve">
+    <value>Refreshing…</value>
+  </data>
+  <data name="Main_StatsError" xml:space="preserve">
+    <value>Calculation error</value>
+  </data>
+  <data name="Main_StatsUpdatedAtFmt" xml:space="preserve">
+    <value>updated {0}</value>
+  </data>
+  <data name="Main_StatsRefreshErrorFmt" xml:space="preserve">
+    <value>Refresh error: {0}</value>
+  </data>
+  <data name="Main_S3Header" xml:space="preserve">
+    <value>S3 storage</value>
+  </data>
+  <data name="Main_S3NotConfigured" xml:space="preserve">
+    <value>not configured</value>
+  </data>
+  <data name="Main_S3Unavailable" xml:space="preserve">
+    <value>unavailable</value>
+  </data>
+  <data name="Main_S3Ungrouped" xml:space="preserve">
+    <value>No group</value>
+  </data>
+  <data name="Main_S3Unlimited" xml:space="preserve">
+    <value>unlimited</value>
+  </data>
+  <data name="Main_S3UsedUnlimitedFmt" xml:space="preserve">
+    <value>{0} · unlimited</value>
+  </data>
+  <data name="Main_S3PercentUsedFmt" xml:space="preserve">
+    <value>{0}% used</value>
+  </data>
+  <data name="Main_S3UnmeasuredFmt" xml:space="preserve">
+    <value>incomplete accounting: {0} bucket(s) inaccessible, free space is an estimate</value>
+  </data>
   <data name="Main_DriveMountedFmt" xml:space="preserve">
     <value>Drive {0}: mounted ({1})</value>
   </data>

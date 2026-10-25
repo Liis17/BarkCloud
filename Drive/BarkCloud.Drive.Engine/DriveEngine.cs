@@ -442,14 +442,33 @@ public sealed class DriveEngine : IDriveEngine
         {
             try
             {
-                var storage = _gateway.GetStorage();
+                var snapshot = _gateway.GetStorage();
+                var storage = snapshot.Info;
                 status.DiskTotalBytes = storage.TotalAvailableStorage;
                 status.DiskOtherBytes = storage.DiskUsedStorage;
                 status.DiskS3Bytes = storage.S3UsedStorage;
+                status.PhysicalStatsState = storage.PhysicalStatsState;
+                status.PhysicalStatsUpdatedAt = storage.PhysicalStatsUpdatedAt?.ToDateTime();
+                status.AllS3StatsAvailable = storage.AllS3StatsAvailable;
+                status.AllS3StatsState = storage.AllS3StatsState;
+                status.AllS3StatsUpdatedAt = storage.AllS3StatsUpdatedAt?.ToDateTime();
+                status.S3Groups = storage.S3QuotaGroups.Select(group => new S3GroupStatus
+                {
+                    Id = group.Id,
+                    Name = group.Name,
+                    UsedBytes = group.UsedBytes,
+                    QuotaBytes = group.QuotaBytes,
+                    IsUngrouped = group.IsUngrouped,
+                    UnmeasuredBuckets = group.UnmeasuredBuckets,
+                }).ToList();
+                if (snapshot.RefreshError is { } refreshFailure)
+                    status.StorageStatsError = ConnectionErrors.GetDisplayMessage(refreshFailure.SourceException);
             }
-            catch
+            catch (Exception ex)
             {
-                // квота недоступна — не критично для статуса
+                // Статистика недоступна и сохранённого снимка нет — показываем
+                // состояние ошибки без цифр, не критично для остального статуса.
+                status.StorageStatsError = ConnectionErrors.GetDisplayMessage(ex);
             }
         }
 
