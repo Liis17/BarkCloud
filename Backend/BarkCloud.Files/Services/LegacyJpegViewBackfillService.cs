@@ -78,6 +78,7 @@ public class LegacyJpegViewBackfillService : BackgroundService
                     .Where(f => f.Type == UploadFileType.CloudFile
                                 && f.MediaKind == MediaKind.Photo
                                 && f.Etag != null && f.Etag != ""
+                                && f.UploadedAt != null
                                 && f.Id > cursor
                                 // Сам файл не является превью-блобом (превью/JpegView другого оригинала).
                                 && !context.FilePreviews.Any(p => p.PreviewFileId == f.Id)
@@ -104,6 +105,10 @@ public class LegacyJpegViewBackfillService : BackgroundService
                         await ProcessFileAsync(scope.ServiceProvider, id, ct);
                         processed++;
                     }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         failed++;
@@ -117,44 +122,61 @@ public class LegacyJpegViewBackfillService : BackgroundService
             _logger.LogInformation("Бэкафилл JpegView завершён: обработано {Processed}, ошибок {Failed}", processed, failed);
     }
 
-    private async Task ProcessFileAsync(IServiceProvider sp, Guid fileId, CancellationToken ct)
+    internal async Task ProcessFileAsync(IServiceProvider sp, Guid fileId, CancellationToken ct)
     {
         var filesStorage = sp.GetRequiredService<IUploadedFilesStorage>();
         var s3 = sp.GetRequiredService<S3Uploader>();
         var bucketRegistry = sp.GetRequiredService<S3BucketRegistry>();
         var compressor = sp.GetRequiredService<ImageCompressor>();
         var heic = sp.GetRequiredService<HeicImageConverter>();
+        var svgRasterizer = sp.GetRequiredService<ISvgRasterizer>();
         var previewPersistence = sp.GetRequiredService<PreviewPersistenceService>();
 
         var file = await filesStorage.GetFile(fileId);
-        if (file is null || string.IsNullOrEmpty(file.Etag))
+        if (file is null || file.Type != UploadFileType.CloudFile || file.MediaKind != MediaKind.Photo
+            || file.UploadedAt is null || string.IsNullOrEmpty(file.Etag))
+            return;
+
+        var isSvg = Path.GetExtension(file.Filename ?? string.Empty).Equals(".svg", StringComparison.OrdinalIgnoreCase);
+        if (isSvg && file.Size > SvgRasterizer.MaximumInputBytes)
             return;
 
         var storageProfileId = bucketRegistry.ResolveReadProfileId(file);
         var previewProfileId = bucketRegistry.ResolveWriteProfileId(file.Type, file.MediaKind, true);
 
-        var tempPath = Path.GetTempFileName();
+        string? tempPath = isSvg ? null : Path.GetTempFileName();
         try
         {
-            // Скачиваем оригинал на диск (нужно для ffmpeg при HEIC).
-            await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
-            await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
-            {
-                await s3Stream.CopyToAsync(fs, ct);
-            }
-
             byte[] jpegView;
-            var isHeic = file.Filename.GetContentType() == "image/heic";
-
-            if (isHeic)
+            if (isSvg)
             {
-                // HEIC ImageSharp не декодирует — берём полнокадровый JPEG через ffmpeg.
-                jpegView = await heic.ConvertToJpegAsync(tempPath, ct);
+                await using var svgStream = await s3.DownloadAsync(storageProfileId, file.Id.ToString(), ct);
+                var svgPng = await svgRasterizer.RasterizeBackfillAsync(svgStream, file.Filename!, ct);
+                if (svgPng is null)
+                    return;
+                using var pngStream = new MemoryStream(svgPng, writable: false);
+                jpegView = await compressor.EncodeFullJpegAsync(pngStream, 90, ct);
             }
             else
             {
-                await using var src = new FileStream(tempPath, FileMode.Open, FileAccess.Read);
-                jpegView = await compressor.EncodeFullJpegAsync(src, 90, ct);
+                // Скачиваем оригинал на диск (нужно для ffmpeg при HEIC).
+                await using (var s3Stream = await s3.DownloadAsync(storageProfileId, file.Id.ToString()))
+                await using (var fs = new FileStream(tempPath!, FileMode.Create, FileAccess.Write))
+                {
+                    await s3Stream.CopyToAsync(fs, ct);
+                }
+
+                var isHeic = file.Filename!.GetContentType() == "image/heic";
+                if (isHeic)
+                {
+                    // HEIC ImageSharp не декодирует — берём полнокадровый JPEG через ffmpeg.
+                    jpegView = await heic.ConvertToJpegAsync(tempPath!, ct);
+                }
+                else
+                {
+                    await using var src = new FileStream(tempPath!, FileMode.Open, FileAccess.Read);
+                    jpegView = await compressor.EncodeFullJpegAsync(src, 90, ct);
+                }
             }
 
             var view = await previewPersistence.PersistJpegViewAsync(
@@ -171,7 +193,7 @@ public class LegacyJpegViewBackfillService : BackgroundService
         {
             try
             {
-                if (File.Exists(tempPath))
+                if (tempPath is not null && File.Exists(tempPath))
                     File.Delete(tempPath);
             }
             catch (Exception ex)
