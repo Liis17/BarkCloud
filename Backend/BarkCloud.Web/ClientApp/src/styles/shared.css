@@ -4,6 +4,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  --sidebar-w: 264px;
   /* ── Color (light, seed = warm orange) ─────────────────────────── */
   --md-primary:               #9A4F1E;
   --md-on-primary:            #FFFFFF;
@@ -188,11 +189,13 @@ a { color: inherit; }
   position: relative;
   width: 100vw; height: 100vh;
   display: grid;
-  grid-template-columns: 264px 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: 1fr;
   overflow: hidden;
   background: var(--md-surface);
 }
+
+:root.sidebar-collapsed { --sidebar-w: 72px; }
 
 /* legacy background layers are now no-ops (kept to avoid breaking AppShell) */
 .bg-blob, .grid-bg, .noise { display: none !important; }
@@ -202,13 +205,26 @@ a { color: inherit; }
   background: var(--md-surface-container-low);
   display: flex; flex-direction: column;
   overflow: hidden;
-  padding: 12px 12px 0;
+  padding: 12px 0 0;
 }
 
 .sb-brand {
-  padding: 14px 12px 18px;
-  display: flex; align-items: center; gap: 12px;
+  padding: 14px 24px 18px;
+  display: flex; align-items: center; gap: 8px;
 }
+.sb-brand-text { min-width: 0; }
+.sb-collapse {
+  flex: 0 0 36px;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  margin-left: auto;
+  border: 0; border-radius: 50%;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+}
+.sb-collapse:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+.sb-collapse:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 3px; }
 .sb-brand .mark {
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
@@ -232,7 +248,7 @@ a { color: inherit; }
   flex: 1;
   overflow-y: auto;
   display: flex; flex-direction: column; gap: 14px;
-  padding-bottom: 8px;
+  padding: 0 12px 8px;
 }
 .sb-section-label {
   font-size: 11px;
@@ -278,7 +294,7 @@ a { color: inherit; }
 
 /* Storage card */
 .sb-storage {
-  margin: 0 4px 8px;
+  margin: 0 16px 8px;
   padding: 16px 16px 14px;
   border-radius: var(--r-lg);
   background: var(--md-surface-container);
@@ -309,7 +325,7 @@ a { color: inherit; }
 }
 
 .sb-user {
-  margin: 0 4px 12px;
+  margin: 0 16px 12px;
   display: flex; align-items: center; gap: 12px;
   padding: 10px 12px;
   border-radius: var(--r-full);
@@ -334,6 +350,17 @@ img.avatar { object-fit: cover; }
 .sb-user .who .uname { font-size: 14px; font-weight: 500; color: var(--md-on-surface); }
 .sb-user .who .uhost { font-size: 12px; color: var(--md-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb-user .chev { margin-left: auto; color: var(--md-on-surface-variant); }
+
+.sidebar.collapsed .sb-brand { padding-inline: 0; justify-content: center; }
+.sidebar.collapsed .sb-brand .mark,
+.sidebar.collapsed .sb-brand-text,
+.sidebar.collapsed .sb-section-label,
+.sidebar.collapsed .sb-item > span:not(.ico),
+.sidebar.collapsed .sb-storage,
+.sidebar.collapsed .sb-user :is(.who, .chev) { display: none; }
+.sidebar.collapsed .sb-collapse { margin-left: 0; }
+.sidebar.collapsed .sb-item { padding: 0; justify-content: center; }
+.sidebar.collapsed .sb-user { margin-inline: 0; padding-inline: 18px; justify-content: center; }
 
 /* ============ MAIN ============ */
 .main {

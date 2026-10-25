@@ -10,6 +10,7 @@ export interface IconProps {
 export type IconFn = (p?: IconProps) => JSX.Element;
 
 export const Icon: Record<string, IconFn> = {
+  sidebar: (p = {}) => <svg width={p.size || 20} height={p.size || 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>,
   cloud: (p = {}) => <svg width={p.size || 24} height={p.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 .5.5 0 0 1-.5-.5 5 5 0 0 0-9.9-1 4 4 0 0 0-3.6 4 4 4 0 0 0 4 4.5h10z" /></svg>,
   photo: (p = {}) => <svg className={p.className || 'ico'} width={p.size || 24} height={p.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.6" /><path d="M21 15l-5-5L5 21" /></svg>,
   video: (p = {}) => <svg className={p.className || 'ico'} width={p.size || 24} height={p.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="14" height="14" rx="2" /><path d="M16 9l6-3v12l-6-3" /></svg>,
