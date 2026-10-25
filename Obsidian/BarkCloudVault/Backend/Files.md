@@ -34,7 +34,7 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | `DynamicFolderApi` | Умные папки — [[Backend/DynamicFolders]] |
 | `AlbumApi` | `CreateAlbum`, `UpdateAlbum`, `DeleteAlbum`, `AddItemsToAlbum`, `RemoveItemsFromAlbum`, `ListAlbums`, `ListAlbumItems`; фото- и видеоальбомы, один блоб может входить в несколько альбомов |
 | `MusicApi` | Треки и URL проигрывания, CRUD плейлистов, состав/порядок треков, публичные ссылки и пользовательские гранты |
-| `SearchApi` | `Search`, `ResolveHit`, `GetFileSearchMetadata`, `ReplaceFileSearchMetadata`; разделённые секции поиска |
+| `SearchApi` | `Search`, `ResolveHit`, `GetFileSearchMetadata`, `ReplaceFileSearchMetadata`; разделённые секции поиска; `ListUserTags`, `SaveUserTag`, `DeleteUserTag` — личный каталог тегов |
 | `FilesServerApi` | Межсервисные данные файла, загрузка аватара, `ResolveShare`/`ResolveFolderShare`/`ResolveAlbumShare`/`ResolveMusicPlaylistShare` и барьер миграции S3 |
 
 Для клиентского сценария сессий см. [[Backend/ResumableUpload]] и [[Api/FilesClientGuide]]. Контракты объявлены в `Shared/BarkCloud.Proto/files_api.proto`.
@@ -52,6 +52,10 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 `GetUploadUrl` создаёт запись `UploadFile` и по-прежнему возвращает URL собственного HTTP-маршрута Files; это не presigned URL S3. Отправка файла на этот URL отключена: единственный путь загрузки — Upload 2.0 из [[Backend/ResumableUpload]].
 
 ### Поиск
+
+`Services/UnifiedSearchService.Tags.cs` управляет личным каталогом `Domain/UserTag.cs` (`FilesContext.UserTags`): UUID, владелец, имя, нормализованное имя и цвет `#RRGGBB`. Названия уникальны внутри владельца после NFKC, схлопывания пробелов и lowercase; максимум 50 символов. `SaveUserTag` с пустым id создаёт тег, с id меняет название/цвет и обновляет строковые назначения `FileTags` в той же транзакции. `DeleteUserTag` удаляет каталог и назначения владельца; алиасы сохраняются. Изменения каталога и `ReplaceFileSearchMetadata` сериализуются транзакционным PostgreSQL advisory lock на владельца. Строковый API назначений сохранён: неизвестные имена создают записи каталога с цветом `#6750A4`, известные используют каталоговое написание; снятие последнего назначения не удаляет каталог. `UserDeletedConsumer` очищает и каталог. Миграция `20261025201354_AddUserTags` заполняет его существующими тегами, сохраняя назначения.
+
+Совместимость строкового API означает, что сохранение устаревшего набора тегов (например, из окна свойств, открытого до переименования или удаления в другой вкладке) может заново создать прежнее имя с цветом по умолчанию. Идентичность назначения определяется строковым именем, а не UUID каталога. Коллизия с существующим назначением при переименовании возвращает `AlreadyExists` без частичного обновления.
 
 `Backend/BarkCloud.Files/Services/SearchRanking.cs` задаёт общее правило PostgreSQL для отбора, ранга и сходства поля: 4 — точное совпадение, 3 — префикс, 2 — подстрока, 1 — `word_similarity(value, query) >= 0.45` для запроса от четырёх символов. Для рангов 2–4 сходство равно 1. Запрос нормализуется через NFKC, обрезку краёв, схлопывание пробелов и invariant lowercase. Алиасы и теги сравниваются по сохранённому `NormalizedValue`; имена и метаданные — в исходном виде средствами PostgreSQL (`lower`, `ILIKE`, `pg_trgm`). Сырые колонки не нормализуются в SQL.
 
