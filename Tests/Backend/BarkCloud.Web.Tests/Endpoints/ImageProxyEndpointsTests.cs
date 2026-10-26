@@ -66,23 +66,71 @@ public sealed class ImageProxyEndpointsTests
     }
 
     [Theory]
+    [MemberData(nameof(InvalidInputs))]
+    public async Task InvalidUrlsReturnBadRequestWithSafeHeaders(string route, string url)
+    {
+        await using var fixture = await Fixture.CreateAsync(_ => throw new InvalidOperationException("Upstream must not be called"));
+
+        using var response = await fixture.Client.GetAsync(ProxyPath(route, url));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        AssertSafeHeaders(response);
+    }
+
+    public static IEnumerable<object[]> InvalidInputs() =>
+        Routes.SelectMany(route => new[]
+        {
+            "not-a-url",
+            "ftp://files.example/download/" + Guid.NewGuid(),
+            "https://files.example/files/" + Guid.NewGuid(),
+            "https://files.example/download/abc"
+        }.Select(url => new object[] { route, url }));
+
+    [Theory]
     [InlineData("/api/head/icon")]
     [InlineData("/api/files/image")]
-    public async Task ErrorResponsesCarrySafeHeaders(string route)
+    public async Task BothProxiesAlwaysFetchTheGuidFromTheInternalFilesHost(string route)
     {
-        await using var invalidUrlFixture = await Fixture.CreateAsync(_ => throw new InvalidOperationException("Upstream must not be called"));
-        var invalidUrl = route == "/api/head/icon"
-            ? "https://other.example/download/" + Guid.NewGuid()
-            : "not-a-url";
-        using (var invalid = await invalidUrlFixture.Client.GetAsync(ProxyPath(route, invalidUrl)))
+        var id = Guid.NewGuid();
+        Uri? requestUri = null;
+        await using var fixture = await Fixture.CreateAsync(request =>
         {
-            invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            AssertSafeHeaders(invalid);
-        }
+            requestUri = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = Content(new byte[] { 1, 2, 3 }, "image/png") };
+        });
 
+        using var response = await fixture.Client.GetAsync(
+            ProxyPath(route, $"https://attacker.example/download/{id}"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        requestUri.Should().Be(new Uri($"http://files-internal/download/{id}"));
+        AssertSafeHeaders(response);
+    }
+
+    [Theory]
+    [InlineData("/api/head/icon")]
+    [InlineData("/api/files/image")]
+    public async Task EmptyFilesBaseReturnsServiceUnavailableWithoutCallingUpstream(string route)
+    {
+        await using var fixture = await Fixture.CreateAsync(
+            _ => throw new InvalidOperationException("Upstream must not be called"),
+            filesServiceHttp1Base: "");
+
+        using var response = await fixture.Client.GetAsync(
+            ProxyPath(route, $"https://attacker.example/download/{Guid.NewGuid()}"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        AssertSafeHeaders(response);
+    }
+
+    [Theory]
+    [InlineData("/api/head/icon")]
+    [InlineData("/api/files/image")]
+    public async Task UpstreamErrorResponsesCarrySafeHeaders(string route)
+    {
         await using var upstreamErrorFixture = await Fixture.CreateAsync(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         using var upstreamError = await upstreamErrorFixture.Client.GetAsync(
-            ProxyPath(route, "https://files.example/download/" + Guid.NewGuid()));
+            ProxyPath(route, "https://other.example/download/" + Guid.NewGuid()));
         upstreamError.StatusCode.Should().Be(HttpStatusCode.BadGateway);
         AssertSafeHeaders(upstreamError);
     }
@@ -163,15 +211,16 @@ public sealed class ImageProxyEndpointsTests
 
         public HttpClient Client { get; }
 
-        public static async Task<Fixture> CreateAsync(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+        public static async Task<Fixture> CreateAsync(
+            Func<HttpRequestMessage, HttpResponseMessage> responseFactory,
+            string? filesServiceHttp1Base = "http://files-internal")
         {
             var builder = WebApplication.CreateBuilder();
             builder.WebHost.UseUrls("http://127.0.0.1:0");
             builder.Logging.ClearProviders();
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["App:PublicHost"] = "files.example",
-                ["FilesService:Http1Base"] = "http://files-internal"
+                ["FilesService:Http1Base"] = filesServiceHttp1Base
             });
             var handler = new StubHandler(responseFactory);
             var httpFactory = new Mock<IHttpClientFactory>();
