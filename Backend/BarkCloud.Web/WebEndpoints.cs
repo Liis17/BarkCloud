@@ -8,7 +8,6 @@ using BarkCloud.Web.Rendering;
 
 using Grpc.Core;
 
-using System.Net;
 using System.Text.Json;
 
 namespace BarkCloud.Web;
@@ -201,12 +200,17 @@ public static class WebEndpoints
         app.MapGet("/api/head/icon", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
         {
             SetSafeImageResponseHeaders(http);
-            if (!TryValidateIconProxyUrl(http, config, url, out var target))
+            if (!TryParseImageDownloadId(url, out var id))
                 return Results.BadRequest();
+
+            var http1Base = config["FilesService:Http1Base"];
+            if (string.IsNullOrWhiteSpace(http1Base))
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 
             try
             {
                 var client = httpFactory.CreateClient("files-upload");
+                var target = $"{http1Base.TrimEnd('/')}/download/{id}";
                 using var resp = await client.GetAsync(target, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
                 if (!resp.IsSuccessStatusCode)
                     return Results.StatusCode(StatusCodes.Status502BadGateway);
@@ -232,22 +236,17 @@ public static class WebEndpoints
         app.MapGet("/api/files/image", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
         {
             SetSafeImageResponseHeaders(http);
-            if (string.IsNullOrEmpty(url)
-                || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
-                || uri.Scheme is not ("http" or "https")
-                || !uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
-                return Results.BadRequest();
-
-            var id = uri.Segments[^1].Trim('/');
-            if (!Guid.TryParse(id, out _))
+            if (!TryParseImageDownloadId(url, out var id))
                 return Results.BadRequest();
 
             var http1Base = config["FilesService:Http1Base"];
-            var fetchUrl = string.IsNullOrEmpty(http1Base) ? url : $"{http1Base}/download/{id}";
+            if (string.IsNullOrWhiteSpace(http1Base))
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 
             try
             {
                 var client = httpFactory.CreateClient("files-upload");
+                var fetchUrl = $"{http1Base.TrimEnd('/')}/download/{id}";
                 using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
                 if (!upstream.IsSuccessStatusCode)
                     return Results.StatusCode(StatusCodes.Status502BadGateway);
@@ -266,6 +265,17 @@ public static class WebEndpoints
                 return Results.StatusCode(StatusCodes.Status502BadGateway);
             }
         });
+    }
+
+    private static bool TryParseImageDownloadId(string? raw, out Guid id)
+    {
+        id = default;
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || !uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return Guid.TryParse(uri.Segments[^1].Trim('/'), out id);
     }
 
     private static void SetSafeImageResponseHeaders(HttpContext http)
@@ -295,54 +305,6 @@ public static class WebEndpoints
 
             output.Write(buffer, 0, read);
         }
-    }
-
-    private static bool TryValidateIconProxyUrl(HttpContext http, IConfiguration config, string? raw, out Uri target)
-    {
-        target = null!;
-        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
-            return false;
-
-        if (uri.Scheme is not ("http" or "https"))
-            return false;
-
-        if (!uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        var requestHost = PublicHost(config) ?? http.Request.Host.Host;
-        if (string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase))
-        {
-            target = uri;
-            return true;
-        }
-
-        if (IsLoopbackHost(requestHost) && uri.IsLoopback)
-        {
-            target = uri;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool IsLoopbackHost(string host)
-    {
-        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip);
-    }
-
-    private static string? PublicHost(IConfiguration config)
-    {
-        var value = config["App:PublicHost"];
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
-            return absolute.Host;
-
-        return value.Split(':', 2)[0];
     }
 
 }

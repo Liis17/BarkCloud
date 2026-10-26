@@ -207,6 +207,7 @@ services:
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
+      App__TrustedProxyNetworks: "${WEB_TRUSTED_PROXY_NETWORKS}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
@@ -541,6 +542,7 @@ networks:
         K("WEB_PORT", m.WebPort);
         K("WEB_COOKIE_SECURE", m.WebCookieSecure ? "true" : "false");
         K("WEB_PUBLIC_HOST", m.WebPublicHost);
+        K("WEB_TRUSTED_PROXY_NETWORKS", m.WebTrustedProxyNetworks);
         K("WEB_ADMIN_PASSWORD", m.WebAdminPassword);
 
         Section("Внешние адреса сервисов для клиентов (обязательны)");

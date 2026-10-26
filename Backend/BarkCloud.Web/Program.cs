@@ -147,15 +147,23 @@ builder.Services.AddHostedService<RevocationSyncService>();
 var app = builder.Build();
 
 // За nginx TLS терминируется снаружи, поэтому Kestrel видит scheme=http.
-// Доверяем X-Forwarded-Proto/Host от reverse-proxy, чтобы Request.Scheme был корректным
-// (используется при сборке публичного URL ссылок /s/{token}).
+// Доверяем X-Forwarded-Proto/Host только reverse-proxy из известных сетей:
+// nginx в docker-сети не loopback, поэтому дефолт включает приватные диапазоны;
+// App:TrustedProxyNetworks (env WEB_TRUSTED_PROXY_NETWORKS) позволяет сузить список.
 var fhOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
 };
-// nginx в docker-сети — не loopback; доверяем proxy из любой сети (веб не открыт наружу напрямую).
-fhOptions.KnownNetworks.Clear();
-fhOptions.KnownProxies.Clear();
+var trustedProxyNetworks = TrustedProxyNetworks.Parse(app.Configuration["App:TrustedProxyNetworks"]);
+foreach (var network in trustedProxyNetworks)
+{
+    if (!fhOptions.KnownIPNetworks.Any(known =>
+            known.BaseAddress.Equals(network.BaseAddress) && known.PrefixLength == network.PrefixLength))
+        fhOptions.KnownIPNetworks.Add(network);
+}
+app.Logger.LogWarning(
+    "ForwardedHeaders доверяет X-Forwarded-* сетям: {Networks}",
+    string.Join(", ", fhOptions.KnownIPNetworks.Select(network => $"{network.BaseAddress}/{network.PrefixLength}")));
 app.UseForwardedHeaders(fhOptions);
 
 // Бандл React-SPA из wwwroot (собирается Vite из ClientApp). Отдаём статику до эндпоинтов.
