@@ -34,6 +34,7 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("POSTGRES_PORT=5432", env);
         Assert.DoesNotContain("SEQ_WEBPORT=", env);
         Assert.Contains("WEB_PORT=8080", env);
+        Assert.Contains("App__TrustedProxyNetworks: \"${WEB_TRUSTED_PROXY_NETWORKS}\"", compose);
         Assert.Contains("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT=", env);
         Assert.Contains("BarkCloud__AndroidCertificateSha256Fingerprint: \"${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}\"", compose);
         Assert.Contains("MINIO_DATA_PATH=./data/minio", env);
@@ -71,6 +72,23 @@ public sealed class BuilderGeneratorTests
         Assert.DoesNotContain("}}", nginx);
         Assert.DoesNotContain("NGINX_SEQ_PORT", env);
         Assert.DoesNotContain("NGINX_MINIO_CONSOLE_PORT", env);
+    }
+
+    [Fact]
+    public void Trusted_proxy_networks_survive_env_round_trip()
+    {
+        const string trustedNetworks = "10.5.0.0/16;192.168.0.0/16";
+        var model = new BuilderModel { WebTrustedProxyNetworks = trustedNetworks };
+
+        var loaded = BuilderConfigLoader.Load(
+            BackendComposeGenerator.BuildCompose(model),
+            BackendComposeGenerator.BuildEnv(model),
+            null,
+            ".");
+        var generatedEnv = BackendComposeGenerator.BuildEnv(loaded);
+
+        Assert.Equal(trustedNetworks, loaded.WebTrustedProxyNetworks);
+        Assert.Contains("WEB_TRUSTED_PROXY_NETWORKS=" + trustedNetworks + "\n", generatedEnv);
     }
 
     [Fact]

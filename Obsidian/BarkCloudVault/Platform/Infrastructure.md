@@ -24,7 +24,7 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 | `*_CONSOLE_OUTPUT`, `*_SEQ_ENABLE`, `*_LOGNARA_ENABLE` | Независимые локальные настройки sink для каждого из семи backend-приложений; defaults — Console on, Seq и Lognara off |
 | `IDENTITY_PORT`, `USERS_PORT`, `CONFIGURATION_PORT`, `FILES_PORT`, `FILES_HTTP1PORT`, `TORRENT_PORT`, `TORRENT_HTTP1PORT` | Внутренние gRPC и HTTP/1 порты; значения по умолчанию: 8000, 8001, 8003, 8005/8006 и 8007/8008 |
 | `EXTERNAL_*_HOST` | Публичные адреса сервисов для клиентских приложений |
-| `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST`, `WEB_ADMIN_PASSWORD` | Настройки браузерной cookie, публичного адреса и AdminGate |
+| `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST`, `WEB_TRUSTED_PROXY_NETWORKS`, `WEB_ADMIN_PASSWORD` | Настройки браузерной cookie, публичного адреса, доверенных reverse-proxy и AdminGate |
 
 ## Зависимости и взаимодействия
 
