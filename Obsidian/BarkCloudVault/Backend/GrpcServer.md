@@ -20,6 +20,9 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 | `Backend/BarkCloud.GrpcServer/Tracker/RequestContextInterceptor.cs` | `RequestContextInterceptor` | Контекст входящего запроса |
 | `Backend/BarkCloud.GrpcServer/Tracker/SourceIpResolver.cs` | `SourceIpResolver` | Доверенный IP для лимитов |
 | `Backend/BarkCloud.GrpcServer/XAuth/XAuthExtensions.cs` | `AddXAuth`, `UseXAuth` | JWT-аутентификация и политики |
+| `Backend/BarkCloud.GrpcServer/XAuth/ServiceAuthorization.cs` | `ServiceTokenRequirement`, `XAuthPolicies` | Требования сервисных токенов и имена политик |
+| `Backend/BarkCloud.GrpcServer/ServiceAuth/ServiceTokenProvider.cs` | `ServiceTokenProvider` | Кеш короткоживущих сервисных JWT от Identity |
+| `Backend/BarkCloud.GrpcServer/ServiceAuth/ServiceTokenClientInterceptor.cs` | `ServiceTokenClientInterceptor` | Заголовок x-auth-token с текущим сервисным токеном |
 | `Backend/BarkCloud.GrpcServer/XAuth/RevocationSyncService.cs` | `RevocationSyncService` | Синхронизация отзывов токенов |
 
 ## Публичные контракты
@@ -30,7 +33,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 `SetRunningAddress` использует `SERVICE_PORT` и `SERVICE_HTTP1PORT` как overrides для `RunSettings`. Kestrel слушает HTTP/2 на `RunSettings:Port`, при заданном `Http1Port` — HTTP/1 на отдельном порту; `RunSettings:Tls` включает TLS.
 
-`AddBarkCloudGrpc` добавляет `ServerExceptionInterceptor` и `RequestContextInterceptor`. `AddXAuth` читает JWT из `x-auth-token`, проверяет подпись/issuer/audience/lifetime; policy `User` принимает user или service token, а `Service` — только service token. Проверка отзывов пользовательских токенов описана в [[Backend/SessionRevocation]].
+`AddBarkCloudGrpc` добавляет `ServerExceptionInterceptor` и `RequestContextInterceptor`. `AddXAuth(configuration, serviceId)` читает JWT из `x-auth-token` и проверяет подпись RS256 по публичным ключам (`JwtSettings:PublicKeyFile` / env `JWT_PUBLIC_KEY_FILE`, несколько путей через `;`, выбор по `kid`; HMAC отключён разрешённым алгоритмом — общий `JwtSettings:SecretKey` упразднён, аудит №9). Policy `User` принимает только пользовательские токены; `Service` — сервисный токен, выпущенный Identity именно для этого сервиса (`x-target-service`), с распознанной личностью вызывающего (`x-service-id`) и клеймом разрешений; политики `service-permission:<право>` (см. `ServicePermissions` в Shared.Identity) требуют конкретное право. Сервисные JWT короткоживущие (~10 минут), их выдаёт Identity по `ServiceCredentialsApi.GetServiceToken` за секрет сервиса; клиенты кешируют их через `AddServiceTokenClient` + `ServiceTokenClientInterceptor` (обновление за минуту до истечения, single-flight, при недоступности Identity — работа на действующем кеше). Проверка отзывов пользовательских токенов описана в [[Backend/SessionRevocation]].
 
 `RequestContextInterceptor` декодирует Base64 UTF-8 metadata из [[Shared/SharedLibraries]]: имя устройства, ОС, приложение/версию, device ID и client IP. `SourceIpResolver` для лимитов доверяет HTTP `X-Real-IP`, затем адресу TCP-соединения; клиентские `x-ip-address` и `X-Forwarded-For` не используются как доверенный источник.
 
@@ -38,7 +41,7 @@ Parent: [[Index]] · See also: [[Backend/Configuration]], [[Backend/SessionRevoc
 
 `AddBarkCloudSerilogAsync` во всех семи backend-приложениях независимо управляет Console, Seq и Lognara флагами `ConsoleOutput`, `SeqEnable` и `LognaraEnable` (по умолчанию `true/false/false`; все комбинации, включая `false/false/false`, допустимы). Флаги строго разбираются как boolean и фиксируются из локальной конфигурации до remote overlay; remote значения не меняют startup-поведение. Seq сохраняет свои уровни, enrichers и durable buffer. При включённом Lognara приложение сначала запускает `/usr/local/bin/lognara-agent` без аргументов в том же контейнере, удаляет у дочернего процесса `LOGNARA_SOURCES_FILE` и ждёт до 10 секунд HTTP `GET /v1/logs` с ответом `405` и `Allow: POST`; только затем создаются sinks. Агент принимает Serilog только по `http://127.0.0.1:7400/v1/logs`; standalone sources ему не нужны. Sink Lognara использует ограниченную памятью очередь по умолчанию и не включает отдельный дисковый buffer; постоянный spool принадлежит агенту и отделён от sink. При выключенном Lognara процесс не запускается и runtime не требует бинарный файл. Host останавливается при неожиданном завершении агента. После `RunAsync` host прекращает работу и освобождает DI, затем logging lifetime завершает Serilog flush/dispose максимум за 20 секунд, пока агент ещё запущен; сетевые ожидания Seq ограничены 10 секундами, HTTP-клиент sink Lognara — 5 секундами. Затем агент получает SIGTERM, ожидание ограничено 10 секундами, после чего завершается только принадлежащий приложению процесс. Host shutdown budget — 30 секунд; суммарный предел до принудительного завершения процесса — 60 секунд. `AddBarkCloudMetrics` регистрирует общий `MetricsCollector`; `MetricsReporterService` пишет снимки метрик в структурированный лог каждые 5 секунд.
 
-`configuration_api.proto` и `session_revocation_api.proto` генерируются этим проектом с `GrpcServices="Both"`. Остальные backend-проекты подключают необходимые `.proto` с собственными параметрами генерации. См. [[Shared/Proto]].
+`configuration_api.proto`, `session_revocation_api.proto` и `service_credentials_api.proto` генерируются этим проектом с `GrpcServices="Both"`. Остальные backend-проекты подключают необходимые `.proto` с собственными параметрами генерации. См. [[Shared/Proto]].
 
 ## Ограничения и важные детали
 

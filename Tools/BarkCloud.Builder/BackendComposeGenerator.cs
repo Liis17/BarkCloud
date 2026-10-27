@@ -66,7 +66,8 @@ public static class BackendComposeGenerator
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
-  CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
+  # Публичный JWT-ключ: валидация RS256 (подписывает только Identity приватным ключом)
+  JwtSettings__PublicKeyFile: /keys/jwt/jwt-public.pem
 
 name: barkcloud
 
@@ -81,6 +82,8 @@ services:
       - .env
     environment:
       <<: *common-variables
+      # Реестр bootstrap-ключей сервисов: доступ к своему разделу, админ-операции — только Web
+      CONFIGURATION_ACCESS_KEYS: "${CONFIGURATION_ACCESS_KEYS}"
       CONFIGURATION_HOST:  cloud-postgres:5432
       CONFIGURATION_DATABASE: configuration
       CONFIGURATION_USERNAME: ${POSTGRES_USER}
@@ -111,8 +114,15 @@ services:
     restart: always{{AppControls("IDENTITY")}}
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${IDENTITY_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIALS: "${SERVICE_CREDENTIALS}"
+      SERVICE_CREDENTIAL: ${IDENTITY_SERVICE_CREDENTIAL}
+      JwtSettings__PrivateKeyFile: /keys/jwt/jwt-private.pem
       SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}{{AppVolumeSection("IDENTITY")}}
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
+    volumes:
+      - ./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -124,7 +134,11 @@ services:
     restart: always{{AppControls("USERS")}}
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${USERS_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${USERS_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${USERS_PORT}{{usersAgentSettings}}{{AppVolumeSection("USERS")}}
+    volumes:
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -137,13 +151,16 @@ services:
     restart: always{{AppControls("FILES")}}
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${FILES_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${FILES_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"{{filesAgentSettings}}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
-      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp{{AppVolume("FILES")}}
+      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("FILES")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -160,7 +177,8 @@ services:
     container_name: ${NOTIFICATION_CONTAINER_NAME}
     restart: always{{AppControls("NOTIFICATION")}}
     environment:
-      <<: *common-variables{{AppEnv("NOTIFICATION")}}{{AppVolumeSection("NOTIFICATION")}}
+      <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${NOTIFICATION_CONFIG_ACCESS_KEY}{{AppEnv("NOTIFICATION")}}{{AppVolumeSection("NOTIFICATION")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -177,13 +195,16 @@ services:
     restart: always{{AppControls("TORRENT")}}
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${TORRENT_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${TORRENT_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
       FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       Torrent__DownloadPath: "/mnt/torrents"
       Torrent__PeerPort: ${TORRENT_PEER_PORT}{{AppEnv("TORRENT")}}
     volumes:
-      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents{{AppVolume("TORRENT")}}
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("TORRENT")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -204,11 +225,14 @@ services:
       - .env
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${WEB_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${WEB_SERVICE_CREDENTIAL}
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
       App__TrustedProxyNetworks: "${WEB_TRUSTED_PROXY_NETWORKS}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      App__AdminCookieKey: "${WEB_ADMIN_COOKIE_KEY}"
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
       Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
@@ -219,6 +243,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
       - cloud-web-maintenance:/app/maintenance{{AppVolume("WEB")}}
     networks:
       - barkcloud-network
@@ -429,8 +454,22 @@ networks:
         // Всегда http:// + имя контейнера + порт конфигурации.
         K("CONFIGURATION_SERVICE_URL", $"http://cloud-configuration:{m.ConfigurationPort}");
         sb.Append('\n');
-        // Bootstrap-ключ доступа к ConfigurationApi. Должен совпадать у всех сервисов.
-        K("CONFIGURATION_ACCESS_KEY", m.ConfigurationAccessKey);
+        // Разделённые секреты (аудит, п. 9): bootstrap-ключ у каждого сервиса свой,
+        // реестр — только у Configuration; секреты сервисов обмениваются на короткоживущие
+        // JWT у Identity. RSA-ключи JWT лежат в ./secrets/jwt (генерируются вместе с .env).
+        K("CONFIGURATION_ACCESS_KEYS", m.ConfigurationAccessKeysRegistry);
+        K("IDENTITY_CONFIG_ACCESS_KEY", m.IdentityConfigAccessKey);
+        K("USERS_CONFIG_ACCESS_KEY", m.UsersConfigAccessKey);
+        K("NOTIFICATION_CONFIG_ACCESS_KEY", m.NotificationConfigAccessKey);
+        K("FILES_CONFIG_ACCESS_KEY", m.FilesConfigAccessKey);
+        K("TORRENT_CONFIG_ACCESS_KEY", m.TorrentConfigAccessKey);
+        K("WEB_CONFIG_ACCESS_KEY", m.WebConfigAccessKey);
+        K("SERVICE_CREDENTIALS", m.ServiceCredentialsRegistry);
+        K("IDENTITY_SERVICE_CREDENTIAL", m.IdentityServiceCredential);
+        K("USERS_SERVICE_CREDENTIAL", m.UsersServiceCredential);
+        K("FILES_SERVICE_CREDENTIAL", m.FilesServiceCredential);
+        K("TORRENT_SERVICE_CREDENTIAL", m.TorrentServiceCredential);
+        K("WEB_SERVICE_CREDENTIAL", m.WebServiceCredential);
 
         Section("Docker-сеть и имена контейнеров");
         K("DOCKER_NETWORK_NAME", m.DockerNetworkName);
@@ -544,6 +583,7 @@ networks:
         K("WEB_PUBLIC_HOST", m.WebPublicHost);
         K("WEB_TRUSTED_PROXY_NETWORKS", m.WebTrustedProxyNetworks);
         K("WEB_ADMIN_PASSWORD", m.WebAdminPassword);
+        K("WEB_ADMIN_COOKIE_KEY", m.WebAdminCookieKey);
 
         Section("Внешние адреса сервисов для клиентов (обязательны)");
         K("EXTERNAL_IDENTITY_HOST", m.ExternalIdentityHost);

@@ -4,7 +4,8 @@
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
-  CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
+  # Публичный JWT-ключ: валидация RS256 (подписывает только Identity приватным ключом)
+  JwtSettings__PublicKeyFile: /keys/jwt/jwt-public.pem
 
 services:
   # === Основные микросервисы (prod-образы) ===
@@ -17,6 +18,8 @@ services:
       - .env
     environment:
       <<: *common-variables
+      # Реестр bootstrap-ключей сервисов: доступ к своему разделу, админ-операции — только Web
+      CONFIGURATION_ACCESS_KEYS: "${CONFIGURATION_ACCESS_KEYS}"
       CONFIGURATION_HOST:  cloud-postgres:5432
       CONFIGURATION_DATABASE: configuration
       CONFIGURATION_USERNAME: ${POSTGRES_USER}
@@ -55,11 +58,18 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${IDENTITY_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIALS: "${SERVICE_CREDENTIALS}"
+      SERVICE_CREDENTIAL: ${IDENTITY_SERVICE_CREDENTIAL}
+      JwtSettings__PrivateKeyFile: /keys/jwt/jwt-private.pem
       SERVICE_PORT: ${IDENTITY_PORT}
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       ConsoleOutput: ${IDENTITY_CONSOLE_OUTPUT}
       SeqEnable: ${IDENTITY_SEQ_ENABLE}
       LognaraEnable: ${IDENTITY_LOGNARA_ENABLE}
+    volumes:
+      - ./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -71,10 +81,14 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${USERS_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${USERS_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${USERS_PORT}
       ConsoleOutput: ${USERS_CONSOLE_OUTPUT}
       SeqEnable: ${USERS_SEQ_ENABLE}
       LognaraEnable: ${USERS_LOGNARA_ENABLE}
+    volumes:
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -87,6 +101,8 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${FILES_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${FILES_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
@@ -97,6 +113,7 @@ services:
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -110,6 +127,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${NOTIFICATION_CONFIG_ACCESS_KEY}
       ConsoleOutput: ${NOTIFICATION_CONSOLE_OUTPUT}
       SeqEnable: ${NOTIFICATION_SEQ_ENABLE}
       LognaraEnable: ${NOTIFICATION_LOGNARA_ENABLE}
@@ -125,6 +143,8 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${TORRENT_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${TORRENT_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
       FILES_HTTP1PORT: ${FILES_HTTP1PORT}
@@ -135,6 +155,7 @@ services:
       LognaraEnable: ${TORRENT_LOGNARA_ENABLE}
     volumes:
       - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -151,11 +172,14 @@ services:
       - .env
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${WEB_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${WEB_SERVICE_CREDENTIAL}
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
       App__TrustedProxyNetworks: "${WEB_TRUSTED_PROXY_NETWORKS:-}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      App__AdminCookieKey: "${WEB_ADMIN_COOKIE_KEY}"
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
       Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
@@ -171,6 +195,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
       - cloud-web-maintenance:/app/maintenance
     networks:
       - barkcloud-network
