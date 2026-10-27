@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal } from '../ui/Modal';
+import { TextAreaField, TextField } from '../ui/TextField';
 import { apiPost } from '../../lib/api';
 import type { Album } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
@@ -50,10 +51,8 @@ export function AlbumFormModal({ album, onClose, onSaved, toast }: AlbumFormModa
         </>
       }
     >
-      <label className="field-label">Название</label>
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Например: Отпуск 2026" />
-      <label className="field-label">Описание</label>
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Необязательно" />
+      <TextField label="Название" value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Например: Отпуск 2026" />
+      <TextAreaField label="Описание" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Необязательно" />
     </Modal>
   );
 }

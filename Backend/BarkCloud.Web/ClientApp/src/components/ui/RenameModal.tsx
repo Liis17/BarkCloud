@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal } from './Modal';
+import { TextField } from './TextField';
 
 interface RenameModalProps {
   title?: string;
@@ -38,9 +39,8 @@ export function RenameModal({ title = 'Переименовать', label = 'Н�
         </>
       }
     >
-      <label className="field-label">{label}</label>
-      <input
-        type="text"
+      <TextField
+        label={label}
         value={name}
         autoFocus
         onChange={(e) => setName(e.target.value)}

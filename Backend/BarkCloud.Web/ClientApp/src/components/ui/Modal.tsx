@@ -14,11 +14,17 @@ interface ModalProps {
 export function Modal({ title, children, onClose, actions, wide, className }: ModalProps) {
   const titleId = React.useId();
   const dialog = React.useRef<HTMLDivElement>(null);
+  const previousFocus = React.useRef<HTMLElement | null>(typeof document === 'undefined' ? null : document.activeElement as HTMLElement | null);
   React.useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
+    const focusables = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button, input, select, textarea') || []);
+    const autofocus = focusables.find((element) => 'autofocus' in element && Boolean((element as HTMLInputElement).autofocus));
     const first = dialog.current?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]');
-    (first || dialog.current)?.focus();
-    return () => previous?.focus();
+    const active = document.activeElement;
+    if (autofocus) autofocus.focus();
+    else if (!dialog.current?.contains(active)) (first || dialog.current)?.focus();
+    return () => {
+      if (!dialog.current?.isConnected) previousFocus.current?.focus();
+    };
   }, []);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Select } from '../components/ui/Select';
+import { TextField } from '../components/ui/TextField';
 import { Switch } from '../components/ui/Switch';
 import { Loading } from '../components/ui/EmptyState';
 import { MigrationProgress } from '../components/settings/MigrationProgress';
@@ -29,7 +30,6 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [error, setError] = React.useState('');
-  const endpointHintId = React.useId();
   const endpointError = !!target.serviceUrl.trim() && !validMigrationEndpoint(target.serviceUrl);
   const expired = React.useRef(onExpired); expired.current = onExpired;
   const source = sources.find(x => x.id === sourceId);
@@ -87,16 +87,17 @@ export default function MigrationTab({ active = true, onExpired }: { active?: bo
       <article className="migration-connection-card" aria-label="Целевое хранилище">
         <div className="migration-card-title"><span className="migration-step">2</span><div><h3>Назначение</h3><small>Отдельный бакет на другом S3</small></div></div>
         <fieldset className="migration-fields" disabled={busy || running}><legend className="sr-only">Подключение назначения</legend>
-          <label className="migration-field"><span>Endpoint</span><input aria-label="Endpoint назначения" inputMode="url" value={target.serviceUrl} placeholder="https://s3.example.com"
-            aria-invalid={endpointError} aria-describedby={endpointHintId} onChange={e => edit('serviceUrl', e.target.value)}
+          <div className="migration-field"><TextField label="Endpoint" aria-label="Endpoint назначения" inputMode="url" value={target.serviceUrl} placeholder="https://s3.example.com"
+            aria-invalid={endpointError} onChange={e => edit('serviceUrl', e.target.value)}
             onBlur={() => { const endpoint = normalizeMigrationEndpoint(target.serviceUrl); if (validMigrationEndpoint(endpoint) && endpoint !== target.serviceUrl) edit('serviceUrl', endpoint); }}
-            autoComplete="off" autoCapitalize="none" spellCheck={false} />
-            <small id={endpointHintId} className={endpointError ? 'migration-note migration-error' : 'migration-note'}>{endpointError
-              ? 'Укажите адрес HTTP или HTTPS без логина, пароля, параметров и #.' : 'Без протокола используем HTTPS.'}</small></label>
-          <label className="migration-field"><span>Bucket</span><input aria-label="Bucket назначения" value={target.bucketName} onChange={e => edit('bucketName', e.target.value)} autoComplete="off" spellCheck={false} /></label>
-          <label className="migration-field"><span>Access key</span><input aria-label="Access key назначения" type="password" value={target.accessKey} onChange={e => edit('accessKey', e.target.value)} autoComplete="off" spellCheck={false} /></label>
-          <label className="migration-field"><span>Secret key</span><input aria-label="Secret key назначения" type="password" value={target.secretKey} onChange={e => edit('secretKey', e.target.value)} autoComplete="new-password" spellCheck={false} /></label>
-          <label className="migration-field"><span>Регион</span><input aria-label="Регион назначения" value={target.isR2 ? 'auto' : target.region} disabled={target.isR2} placeholder="Автоматически" onChange={e => edit('region', e.target.value)} autoComplete="off" /></label>
+            autoComplete="off" autoCapitalize="none" spellCheck={false}
+            hint={!endpointError ? 'Без протокола используем HTTPS.' : undefined}
+            error={endpointError ? 'Укажите адрес HTTP или HTTPS без логина, пароля, параметров и #.' : undefined} />
+          </div>
+          <div className="migration-field"><TextField label="Bucket" aria-label="Bucket назначения" value={target.bucketName} onChange={e => edit('bucketName', e.target.value)} autoComplete="off" spellCheck={false} /></div>
+          <div className="migration-field"><TextField label="Access key" aria-label="Access key назначения" type="password" value={target.accessKey} onChange={e => edit('accessKey', e.target.value)} autoComplete="off" spellCheck={false} /></div>
+          <div className="migration-field"><TextField label="Secret key" aria-label="Secret key назначения" type="password" value={target.secretKey} onChange={e => edit('secretKey', e.target.value)} autoComplete="new-password" spellCheck={false} /></div>
+          <div className="migration-field"><TextField label="Регион" aria-label="Регион назначения" value={target.isR2 ? 'auto' : target.region} disabled={target.isR2} placeholder="Автоматически" onChange={e => edit('region', e.target.value)} autoComplete="off" /></div>
           <label className="migration-field"><span>Адресация бакета</span><Select aria-label="Адресация бакета назначения" value={target.forcePathStyle ? 'path' : 'virtual'} disabled={busy || running}
             options={[{ value: 'path', label: 'Path style · endpoint/bucket' }, { value: 'virtual', label: 'Virtual host · bucket.endpoint' }]} onChange={v => edit('forcePathStyle', v === 'path')} /></label>
           <div className="migration-r2"><span>Cloudflare R2</span><Switch label="Cloudflare R2 назначения" on={target.isR2} disabled={busy || running} onChange={v => edit('isR2', v)} /></div>

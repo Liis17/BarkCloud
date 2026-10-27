@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/ui/Modal';
+import { TextField } from '../components/ui/TextField';
 import { Select } from '../components/ui/Select';
 import { EmptyState } from '../components/ui/EmptyState';
 import { FileDropOverlay } from '../components/ui/FileDropOverlay';
@@ -177,8 +178,7 @@ function AddModal({ onClose, onToast }: { onClose: () => void; onToast: (m: stri
         <button className="btn text" onClick={onClose}>Отмена</button>
         <button className="btn primary" disabled={busy || !magnet.trim()} onClick={submitMagnet}>Добавить</button>
       </>}>
-      <label className="field-label">Magnet-ссылка</label>
-      <input type="text" value={magnet} onChange={(e) => setMagnet(e.target.value)} placeholder="magnet:?xt=urn:btih:…" autoFocus />
+      <TextField label="Magnet-ссылка" value={magnet} onChange={(e) => setMagnet(e.target.value)} placeholder="magnet:?xt=urn:btih:…" autoFocus />
       <label className="field-label">или загрузите .torrent-файл:</label>
       <input ref={fileRef} type="file" accept=".torrent" hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) submitFile(f); }} />

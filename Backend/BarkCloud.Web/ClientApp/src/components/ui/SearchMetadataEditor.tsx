@@ -2,6 +2,7 @@ import React from 'react';
 import { apiGet, apiPut } from '../../lib/api';
 import { tagKey, tagStyle, type UserTag } from '../../lib/tags';
 import { Icon } from '../Icon';
+import { SearchField, TextField } from './TextField';
 
 export function SearchMetadataEditor({ fileId, initialAlias, initialTags, onSaved }: {
   fileId: string;
@@ -59,8 +60,8 @@ export function SearchMetadataEditor({ fileId, initialAlias, initialTags, onSave
   }
 
   return <form className="prop-search-meta" onSubmit={save}>
-    <label className="tag-text-field"><span>Имя для поиска</span><input value={alias} maxLength={120} disabled={saving}
-      onChange={(e) => { setAlias(e.target.value); setMessage(''); }} placeholder="Например, важный документ" /></label>
+    <TextField label="Имя для поиска" value={alias} maxLength={120} disabled={saving}
+      onChange={(e) => { setAlias(e.target.value); setMessage(''); }} placeholder="Например, важный документ" />
     <div className="prop-search-help">Помогает найти файл, сохраняя его настоящее имя.</div>
     <div className="prop-section">Теги</div>
     <div className="prop-tag-list" aria-label="Теги файла">
@@ -74,7 +75,7 @@ export function SearchMetadataEditor({ fileId, initialAlias, initialTags, onSave
         <button type="button" className="tag-chip tag-add" ref={addButton} disabled={saving || tags.length >= 20} aria-label="Добавить тег" aria-expanded={open}
           aria-controls={open ? pickerId : undefined} onClick={() => { setQuery(''); setOpen(!open); }}><Icon.plus size={18} /></button>
         {open && <div className="tag-picker-menu" id={pickerId}>
-          <label className="tag-search"><Icon.search size={18} /><input autoFocus type="search" aria-label="Поиск тегов" placeholder="Поиск тегов" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
+          <SearchField leading={<Icon.search size={18} />} autoFocus label="Поиск тегов" placeholder="Поиск тегов" value={query} onChange={(e) => setQuery(e.target.value)} />
           <div className="tag-picker-options" aria-label="Доступные теги">
             {loading ? <div className="prop-empty" role="status">Загрузка…</div> : catalogError ? <div className="prop-err" role="alert">{catalogError}</div> : <>
               {available.map((tag) => <button type="button" className="tag-picker-option" key={tag.id} style={tagStyle(tag.color)}
