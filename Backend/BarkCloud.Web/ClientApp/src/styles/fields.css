@@ -1,0 +1,236 @@
+/* Shared MD3 outlined fields. This file has no page reset so auth and SPA can share it. */
+.md-text-field {
+  --field-primary: var(--md-primary, var(--auth-primary));
+  --field-on-surface: var(--md-on-surface, var(--auth-on-surface));
+  --field-on-variant: var(--md-on-surface-variant, var(--auth-on-surface-variant));
+  --field-outline: var(--md-outline, var(--auth-outline));
+  --field-outline-variant: var(--md-outline-variant, var(--auth-outline-variant));
+  --field-background: var(--md-surface-container-lowest, var(--auth-surface-container));
+  --field-error: var(--md-error, var(--auth-error));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  color: var(--field-on-surface);
+  font: inherit;
+}
+
+.md-text-field__box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  border-radius: 4px;
+  background: var(--field-background);
+}
+
+.md-text-field__outline {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--field-outline);
+  border-radius: 4px;
+  pointer-events: none;
+  transition: border-color 150ms ease, inset 150ms ease, border-width 150ms ease;
+}
+
+.md-text-field__outline legend {
+  float: none;
+  width: auto;
+  max-width: 0.01px;
+  height: 12px;
+  padding: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-size: 12px;
+  line-height: 12px;
+  transition: max-width 150ms ease;
+}
+
+.md-text-field__outline legend span {
+  display: block;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.md-text-field__control {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  height: 56px;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 4px;
+  outline: 0;
+  background: transparent;
+  color: var(--field-on-surface);
+  font: inherit;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.md-text-field__control::placeholder {
+  color: transparent;
+  opacity: 1;
+}
+
+.md-text-field__control:focus::placeholder {
+  color: var(--field-on-variant);
+}
+
+.md-text-field__label {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 16px;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  color: var(--field-on-variant);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: top 150ms ease, left 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.md-text-field__box:focus-within .md-text-field__outline {
+  inset: -1px;
+  border-width: 2px;
+  border-color: var(--field-primary);
+}
+
+.md-text-field__box:focus-within .md-text-field__outline legend,
+.md-text-field__box:has(.md-text-field__control:not(:placeholder-shown)) .md-text-field__outline legend,
+.md-text-field__box:has(.md-text-field__control:autofill) .md-text-field__outline legend,
+.md-text-field__box:has(.md-text-field__control:-webkit-autofill) .md-text-field__outline legend {
+  max-width: 100%;
+}
+
+.md-text-field__box:focus-within .md-text-field__label,
+.md-text-field__control:not(:placeholder-shown) ~ .md-text-field__label,
+.md-text-field__box:has(.md-text-field__control:autofill) .md-text-field__label,
+.md-text-field__box:has(.md-text-field__control:-webkit-autofill) .md-text-field__label {
+  top: 0;
+  left: 12px;
+  transform: translateY(-50%) scale(.75);
+  color: var(--field-primary);
+}
+
+.md-text-field__box:has(.md-text-field__control[aria-invalid='true']) .md-text-field__outline {
+  border-color: var(--field-error);
+}
+
+.md-text-field__control[aria-invalid='true'] ~ .md-text-field__label {
+  color: var(--field-error);
+}
+
+.md-text-field__control:disabled {
+  color: color-mix(in srgb, var(--field-on-surface) 48%, transparent);
+  cursor: not-allowed;
+}
+
+.md-text-field__box:has(.md-text-field__control:disabled) .md-text-field__outline {
+  border-color: color-mix(in srgb, var(--field-outline) 45%, transparent);
+}
+
+.md-text-field__control:read-only {
+  cursor: default;
+}
+
+.md-text-field.has-trailing .md-text-field__control {
+  padding-right: 64px;
+}
+
+.md-text-field__trailing {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+}
+
+.md-text-field__hint,
+.md-text-field__error {
+  padding: 0 16px;
+  color: var(--field-on-variant);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.md-text-field__error { color: var(--field-error); }
+
+.md-text-field--multiline .md-text-field__box {
+  align-items: stretch;
+  min-height: 112px;
+}
+
+.md-text-field--multiline .md-text-field__control {
+  height: auto;
+  min-height: 112px;
+  padding-top: 24px;
+  resize: vertical;
+}
+
+.md-text-field--multiline .md-text-field__label { top: 24px; }
+.md-text-field--multiline .md-text-field__box:focus-within .md-text-field__label,
+.md-text-field--multiline .md-text-field__control:not(:placeholder-shown) ~ .md-text-field__label,
+.md-text-field--multiline .md-text-field__box:has(.md-text-field__control:autofill) .md-text-field__label,
+.md-text-field--multiline .md-text-field__box:has(.md-text-field__control:-webkit-autofill) .md-text-field__label { top: 0; }
+
+.md-search-field {
+  --field-primary: var(--md-primary, var(--auth-primary));
+  --field-on-surface: var(--md-on-surface, var(--auth-on-surface));
+  --field-on-variant: var(--md-on-surface-variant, var(--auth-on-surface-variant));
+  --field-background: var(--md-surface-container-high, var(--auth-surface-high));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--field-background);
+  color: var(--field-on-variant);
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+
+.md-search-field:hover { background: var(--md-surface-container-highest, var(--auth-surface-high)); }
+.md-search-field:focus-within { background: var(--md-surface-container-highest, var(--auth-surface-high)); box-shadow: 0 0 0 2px var(--field-primary); }
+.md-search-field:has(:disabled) { opacity: .6; }
+.md-search-field__leading, .md-search-field__trailing { display: inline-flex; flex: 0 0 auto; align-items: center; }
+.md-search-field__control {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--field-on-surface);
+  font: inherit;
+  font-size: 15px;
+}
+.md-search-field__control::placeholder { color: var(--field-on-variant); opacity: 1; }
+.md-search-field__control:focus-visible { outline: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .md-text-field__outline, .md-text-field__outline legend, .md-text-field__label,
+  .md-search-field { transition-duration: 0ms; }
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal } from './Modal';
+import { SearchField } from './TextField';
 import { Icon } from '../Icon';
 import { apiGet, apiPost } from '../../lib/api';
 import type { ToastPush } from '../../hooks/useToast';
@@ -12,15 +13,6 @@ interface SearchUser {
   avatar: string;
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid var(--md-outline, #444)',
-  background: 'var(--md-surface-container-high, #25252e)',
-  color: 'inherit',
-  fontSize: 14,
-};
 const hint: React.CSSProperties = { color: 'var(--md-on-surface-variant)', fontSize: 13, margin: '10px 2px 0' };
 
 /**
@@ -93,12 +85,13 @@ export function ShareWithUserModal({
         </button>
       }
     >
-      <input
-        style={inputStyle}
+      <SearchField
+        label="Поиск по имени или юзернейму"
         autoFocus
         placeholder="Поиск по имени или юзернейму…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
+        leading={<Icon.search size={18} />}
       />
       {q.trim().length < 2 ? (
         <p style={hint}>Введите минимум 2 символа.</p>
