@@ -6,6 +6,92 @@ namespace BarkCloud.Builder.Tests;
 public sealed class BuilderConfigLoaderTests
 {
     [Fact]
+    public void Registry_only_env_restores_split_secrets_and_prefers_explicit_values()
+    {
+        const string env = """
+IDENTITY_CONFIG_ACCESS_KEY="replace-identity-key" # old placeholder
+USERS_CONFIG_ACCESS_KEY="custom-users-key"
+CONFIGURATION_ACCESS_KEYS='Identity=registry-identity-key;Users=registry-users-key;Notification=notification-key;Files=files-key;Torrent=torrent-key;Web=web-key'
+SERVICE_CREDENTIALS='Identity=identity-credential;Users=users-credential;Files=files-credential;Torrent=torrent-credential;Web=web-credential'
+""";
+
+        var model = new BuilderModel();
+        var loaded = BuilderConfigLoader.Load(BackendComposeGenerator.BuildCompose(model), env, null, "C:\\out");
+        var generatedEnv = BackendComposeGenerator.BuildEnv(loaded);
+
+        Assert.Equal("registry-identity-key", loaded.IdentityConfigAccessKey);
+        Assert.Equal("custom-users-key", loaded.UsersConfigAccessKey);
+        Assert.Equal("notification-key", loaded.NotificationConfigAccessKey);
+        Assert.Equal("files-key", loaded.FilesConfigAccessKey);
+        Assert.Equal("torrent-key", loaded.TorrentConfigAccessKey);
+        Assert.Equal("web-key", loaded.WebConfigAccessKey);
+        Assert.Equal("identity-credential", loaded.IdentityServiceCredential);
+        Assert.Equal("users-credential", loaded.UsersServiceCredential);
+        Assert.Equal("files-credential", loaded.FilesServiceCredential);
+        Assert.Equal("torrent-credential", loaded.TorrentServiceCredential);
+        Assert.Equal("web-credential", loaded.WebServiceCredential);
+        Assert.Contains("IDENTITY_CONFIG_ACCESS_KEY='registry-identity-key'\n", generatedEnv);
+        Assert.Contains("USERS_CONFIG_ACCESS_KEY='custom-users-key'\n", generatedEnv);
+    }
+
+    [Fact]
+    public void Service_database_and_rabbit_passwords_round_trip_and_legacy_placeholders_are_replaced()
+    {
+        var model = new BuilderModel
+        {
+            ConfigurationDbPassword = "configuration-db-secret",
+            IdentityDbPassword = "identity-db-secret",
+            UsersDbPassword = "users-db-secret",
+            FilesDbPassword = "files-db-secret",
+            TorrentDbPassword = "torrent-db-secret",
+            IdentityRabbitPassword = "identity'quoted;secret",
+            UsersRabbitPassword = "users-rabbit-secret",
+            FilesRabbitPassword = "files-rabbit-secret",
+            TorrentRabbitPassword = "torrent-rabbit-secret",
+            NotificationRabbitPassword = "notification-rabbit-secret",
+            PostgresHost = "postgres.example.test",
+            RabbitHost = "rabbit.example.test",
+            RabbitVirtualHost = "/barkcloud"
+        };
+
+        var loaded = RoundTrip(model, "C:\\out");
+        Assert.Equal(model.ConfigurationDbPassword, loaded.ConfigurationDbPassword);
+        Assert.Equal(model.IdentityDbPassword, loaded.IdentityDbPassword);
+        Assert.Equal(model.UsersDbPassword, loaded.UsersDbPassword);
+        Assert.Equal(model.FilesDbPassword, loaded.FilesDbPassword);
+        Assert.Equal(model.TorrentDbPassword, loaded.TorrentDbPassword);
+        Assert.Equal(model.IdentityRabbitPassword, loaded.IdentityRabbitPassword);
+        Assert.Equal(model.UsersRabbitPassword, loaded.UsersRabbitPassword);
+        Assert.Equal(model.FilesRabbitPassword, loaded.FilesRabbitPassword);
+        Assert.Equal(model.TorrentRabbitPassword, loaded.TorrentRabbitPassword);
+        Assert.Equal(model.NotificationRabbitPassword, loaded.NotificationRabbitPassword);
+        Assert.Equal(model.PostgresHost, loaded.PostgresHost);
+        Assert.Equal(model.RabbitHost, loaded.RabbitHost);
+        Assert.Equal(model.RabbitVirtualHost, loaded.RabbitVirtualHost);
+        var env = BackendComposeGenerator.BuildEnv(loaded);
+        Assert.Contains("POSTGRES_HOST='postgres.example.test'\n", env);
+        Assert.Contains("RABBITMQ_HOST='rabbit.example.test'\n", env);
+        Assert.Contains("RABBITMQ_VIRTUAL_HOST='/barkcloud'\n", env);
+        AssertSameOutput(model, loaded);
+
+        const string legacyEnv = "CONFIGURATION_DB_PASSWORD=replace-configuration-db-password\n"
+                                 + "IDENTITY_DB_PASSWORD=replace-identity-db-password\n"
+                                 + "RABBITMQ_TORRENT_PASSWORD=replace-torrent-rabbitmq-password\n";
+        var repaired = BuilderConfigLoader.Load(
+            BackendComposeGenerator.BuildCompose(new BuilderModel()), legacyEnv, null, "C:\\out");
+        Assert.False(repaired.ConfigurationDbPassword.StartsWith("replace-", StringComparison.Ordinal));
+        Assert.False(repaired.IdentityDbPassword.StartsWith("replace-", StringComparison.Ordinal));
+        Assert.False(repaired.TorrentRabbitPassword.StartsWith("replace-", StringComparison.Ordinal));
+        Assert.NotEqual(string.Empty, repaired.ConfigurationDbPassword);
+        Assert.Equal(BackendComposeGenerator.BuildEnv(repaired), BackendComposeGenerator.BuildEnv(repaired));
+
+        var reopened = RoundTrip(repaired, "C:\\out");
+        Assert.Equal(repaired.ConfigurationDbPassword, reopened.ConfigurationDbPassword);
+        Assert.Equal(repaired.IdentityDbPassword, reopened.IdentityDbPassword);
+        Assert.Equal(repaired.TorrentRabbitPassword, reopened.TorrentRabbitPassword);
+    }
+
+    [Fact]
     public void External_mode_round_trip_restores_all_generated_files()
     {
         var model = new BuilderModel
@@ -22,7 +108,17 @@ public sealed class BuilderConfigLoaderTests
             LognaraAgentVersion = "agent-20261018-120000-123456abcdef",
             DockerNetworkName = "custom-net",
             WebContainerName = "my-web",
-            ConfigurationAccessKey = "key=with=equals",
+            IdentityConfigAccessKey = "identity-key=with=equals",
+            UsersConfigAccessKey = "users-key",
+            NotificationConfigAccessKey = "notification-key",
+            FilesConfigAccessKey = "files-key",
+            TorrentConfigAccessKey = "torrent-key",
+            WebConfigAccessKey = "web-key",
+            IdentityServiceCredential = "identity-credential",
+            UsersServiceCredential = "users-credential",
+            FilesServiceCredential = "files-credential",
+            TorrentServiceCredential = "torrent-credential",
+            WebServiceCredential = "web-credential",
             WebCookieSecure = true,
             WebAdminPassword = "admin",
             AndroidCertificateSha256Fingerprint = "AA:BB:CC:DD",
@@ -57,6 +153,17 @@ public sealed class BuilderConfigLoaderTests
         Assert.True(loaded.UseNginx);
         Assert.True(loaded.NginxSeqProxy);
         Assert.False(loaded.NginxMinioConsoleProxy);
+        Assert.Equal(model.IdentityConfigAccessKey, loaded.IdentityConfigAccessKey);
+        Assert.Equal(model.UsersConfigAccessKey, loaded.UsersConfigAccessKey);
+        Assert.Equal(model.NotificationConfigAccessKey, loaded.NotificationConfigAccessKey);
+        Assert.Equal(model.FilesConfigAccessKey, loaded.FilesConfigAccessKey);
+        Assert.Equal(model.TorrentConfigAccessKey, loaded.TorrentConfigAccessKey);
+        Assert.Equal(model.WebConfigAccessKey, loaded.WebConfigAccessKey);
+        Assert.Equal(model.IdentityServiceCredential, loaded.IdentityServiceCredential);
+        Assert.Equal(model.UsersServiceCredential, loaded.UsersServiceCredential);
+        Assert.Equal(model.FilesServiceCredential, loaded.FilesServiceCredential);
+        Assert.Equal(model.TorrentServiceCredential, loaded.TorrentServiceCredential);
+        Assert.Equal(model.WebServiceCredential, loaded.WebServiceCredential);
         AssertSameOutput(model, loaded);
     }
 

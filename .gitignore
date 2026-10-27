@@ -12,6 +12,8 @@
 *.env
 # Пример-файл переменных окружения — трекаем (реальный .env остаётся игнорируемым)
 !Backend/sample.env
+/Backend/.env.bak.*
+/Backend/secrets/jwt/jwt-private.pem
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

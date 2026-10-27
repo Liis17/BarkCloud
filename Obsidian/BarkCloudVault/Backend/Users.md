@@ -23,7 +23,7 @@ Parent: [[Index]] · See also: [[Api/UsersClientGuide]], [[Backend/AccountDeleti
 
 ## Публичные контракты
 
-`UsersApi` использует policy `User` (принимает user или service JWT); `CheckExistUsername` и `CheckExistEmail` разрешены без токена. Клиентам следует передавать user JWT. Клиентский гайд по входным данным и ответам — [[Api/UsersClientGuide]].
+`UsersApi` использует policy `User` (принимает только пользовательский JWT); `CheckExistUsername` и `CheckExistEmail` разрешены без токена. Клиентский гайд по входным данным и ответам — [[Api/UsersClientGuide]].
 
 | Контракт | Поведение |
 |---|---|

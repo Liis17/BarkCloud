@@ -44,6 +44,12 @@ public static class BackendComposeGenerator
               + "\n      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}"
               + "\n      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}"
             : "";
+        string minioEnv = m.IncludeMinio
+            ? "\n      MINIO_HOST: cloud-minio"
+              + "\n      MINIO_PORT: \"9000\""
+              + "\n      MINIO_ROOT_USER: ${MINIO_ROOT_USER}"
+              + "\n      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}"
+            : "";
         string torrentDependency = m.IncludeTorrent ? "\n      - cloud-torrent" : "";
         string webOptionalContainerNames = string.Concat(
             m.IncludeNotification ? "\n      Docker__ContainerNames__Notification: \"${NOTIFICATION_CONTAINER_NAME}\"" : "",
@@ -66,7 +72,8 @@ public static class BackendComposeGenerator
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
-  CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
+  # Публичный JWT-ключ: валидация RS256 (подписывает только Identity приватным ключом)
+  JwtSettings__PublicKeyFile: /keys/jwt/jwt-public.pem
 
 name: barkcloud
 
@@ -77,22 +84,29 @@ services:
     image: {{Img("configuration")}}
     container_name: ${CONFIGURATION_CONTAINER_NAME}
     restart: always{{AppControls("CONFIGURATION")}}
-    env_file:
-      - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST:  cloud-postgres:5432
+      # Реестр bootstrap-ключей сервисов: доступ к своему разделу, админ-операции — только Web
+      CONFIGURATION_ACCESS_KEYS: "${CONFIGURATION_ACCESS_KEYS}"
+      CONFIGURATION_HOST: ${POSTGRES_HOST}
       CONFIGURATION_DATABASE: configuration
-      CONFIGURATION_USERNAME: ${POSTGRES_USER}
-      CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
+      CONFIGURATION_USERNAME: barkcloud_configuration
+      CONFIGURATION_PASSWORD: "${CONFIGURATION_DB_PASSWORD}"
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
-      CONFIGURATION_DBPORT: "5432"
-      MINIO_HOST: cloud-minio
-      MINIO_PORT: "9000"
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}{{emailEnv}}
+      CONFIGURATION_DBPORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      IDENTITY_DB_PASSWORD: "${IDENTITY_DB_PASSWORD}"
+      USERS_DB_PASSWORD: "${USERS_DB_PASSWORD}"
+      FILES_DB_PASSWORD: "${FILES_DB_PASSWORD}"
+      TORRENT_DB_PASSWORD: "${TORRENT_DB_PASSWORD}"
+      RABBITMQ_HOST: ${RABBITMQ_HOST}{{minioEnv}}
+      RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VIRTUAL_HOST}
+      RABBITMQ_IDENTITY_PASSWORD: "${RABBITMQ_IDENTITY_PASSWORD}"
+      RABBITMQ_USERS_PASSWORD: "${RABBITMQ_USERS_PASSWORD}"
+      RABBITMQ_FILES_PASSWORD: "${RABBITMQ_FILES_PASSWORD}"
+      RABBITMQ_TORRENT_PASSWORD: "${RABBITMQ_TORRENT_PASSWORD}"
+      RABBITMQ_NOTIFICATION_PASSWORD: "${RABBITMQ_NOTIFICATION_PASSWORD}"{{emailEnv}}
       # Внешние адреса сервисов для клиентов (обязательны)
       EXTERNAL_IDENTITY_HOST: ${EXTERNAL_IDENTITY_HOST}
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
@@ -111,8 +125,15 @@ services:
     restart: always{{AppControls("IDENTITY")}}
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}{{AppVolumeSection("IDENTITY")}}
+      CONFIGURATION_ACCESS_KEY: ${IDENTITY_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIALS: "${SERVICE_CREDENTIALS}"
+      SERVICE_CREDENTIAL: ${IDENTITY_SERVICE_CREDENTIAL}
+      JwtSettings__PrivateKeyFile: /keys/jwt/jwt-private.pem
+      SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
+    volumes:
+      - ./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("IDENTITY")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -124,7 +145,11 @@ services:
     restart: always{{AppControls("USERS")}}
     environment:
       <<: *common-variables
-      SERVICE_PORT: ${USERS_PORT}{{usersAgentSettings}}{{AppVolumeSection("USERS")}}
+      CONFIGURATION_ACCESS_KEY: ${USERS_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${USERS_SERVICE_CREDENTIAL}
+      SERVICE_PORT: ${USERS_PORT}{{usersAgentSettings}}
+    volumes:
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("USERS")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -137,13 +162,16 @@ services:
     restart: always{{AppControls("FILES")}}
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${FILES_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${FILES_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"{{filesAgentSettings}}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
-      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp{{AppVolume("FILES")}}
+      - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("FILES")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -160,7 +188,8 @@ services:
     container_name: ${NOTIFICATION_CONTAINER_NAME}
     restart: always{{AppControls("NOTIFICATION")}}
     environment:
-      <<: *common-variables{{AppEnv("NOTIFICATION")}}{{AppVolumeSection("NOTIFICATION")}}
+      <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${NOTIFICATION_CONFIG_ACCESS_KEY}{{AppEnv("NOTIFICATION")}}{{AppVolumeSection("NOTIFICATION")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -177,13 +206,16 @@ services:
     restart: always{{AppControls("TORRENT")}}
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${TORRENT_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${TORRENT_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
       FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       Torrent__DownloadPath: "/mnt/torrents"
       Torrent__PeerPort: ${TORRENT_PEER_PORT}{{AppEnv("TORRENT")}}
     volumes:
-      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents{{AppVolume("TORRENT")}}
+      - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("TORRENT")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -204,11 +236,14 @@ services:
       - .env
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${WEB_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${WEB_SERVICE_CREDENTIAL}
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
       App__TrustedProxyNetworks: "${WEB_TRUSTED_PROXY_NETWORKS}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      App__AdminCookieKey: "${WEB_ADMIN_COOKIE_KEY}"
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
       Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
@@ -219,6 +254,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
       - cloud-web-maintenance:/app/maintenance{{AppVolume("WEB")}}
     networks:
       - barkcloud-network
@@ -422,6 +458,7 @@ networks:
             sb.Append("# ").Append(title).Append('\n');
         }
         void K(string key, string value) => sb.Append(key).Append('=').Append(value).Append('\n');
+        void KS(string key, string value) => K(key, $"'{value.Replace("'", "\\'", StringComparison.Ordinal)}'");
 
         sb.Append("# Сгенерировано BarkCloud.Builder\n");
 
@@ -429,8 +466,24 @@ networks:
         // Всегда http:// + имя контейнера + порт конфигурации.
         K("CONFIGURATION_SERVICE_URL", $"http://cloud-configuration:{m.ConfigurationPort}");
         sb.Append('\n');
-        // Bootstrap-ключ доступа к ConfigurationApi. Должен совпадать у всех сервисов.
-        K("CONFIGURATION_ACCESS_KEY", m.ConfigurationAccessKey);
+        // Разделённые секреты (аудит, п. 9): bootstrap-ключ у каждого сервиса свой,
+        // реестр — только у Configuration; секреты сервисов обмениваются на короткоживущие
+        // JWT у Identity. RSA-ключи JWT лежат в ./secrets/jwt (генерируются вместе с .env).
+        sb.Append("# После копирования вывода на Linux выполните в этой папке: bash ./migrate-secrets.sh (ключ останется закрытым для всех, кроме владельца и Identity uid 1654).\n");
+        KS("CONFIGURATION_ACCESS_KEYS", m.ConfigurationAccessKeysRegistry);
+        KS("IDENTITY_CONFIG_ACCESS_KEY", m.IdentityConfigAccessKey);
+        KS("USERS_CONFIG_ACCESS_KEY", m.UsersConfigAccessKey);
+        KS("NOTIFICATION_CONFIG_ACCESS_KEY", m.NotificationConfigAccessKey);
+        KS("FILES_CONFIG_ACCESS_KEY", m.FilesConfigAccessKey);
+        KS("TORRENT_CONFIG_ACCESS_KEY", m.TorrentConfigAccessKey);
+        KS("WEB_CONFIG_ACCESS_KEY", m.WebConfigAccessKey);
+        KS("SERVICE_CREDENTIALS", m.ServiceCredentialsRegistry);
+        KS("IDENTITY_SERVICE_CREDENTIAL", m.IdentityServiceCredential);
+        KS("USERS_SERVICE_CREDENTIAL", m.UsersServiceCredential);
+        KS("FILES_SERVICE_CREDENTIAL", m.FilesServiceCredential);
+        KS("TORRENT_SERVICE_CREDENTIAL", m.TorrentServiceCredential);
+        KS("WEB_SERVICE_CREDENTIAL", m.WebServiceCredential);
+        KS("WEB_ADMIN_COOKIE_KEY", m.WebAdminCookieKey);
 
         Section("Docker-сеть и имена контейнеров");
         K("DOCKER_NETWORK_NAME", m.DockerNetworkName);
@@ -454,19 +507,33 @@ networks:
         {
             Section("RabbitMQ");
             K("RABBITMQ_DEFAULT_USER", m.RabbitUser);
-            K("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
+            KS("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
         }
 
-        if (m.IncludePostgres)
-        {
-            Section("Postgres");
-            K("POSTGRES_USER", m.PostgresUser);
-            K("POSTGRES_PASSWORD", m.PostgresPassword);
-            K("POSTGRES_DB", m.PostgresDb);
-            K("POSTGRES_PORT", m.PostgresPort);
-            K("POSTGRES_DATA_PATH", m.PostgresDataPath);
-            K("BACKUP_PATH", m.BackupPath);
-        }
+        Section("Сервисные учётные данные PostgreSQL и RabbitMQ");
+        KS("CONFIGURATION_DB_PASSWORD", m.ConfigurationDbPassword);
+        KS("IDENTITY_DB_PASSWORD", m.IdentityDbPassword);
+        KS("USERS_DB_PASSWORD", m.UsersDbPassword);
+        KS("FILES_DB_PASSWORD", m.FilesDbPassword);
+        KS("TORRENT_DB_PASSWORD", m.TorrentDbPassword);
+        KS("RABBITMQ_IDENTITY_PASSWORD", m.IdentityRabbitPassword);
+        KS("RABBITMQ_USERS_PASSWORD", m.UsersRabbitPassword);
+        KS("RABBITMQ_FILES_PASSWORD", m.FilesRabbitPassword);
+        KS("RABBITMQ_TORRENT_PASSWORD", m.TorrentRabbitPassword);
+        KS("RABBITMQ_NOTIFICATION_PASSWORD", m.NotificationRabbitPassword);
+
+        Section("Postgres");
+        KS("POSTGRES_HOST", m.PostgresHost);
+        K("POSTGRES_USER", m.PostgresUser);
+        KS("POSTGRES_PASSWORD", m.PostgresPassword);
+        K("POSTGRES_DB", m.PostgresDb);
+        K("POSTGRES_PORT", m.PostgresPort);
+        K("POSTGRES_DATA_PATH", m.PostgresDataPath);
+        K("BACKUP_PATH", m.BackupPath);
+
+        // RabbitMQ host and vhost also apply when infrastructure is externally managed.
+        KS("RABBITMQ_HOST", m.RabbitHost);
+        KS("RABBITMQ_VIRTUAL_HOST", m.RabbitVirtualHost);
 
         Section("Порты сервисов");
         K("IDENTITY_PORT", m.IdentityPort);

@@ -4,17 +4,15 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Identity;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace BarkCloud.Configuration.Infrastructure;
 
 /// <summary>
-/// Idempotently creates catalog rows and fills only empty values from environment-backed defaults.
+/// Creates catalog rows, fills empty defaults, and refreshes deployment-managed service credentials.
 /// </summary>
 public class ConfigurationDefaultsPopulator
 {
@@ -22,10 +20,11 @@ public class ConfigurationDefaultsPopulator
     private readonly ILogger<ConfigurationDefaultsPopulator> _logger;
     private readonly MetricsCollector _metrics;
     private readonly string _postgresHost;
-    private readonly string _postgresUsername;
-    private readonly string _postgresPassword;
-    private readonly string _rabbitUsername;
-    private readonly string _rabbitPassword;
+    private readonly int _postgresPort;
+    private readonly IReadOnlyDictionary<ServiceId, string> _databasePasswords;
+    private readonly string _rabbitHost;
+    private readonly string _rabbitVirtualHost;
+    private readonly IReadOnlyDictionary<ServiceId, string> _rabbitPasswords;
     private readonly string _minioHost;
     private readonly string _minioPort;
     private readonly string _minioAccessKey;
@@ -59,23 +58,24 @@ public class ConfigurationDefaultsPopulator
             [ServiceId.Torrent] = ("TORRENT_PORT", 7027)
         };
 
-    private static readonly IReadOnlyDictionary<ServiceId, (string Section, string Database)> DatabaseNames =
-        new Dictionary<ServiceId, (string, string)>
+    private static readonly IReadOnlyDictionary<ServiceId, (string Section, string Database, string Username)> DatabaseNames =
+        new Dictionary<ServiceId, (string, string, string)>
         {
-            [ServiceId.Identity] = ("IdentityDb", "identity"),
-            [ServiceId.Users] = ("UsersDb", "users"),
-            [ServiceId.Files] = ("FilesDb", "files"),
-            [ServiceId.Torrent] = ("TorrentDb", "torrent")
+            [ServiceId.Identity] = ("IdentityDb", "identity", "barkcloud_identity"),
+            [ServiceId.Users] = ("UsersDb", "users", "barkcloud_users"),
+            [ServiceId.Files] = ("FilesDb", "files", "barkcloud_files"),
+            [ServiceId.Torrent] = ("TorrentDb", "torrent", "barkcloud_torrent")
         };
 
     public ConfigurationDefaultsPopulator(
         ConfigurationContext context,
         ILogger<ConfigurationDefaultsPopulator> logger,
         string postgresHost,
-        string postgresUsername,
-        string postgresPassword,
-        string rabbitUsername,
-        string rabbitPassword,
+        int postgresPort,
+        IReadOnlyDictionary<ServiceId, string> databasePasswords,
+        string rabbitHost,
+        string rabbitVirtualHost,
+        IReadOnlyDictionary<ServiceId, string> rabbitPasswords,
         string minioHost,
         string minioPort,
         string minioAccessKey,
@@ -95,10 +95,11 @@ public class ConfigurationDefaultsPopulator
         _logger = logger;
         _metrics = metrics ?? new MetricsCollector();
         _postgresHost = postgresHost;
-        _postgresUsername = postgresUsername;
-        _postgresPassword = postgresPassword;
-        _rabbitUsername = rabbitUsername;
-        _rabbitPassword = rabbitPassword;
+        _postgresPort = postgresPort;
+        _databasePasswords = databasePasswords;
+        _rabbitHost = rabbitHost;
+        _rabbitVirtualHost = rabbitVirtualHost;
+        _rabbitPasswords = rabbitPasswords;
         _minioHost = minioHost;
         _minioPort = minioPort;
         _minioAccessKey = minioAccessKey;
@@ -127,10 +128,10 @@ public class ConfigurationDefaultsPopulator
 
     public async Task PopulateDefaultsAsync()
     {
+        ValidateServiceCredentials();
         var global = SettingsScopes.Get(ServiceId.Unknown);
         var globalRows = await _context.Settings(global).AsNoTracking()
             .ToDictionaryAsync(row => row.Key, row => row.Value, StringComparer.Ordinal);
-        var jwtSecret = GetNonEmpty(globalRows, "JwtSettings:SecretKey") ?? GenerateRandomKey(64);
         var jwtIssuer = GetNonEmpty(globalRows, "JwtSettings:Issuer") ?? "BarkCloud";
         var jwtAudience = GetNonEmpty(globalRows, "JwtSettings:Audience") ?? "BarkCloudMicroservices";
 
@@ -138,7 +139,30 @@ public class ConfigurationDefaultsPopulator
         var beforeEmpty = await CountEmptySettingsAsync();
         var storage = new ConfigurationStorage(_context, _metrics);
         await storage.SeedMissingCatalogRowsAsync(entry =>
-            ResolveDefault(entry, jwtSecret, jwtIssuer, jwtAudience));
+            ResolveDefault(entry, jwtIssuer, jwtAudience));
+        // These credentials are deployment-managed: a password rotation must also refresh
+        // previously seeded rows, while operator-editable settings retain their values.
+        foreach (var group in SettingsCatalog.All.Where(entry =>
+                     entry.IsEnvironmentManaged &&
+                     (entry.Section == "RabbitMQ" ||
+                      (DatabaseNames.TryGetValue(entry.ServiceId, out var database) && entry.Section == database.Section)))
+                 .GroupBy(entry => entry.ServiceId))
+        {
+            var entries = group.ToDictionary(entry => entry.StorageKey);
+            var keys = entries.Keys.ToArray();
+            var rows = await _context.Settings(SettingsScopes.Get(group.Key))
+                .Where(row => keys.Contains(row.Key)).ToListAsync();
+            foreach (var row in rows)
+            {
+                var value = ResolveDefault(entries[row.Key], jwtIssuer, jwtAudience);
+                if (value is null || value == row.Value)
+                    continue;
+                row.Value = value;
+                row.EditedAt = DateTime.UtcNow;
+                row.EditedBy = "system";
+            }
+        }
+        await _context.SaveChangesAsync();
         var afterEmpty = await CountEmptySettingsAsync();
         var populated = beforeEmpty - afterEmpty;
         _metrics.Add("defaults_populated_total", populated);
@@ -150,7 +174,6 @@ public class ConfigurationDefaultsPopulator
 
     private string? ResolveDefault(
         SettingsCatalogEntry entry,
-        string jwtSecret,
         string jwtIssuer,
         string jwtAudience)
     {
@@ -163,7 +186,6 @@ public class ConfigurationDefaultsPopulator
         if (entry.Section == "JwtSettings")
             return entry.Key switch
             {
-                "SecretKey" => jwtSecret,
                 "Issuer" => jwtIssuer,
                 "Audience" => jwtAudience,
                 "ExpiryMinutes" => "60",
@@ -171,21 +193,38 @@ public class ConfigurationDefaultsPopulator
             };
 
         if (entry.Section == "RabbitMQ")
-            return entry.Key switch
-            {
-                "Host" => "cloud-rabbitmq",
-                "Username" => EmptyAsNull(_rabbitUsername),
-                "Password" => EmptyAsNull(_rabbitPassword),
-                "VirtualHost" => "/",
-                _ => null
-            };
+        {
+            if (entry.Key == "Host")
+                return EmptyAsNull(_rabbitHost) ?? "cloud-rabbitmq";
+            if (entry.Key == "VirtualHost")
+                return EmptyAsNull(_rabbitVirtualHost) ?? "/";
+            if (entry.ServiceId != ServiceId.Unknown && entry.Key == "Username")
+                return $"barkcloud_{entry.ServiceId.ToString().ToLowerInvariant()}";
+            if (entry.ServiceId != ServiceId.Unknown && entry.Key == "Password")
+                return _rabbitPasswords.TryGetValue(entry.ServiceId, out var password) ? EmptyAsNull(password) : null;
+            return null;
+        }
         if (entry.Section == "Seq" && entry.Key == "ServerUrl")
             return "http://cloud-seq:5341";
         if (entry.Section == "Features" && entry.Key == "RegistrationEnabled")
             return "true";
 
         if (DatabaseNames.TryGetValue(entry.ServiceId, out var database) && entry.Section == database.Section)
-            return $"Host={_postgresHost};Database={database.Database};Username={_postgresUsername};Password={_postgresPassword};Maximum Pool Size=20;Connection Idle Lifetime=60;Connection Pruning Interval=10";
+        {
+            if (!_databasePasswords.TryGetValue(entry.ServiceId, out var password) || string.IsNullOrEmpty(password))
+                return null;
+            return new NpgsqlConnectionStringBuilder
+            {
+                Host = _postgresHost,
+                Port = _postgresPort,
+                Database = database.Database,
+                Username = database.Username,
+                Password = password,
+                MaxPoolSize = 20,
+                ConnectionIdleLifetime = 60,
+                ConnectionPruningInterval = 10
+            }.ConnectionString;
+        }
 
         if (entry.ServiceId == ServiceId.Notification && entry.Section == "Email" && entry.Key == "AllowInsecure")
             return "true";
@@ -228,7 +267,8 @@ public class ConfigurationDefaultsPopulator
                 return entry.Key switch
                 {
                     "Host" => $"http://{ContainerNames[target]}:{ResolveServicePort(target)}",
-                    "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, $"{entry.Section}Client"),
+                    // Сервисные JWT больше не генерируются и не хранятся в Configuration:
+                    // их выдаёт Identity (ServiceCredentialsApi) по секрету сервиса.
                     _ => null
                 };
         }
@@ -287,6 +327,25 @@ public class ConfigurationDefaultsPopulator
             if (string.IsNullOrWhiteSpace(value))
                 throw new InvalidOperationException(
                     $"ExternalEndpoint:Host для сервиса {serviceId} обязателен. Задайте EXTERNAL_{serviceId.ToString().ToUpperInvariant()}_HOST.");
+        }
+    }
+
+    private void ValidateServiceCredentials()
+    {
+        foreach (var serviceId in DatabaseNames.Keys)
+        {
+            if (!_databasePasswords.TryGetValue(serviceId, out var password) || string.IsNullOrWhiteSpace(password))
+                throw new InvalidOperationException($"{serviceId} PostgreSQL password is required in the Configuration environment.");
+        }
+
+        foreach (var serviceId in new[]
+                 {
+                     ServiceId.Identity, ServiceId.Users, ServiceId.Files,
+                     ServiceId.Torrent, ServiceId.Notification
+                 })
+        {
+            if (!_rabbitPasswords.TryGetValue(serviceId, out var password) || string.IsNullOrWhiteSpace(password))
+                throw new InvalidOperationException($"{serviceId} RabbitMQ password is required in the Configuration environment.");
         }
     }
 
@@ -350,29 +409,6 @@ public class ConfigurationDefaultsPopulator
         foreach (var scope in SettingsScopes.All)
             count += await _context.Settings(scope).CountAsync(row => row.Value == string.Empty);
         return count;
-    }
-
-    private static string GenerateServiceToken(
-        string secretKey,
-        string issuer,
-        string audience,
-        string serviceName)
-    {
-        var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secretKey)),
-            SecurityAlgorithms.HmacSha256);
-        var claims = new[]
-        {
-            new Claim(IdentityClaims.TokenType, nameof(TokenType.Service)),
-            new Claim(IdentityClaims.UserId, "0"),
-            new Claim("service-name", serviceName)
-        };
-        return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
-            issuer,
-            audience,
-            claims,
-            expires: DateTime.UtcNow.AddYears(10),
-            signingCredentials: credentials));
     }
 
     private static string GenerateRandomKey(int length)

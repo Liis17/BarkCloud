@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace BarkCloud.Identity.Host;
 
-[Authorize(Policy = nameof(TokenType.Service))]
+[Authorize(Policy = XAuthPolicies.RevocationReadPolicy)]
 public class SessionRevocationApiService(IRevocationFeed feed) : SessionRevocationApi.SessionRevocationApiBase
 {
     public override async Task<GetRevokedSessionsResponse> GetRevokedSessions(

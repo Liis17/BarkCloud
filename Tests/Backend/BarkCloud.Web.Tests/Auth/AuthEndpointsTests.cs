@@ -9,6 +9,7 @@ using BarkCloud.Proto.Identity;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
 using BarkCloud.TestKit;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
@@ -765,7 +766,6 @@ public sealed class AuthEndpointsTests
 
     private sealed class Fixture : IAsyncDisposable
     {
-        private static readonly string JwtSecret = "auth-endpoint-fixture-signing-secret-at-least-32-bytes";
         private const string TestAssetManifest = """
             {
               "src/auth/main.tsx": {
@@ -790,10 +790,11 @@ public sealed class AuthEndpointsTests
         private readonly CookieContainer _cookies;
         private readonly Uri _baseAddress;
         private readonly string _temporaryWebRoot;
+        private readonly RsaJwtTestKeys _keys;
 
         private Fixture(WebApplication app, HttpClient client, CookieContainer cookies, Uri baseAddress,
             Mock<IdentityApi.IdentityApiClient> identity, Mock<ConfigurationApi.ConfigurationApiClient> configuration,
-            string serverName, bool registrationEnabled, string temporaryWebRoot)
+            string serverName, bool registrationEnabled, string temporaryWebRoot, RsaJwtTestKeys keys)
         {
             App = app;
             Client = client;
@@ -804,6 +805,7 @@ public sealed class AuthEndpointsTests
             ServerName = serverName;
             RegistrationEnabled = registrationEnabled;
             _temporaryWebRoot = temporaryWebRoot;
+            _keys = keys;
         }
 
         public WebApplication App { get; }
@@ -842,6 +844,7 @@ public sealed class AuthEndpointsTests
             var temporaryWebRoot = Path.Combine(Path.GetTempPath(), $"BarkCloud.Web.Tests.Auth.{Guid.NewGuid():N}");
             WebApplication? app = null;
             HttpClient? client = null;
+            var keys = new RsaJwtTestKeys();
             try
             {
                 Directory.CreateDirectory(temporaryWebRoot);
@@ -860,7 +863,7 @@ public sealed class AuthEndpointsTests
                 builder.Logging.ClearProviders();
                 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["JwtSettings:SecretKey"] = JwtSecret,
+                    [RsaJwtKeys.PublicKeyConfigKey] = keys.PublicKeyFile,
                     ["JwtSettings:Issuer"] = "bark",
                     ["JwtSettings:Audience"] = "bark",
                     ["App:PublicHost"] = serverName,
@@ -872,7 +875,7 @@ public sealed class AuthEndpointsTests
                 var identity = new Mock<IdentityApi.IdentityApiClient>(MockBehavior.Strict);
                 var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>(MockBehavior.Strict);
                 var fixture = new Fixture(null!, null!, cookies, null!, identity, configuration,
-                    serverName, registrationEnabled, temporaryWebRoot);
+                    serverName, registrationEnabled, temporaryWebRoot, keys);
                 configuration.Setup(x => x.GetConfigurationAsync(It.IsAny<GetConfigurationRequest>(),
                         It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
                     .Returns(() => GrpcCallHelpers.AsyncUnary(new GetConfigurationResponse
@@ -919,10 +922,11 @@ public sealed class AuthEndpointsTests
                 var handler = new HttpClientHandler { CookieContainer = cookies, UseCookies = true };
                 client = new HttpClient(handler) { BaseAddress = baseAddress };
                 return new Fixture(app, client, cookies, baseAddress, identity, configuration,
-                    serverName, registrationEnabled, temporaryWebRoot);
+                    serverName, registrationEnabled, temporaryWebRoot, keys);
             }
             catch
             {
+                keys.Dispose();
                 client?.Dispose();
                 try
                 {
@@ -1013,6 +1017,7 @@ public sealed class AuthEndpointsTests
             }
             finally
             {
+                _keys.Dispose();
                 if (Directory.Exists(_temporaryWebRoot))
                     Directory.Delete(_temporaryWebRoot, recursive: true);
             }

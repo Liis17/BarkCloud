@@ -27,6 +27,8 @@ Consumer слушает RabbitMQ endpoint `notifications-email-handler`. `EmailN
 
 `Email:Host`, `Email:Port`, `Email:SenderEmail`, `Email:SenderPassword` и `Email:AllowInsecure` поступают из [[Backend/Configuration]]. Identity публикует письма в RabbitMQ; для отложенной доставки используется [[Backend/IdentityNotificationOutbox]].
 
+Notification подключается отдельным RabbitMQ user `barkcloud_notification`. Provisioning ограничивает его email endpoint и собственную bus/fault topology; отдельные service users Files, Torrent и Users не могут читать, публиковать или привязывать очередь к `EmailNotification`, Notification base exchange или `Fault<EmailNotification>`. ACL и upgrade procedure описаны в [[Platform/Infrastructure]].
+
 ## Ограничения и важные детали
 
 Порт 465 использует implicit TLS. При `Email:AllowInsecure=false` на остальных портах требуется STARTTLS с проверкой сертификата. При `Email:AllowInsecure=true` проверка сертификата отключается для этого SMTP-клиента, а STARTTLS становится необязательным; на порту 465 TLS остаётся обязательным. Configuration создаёт настройку со значением `true`, чтобы первоначальная регистрация могла отправить письмо через SMTP с самоподписанным сертификатом. Существующее сохранённое значение не перезаписывается.

@@ -1,5 +1,6 @@
 using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Consumers;
 using BarkCloud.Identity.Host;
@@ -77,7 +78,7 @@ public class Program
 
         builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 
-        builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddXAuth(builder.Configuration, ServiceId.Identity);
         builder.Services.AddSingleton<IRevocationFeed, DbRevocationFeed>();
 
         builder.Services.AddCors(o => o.AddPolicy("IdentityCors", p =>
@@ -96,10 +97,15 @@ public class Program
         {
             o.Address = new Uri(configurationAddress);
         });
+
+        // Сервисные токены для server-API Users: короткоживущие, выдаёт ServiceCredentialsApi
+        // по секрету сервиса (ServiceAuth:Credential / SERVICE_CREDENTIAL).
+        builder.Services.AddServiceTokenClient(builder.Configuration);
         builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["UsersService:Host"]);
-            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["UsersService:Token"]))
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Users))
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddTransient<IRefreshTokensStorage, RefreshTokensStorage>();
@@ -128,11 +134,12 @@ public class Program
 
             x.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                cfg.Host(builder.Configuration["RabbitMQ:Host"], builder.Configuration["RabbitMQ:VirtualHost"], h =>
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
                 });
+                cfg.OverrideDefaultBusEndpointQueueName("bark-identity-bus-" + Guid.NewGuid().ToString("N"));
 
                 cfg.ReceiveEndpoint("user-deleted-identity", e =>
                 {
@@ -160,7 +167,7 @@ public class Program
         app.UseXAuth();
 
         app.MapGrpcService<IdentityApiService>().EnableGrpcWeb();
-        app.MapGrpcService<IdentityServerApiService>();
+        app.MapGrpcService<ServiceCredentialsApiService>();
         app.MapGrpcService<SessionRevocationApiService>();
 
         await app.RunAsync();

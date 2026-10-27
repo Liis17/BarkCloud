@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 
-using BarkCloud.Shared.Identity;
 using BarkCloud.Web.Infrastructure;
 
 namespace BarkCloud.Web.Auth;
@@ -10,12 +9,16 @@ namespace BarkCloud.Web.Auth;
 /// Гейт администраторских действий (обновление бэкенда) по отдельному паролю из конфигурации.
 /// В BarkCloud нет ролей, а облако self-hosted «для своих», поэтому доступ открывается вводом
 /// пароля <c>App:AdminPassword</c>: после проверки выдаётся подписанная HttpOnly-cookie
-/// <see cref="AdminCookie"/> (HMAC-SHA256 на общем <c>JwtSettings:SecretKey</c>), и последующие
-/// запросы к <c>/api/system/*</c> не требуют повторного ввода до истечения срока.
+/// <see cref="AdminCookie"/> (HMAC-SHA256 на отдельном секрете <c>App:AdminCookieKey</c>),
+/// и последующие запросы к <c>/api/system/*</c> не требуют повторного ввода до истечения срока.
 /// </summary>
 public sealed class AdminGate
 {
     public const string AdminCookie = "bark_admin";
+
+    /// <summary>Минимум для HMAC-SHA256 (NIST): 32 байта UTF-8.</summary>
+    public const int MinKeyBytes = 32;
+
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(30);
 
     private readonly byte[]? _key;
@@ -24,10 +27,28 @@ public sealed class AdminGate
 
     public AdminGate(IConfiguration configuration)
     {
-        var secret = configuration["JwtSettings:SecretKey"];
-        _key = string.IsNullOrEmpty(secret) ? null : JwtSecret.GetKeyBytes(secret);
+        var secret = configuration["App:AdminCookieKey"];
+        _key = string.IsNullOrEmpty(secret) ? null : ValidateKey(secret);
         _password = configuration["App:AdminPassword"];
         _cookieSecure = configuration.Flag("App:CookieSecure");
+    }
+
+    /// <summary>
+    /// Стартовая проверка (fail-closed): включённый админ-доступ обязан иметь валидный секрет cookie.
+    /// Вызывается из Program.cs, чтобы ошибка конфигурации останавливала Web, а не молча отключала гейт.
+    /// </summary>
+    public static void EnsureConfigured(IConfiguration configuration)
+    {
+        if (string.IsNullOrEmpty(configuration["App:AdminPassword"]))
+            return;
+
+        var secret = configuration["App:AdminCookieKey"];
+        if (string.IsNullOrEmpty(secret))
+            throw new InvalidOperationException(
+                "Задан App:AdminPassword, но не задан App:AdminCookieKey — админ-cookie нечем подписать. " +
+                "Укажите случайный секрет длиной не менее 32 байт (UTF-8), например через WEB_ADMIN_COOKIE_KEY.");
+
+        ValidateKey(secret);
     }
 
     /// <summary>Настроен ли админ-доступ (задан пароль и есть секрет для подписи).</summary>
@@ -72,6 +93,16 @@ public sealed class AdminGate
 
     public void Lock(HttpContext http)
         => http.Response.Cookies.Delete(AdminCookie, new CookieOptions { Path = "/", Secure = _cookieSecure, SameSite = SameSiteMode.Lax });
+
+    private static byte[] ValidateKey(string secret)
+    {
+        var bytes = Encoding.UTF8.GetBytes(secret);
+        if (bytes.Length < MinKeyBytes)
+            throw new InvalidOperationException(
+                $"App:AdminCookieKey слишком короткий: {bytes.Length} байт (UTF-8), требуется не менее {MinKeyBytes}.");
+
+        return bytes;
+    }
 
     private string Sign(DateTimeOffset expires)
     {

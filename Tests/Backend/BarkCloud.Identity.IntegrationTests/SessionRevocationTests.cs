@@ -4,7 +4,6 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Features.Logout;
 using BarkCloud.Identity.Features.RemoveActiveSession;
-using BarkCloud.Identity.Features.RemoveActiveSessionServer;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Users;
@@ -21,7 +20,6 @@ public class SessionRevocationTests
     [Theory]
     [InlineData("logout")]
     [InlineData("remove")]
-    [InlineData("server")]
     public async Task Revoke_WhenDurableRecordCannotBeSaved_PreservesRefreshTokens(string operation)
     {
         await using var database = await PostgresIdentityDatabase.CreateAsync();
@@ -45,7 +43,6 @@ public class SessionRevocationTests
     [Theory]
     [InlineData("logout")]
     [InlineData("remove")]
-    [InlineData("server")]
     public async Task Revoke_UsersServiceUnavailable_KeepsCommittedRevocation(string operation)
     {
         await using var database = await PostgresIdentityDatabase.CreateAsync();
@@ -101,9 +98,6 @@ public class SessionRevocationTests
             "remove" => new RemoveActiveSessionCommandHandler(storage, userContext, users.Object, metrics,
                 NullLogger<RemoveActiveSessionCommandHandler>.Instance)
                 .Handle(new RemoveActiveSessionCommand { DeviceId = "phone" }, default),
-            "server" => new RemoveActiveSessionServerCommandHandler(storage, users.Object, metrics,
-                NullLogger<RemoveActiveSessionServerCommandHandler>.Instance)
-                .Handle(new RemoveActiveSessionServerCommand { UserId = 42, DeviceId = "phone" }, default),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         };
     }

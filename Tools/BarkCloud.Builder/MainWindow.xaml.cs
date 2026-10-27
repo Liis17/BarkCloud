@@ -20,9 +20,22 @@ namespace BarkCloud.Builder
         public MainWindow()
         {
             InitializeComponent();
+            // Разделённые секреты генерируем при каждом запуске без загруженного конфига;
+            // при Load() из существующего .env они восстанавливаются оттуда.
             _model = new BuilderModel
             {
-                ConfigurationAccessKey = GenerateKey(50),
+                IdentityConfigAccessKey = BuilderModel.GenerateSecret(50),
+                UsersConfigAccessKey = BuilderModel.GenerateSecret(50),
+                NotificationConfigAccessKey = BuilderModel.GenerateSecret(50),
+                FilesConfigAccessKey = BuilderModel.GenerateSecret(50),
+                TorrentConfigAccessKey = BuilderModel.GenerateSecret(50),
+                WebConfigAccessKey = BuilderModel.GenerateSecret(50),
+                IdentityServiceCredential = BuilderModel.GenerateSecret(43),
+                UsersServiceCredential = BuilderModel.GenerateSecret(43),
+                FilesServiceCredential = BuilderModel.GenerateSecret(43),
+                TorrentServiceCredential = BuilderModel.GenerateSecret(43),
+                WebServiceCredential = BuilderModel.GenerateSecret(43),
+                WebAdminCookieKey = BuilderModel.GenerateSecret(64),
                 WebAdminPassword = GenerateKey(20),
             };
             DataContext = _model;
@@ -129,10 +142,12 @@ namespace BarkCloud.Builder
             try
             {
                 var encoding = new UTF8Encoding(false);
+                JwtKeyFileWriter.WriteJwtKeys(dir);
                 File.WriteAllText(Path.Combine(dir, "docker-compose.yml"),
                     ToLf(BackendComposeGenerator.BuildCompose(_model)), encoding);
                 File.WriteAllText(Path.Combine(dir, ".env"),
                     ToLf(BackendComposeGenerator.BuildEnv(_model)), encoding);
+                MigrationScriptWriter.WriteTo(dir);
 
                 var lognaraDockerfiles = BackendComposeGenerator.BuildLognaraDockerfiles(_model);
                 if (lognaraDockerfiles.Count > 0)
@@ -167,7 +182,7 @@ namespace BarkCloud.Builder
                     }
                 }
 
-                SetStatus($"Готово: docker-compose.yml, .env{extra} записаны в {dir}", error: false);
+                SetStatus($"Готово: docker-compose.yml, .env, migrate-secrets.sh{extra} записаны в {dir}", error: false);
             }
             catch (Exception ex)
             {
@@ -205,5 +220,6 @@ namespace BarkCloud.Builder
                 sb.Append(chars[b % chars.Length]);
             return sb.ToString();
         }
+
     }
 }

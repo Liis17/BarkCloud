@@ -1,5 +1,6 @@
 using BarkCloud.Proto.Identity;
 using BarkCloud.GrpcServer.XAuth;
+using BarkCloud.Shared.Identity;
 using BarkCloud.TestKit;
 using BarkCloud.Web.Auth;
 
@@ -59,9 +60,11 @@ public sealed class RegistrationGatewayTests
 
     private static RegistrationGateway CreateGateway(IdentityApi.IdentityApiClient identity)
     {
+        // Ключ читается в конструкторе AuthGateway, дальше файл не нужен — данные уже в памяти.
+        using var keys = new RsaJwtTestKeys();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["JwtSettings:SecretKey"] = "registration-gateway-test-signing-secret-at-least-32-bytes",
+            [RsaJwtKeys.PublicKeyConfigKey] = keys.PublicKeyFile,
             ["Features:EmailEnabled"] = "true"
         }).Build();
         var auth = new AuthGateway(identity, new TokenRevocationCache(), configuration,
