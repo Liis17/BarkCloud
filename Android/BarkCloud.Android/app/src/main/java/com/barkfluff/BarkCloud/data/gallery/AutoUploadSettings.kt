@@ -9,11 +9,11 @@ class AutoUploadSettings(context: Context) {
         get() {
             val saved = prefs.getString(KEY_POLICY, null)
             if (saved != null) return runCatching { AutoUploadNetworkPolicy.valueOf(saved) }
-                .getOrDefault(AutoUploadNetworkPolicy.WIFI_ONLY)
+                .getOrDefault(AutoUploadNetworkPolicy.OFF)
             return if (prefs.contains(KEY_LEGACY_ENABLED)) {
                 if (prefs.getBoolean(KEY_LEGACY_ENABLED, false)) AutoUploadNetworkPolicy.ANY_NETWORK
                 else AutoUploadNetworkPolicy.OFF
-            } else AutoUploadNetworkPolicy.WIFI_ONLY
+            } else AutoUploadNetworkPolicy.OFF
         }
         set(value) = prefs.edit().putString(KEY_POLICY, value.name).apply()
 
