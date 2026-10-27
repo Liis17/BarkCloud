@@ -38,16 +38,11 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
 
         await populator.PopulateDefaultsAsync();
         var first = await storage.GetAllAsync();
-        var secret = first.Single(item => item.ServiceId == ServiceId.Unknown
-                                          && item.Section == "JwtSettings"
-                                          && item.Key == "SecretKey").Value;
         await populator.PopulateDefaultsAsync();
         var second = await storage.GetAllAsync();
 
-        secret.Should().NotBeNullOrWhiteSpace();
-        second.Single(item => item.ServiceId == ServiceId.Unknown
-                              && item.Section == "JwtSettings"
-                              && item.Key == "SecretKey").Value.Should().Be(secret);
+        // Общий HMAC-секрет JWT упразднён (RS256): записи SecretKey в каталоге и БД больше нет.
+        first.Where(item => item.Section == "JwtSettings" && item.Key == "SecretKey").Should().BeEmpty();
         second.Single(item => item.ServiceId == ServiceId.Unknown
                               && item.Section == "JwtSettings"
                               && item.Key == "Issuer").Value.Should().Be("manual-issuer");
@@ -101,8 +96,8 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
 
         // Сервисные JWT больше не генерируются и не хранятся в Configuration:
         // их выдаёт Identity (ServiceCredentialsApi) по секрету сервиса.
-        settings.Single(x => x.ServiceId == serviceId && x.Section == "IdentityService" && x.Key == "Token")
-            .Value.Should().BeEmpty();
+        settings.Where(x => x.ServiceId == serviceId && x.Section == "IdentityService" && x.Key == "Token")
+            .Should().BeEmpty();
     }
 
     [Fact]

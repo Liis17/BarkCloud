@@ -40,16 +40,16 @@ public sealed class ConfigurationApiServiceTests : IDisposable
     }
 
     [Theory]
-    [InlineData("bootstrap-key", true)]
+    [InlineData("users-bootstrap-key", true)]
     [InlineData("wrong-key", false)]
     [InlineData(null, false)]
     public async Task Readiness_UsesBootstrapAccessGate(string? providedKey, bool allowed)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?> { ["CONFIGURATION_ACCESS_KEY"] = "bootstrap-key" }).Build();
+            new Dictionary<string, string?> { ["CONFIGURATION_ACCESS_KEYS"] = "Users=users-bootstrap-key;Web=web-bootstrap-key" }).Build();
         var interceptor = new ConfigurationAccessInterceptor(configuration,
             NullLogger<ConfigurationAccessInterceptor>.Instance);
-        var context = new TestServerCallContext();
+        var context = new TestServerCallContext("/barkcloud.configuration.ConfigurationApi/GetReadiness");
         if (providedKey != null)
             context.RequestHeaders.Add("x-config-access-key", providedKey);
 

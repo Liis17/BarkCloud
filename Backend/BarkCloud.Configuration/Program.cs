@@ -16,7 +16,7 @@ public class Program
 
         ConfigurationAccessPolicy.EnsureConfigured(
             builder.Environment.IsDevelopment(),
-            builder.Configuration["CONFIGURATION_ACCESS_KEY"]);
+            builder.Configuration["CONFIGURATION_ACCESS_KEYS"]);
 
         await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Configuration");
         builder.Services.AddBarkCloudMetrics("BarkCloud.Configuration");
