@@ -65,8 +65,6 @@
 .tag-catalog-row + .tag-catalog-row { border-top: 1px solid var(--md-outline-variant); }
 .tag-row-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 4px; }
 .tag-editor { display: grid; gap: 24px; padding-top: 12px; }
-.tag-color-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.tag-color-field input { width: 56px; height: 40px; padding: 3px; border: 1px solid var(--md-outline); border-radius: 8px; background: transparent; cursor: pointer; }
 @media (max-width: 540px) {
   .prop-search-meta { padding: 16px 12px; }
   .tag-picker { position: static; }
