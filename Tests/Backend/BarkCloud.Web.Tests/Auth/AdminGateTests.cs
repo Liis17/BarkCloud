@@ -14,7 +14,7 @@ public class AdminGateTests
     {
         var dict = new Dictionary<string, string?> { ["App:CookieSecure"] = "false" };
         if (password is not null) dict["App:AdminPassword"] = password;
-        if (secret is not null) dict["JwtSettings:SecretKey"] = secret;
+        if (secret is not null) dict["App:AdminCookieKey"] = secret;
         return new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
     }
 
@@ -36,6 +36,30 @@ public class AdminGateTests
     [Fact]
     public void Enabled_TrueWhenConfigured()
         => new AdminGate(Config()).Enabled.Should().BeTrue();
+
+    [Fact]
+    public void EnsureConfigured_AdminPasswordWithoutKey_FailsClosed()
+    {
+        var act = () => AdminGate.EnsureConfigured(Config(secret: null));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*App:AdminCookieKey*");
+    }
+
+    [Fact]
+    public void EnsureConfigured_NoAdminPassword_AllowsMissingKey()
+    {
+        var act = () => AdminGate.EnsureConfigured(Config(password: null, secret: null));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void EnsureConfigured_TooShortKey_FailsClosed()
+    {
+        var act = () => AdminGate.EnsureConfigured(Config(secret: "short"));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*App:AdminCookieKey*");
+    }
 
     [Fact]
     public void Unlock_CorrectPassword_ReturnsTrueAndAppendsCookie()
@@ -98,7 +122,7 @@ public class AdminGateTests
     public void IsUnlocked_NoCookie_ReturnsFalse()
         => new AdminGate(Config()).IsUnlocked(new DefaultHttpContext()).Should().BeFalse();
 
-    // F23: не-ASCII секрет раньше превращался в ключ из «?»; теперь UTF-8, и разные секреты дают разные подписи.
+    // Не-ASCII секрет валиден для того же секрета и невалиден для другого (ключ — UTF-8 байты).
     [Fact]
     public void IsUnlocked_UnicodeSecret_ValidOnlyForSameSecret()
     {
@@ -118,6 +142,6 @@ public class AdminGateTests
     {
         var act = () => new AdminGate(Config(secret: "short"));
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*JwtSettings:SecretKey*");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*App:AdminCookieKey*");
     }
 }

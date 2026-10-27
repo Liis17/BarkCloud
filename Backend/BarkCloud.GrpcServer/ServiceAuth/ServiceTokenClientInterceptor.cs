@@ -1,17 +1,18 @@
+using BarkCloud.Shared.Auth;
+using BarkCloud.Shared.Identity;
+
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 
-namespace BarkCloud.Shared.Auth;
+namespace BarkCloud.GrpcServer.ServiceAuth;
 
-public class JwtClientInterceptor : Interceptor
+/// <summary>
+/// Подставляет текущий сервисный JWT короткого действия (см. <see cref="ServiceTokenProvider"/>)
+/// в заголовок x-auth-token всех исходящих вызовов. Токен привязан к целевому сервису target
+/// и его разрешениям; вечные токены из Configuration больше не используются.
+/// </summary>
+public sealed class ServiceTokenClientInterceptor(ServiceTokenProvider provider, ServiceId target) : Interceptor
 {
-    private readonly string _token;
-
-    public JwtClientInterceptor(string token)
-    {
-        _token = token;
-    }
-
     public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
         TRequest request,
         ClientInterceptorContext<TRequest, TResponse> context,
@@ -56,7 +57,7 @@ public class JwtClientInterceptor : Interceptor
         where TResponse : class
     {
         var metadata = context.Options.Headers ?? new Metadata();
-        metadata.Add(MetadataKeys.Token, _token);
+        metadata.Add(MetadataKeys.Token, provider.GetToken(target));
 
         return new ClientInterceptorContext<TRequest, TResponse>(
             context.Method,

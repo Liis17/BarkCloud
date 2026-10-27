@@ -6,4 +6,9 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+        <!-- RsaJwtKeys возвращает RsaSecurityKey для подписи/проверки JWT RS256. -->
+        <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.23.0" />
+    </ItemGroup>
+
 </Project>

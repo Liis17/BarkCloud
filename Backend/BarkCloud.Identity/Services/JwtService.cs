@@ -6,6 +6,7 @@ using Google.Protobuf.WellKnownTypes;
 
 using Microsoft.IdentityModel.Tokens;
 
+using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -13,6 +14,12 @@ namespace BarkCloud.Identity.Services;
 
 public class JwtService(JwtSettings jwtSettings)
 {
+    /// <summary>Срок действия сервисного токена: короткий, права проверяются на каждом RPC.</summary>
+    public static readonly TimeSpan ServiceTokenLifetime = TimeSpan.FromMinutes(10);
+
+    // Ключ читается с диска один раз на процесс (по пути); JwtService — transient.
+    private static readonly ConcurrentDictionary<string, RsaSecurityKey> SigningKeyCache = new();
+
     public Token GenerateUserToken(long userId, string deviceId, long sessionId)
     {
         var claims = new List<Claim>
@@ -30,25 +37,36 @@ public class JwtService(JwtSettings jwtSettings)
         return new Token { Value = token, ExpirationDate = Timestamp.FromDateTime(dateEnd) };
     }
 
-    public string GenerateServerToken(ServiceId serviceId)
+    /// <summary>
+    /// Сервисный токен для вызова target-сервиса: личность вызывающего (caller), адресат и
+    /// разрешения из <see cref="ServicePermissions"/>. Клиент не может выбрать чужую личность
+    /// или расширить права — их определяет Identity по зарегистрированному credential.
+    /// </summary>
+    public (string Token, DateTimeOffset ExpiresAt) GenerateServiceToken(ServiceId caller, ServiceId target)
     {
+        var permissions = ServicePermissions.For(caller);
         var claims = new List<Claim>
         {
-            new(IdentityClaims.ServiceId, serviceId.ToString()),
+            new(IdentityClaims.ServiceId, ((int)caller).ToString()),
             new(IdentityClaims.TokenType, TokenType.Service.ToString()),
+            new(IdentityClaims.TargetService, ((int)target).ToString()),
+            new(IdentityClaims.Permissions, string.Join(' ', permissions)),
         };
 
-        var dateEnd = new DateTime(9999, 12, 31, 23, 59, 59);
+        var dateEnd = DateTimeOffset.UtcNow.Add(ServiceTokenLifetime);
 
-        var token = CreateToken(claims, dateEnd);
+        var token = CreateToken(claims, dateEnd.UtcDateTime);
 
-        return token;
+        return (token, dateEnd);
     }
 
     private string CreateToken(IEnumerable<Claim> claims, DateTime expiration)
     {
-        var securityKey = new SymmetricSecurityKey(JwtSecret.GetKeyBytes(jwtSettings.SecretKey));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        // Подпись RS256 приватным ключом, он есть только у Identity: остальные сервисы
+        // проверяют токены публичным ключом и выпускать их не могут.
+        var credentials = new SigningCredentials(
+            GetSigningKey(jwtSettings),
+            SecurityAlgorithms.RsaSha256);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
@@ -63,5 +81,13 @@ public class JwtService(JwtSettings jwtSettings)
         var token = tokenHandler.CreateToken(tokenDescriptor);
 
         return tokenHandler.WriteToken(token);
+    }
+
+    private static RsaSecurityKey GetSigningKey(JwtSettings settings)
+    {
+        var file = settings.PrivateKeyFile
+                   ?? Environment.GetEnvironmentVariable(RsaJwtKeys.PrivateKeyEnvName);
+
+        return SigningKeyCache.GetOrAdd(file ?? string.Empty, static path => RsaJwtKeys.LoadSigningKey(path));
     }
 }

@@ -83,7 +83,7 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
             throw new XAppInfoIsRequiedException();
         }
 
-        // Режим без почты доступен только через ForceSetPasswordServer.
+        // Режим без почты недоступен через сброс пароля (ForceSetPasswordServer удалён).
         if (!_configuration.EmailEnabled())
         {
             _logger.LogWarning("Сброс пароля по email отклонён — почта на сервере не настроена");

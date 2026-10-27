@@ -6,6 +6,7 @@ using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Settings;
 using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Shared.Identity;
+using BarkCloud.TestKit;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,18 +15,26 @@ using System.IdentityModel.Tokens.Jwt;
 
 namespace BarkCloud.Identity.Tests.Features.CreateToken;
 
-public class CreateTokenCommandHandlerTests
+public class CreateTokenCommandHandlerTests : IDisposable
 {
     private readonly Mock<IRefreshTokensStorage> _refreshTokens = new();
-    private readonly JwtService _jwt = new(new JwtSettings
-    {
-        SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!",
-        Issuer = "bark",
-        Audience = "bark",
-        ExpiryMinutes = 60
-    });
+    private readonly RsaJwtTestKeys _keys = new();
+    private readonly JwtService _jwt;
     private readonly MetricsCollector _metrics = new();
     private readonly ILogger<CreateTokenCommandHandler> _logger = NullLogger<CreateTokenCommandHandler>.Instance;
+
+    public CreateTokenCommandHandlerTests()
+    {
+        _jwt = new JwtService(new JwtSettings
+        {
+            Issuer = "bark",
+            Audience = "bark",
+            ExpiryMinutes = 60,
+            PrivateKeyFile = _keys.PrivateKeyFile
+        });
+    }
+
+    public void Dispose() => _keys.Dispose();
 
     private CreateTokenCommandHandler CreateSut()
         => new(_refreshTokens.Object, _jwt, _metrics, _logger);

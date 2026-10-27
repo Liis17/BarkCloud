@@ -4,10 +4,7 @@ using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.Shared.Identity;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -228,7 +225,8 @@ public class ConfigurationDefaultsPopulator
                 return entry.Key switch
                 {
                     "Host" => $"http://{ContainerNames[target]}:{ResolveServicePort(target)}",
-                    "Token" => GenerateServiceToken(jwtSecret, jwtIssuer, jwtAudience, $"{entry.Section}Client"),
+                    // Сервисные JWT больше не генерируются и не хранятся в Configuration:
+                    // их выдаёт Identity (ServiceCredentialsApi) по секрету сервиса.
                     _ => null
                 };
         }
@@ -350,29 +348,6 @@ public class ConfigurationDefaultsPopulator
         foreach (var scope in SettingsScopes.All)
             count += await _context.Settings(scope).CountAsync(row => row.Value == string.Empty);
         return count;
-    }
-
-    private static string GenerateServiceToken(
-        string secretKey,
-        string issuer,
-        string audience,
-        string serviceName)
-    {
-        var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secretKey)),
-            SecurityAlgorithms.HmacSha256);
-        var claims = new[]
-        {
-            new Claim(IdentityClaims.TokenType, nameof(TokenType.Service)),
-            new Claim(IdentityClaims.UserId, "0"),
-            new Claim("service-name", serviceName)
-        };
-        return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
-            issuer,
-            audience,
-            claims,
-            expires: DateTime.UtcNow.AddYears(10),
-            signingCredentials: credentials));
     }
 
     private static string GenerateRandomKey(int length)
