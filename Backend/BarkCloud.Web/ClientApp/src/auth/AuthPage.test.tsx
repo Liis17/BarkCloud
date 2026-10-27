@@ -113,8 +113,9 @@ describe('auth screen states', () => {
   it('shows optional registration names and does not require them', async () => {
     const request = requestReturning(state({ screen: 'register-otp', flowId: 'reg-flow' }));
     render(<AuthPage initialState={state({ screen: 'register' })} request={request} />);
-    const firstName = screen.getByLabelText('Имя (необязательно)') as HTMLInputElement;
-    const lastName = screen.getByLabelText('Фамилия (необязательно)') as HTMLInputElement;
+    const firstName = screen.getByLabelText('Имя') as HTMLInputElement;
+    const lastName = screen.getByLabelText('Фамилия') as HTMLInputElement;
+    expect(screen.getAllByText('Необязательно')).toHaveLength(2);
     expect(firstName.required).toBe(false);
     expect(lastName.required).toBe(false);
     fireEvent.change(screen.getByLabelText('Логин'), { target: { value: 'liis' } });
