@@ -78,7 +78,11 @@ class AuthBackendScenarioTest {
         assumeTrue("Explicit restored account and matching server required", host != null && host == ServerSettings.host && username != null)
         org.junit.Assert.assertTrue(app.globalParam.hasValidRefreshToken())
         org.junit.Assert.assertNull(app.authFlowRepository.pendingRegistration())
-        compose.setContent { BarkCloudTheme { RootNavGraph(android.net.Uri.parse("barkcloud://settings")) } }
+        compose.setContent {
+            BarkCloudTheme {
+                RootNavGraph(DeepLinkEvent(android.net.Uri.parse("barkcloud://settings"), sequence = 1))
+            }
+        }
         try {
             val profile = runBlocking(Dispatchers.IO) {
                 app.grpcManager.usersStub().withDeadlineAfter(15, java.util.concurrent.TimeUnit.SECONDS)

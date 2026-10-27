@@ -1,5 +1,9 @@
 package com.barkfluff.BarkCloud.ui.settings
 
+import com.barkfluff.BarkCloud.data.SessionManager
+import android.net.Uri
+import kotlinx.coroutines.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -22,11 +26,16 @@ data class EditProfileUiState(
     val bio: String = "",
     val originalUsername: String = "",
     val isSaving: Boolean = false,
+    val isProcessing: Boolean = false,
+    val avatarUrl: String? = null,
+    val hasAvatar: Boolean = false,
+    val isUpdatingAvatar: Boolean = false,
     val usernameTaken: Boolean = false,
     val snackbar: String? = null,
 ) {
+    val displayName: String get() = "$firstName $lastName".trim().ifEmpty { username }
     val bioTooLong: Boolean get() = bio.length > MAX_BIO
-    val canSave: Boolean get() = !isLoading && !isSaving && !bioTooLong
+    val canSave: Boolean get() = !isLoading && !isSaving && !isProcessing && !isUpdatingAvatar && !bioTooLong
 
     companion object {
         const val MAX_BIO = 200
@@ -35,13 +44,39 @@ data class EditProfileUiState(
 
 class EditProfileViewModel(
     private val userRepository: UserRepository,
+    private val sessionManager: SessionManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditProfileUiState())
     val state: StateFlow<EditProfileUiState> = _state.asStateFlow()
 
+    private val avatarUpdateInProgress = AtomicBoolean()
+
     private val _events = Channel<Unit>(Channel.BUFFERED)
     val saved = _events.receiveAsFlow()
+
+    private val _signedOut = Channel<Unit>(Channel.BUFFERED)
+    val signedOut = _signedOut.receiveAsFlow()
+
+    fun signOut() {
+        if (_state.value.isProcessing) return
+        _state.update { it.copy(isProcessing = true) }
+        viewModelScope.launch {
+            sessionManager.signOut()
+            _signedOut.send(Unit)
+        }
+    }
+
+    fun deleteAccount() {
+        if (_state.value.isProcessing) return
+        _state.update { it.copy(isProcessing = true) }
+        viewModelScope.launch {
+            // Чистим локально даже при ошибке сервера (как iOS): аккаунт мог уже удалиться.
+            runCatching { userRepository.deleteAccount() }
+            sessionManager.resetLocalState()
+            _signedOut.send(Unit)
+        }
+    }
 
     fun load() {
         viewModelScope.launch {
@@ -56,10 +91,49 @@ class EditProfileViewModel(
                         username = user.username,
                         bio = user.bio,
                         originalUsername = user.username,
+                        avatarUrl = user.profilePicture.ifEmpty { user.profilePicturePreview }.ifEmpty { null },
+                        hasAvatar = user.profilePicture.isNotEmpty() || user.profilePicturePreview.isNotEmpty(),
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.update { it.copy(isLoading = false, snackbar = e.message) }
+            }
+        }
+    }
+
+    fun setAvatar(uri: Uri, onFinished: () -> Unit = {}) = updateAvatar(onFinished) {
+        userRepository.setAvatar(uri)
+    }
+
+    fun removeAvatar() = updateAvatar {
+        userRepository.removeAvatar()
+    }
+
+    private fun updateAvatar(onFinished: () -> Unit = {}, update: suspend () -> Unit) {
+        if (!avatarUpdateInProgress.compareAndSet(false, true)) {
+            onFinished()
+            return
+        }
+        _state.update { it.copy(isUpdatingAvatar = true) }
+        viewModelScope.launch {
+            try {
+                update()
+                val user = userRepository.getUser()
+                _state.update {
+                    it.copy(
+                        avatarUrl = user.profilePicture.ifEmpty { user.profilePicturePreview }.ifEmpty { null },
+                        hasAvatar = user.profilePicture.isNotEmpty() || user.profilePicturePreview.isNotEmpty(),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(snackbar = e.message) }
+            } finally {
+                onFinished()
+                avatarUpdateInProgress.set(false)
+                _state.update { it.copy(isUpdatingAvatar = false) }
             }
         }
     }
@@ -90,6 +164,7 @@ class EditProfileViewModel(
                 _state.update { it.copy(isSaving = false) }
                 _events.send(Unit)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.update { it.copy(isSaving = false, snackbar = e.message) }
             }
         }
@@ -101,7 +176,7 @@ class EditProfileViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return EditProfileViewModel(app.userRepository) as T
+                return EditProfileViewModel(app.userRepository, app.sessionManager) as T
             }
         }
     }

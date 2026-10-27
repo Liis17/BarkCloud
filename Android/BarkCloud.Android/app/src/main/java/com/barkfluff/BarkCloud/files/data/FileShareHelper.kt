@@ -5,11 +5,24 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.barkfluff.BarkCloud.BuildConfig
+import com.barkfluff.BarkCloud.data.cache.LocalShareFileCache
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object FileShareHelper {
 
     private fun authority(): String = "${BuildConfig.APPLICATION_ID}.fileprovider"
+
+    suspend fun prepareLocalFile(context: Context, file: File): File = withContext(Dispatchers.IO) {
+        try {
+            FileProvider.getUriForFile(context, authority(), file)
+            file
+        } catch (_: IllegalArgumentException) {
+            // Removable volumes are outside FileProvider's primary external-path.
+            LocalShareFileCache.prepare(context.cacheDir, file)
+        }
+    }
 
     fun uriFor(context: Context, file: File): Uri =
         FileProvider.getUriForFile(context, authority(), file)

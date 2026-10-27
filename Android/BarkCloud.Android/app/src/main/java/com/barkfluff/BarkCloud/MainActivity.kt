@@ -23,8 +23,17 @@ import androidx.compose.runtime.setValue
 import com.barkfluff.BarkCloud.ui.navigation.RootNavGraph
 import com.barkfluff.BarkCloud.ui.theme.BarkCloudTheme
 
+data class DeepLinkEvent(val uri: Uri, val sequence: Int)
+
+internal fun initialDeepLinkEvent(uri: Uri?, restored: Boolean, sequence: Int = 0): DeepLinkEvent? =
+    if (restored || uri == null) null else DeepLinkEvent(uri, sequence)
+
+internal fun nextDeepLinkEvent(uri: Uri?, sequence: Int): DeepLinkEvent? =
+    uri?.let { DeepLinkEvent(it, sequence + 1) }
+
 class MainActivity : ComponentActivity() {
-    private var deepLink by mutableStateOf<Uri?>(null)
+    private var deepLink by mutableStateOf<DeepLinkEvent?>(null)
+    private var deepLinkSequence = 0
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { }
@@ -38,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 NotificationPermissionRequests.events.collect { requestNotificationPermissionIfNeeded() }
             }
         }
-        deepLink = intent?.data
+        deepLink = initialDeepLinkEvent(intent?.data, restored = savedInstanceState != null, sequence = deepLinkSequence)
         setContent {
             BarkCloudTheme {
                 RootNavGraph(deepLink = deepLink)
@@ -48,7 +57,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        deepLink = intent.data
+        nextDeepLinkEvent(intent.data, deepLinkSequence)?.let { event ->
+            deepLinkSequence = event.sequence
+            deepLink = event
+        }
     }
 
     private fun requestNotificationPermissionIfNeeded() {
