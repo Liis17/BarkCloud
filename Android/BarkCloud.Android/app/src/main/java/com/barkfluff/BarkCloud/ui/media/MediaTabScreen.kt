@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.ui.media
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -33,21 +34,26 @@ fun MediaTabScreen(
     val onSnackbar: (String) -> Unit = { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } }
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.tab_albums)) },
-                actions = {
-                    menu()
-                    IconButton(onClick = onOpenFavorites) {
-                        Icon(Icons.Outlined.FavoriteBorder, contentDescription = stringResource(R.string.tab_favorites))
-                    }
-                },
-            )
-        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().padding(padding)) {
-            AlbumsGridScreen(onOpenAlbum = onOpenAlbum, onSnackbar = onSnackbar)
+            AlbumsGridScreen(
+                onOpenAlbum = onOpenAlbum,
+                onSnackbar = onSnackbar,
+                header = {
+                    CenterAlignedTopAppBar(
+                        title = { Text(stringResource(R.string.tab_albums)) },
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        actions = {
+                            menu()
+                            IconButton(onClick = onOpenFavorites) {
+                                Icon(Icons.Outlined.FavoriteBorder, contentDescription = stringResource(R.string.tab_favorites))
+                            }
+                        },
+                    )
+                },
+            )
         }
     }
 }

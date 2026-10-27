@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -80,7 +79,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -92,6 +90,9 @@ import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.RefreshContentSurface
+import com.barkfluff.BarkCloud.ui.components.RefreshIndicator
+import com.barkfluff.BarkCloud.ui.components.contentSurfaceTopPx
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
@@ -102,9 +103,9 @@ import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 private fun requiredMediaPermissions(): Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -206,6 +207,7 @@ fun GalleryScreen(
                 do {
                     refreshQueued = false
                     coroutineScope {
+                        launch { delay(1_500) }
                         val local = async { if (state.permissionGranted) viewModel.reloadAndWait() }
                         val cloudPhotosReload = async { photos.reloadAndWait() }
                         val cloudVideosReload = async { videos.reloadAndWait() }
@@ -220,7 +222,9 @@ fun GalleryScreen(
         }
     }
 
-    val headerHeight = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
+    val statusBarHeight = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarHeightPx = with(density) { statusBarHeight.toPx() }
+    val headerHeight = statusBarHeight + 64.dp
     val headerHeightPx = with(density) { headerHeight.toPx() }
     val maxHeaderCollapsePx = with(density) { 64.dp.toPx() }
     val pullThresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
@@ -412,24 +416,26 @@ fun GalleryScreen(
             onRefresh = ::requestRefresh,
             modifier = Modifier.fillMaxSize().nestedScroll(headerScrollConnection),
             indicator = {
-                PullToRefreshDefaults.Indicator(
-                    state = pullToRefreshState,
+                RefreshIndicator(
+                    pullProgress = { pullToRefreshState.distanceFraction },
                     isRefreshing = refreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).offset {
-                        IntOffset(0, (headerHeightPx - if (state.selecting) 0f else headerCollapsePx).roundToInt())
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = statusBarHeight),
+                    gapHeightPx = {
+                        headerHeightPx - statusBarHeightPx - (if (state.selecting) 0f else headerCollapsePx) +
+                            pullThresholdPx * pullToRefreshState.distanceFraction
                     },
                 )
             },
         ) {
-            GalleryContentSurface(
+            RefreshContentSurface(
                 modifier = Modifier.fillMaxSize(),
                 topOffsetPx = {
-                    gallerySurfaceTopPx(
+                    contentSurfaceTopPx(
                         headerHeightPx = headerHeightPx,
                         collapsedHeaderPx = if (state.selecting) 0f else headerCollapsePx,
-                        pullOffsetPx = pullThresholdPx * pullToRefreshState.distanceFraction,
                     )
                 },
+                pullOffsetPx = { pullThresholdPx * pullToRefreshState.distanceFraction },
             ) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 120.dp),
@@ -446,10 +452,10 @@ fun GalleryScreen(
                             }
                         }
                     }
-                    if (state.isLoading || cloudPhotos.isLoading || cloudVideos.isLoading) {
+                    if (!refreshing && timeline.isEmpty() && (state.isLoading || cloudPhotos.isLoading || cloudVideos.isLoading)) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
+                                LoadingIndicator()
                             }
                         }
                     }
