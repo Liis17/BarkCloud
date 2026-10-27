@@ -23,9 +23,9 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace BarkCloud.Web.Tests.Endpoints;
 
-public sealed class FileViewEndpointTests
+public sealed class FileViewEndpointTests : IDisposable
 {
-    private const string Secret = "file-view-test-signing-key-at-least-32-bytes";
+    private readonly RsaJwtTestKeys _keys = new();
 
     [Fact]
     public async Task AuthenticatedViewDownloadsAsAttachmentAndSuppressesContentTypeSniffing()
@@ -56,7 +56,7 @@ public sealed class FileViewEndpointTests
 
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["JwtSettings:SecretKey"] = Secret,
+            [RsaJwtKeys.PublicKeyConfigKey] = _keys.PublicKeyFile,
             ["JwtSettings:Issuer"] = "bark",
             ["JwtSettings:Audience"] = "bark",
             ["FilesService:Http1Base"] = "http://files-internal"
@@ -89,21 +89,13 @@ public sealed class FileViewEndpointTests
 
     }
 
-    private static string CreateJwt()
-    {
-        var handler = new JwtSecurityTokenHandler();
-        return handler.WriteToken(handler.CreateToken(new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity([
-                new Claim(IdentityClaims.UserId, "42"),
-                new Claim(IdentityClaims.TokenType, TokenType.User.ToString())]),
-            Issuer = "bark",
-            Audience = "bark",
-            IssuedAt = DateTime.UtcNow.AddMinutes(-1),
-            Expires = DateTime.UtcNow.AddHours(1),
-            SigningCredentials = new(new SymmetricSecurityKey(JwtSecret.GetKeyBytes(Secret)), SecurityAlgorithms.HmacSha256)
-        }));
-    }
+    private string CreateJwt()
+        => _keys.IssueToken([
+            new Claim(IdentityClaims.UserId, "42"),
+            new Claim(IdentityClaims.TokenType, TokenType.User.ToString())],
+            expires: DateTime.UtcNow.AddHours(1),
+            issuer: "bark",
+            audience: "bark");
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {
@@ -116,4 +108,6 @@ public sealed class FileViewEndpointTests
             return Task.FromResult(responseFactory(request));
         }
     }
+
+    public void Dispose() => _keys.Dispose();
 }

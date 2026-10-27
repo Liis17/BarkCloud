@@ -46,8 +46,39 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public string ImageChannel { get; set; } = "Release"; // "Release" | "Dev"
 
     // Общие
-    public string ConfigurationAccessKey { get; set; } = "";
     public string AspNetCoreEnvironment { get; set; } = "Production";
+
+    // Разделённые секреты (аудит, п. 9): bootstrap-ключи Configuration и секреты сервисных
+    // токенов у каждого сервиса свои; реестры собираются из них в BuildEnv.
+    public string IdentityConfigAccessKey { get; set; } = "";
+    public string UsersConfigAccessKey { get; set; } = "";
+    public string NotificationConfigAccessKey { get; set; } = "";
+    public string FilesConfigAccessKey { get; set; } = "";
+    public string TorrentConfigAccessKey { get; set; } = "";
+    public string WebConfigAccessKey { get; set; } = "";
+    public string IdentityServiceCredential { get; set; } = "";
+    public string UsersServiceCredential { get; set; } = "";
+    public string FilesServiceCredential { get; set; } = "";
+    public string TorrentServiceCredential { get; set; } = "";
+    public string WebServiceCredential { get; set; } = "";
+
+    // Deployment-only credentials are generated internally; they are not exposed as UI fields.
+    public string ConfigurationDbPassword { get; set; } = GenerateSecret(48);
+    public string IdentityDbPassword { get; set; } = GenerateSecret(48);
+    public string UsersDbPassword { get; set; } = GenerateSecret(48);
+    public string FilesDbPassword { get; set; } = GenerateSecret(48);
+    public string TorrentDbPassword { get; set; } = GenerateSecret(48);
+    public string IdentityRabbitPassword { get; set; } = GenerateSecret(48);
+    public string UsersRabbitPassword { get; set; } = GenerateSecret(48);
+    public string FilesRabbitPassword { get; set; } = GenerateSecret(48);
+    public string TorrentRabbitPassword { get; set; } = GenerateSecret(48);
+    public string NotificationRabbitPassword { get; set; } = GenerateSecret(48);
+
+    public string ConfigurationAccessKeysRegistry =>
+        $"Identity={IdentityConfigAccessKey};Users={UsersConfigAccessKey};Notification={NotificationConfigAccessKey};Files={FilesConfigAccessKey};Torrent={TorrentConfigAccessKey};Web={WebConfigAccessKey}";
+
+    public string ServiceCredentialsRegistry =>
+        $"Identity={IdentityServiceCredential};Users={UsersServiceCredential};Files={FilesServiceCredential};Torrent={TorrentServiceCredential};Web={WebServiceCredential}";
 
     // MinIO
     public string MinioRootUser { get; set; } = "user";
@@ -58,11 +89,14 @@ public sealed class BuilderModel : INotifyPropertyChanged
 
     // RabbitMQ
     public string RabbitUser { get; set; } = "user";
-    public string RabbitPass { get; set; } = "password";
+    public string RabbitPass { get; set; } = GenerateSecret(48);
+    public string RabbitHost { get; set; } = "cloud-rabbitmq";
+    public string RabbitVirtualHost { get; set; } = "/";
 
     // PostgreSQL
     public string PostgresUser { get; set; } = "user";
-    public string PostgresPassword { get; set; } = "password";
+    public string PostgresPassword { get; set; } = GenerateSecret(48);
+    public string PostgresHost { get; set; } = "cloud-postgres";
     public string PostgresDb { get; set; } = "postgrescloud";
     public string PostgresPort { get; set; } = "5432";
     public string PostgresDataPath { get; set; } = "./data/pgdata";
@@ -108,6 +142,7 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public string WebPublicHost { get; set; } = "https://cloud.barkfluff.com";
     public string WebTrustedProxyNetworks { get; set; } = "";
     public string WebAdminPassword { get; set; } = "";
+    public string WebAdminCookieKey { get; set; } = "";
     public string AndroidCertificateSha256Fingerprint { get; set; } = "27:85:31:F0:57:D2:28:2F:E0:47:1D:05:68:46:6B:91:2F:9C:31:16:E7:19:F4:27:20:40:BD:FF:63:34:E8:26";
 
     // Внешние адреса сервисов для клиентов (обязательны). Configuration пишет их в БД
@@ -215,6 +250,17 @@ public sealed class BuilderModel : INotifyPropertyChanged
             return;
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    /// <summary>Случайный секрет из букв/цифр (для bootstrap-ключей и секретов сервисов).</summary>
+    public static string GenerateSecret(int length)
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var data = System.Security.Cryptography.RandomNumberGenerator.GetBytes(length);
+        var result = new char[length];
+        for (var i = 0; i < length; i++)
+            result[i] = chars[data[i] % chars.Length];
+        return new string(result);
     }
 }
 

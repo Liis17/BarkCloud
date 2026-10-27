@@ -127,7 +127,7 @@ public class PageDataBuilderTests
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["App:AdminPassword"] = "admin", ["JwtSettings:SecretKey"] = "test-secret-key-at-least-32-bytes-long"
+            ["App:AdminPassword"] = "admin", ["App:AdminCookieKey"] = "test-admin-cookie-key-at-least-32-bytes"
         }).Build();
         return new(_users.Object, _usersServer.Object, _files.Object, new Mock<IdentityApi.IdentityApiClient>().Object,
             new AdminGate(config), config, new FeatureConfigurationGateway(new Mock<ConfigurationApi.ConfigurationApiClient>().Object,

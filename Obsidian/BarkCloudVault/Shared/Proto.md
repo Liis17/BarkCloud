@@ -11,7 +11,8 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 | Файл | Сервисы | Связанная заметка |
 |---|---|---|
 | `Shared/BarkCloud.Proto/configuration_api.proto` | `ConfigurationApi` | [[Backend/Configuration]] |
-| `Shared/BarkCloud.Proto/identity_api.proto` | `IdentityApi`, `IdentityServerApi` | [[Backend/Identity]] |
+| `Shared/BarkCloud.Proto/identity_api.proto` | `IdentityApi` | [[Backend/Identity]] |
+| `Shared/BarkCloud.Proto/service_credentials_api.proto` | `ServiceCredentialsApi` | [[Backend/Identity]], [[Backend/GrpcServer]] |
 | `Shared/BarkCloud.Proto/session_revocation_api.proto` | `SessionRevocationApi` | [[Backend/SessionRevocation]] |
 | `Shared/BarkCloud.Proto/users_api.proto` | `UsersApi`, `UsersServerApi` | [[Backend/Users]] |
 | `Shared/BarkCloud.Proto/files_api.proto` | `FilesApi`, `CloudApi`, `FilesServerApi`, `AlbumApi`, `MusicApi`, `SearchApi`, `DynamicFolderApi` | [[Backend/Files]] |
@@ -22,7 +23,7 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 
 `IdentityApi` предоставляет отдельные `CreateAccountWithPassword` и `ConfirmAccountWithPassword` для регистрации с первоначальным паролем. Они используют request-типы `CreateAccountRequest` и `ConfirmAccountRequest` с optional `initial_password` (поля 5 и 3 соответственно); legacy `CreateAccount` и `ConfirmAccount` это поле игнорируют. Сервер проверяет пароль нового контракта до побочных эффектов.
 
-`ConfirmResetPasswordRequest` получил additive optional `reset_passkeys` (поле 6); существующее optional `revoke_other_sessions` (поле 4) сохранено. При отсутствии каждого поля сервер считает выбор включённым. `ForceSetPasswordServerRequest` получил optional `reset_passkeys` и `revoke_other_sessions` (поля 3 и 4); этот служебный путь не выдаёт новую сессию.
+`ConfirmResetPasswordRequest` содержит optional `reset_passkeys` (поле 6) и `revoke_other_sessions` (поле 4). При отсутствии каждого поля сервер считает выбор включённым.
 
 `IdentityApi` добавил авторизованные `BeginReauthentication` и `CompleteReauthentication` для выдачи одноразового разрешения управления passkey. `BeginWebAuthnRegistrationRequest`, `CompleteWebAuthnRegistrationRequest` и `RemoveWebAuthnCredentialRequest` принимают additive optional `permission_token`; старые вызовы без него отклоняются сервером. Разрешение связано с действием и, при удалении, конкретным credential. Подробный поток описан в [[Backend/Identity]].
 

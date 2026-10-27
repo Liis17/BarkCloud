@@ -16,7 +16,7 @@ public class Program
 
         ConfigurationAccessPolicy.EnsureConfigured(
             builder.Environment.IsDevelopment(),
-            builder.Configuration["CONFIGURATION_ACCESS_KEY"]);
+            builder.Configuration["CONFIGURATION_ACCESS_KEYS"]);
 
         await using var loggingLifetime = await builder.AddBarkCloudSerilogAsync("BarkCloud.Configuration");
         builder.Services.AddBarkCloudMetrics("BarkCloud.Configuration");
@@ -64,9 +64,16 @@ public class Program
                 "Database settings are not configured. Set CONFIGURATION_HOST, CONFIGURATION_DATABASE, CONFIGURATION_USERNAME, CONFIGURATION_PASSWORD.");
         }
 
-        var configurationDb = string.IsNullOrWhiteSpace(port)
-            ? $"Host={host};Database={database};Username={username};Password={password}"
-            : $"Host={host};Port={port};Database={database};Username={username};Password={password}";
+        var configurationDbBuilder = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Database = database,
+            Username = username,
+            Password = password
+        };
+        if (int.TryParse(port, out var configurationDbPort))
+            configurationDbBuilder.Port = configurationDbPort;
+        var configurationDb = configurationDbBuilder.ConnectionString;
 
         builder.Services.AddDbContext<ConfigurationContext>(c => c.UseNpgsql(configurationDb));
 
@@ -107,13 +114,24 @@ public class Program
                     // Авто-заполнение пустых конфигураций значениями по умолчанию
                     try
                     {
-                        // Извлекаем данные postgres из connection string Configuration-сервиса
-                        var pgHostOnly = host.Contains(':') ? host.Split(':')[0] : host;
-
-                        // Креды RabbitMQ пробрасываются в контейнер через env_file: .env,
-                        // совпадают с RABBITMQ_DEFAULT_USER/PASS, с которыми стартует брокер
-                        var rabbitUsername = builder.Configuration["RABBITMQ_DEFAULT_USER"] ?? "";
-                        var rabbitPassword = builder.Configuration["RABBITMQ_DEFAULT_PASS"] ?? "";
+                        var postgresHost = builder.Configuration["POSTGRES_HOST"] ?? "cloud-postgres";
+                        var postgresPort = int.TryParse(builder.Configuration["POSTGRES_PORT"], out var parsedPostgresPort)
+                            ? parsedPostgresPort : 5432;
+                        var databasePasswords = new Dictionary<BarkCloud.Shared.Identity.ServiceId, string>
+                        {
+                            [BarkCloud.Shared.Identity.ServiceId.Identity] = builder.Configuration["IDENTITY_DB_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Users] = builder.Configuration["USERS_DB_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Files] = builder.Configuration["FILES_DB_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Torrent] = builder.Configuration["TORRENT_DB_PASSWORD"] ?? ""
+                        };
+                        var rabbitPasswords = new Dictionary<BarkCloud.Shared.Identity.ServiceId, string>
+                        {
+                            [BarkCloud.Shared.Identity.ServiceId.Identity] = builder.Configuration["RABBITMQ_IDENTITY_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Users] = builder.Configuration["RABBITMQ_USERS_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Files] = builder.Configuration["RABBITMQ_FILES_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Torrent] = builder.Configuration["RABBITMQ_TORRENT_PASSWORD"] ?? "",
+                            [BarkCloud.Shared.Identity.ServiceId.Notification] = builder.Configuration["RABBITMQ_NOTIFICATION_PASSWORD"] ?? ""
+                        };
 
                         // MinIO: дефолтные значения соответствуют внутренней docker-сети.
                         // MINIO_PORT здесь — порт API внутри контейнера (не маппинг наружу).
@@ -136,8 +154,10 @@ public class Program
 
                         var populatorLogger = scope.ServiceProvider.GetRequiredService<ILogger<ConfigurationDefaultsPopulator>>();
                         var populator = new ConfigurationDefaultsPopulator(
-                            ctx, populatorLogger, pgHostOnly, username, password,
-                            rabbitUsername, rabbitPassword,
+                            ctx, populatorLogger, postgresHost, postgresPort, databasePasswords,
+                            builder.Configuration["RABBITMQ_HOST"] ?? "cloud-rabbitmq",
+                            builder.Configuration["RABBITMQ_VIRTUAL_HOST"] ?? "/",
+                            rabbitPasswords,
                             minioHost, minioPort, minioAccessKey, minioSecretKey,
                             emailHost, emailPort, emailSenderEmail, emailSenderPassword,
                             externalIdentityHost, externalUsersHost, externalFilesHost, externalTorrentHost,

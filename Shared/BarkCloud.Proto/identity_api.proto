@@ -82,70 +82,10 @@ service IdentityApi {
   rpc CompleteReauthentication(CompleteReauthenticationRequest) returns(CompleteReauthenticationResponse);
 }
 
-// Серверное API для админ-панели
-service IdentityServerApi {
-  // Получить статус 2FA пользователя
-  rpc ListOtpVerificationServer(ListOtpVerificationServerRequest) returns(ListOtpVerificationResponse);
-
-  // Принудительно отключить 2FA пользователя
-  rpc DisableOtpVerificationServer(DisableOtpVerificationServerRequest) returns(DisableOtpVerificationResponse);
-
-  // Получить активные сессии пользователя
-  rpc GetActiveSessionsServer(GetActiveSessionsServerRequest) returns(GetActiveSessionsResponse);
-
-  // Удалить активную сессию пользователя
-  rpc RemoveActiveSessionServer(RemoveActiveSessionServerRequest) returns(RemoveActiveSessionResponse);
-
-  // Создать сессию (refresh + access) для пользователя из другого сервиса (например FastAuth).
-  // Регистрирует устройство в Users, отправляет уведомление о входе.
-  rpc CreateSessionForUserServer(CreateSessionForUserServerRequest) returns(CreateSessionForUserServerResponse);
-
-  // Принудительно сменить пароль пользователя (для админ-панели, без OTP).
-  // Отправляет email-уведомление пользователю.
-  rpc ForceSetPasswordServer(ForceSetPasswordServerRequest) returns(ForceSetPasswordServerResponse);
-}
-
-message CreateSessionForUserServerRequest {
-  int64 user_id = 1;
-  string device_id = 2;            // GUID нового устройства
-  string device_name = 3;
-  string operation_system = 4;
-  string app_name = 5;             // "AppName v.X.Y.Z" (склеено вызывающим)
-  string ip_address = 6;
-}
-
-message CreateSessionForUserServerResponse {
-  Token access_token = 1;
-  Token refresh_token = 2;
-}
-
-message ListOtpVerificationServerRequest {
-  int64 user_id = 1;
-}
-
-message DisableOtpVerificationServerRequest {
-  int64 user_id = 1;
-  OtpTypeId otp_type = 2;
-}
-
-message GetActiveSessionsServerRequest {
-  int64 user_id = 1;
-}
-
-message RemoveActiveSessionServerRequest {
-  int64 user_id = 1;
-  string device_id = 2;
-}
-
-// Принудительная смена пароля (серверный, для админ-панели)
-message ForceSetPasswordServerRequest {
-  int64 user_id = 1;
-  string new_password = 2;
-  optional bool reset_passkeys = 3; // удалить все passkey (если не передано — true)
-  optional bool revoke_other_sessions = 4; // отозвать все сессии (если не передано — true)
-}
-
-message ForceSetPasswordServerResponse { }
+// Серверное API IdentityServerApi удалено: не имело вызывающих, а CreateSessionForUserServer
+// позволял любому обладателю сервисного токена выпустить сессию произвольного пользователя
+// (аудит безопасности, п. 9). Server-потребители Identity — только SessionRevocationApi
+// и ServiceCredentialsApi ниже.
 
 message ConfirmResetPasswordRequest {
   string reset_id = 1; // идентификатор сброса пароля

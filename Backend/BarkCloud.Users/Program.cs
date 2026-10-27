@@ -1,9 +1,9 @@
 using BarkCloud.GrpcServer;
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.SessionRevocation;
 using BarkCloud.Proto.Files;
-using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Users.Host;
@@ -45,18 +45,23 @@ public class Program
         builder.Services.AddSingleton<ReservedUsernamesService>();
 
         // Регистрируем аутентификацию и авторизацию
-        builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddXAuth(builder.Configuration, ServiceId.Users);
         builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+
+        // Сервисные токены: выдаёт Identity по секрету сервиса (ServiceAuth:Credential / SERVICE_CREDENTIAL).
+        builder.Services.AddServiceTokenClient(builder.Configuration);
         builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["IdentityService:Host"]!);
-            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["IdentityService:Token"]!))
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Identity))
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["FilesService:Host"]);
-            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["FilesService:Token"]))
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Files))
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddMassTransit(x =>
@@ -69,11 +74,12 @@ public class Program
 
             x.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                cfg.Host(builder.Configuration["RabbitMQ:Host"], builder.Configuration["RabbitMQ:VirtualHost"], h =>
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
                 });
+                cfg.OverrideDefaultBusEndpointQueueName("bark-users-bus-" + Guid.NewGuid().ToString("N"));
             });
         });
 

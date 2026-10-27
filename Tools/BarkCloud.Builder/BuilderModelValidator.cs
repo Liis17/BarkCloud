@@ -17,6 +17,7 @@ public static partial class BuilderModelValidator
         var errors = new List<string>();
 
         ValidateDockerNetworkName(model.DockerNetworkName, errors);
+        ValidateIsolationSettings(model, errors);
 
         var allNames = model.ContainerNames;
         foreach (var container in allNames.Where(x => x.Enabled))
@@ -169,6 +170,34 @@ public static partial class BuilderModelValidator
             || value.Any(char.IsControl)
             || value.IndexOfAny(['$', '\'', '"', '#']) >= 0)
             errors.Add("URL Lognara Core обязателен: абсолютный HTTP/HTTPS endpoint /v1/batches без учётных данных, query, #, пробелов и управляющих символов.");
+    }
+
+    private static void ValidateIsolationSettings(BuilderModel model, ICollection<string> errors)
+    {
+        ValidateInternalPort(model.PostgresPort, "PostgreSQL", errors);
+        if (string.IsNullOrWhiteSpace(model.PostgresHost) || model.PostgresHost.Any(char.IsControl))
+            errors.Add("Укажите адрес PostgreSQL без управляющих символов.");
+        if (string.IsNullOrWhiteSpace(model.RabbitHost) || model.RabbitHost.Any(char.IsControl))
+            errors.Add("Укажите адрес RabbitMQ без управляющих символов.");
+        if (string.IsNullOrWhiteSpace(model.RabbitVirtualHost) || model.RabbitVirtualHost.Any(char.IsControl))
+            errors.Add("Укажите vhost RabbitMQ без управляющих символов.");
+
+        if (string.IsNullOrWhiteSpace(model.PostgresUser) || string.IsNullOrWhiteSpace(model.PostgresPassword))
+            errors.Add("Учётные данные оператора PostgreSQL обязательны для provisioning.");
+        if (model.IncludeRabbitmq && (string.IsNullOrWhiteSpace(model.RabbitUser) || string.IsNullOrWhiteSpace(model.RabbitPass)))
+            errors.Add("Bootstrap-учётные данные RabbitMQ обязательны для контейнера брокера.");
+
+        var servicePasswords = new[]
+        {
+            model.ConfigurationDbPassword, model.IdentityDbPassword, model.UsersDbPassword,
+            model.FilesDbPassword, model.TorrentDbPassword, model.IdentityRabbitPassword,
+            model.UsersRabbitPassword, model.FilesRabbitPassword, model.TorrentRabbitPassword,
+            model.NotificationRabbitPassword
+        };
+        if (servicePasswords.Any(string.IsNullOrWhiteSpace))
+            errors.Add("Все сервисные пароли PostgreSQL и RabbitMQ должны быть непустыми.");
+        if (servicePasswords.Any(value => value.Any(char.IsControl)))
+            errors.Add("Сервисные пароли PostgreSQL и RabbitMQ не должны содержать управляющие символы.");
     }
 
     private static void ValidateAgentToken(string value, string label, ICollection<string> errors)

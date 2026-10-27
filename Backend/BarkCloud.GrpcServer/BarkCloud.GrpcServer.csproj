@@ -36,6 +36,14 @@
         <InternalsVisibleTo Include="BarkCloud.GrpcServer.Tests" />
         <Protobuf Include="..\..\Shared\BarkCloud.Proto\configuration_api.proto" GrpcServices="Both" />
         <Protobuf Include="..\..\Shared\BarkCloud.Proto\session_revocation_api.proto" GrpcServices="Both" />
+        <!-- Клиент и серверная база ServiceCredentialsApi: Identity хостит API, остальные сервисы
+             берут отсюда и клиент, и ServiceTokenProvider (как Configuration со своим API). -->
+        <Protobuf Include="..\..\Shared\BarkCloud.Proto\service_credentials_api.proto" GrpcServices="Both" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!-- AddGrpcClient для ServiceCredentialsApi.ServiceCredentialsApiClient в ServiceAuth. -->
+      <PackageReference Include="Grpc.Net.ClientFactory" Version="2.84.0" />
     </ItemGroup>
 
 </Project>

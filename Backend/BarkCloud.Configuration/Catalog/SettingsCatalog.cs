@@ -74,13 +74,11 @@ public static class SettingsCatalog
     {
         var entries = new List<SettingsCatalogEntry>();
 
-        Add(entries, ServiceId.Unknown, "JwtSettings", "SecretKey", SettingValueKind.Password, true);
+        // Общего HMAC-секрета JWT больше нет: подпись RS256, приватный ключ только у Identity (аудит, п. 9).
         Add(entries, ServiceId.Unknown, "JwtSettings", "Issuer");
         Add(entries, ServiceId.Unknown, "JwtSettings", "Audience");
         Add(entries, ServiceId.Unknown, "JwtSettings", "ExpiryMinutes", SettingValueKind.Integer);
         Add(entries, ServiceId.Unknown, "RabbitMQ", "Host");
-        Add(entries, ServiceId.Unknown, "RabbitMQ", "Username");
-        Add(entries, ServiceId.Unknown, "RabbitMQ", "Password", SettingValueKind.Password, true);
         Add(entries, ServiceId.Unknown, "RabbitMQ", "VirtualHost");
         Add(entries, ServiceId.Unknown, "Seq", "ServerUrl", SettingValueKind.Url);
         Add(entries, ServiceId.Unknown, "Features", "RegistrationEnabled", SettingValueKind.Boolean,
@@ -91,15 +89,19 @@ public static class SettingsCatalog
         AddService(entries, ServiceId.Identity,
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("IdentityDb", "", SettingValueKind.Password, true, true),
+            ("RabbitMQ", "Username", SettingValueKind.String, false, true),
+            ("RabbitMQ", "Password", SettingValueKind.Password, true, true),
+            ("IdentityService", "Host", SettingValueKind.Url, false, false),
             ("UsersService", "Host", SettingValueKind.Url, false, false),
-            ("UsersService", "Token", SettingValueKind.Password, true, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false),
             ("WebAuthn", "RpId", SettingValueKind.String, false, false),
             ("WebAuthn", "ServerName", SettingValueKind.String, false, false),
             ("WebAuthn", "Origins", SettingValueKind.String, false, false));
 
         AddService(entries, ServiceId.Notification,
-            ("RunSettings", "Port", SettingValueKind.Integer, false, true));
+            ("RunSettings", "Port", SettingValueKind.Integer, false, true),
+            ("RabbitMQ", "Username", SettingValueKind.String, false, true),
+            ("RabbitMQ", "Password", SettingValueKind.Password, true, true));
         Add(entries, ServiceId.Notification, "Email", "Host",
             restartTargets: ["notification", "identity", "web"]);
         Add(entries, ServiceId.Notification, "Email", "Port", SettingValueKind.Integer,
@@ -113,35 +115,34 @@ public static class SettingsCatalog
 
         AddService(entries, ServiceId.Users,
             ("IdentityService", "Host", SettingValueKind.Url, false, false),
-            ("IdentityService", "Token", SettingValueKind.Password, true, false),
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("UsersDb", "", SettingValueKind.Password, true, true),
+            ("RabbitMQ", "Username", SettingValueKind.String, false, true),
+            ("RabbitMQ", "Password", SettingValueKind.Password, true, true),
             ("FilesService", "Host", SettingValueKind.Url, false, false),
-            ("FilesService", "Token", SettingValueKind.Password, true, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false));
 
         AddService(entries, ServiceId.Files,
             ("IdentityService", "Host", SettingValueKind.Url, false, false),
-            ("IdentityService", "Token", SettingValueKind.Password, true, false),
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("RunSettings", "Http1Port", SettingValueKind.Integer, false, true),
             ("FilesDb", "", SettingValueKind.Password, true, true),
+            ("RabbitMQ", "Username", SettingValueKind.String, false, true),
+            ("RabbitMQ", "Password", SettingValueKind.Password, true, true),
             ("UsersService", "Host", SettingValueKind.Url, false, false),
-            ("UsersService", "Token", SettingValueKind.Password, true, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false),
             ("TempFiles", "ExpiresAt", SettingValueKind.Integer, false, false),
             ("Uploads", "TempDirectory", SettingValueKind.String, false, false));
 
         AddService(entries, ServiceId.Torrent,
             ("IdentityService", "Host", SettingValueKind.Url, false, false),
-            ("IdentityService", "Token", SettingValueKind.Password, true, false),
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("RunSettings", "Http1Port", SettingValueKind.Integer, false, true),
             ("TorrentDb", "", SettingValueKind.Password, true, true),
+            ("RabbitMQ", "Username", SettingValueKind.String, false, true),
+            ("RabbitMQ", "Password", SettingValueKind.Password, true, true),
             ("UsersService", "Host", SettingValueKind.Url, false, false),
-            ("UsersService", "Token", SettingValueKind.Password, true, false),
             ("FilesService", "Host", SettingValueKind.Url, false, false),
-            ("FilesService", "Token", SettingValueKind.Password, true, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false),
             ("Torrent", "DownloadPath", SettingValueKind.String, false, true),
             ("Torrent", "PeerPort", SettingValueKind.Integer, false, true));

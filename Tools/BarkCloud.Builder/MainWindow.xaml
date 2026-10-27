@@ -242,18 +242,9 @@
                         <ui:TextBox x:Name="ConfigurationServiceUrlBox" IsReadOnly="True" ClearButtonEnabled="False"
                                     Text="{Binding Text, ElementName=ConfigPortBox, Mode=OneWay, StringFormat='http://cloud-configuration:{0}'}" />
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_ACCESS_KEY (одинаковый у всех сервисов)" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ui:TextBox x:Name="AccessKeyBox" Grid.Column="0"
-                                        Text="{Binding ConfigurationAccessKey, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайный"
-                                       Icon="{ui:SymbolIcon ArrowSync24}" Tag="50"
-                                       CommandParameter="{Binding ElementName=AccessKeyBox}" Click="OnRandom" />
-                        </Grid>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Секреты сервисов (разделённые, аудит №9): bootstrap-ключи Configuration, секреты сервисных токенов и RSA-ключи JWT (secrets/jwt) генерируются автоматически и пишутся в .env. При загрузке существующего .env значения сохраняются." TextWrapping="Wrap" />
+                        <ui:TextBox x:Name="AccessKeyBox" IsReadOnly="True" ClearButtonEnabled="False"
+                                    Text="{Binding ConfigurationAccessKeysRegistry, Mode=OneWay}" />
                     </StackPanel>
                 </ui:CardExpander>
 

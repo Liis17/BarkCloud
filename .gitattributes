@@ -1,0 +1,8 @@
+Backend/migrate-secrets.sh text eol=lf
+Backend/provision-isolation.sh text eol=lf
+Backend/provision-rabbitmq.sh text eol=lf
+Backend/postgres-isolation-smoke.sh text eol=lf
+Backend/rabbitmq-isolation-smoke.sh text eol=lf
+Backend/*.sql text eol=lf
+Tests/Backend/migrate-secrets-test.sh text eol=lf
+Tests/Backend/isolation-provisioning-test.sh text eol=lf
