@@ -127,7 +127,6 @@ public class ConfigurationDefaultsPopulator
         var global = SettingsScopes.Get(ServiceId.Unknown);
         var globalRows = await _context.Settings(global).AsNoTracking()
             .ToDictionaryAsync(row => row.Key, row => row.Value, StringComparer.Ordinal);
-        var jwtSecret = GetNonEmpty(globalRows, "JwtSettings:SecretKey") ?? GenerateRandomKey(64);
         var jwtIssuer = GetNonEmpty(globalRows, "JwtSettings:Issuer") ?? "BarkCloud";
         var jwtAudience = GetNonEmpty(globalRows, "JwtSettings:Audience") ?? "BarkCloudMicroservices";
 
@@ -135,7 +134,7 @@ public class ConfigurationDefaultsPopulator
         var beforeEmpty = await CountEmptySettingsAsync();
         var storage = new ConfigurationStorage(_context, _metrics);
         await storage.SeedMissingCatalogRowsAsync(entry =>
-            ResolveDefault(entry, jwtSecret, jwtIssuer, jwtAudience));
+            ResolveDefault(entry, jwtIssuer, jwtAudience));
         var afterEmpty = await CountEmptySettingsAsync();
         var populated = beforeEmpty - afterEmpty;
         _metrics.Add("defaults_populated_total", populated);
@@ -147,7 +146,6 @@ public class ConfigurationDefaultsPopulator
 
     private string? ResolveDefault(
         SettingsCatalogEntry entry,
-        string jwtSecret,
         string jwtIssuer,
         string jwtAudience)
     {
@@ -160,7 +158,6 @@ public class ConfigurationDefaultsPopulator
         if (entry.Section == "JwtSettings")
             return entry.Key switch
             {
-                "SecretKey" => jwtSecret,
                 "Issuer" => jwtIssuer,
                 "Audience" => jwtAudience,
                 "ExpiryMinutes" => "60",
