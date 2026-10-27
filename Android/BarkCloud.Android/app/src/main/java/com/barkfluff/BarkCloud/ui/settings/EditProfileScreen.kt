@@ -1,5 +1,15 @@
 package com.barkfluff.BarkCloud.ui.settings
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
+import com.barkfluff.BarkCloud.BuildConfig
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,14 +46,23 @@ import com.barkfluff.BarkCloud.R
 @Composable
 fun EditProfileScreen(
     onNavigateUp: () -> Unit,
+    onSignedOut: () -> Unit,
     viewModel: EditProfileViewModel = viewModel(factory = EditProfileViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var pendingAvatar by rememberSaveable { mutableStateOf<String?>(null) }
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        pendingAvatar = uri?.toString()
+    }
 
     LaunchedEffect(Unit) { viewModel.load() }
     LaunchedEffect(viewModel) {
         viewModel.saved.collect { onNavigateUp() }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.signedOut.collect { onSignedOut() }
     }
     LaunchedEffect(state.snackbar) {
         val msg = state.snackbar ?: return@LaunchedEffect
@@ -51,10 +70,24 @@ fun EditProfileScreen(
         viewModel.snackbarShown()
     }
 
+    pendingAvatar?.let { pending ->
+        AvatarCropDialog(
+            uri = Uri.parse(pending),
+            onDismiss = { pendingAvatar = null },
+            onConfirm = { file ->
+                val croppedUri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
+                viewModel.setAvatar(croppedUri) { file.delete() }
+                pendingAvatar = null
+            },
+        )
+    }
+
     Scaffold(
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.edit_profile_title)) },
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
@@ -81,6 +114,13 @@ fun EditProfileScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            ProfileHeader(
+                state = state,
+                onPickAvatar = {
+                    avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+                onRemoveAvatar = viewModel::removeAvatar,
+            )
             OutlinedTextField(
                 value = state.firstName,
                 onValueChange = viewModel::onFirstNameChange,
@@ -119,6 +159,12 @@ fun EditProfileScreen(
                 },
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth(),
+            )
+            ProfileAccountActions(
+                enabled = !state.isSaving && !state.isUpdatingAvatar && !state.isProcessing,
+                isProcessing = state.isProcessing,
+                onSignOut = viewModel::signOut,
+                onDeleteAccount = viewModel::deleteAccount,
             )
         }
     }

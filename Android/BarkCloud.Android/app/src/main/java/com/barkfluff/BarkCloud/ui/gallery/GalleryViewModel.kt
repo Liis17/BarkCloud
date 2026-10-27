@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.NotificationPermissionRequests
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
@@ -30,6 +31,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
@@ -46,6 +49,7 @@ data class GalleryUiState(
     val snackbar: String? = null,
 ) {
     val reclaimableCount: Int get() = items.count { cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
+    internal val selectionActions: PhotoSelectionActions get() = photoSelectionActions(selected)
 }
 
 class GalleryViewModel(
@@ -57,10 +61,18 @@ class GalleryViewModel(
     private val mediaDao: MediaCloudStateDao = BarkCloudDatabase.get(appContext).mediaCloudStateDao()
     private val _state = MutableStateFlow(GalleryUiState())
     val state: StateFlow<GalleryUiState> = _state.asStateFlow()
+    private val deletionCoordinator = GalleryDeletionCoordinator(
+        scope = viewModelScope,
+        deleteCloudFile = cloudRepository::deleteUserMedia,
+        onDeviceFilesDeleted = ::onDeviceCopiesDeleted,
+        onCloudFileDeleted = ::onCloudFileDeleted,
+    )
+    internal val deletionState: StateFlow<GalleryDeletionState> = deletionCoordinator.state
 
     private val idToHash = ConcurrentHashMap<String, String>()
     private val hashPresence = ConcurrentHashMap<String, Boolean>()
     private val pendingHashes = LinkedHashSet<String>()
+    private val mediaLoadMutex = Mutex()
     private var flushJob: Job? = null
 
     init {
@@ -86,28 +98,55 @@ class GalleryViewModel(
 
     fun load() {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+            reloadAndWait()
+        }
+    }
+
+    suspend fun reloadAndWait() = mediaLoadMutex.withLock {
+        _state.update { it.copy(isLoading = true) }
+        try {
             val items = DeviceMediaStore.query(appContext)
             _state.update { it.copy(isLoading = false, items = items) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            _state.update { it.copy(isLoading = false) }
+            throw e
+        } catch (e: Exception) {
+            _state.update { it.copy(isLoading = false, snackbar = e.message) }
         }
     }
 
-    fun toggleSelecting() {
-        _state.update {
-            if (it.selecting) it.copy(selecting = false, selected = emptySet())
-            else it.copy(selecting = true)
-        }
+    fun toggleSelecting() = clearSelection()
+
+    fun startSelecting(key: String) = _state.update {
+        if (deletionState.value.isBusy) return@update it
+        val selection = PhotoSelection(it.selected).start(key)
+        it.copy(selecting = selection.isSelecting, selected = selection.keys)
     }
 
-    fun startSelecting(mediaKey: String) = _state.update { it.copy(selecting = true, selected = it.selected + mediaKey) }
+    fun toggle(key: String) = _state.update {
+        if (deletionState.value.isBusy) return@update it
+        val selection = PhotoSelection(it.selected).toggle(key)
+        it.copy(selecting = selection.isSelecting, selected = selection.keys)
+    }
 
-    fun toggle(mediaKey: String) = _state.update {
-        val selected = if (mediaKey in it.selected) it.selected - mediaKey else it.selected + mediaKey
-        it.copy(selected = selected)
+    fun removeSelection(keys: Set<String>) = _state.update {
+        if (deletionState.value.isBusy) return@update it
+        val selection = PhotoSelection(it.selected).remove(keys)
+        it.copy(selecting = selection.isSelecting, selected = selection.keys)
+    }
+
+    fun clearSelection() = _state.update {
+        if (deletionState.value.isBusy) return@update it
+        it.copy(selecting = false, selected = emptySet())
     }
 
     fun uploadSelected() {
-        val targets = _state.value.items.filter { it.mediaKey in _state.value.selected }
+        if (deletionState.value.isBusy || _state.value.isQueueing) return
+        val selectedDeviceKeys = _state.value.selected
+            .filter { it.startsWith(DEVICE_SELECTION_PREFIX) }
+            .map { it.removePrefix(DEVICE_SELECTION_PREFIX) }
+            .toSet()
+        val targets = _state.value.items.filter { it.mediaKey in selectedDeviceKeys }
         if (targets.isEmpty()) return
         _state.update { it.copy(isQueueing = true) }
         viewModelScope.launch {
@@ -148,6 +187,7 @@ class GalleryViewModel(
                 AutoUploadScheduler.disable(appContext)
                 app.uploadQueue.pauseBackup()
             } else {
+                NotificationPermissionRequests.request()
                 app.uploadQueue.resumeBackup()
                 AutoUploadScheduler.apply(appContext, policy)
             }
@@ -159,6 +199,13 @@ class GalleryViewModel(
                 snackbar = if (policy == AutoUploadNetworkPolicy.OFF) AUTO_UPLOAD_OFF else AUTO_UPLOAD_ON,
             )
         }
+    }
+
+    fun refreshAutoUploadPolicy() = _state.update {
+        it.copy(
+            autoUploadPolicy = autoUploadSettings.policy,
+            lastAutoUploadCount = autoUploadSettings.lastUploadedCount,
+        )
     }
 
     fun observeCloudPresence(media: DeviceMedia) {
@@ -198,10 +245,69 @@ class GalleryViewModel(
         }
     }
 
-    fun onDeviceCopiesDeleted(mediaKeys: List<String>) = viewModelScope.launch {
-        mediaKeys.forEach { mediaDao.delete(it) }
-        _state.update { it.copy(snackbar = appContext.getString(com.barkfluff.BarkCloud.R.string.gallery_device_copies_deleted, mediaKeys.size)) }
-        load()
+    internal fun selectedDeviceTargets(mediaKeys: List<String>): List<DeviceMedia> {
+        val selectedMediaKeys = mediaKeys.toSet()
+        return _state.value.items.filter { it.mediaKey in selectedMediaKeys }
+    }
+
+    fun onDeviceCopiesDeleted(mediaKeys: List<String>) {
+        val selectedKeys = mediaKeys.map { "$DEVICE_SELECTION_PREFIX$it" }.toSet()
+        _state.update {
+            val selection = PhotoSelection(it.selected).remove(selectedKeys)
+            it.copy(
+                items = it.items.filterNot { media -> media.mediaKey in mediaKeys },
+                selecting = selection.isSelecting,
+                selected = selection.keys,
+            )
+        }
+        viewModelScope.launch { mediaKeys.forEach { mediaDao.delete(it) } }
+    }
+
+    suspend fun addFavorites(fileIds: List<String>): Set<String> {
+        if (deletionState.value.isBusy) return emptySet()
+        val added = linkedSetOf<String>()
+        fileIds.forEach { fileId ->
+            try {
+                cloudRepository.addFavorite(fileId)
+                added += fileId
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Ошибочные элементы остаются выбранными для повтора.
+            }
+        }
+        return added
+    }
+
+    internal fun beginSystemDelete(pending: PendingPhotoDelete): Boolean =
+        !_state.value.isQueueing && deletionCoordinator.beginSystemConfirmation(pending)
+
+    internal fun abortSystemDelete() = deletionCoordinator.abortSystemConfirmation()
+
+    internal fun completeSystemDelete(pending: PendingPhotoDelete, approved: Boolean) =
+        deletionCoordinator.completeSystemConfirmation(pending, approved)
+
+    internal fun deleteCloudOnly(fileIds: List<String>, totalCount: Int = fileIds.size): Boolean {
+        if (_state.value.isQueueing) return false
+        return deletionCoordinator.deleteCloudOnly(
+            PendingPhotoDelete(
+                deviceMediaKeys = emptyList(),
+                cloudFileIds = fileIds,
+                totalCount = totalCount,
+            ),
+        )
+    }
+
+    internal fun acknowledgeDeletedCloudIds(ids: Set<String>) = deletionCoordinator.acknowledgeDeletedCloudIds(ids)
+
+    internal fun acknowledgeDeleteResult(id: Int) = deletionCoordinator.acknowledgeResult(id)
+
+    private fun onCloudFileDeleted(fileId: String) {
+        val key = "$CLOUD_SELECTION_PREFIX$fileId"
+        _state.update {
+            val selection = PhotoSelection(it.selected).remove(setOf(key))
+            it.copy(selecting = selection.isSelecting, selected = selection.keys)
+        }
     }
 
     private fun enqueueHash(hash: String) {

@@ -42,9 +42,8 @@ class LocalBrowserViewModel(
     private val repository: LocalFileRepository,
     initialPath: String,
     private val rootLabel: String,
+    private val rootPath: String = StoragePermission.externalRoot.absolutePath,
 ) : ViewModel() {
-
-    private val rootPath: String = StoragePermission.externalRoot.absolutePath
 
     private val _state = MutableStateFlow(
         BrowserUiState(
@@ -243,7 +242,13 @@ class LocalBrowserViewModel(
                     return LocalBrowserViewModel(
                         repository = app.localFileRepository,
                         initialPath = initialPath,
-                        rootLabel = rootLabel,
+                        rootLabel = app.getSystemService(android.os.storage.StorageManager::class.java)
+                            .storageVolumes.firstOrNull { !it.isPrimary && it.directory?.absolutePath == initialPath }
+                            ?.getDescription(app) ?: rootLabel,
+                        rootPath = app.getSystemService(android.os.storage.StorageManager::class.java)
+                            .storageVolumes.mapNotNull { it.directory?.absolutePath }
+                            .filter { initialPath == it || initialPath.startsWith("$it/") }
+                            .maxByOrNull { it.length } ?: StoragePermission.externalRoot.absolutePath,
                     ) as T
                 }
             }

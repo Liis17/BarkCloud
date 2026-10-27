@@ -11,8 +11,9 @@ class FileCacheService(
     private val transfer: FileTransferService,
     private val settings: FileCacheSettings,
 ) {
-    private val originalsDir = File(context.cacheDir, "BarkCloudFiles/originals")
-    private val previewsDir = File(context.cacheDir, "BarkCloudFiles/previews")
+    private val cacheDir = context.cacheDir
+    private val originalsDir = File(cacheDir, "BarkCloudFiles/originals")
+    private val previewsDir = File(cacheDir, "BarkCloudFiles/previews")
 
     suspend fun loadOriginal(fileId: String, fileName: String): File = withContext(Dispatchers.IO) {
         originalsDir.mkdirs()
@@ -51,6 +52,7 @@ class FileCacheService(
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         originalsDir.deleteRecursively()
         originalsDir.mkdirs()
+        LocalShareFileCache.clear(cacheDir)
     }
 
     suspend fun clearStale(): Int = withContext(Dispatchers.IO) {

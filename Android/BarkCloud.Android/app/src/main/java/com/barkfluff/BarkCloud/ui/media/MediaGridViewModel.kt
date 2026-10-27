@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class MediaGridUiState(
     val isLoading: Boolean = true,
@@ -43,6 +45,7 @@ class MediaGridViewModel(
     private var cursorCreatedAt: Long? = null
     private var cursorFileId: String = ""
     private val observedCompleted = mutableSetOf<String>()
+    private val mediaRequestMutex = Mutex()
 
     init {
         val app = appContext as BarkCloudApplication
@@ -58,51 +61,61 @@ class MediaGridViewModel(
     }
 
     fun reload() {
-        cursorCreatedAt = null
-        cursorFileId = ""
         viewModelScope.launch {
-            _state.update { it.copy(isRefreshing = it.items.isNotEmpty(), isLoading = it.items.isEmpty()) }
-            try {
-                val page = cloudRepository.listUserMedia(kind, limit = 60)
-                cursorCreatedAt = page.nextCursorCreatedAtMillis
-                cursorFileId = page.nextCursorFileId
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        items = page.items,
-                        canLoadMore = page.hasMore,
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, isRefreshing = false, snackbar = e.message) }
+            reloadAndWait()
+        }
+    }
+
+    suspend fun reloadAndWait() = mediaRequestMutex.withLock {
+        _state.update { it.copy(isRefreshing = it.items.isNotEmpty(), isLoading = it.items.isEmpty()) }
+        try {
+            val page = cloudRepository.listUserMedia(kind, limit = 60)
+            cursorCreatedAt = page.nextCursorCreatedAtMillis
+            cursorFileId = page.nextCursorFileId
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    items = page.items,
+                    canLoadMore = page.hasMore,
+                )
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            _state.update { it.copy(isLoading = false, isRefreshing = false) }
+            throw e
+        } catch (e: Exception) {
+            _state.update { it.copy(isLoading = false, isRefreshing = false, snackbar = e.message) }
         }
     }
 
     fun loadMore() {
-        val s = _state.value
-        if (!s.canLoadMore || s.isLoadingMore || s.isLoading) return
-        _state.update { it.copy(isLoadingMore = true) }
         viewModelScope.launch {
-            try {
-                val page = cloudRepository.listUserMedia(
-                    kind,
-                    limit = 60,
-                    cursorCreatedAtMillis = cursorCreatedAt,
-                    cursorFileId = cursorFileId,
-                )
-                cursorCreatedAt = page.nextCursorCreatedAtMillis
-                cursorFileId = page.nextCursorFileId
-                _state.update {
-                    it.copy(
-                        isLoadingMore = false,
-                        items = it.items + page.items,
-                        canLoadMore = page.hasMore,
+            mediaRequestMutex.withLock {
+                val s = _state.value
+                if (!s.canLoadMore || s.isLoadingMore || s.isLoading) return@withLock
+                _state.update { it.copy(isLoadingMore = true) }
+                try {
+                    val page = cloudRepository.listUserMedia(
+                        kind,
+                        limit = 60,
+                        cursorCreatedAtMillis = cursorCreatedAt,
+                        cursorFileId = cursorFileId,
                     )
+                    cursorCreatedAt = page.nextCursorCreatedAtMillis
+                    cursorFileId = page.nextCursorFileId
+                    _state.update {
+                        it.copy(
+                            isLoadingMore = false,
+                            items = it.items + page.items,
+                            canLoadMore = page.hasMore,
+                        )
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    _state.update { it.copy(isLoadingMore = false) }
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(isLoadingMore = false, snackbar = e.message) }
                 }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoadingMore = false, snackbar = e.message) }
             }
         }
     }
@@ -134,6 +147,10 @@ class MediaGridViewModel(
                 .onSuccess { _state.update { it.copy(snackbar = FAVORITE_ADDED) } }
                 .onFailure { e -> _state.update { it.copy(snackbar = e.message) } }
         }
+    }
+
+    fun removeItems(fileIds: Set<String>) = _state.update {
+        it.copy(items = it.items.filterNot { asset -> asset.id in fileIds })
     }
 
     fun addToVault(asset: MediaAsset) {

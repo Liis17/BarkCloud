@@ -1,0 +1,221 @@
+package com.barkfluff.BarkCloud.ui.gallery
+
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
+import com.barkfluff.BarkCloud.files.ui.formatSize
+import com.barkfluff.BarkCloud.ui.components.RemoteImage
+import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
+
+@Composable
+internal fun GalleryAccountDialog(
+    displayName: String?,
+    username: String?,
+    avatarUrl: String?,
+    storageUsed: Long?,
+    storageLimit: Long?,
+    storageLoading: Boolean,
+    autoUploadPolicy: AutoUploadNetworkPolicy,
+    uploadState: UploadQueueUiState,
+    reclaimableCount: Int,
+    onAutoUploadPolicyChange: (AutoUploadNetworkPolicy) -> Unit,
+    onOpenUploads: () -> Unit,
+    onFreeDeviceSpace: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenTrash: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scrollState: ScrollState = rememberScrollState()
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 720.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier.verticalScroll(scrollState).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        if (avatarUrl != null) {
+                            RemoteImage(
+                                url = avatarUrl,
+                                contentDescription = null,
+                                normalize = true,
+                                modifier = Modifier.size(56.dp).clip(CircleShape),
+                            )
+                        } else {
+                            Icon(
+                                Icons.Outlined.Person,
+                                contentDescription = null,
+                                modifier = Modifier.padding(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            displayName?.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.gallery_account_profile_unavailable),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        username?.takeIf { it.isNotBlank() }?.let {
+                            Text("@$it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.settings_storage_title), style = MaterialTheme.typography.titleSmall)
+                    when {
+                        storageLoading -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                        storageUsed != null && storageLimit != null -> {
+                            LinearProgressIndicator(
+                                progress = {
+                                    if (storageLimit > 0L) (storageUsed.toFloat() / storageLimit).coerceIn(0f, 1f) else 0f
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                stringResource(
+                                    R.string.settings_storage_usage,
+                                    formatSize(context, storageUsed),
+                                    formatSize(context, storageLimit),
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        else -> Text(
+                            stringResource(R.string.gallery_account_storage_unavailable),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.gallery_auto_upload), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        when (autoUploadPolicy) {
+                            AutoUploadNetworkPolicy.OFF -> stringResource(R.string.photos_auto_upload_off)
+                            AutoUploadNetworkPolicy.WIFI_ONLY -> stringResource(R.string.photos_auto_upload_wifi)
+                            AutoUploadNetworkPolicy.ANY_NETWORK -> stringResource(R.string.photos_auto_upload_any)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    PolicyChoice(
+                        stringResource(R.string.photos_auto_upload_off),
+                        AutoUploadNetworkPolicy.OFF,
+                        autoUploadPolicy,
+                        onAutoUploadPolicyChange,
+                    )
+                    PolicyChoice(
+                        stringResource(R.string.photos_auto_upload_wifi),
+                        AutoUploadNetworkPolicy.WIFI_ONLY,
+                        autoUploadPolicy,
+                        onAutoUploadPolicyChange,
+                    )
+                    PolicyChoice(
+                        stringResource(R.string.photos_auto_upload_any),
+                        AutoUploadNetworkPolicy.ANY_NETWORK,
+                        autoUploadPolicy,
+                        onAutoUploadPolicyChange,
+                    )
+                }
+
+                HorizontalDivider()
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.gallery_uploads_title), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.gallery_uploads_progress, uploadState.completed, uploadState.total),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    uploadState.current?.let {
+                        Text(it.fileName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    LinearProgressIndicator(progress = { uploadState.progress }, modifier = Modifier.fillMaxWidth())
+                    TextButton(onClick = onOpenUploads) {
+                        Text(stringResource(R.string.gallery_open_uploads))
+                    }
+                }
+
+                HorizontalDivider()
+                TextButton(onClick = onFreeDeviceSpace, enabled = reclaimableCount > 0) {
+                    Text(stringResource(R.string.gallery_free_device_space, reclaimableCount))
+                }
+
+                HorizontalDivider()
+                Column {
+                    TextButton(onClick = onOpenProfile) { Text(stringResource(R.string.settings_edit_profile)) }
+                    TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_title)) }
+                    TextButton(onClick = onOpenTrash) { Text(stringResource(R.string.tab_trash)) }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PolicyChoice(
+    title: String,
+    policy: AutoUploadNetworkPolicy,
+    selected: AutoUploadNetworkPolicy,
+    onSelect: (AutoUploadNetworkPolicy) -> Unit,
+) {
+    FilterChip(
+        selected = policy == selected,
+        onClick = { onSelect(policy) },
+        label = { Text(title) },
+    )
+}
