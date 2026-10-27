@@ -1,8 +1,8 @@
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.SessionRevocation;
 using BarkCloud.Proto.Files;
-using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Torrent.Consumers;
@@ -42,12 +42,16 @@ public class Program
 
         builder.Services.AddControllers();
 
-        builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddXAuth(builder.Configuration, ServiceId.Torrent);
         builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+
+        // Сервисный токен Torrent — только чтение отзыва сессий (см. ServicePermissions).
+        builder.Services.AddServiceTokenClient(builder.Configuration);
         builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["IdentityService:Host"]!);
-            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["IdentityService:Token"]!))
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Identity))
             .AddInterceptor(() => new ExceptionClientInterceptor());
 
         builder.Services.AddDbContext<TorrentContext>(c =>

@@ -102,11 +102,12 @@ public sealed class TextPreviewEndpointsTests
 
         public static async Task<Fixture> CreateAsync()
         {
+            using var keys = new RsaJwtTestKeys();
             var builder = WebApplication.CreateBuilder();
             builder.WebHost.UseUrls("http://127.0.0.1:0"); builder.Logging.ClearProviders();
             var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            { ["JwtSettings:SecretKey"] = Secret, ["JwtSettings:Issuer"] = "bark", ["JwtSettings:Audience"] = "bark" }).Build();
-            var fixture = new Fixture { Jwt = CreateJwt() };
+            { [RsaJwtKeys.PublicKeyConfigKey] = keys.PublicKeyFile, ["JwtSettings:Issuer"] = "bark", ["JwtSettings:Audience"] = "bark" }).Build();
+            var fixture = new Fixture { Jwt = CreateJwt(keys) };
             builder.Services.AddSingleton(new AuthGateway(new Mock<IdentityApi.IdentityApiClient>(MockBehavior.Strict).Object,
                 new TokenRevocationCache(), config, NullLogger<AuthGateway>.Instance));
             builder.Services.AddSingleton(fixture.Files.Object); builder.Services.AddSingleton(fixture.Cloud.Object); builder.Services.AddSingleton(fixture.Server.Object);
@@ -118,16 +119,12 @@ public sealed class TextPreviewEndpointsTests
         }
 
         public void Authenticate() => Client.DefaultRequestHeaders.Add("Cookie", AuthGateway.AccessCookie + "=" + Jwt);
-        private static string CreateJwt()
-        {
-            var handler = new JwtSecurityTokenHandler();
-            return handler.WriteToken(handler.CreateToken(new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity([new Claim(IdentityClaims.UserId, "42"), new Claim(IdentityClaims.TokenType, TokenType.User.ToString())]),
-                Issuer = "bark", Audience = "bark", IssuedAt = DateTime.UtcNow.AddMinutes(-1), Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new(new SymmetricSecurityKey(JwtSecret.GetKeyBytes(Secret)), SecurityAlgorithms.HmacSha256)
-            }));
-        }
+        private static string CreateJwt(RsaJwtTestKeys keys)
+            => keys.IssueToken(
+                [new Claim(IdentityClaims.UserId, "42"), new Claim(IdentityClaims.TokenType, TokenType.User.ToString())],
+                expires: DateTime.UtcNow.AddHours(1),
+                issuer: "bark",
+                audience: "bark");
         public async ValueTask DisposeAsync() { Client.Dispose(); await App.DisposeAsync(); Handler.Dispose(); }
     }
 

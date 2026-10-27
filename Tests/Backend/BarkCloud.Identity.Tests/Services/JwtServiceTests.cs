@@ -2,6 +2,7 @@ using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Services;
 using BarkCloud.Identity.Settings;
 using BarkCloud.Shared.Identity;
+using BarkCloud.TestKit;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -10,18 +11,19 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 
 namespace BarkCloud.Identity.Tests.Services;
 
-public class JwtServiceTests
+public class JwtServiceTests : IDisposable
 {
-    private static JwtSettings BuildSettings(int expiryMinutes = 60) => new()
+    private readonly RsaJwtTestKeys _keys = new();
+
+    private JwtSettings BuildSettings(int expiryMinutes = 60) => new()
     {
-        SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!",
-        Issuer = "bark-issuer",
-        Audience = "bark-audience",
-        ExpiryMinutes = expiryMinutes
+        Issuer = RsaJwtTestKeys.TestIssuer,
+        Audience = RsaJwtTestKeys.TestAudience,
+        ExpiryMinutes = expiryMinutes,
+        PrivateKeyFile = _keys.PrivateKeyFile
     };
 
     private static JwtSecurityToken Read(string token)
@@ -49,8 +51,8 @@ public class JwtServiceTests
         var token = sut.GenerateUserToken(1, "d", 7);
 
         var jwt = Read(token.Value);
-        jwt.Issuer.Should().Be("bark-issuer");
-        jwt.Audiences.Should().ContainSingle().Which.Should().Be("bark-audience");
+        jwt.Issuer.Should().Be(RsaJwtTestKeys.TestIssuer);
+        jwt.Audiences.Should().ContainSingle().Which.Should().Be(RsaJwtTestKeys.TestAudience);
     }
 
     [Fact]
@@ -66,21 +68,21 @@ public class JwtServiceTests
     }
 
     [Fact]
-    public void GenerateUserToken_TokenIsSignedWithHs256()
+    public void GenerateUserToken_TokenIsSignedWithRs256AndKid()
     {
         var sut = new JwtService(BuildSettings());
 
         var token = sut.GenerateUserToken(1, "d", 7);
 
         var jwt = Read(token.Value);
-        jwt.SignatureAlgorithm.Should().Be(SecurityAlgorithms.HmacSha256);
+        jwt.SignatureAlgorithm.Should().Be(SecurityAlgorithms.RsaSha256);
+        jwt.Header.Kid.Should().Be(_keys.Kid);
     }
 
     [Fact]
-    public void GenerateUserToken_ProducesTokenValidatedByConfiguredKey()
+    public void GenerateUserToken_ProducesTokenValidatedByPublicKey()
     {
-        var settings = BuildSettings();
-        var sut = new JwtService(settings);
+        var sut = new JwtService(BuildSettings());
 
         var token = sut.GenerateUserToken(42, "device-abc", 7);
 
@@ -88,145 +90,128 @@ public class JwtServiceTests
         handler.ValidateToken(token.Value, new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = settings.Issuer,
+            ValidIssuer = RsaJwtTestKeys.TestIssuer,
             ValidateAudience = true,
-            ValidAudience = settings.Audience,
+            ValidAudience = RsaJwtTestKeys.TestAudience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SecretKey)),
+            IssuerSigningKeys = RsaJwtKeys.LoadPublicKeyMap(_keys.PublicKeyFile).Values,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(5)
         }, out _);
     }
 
     [Fact]
-    public void GenerateServerToken_ReturnsTokenWithServiceClaim()
+    public void GenerateServiceToken_ReturnsCallerTargetAndPermissionsClaims()
     {
         var sut = new JwtService(BuildSettings());
 
-        var token = sut.GenerateServerToken(ServiceId.Identity);
+        var (token, expiresAt) = sut.GenerateServiceToken(ServiceId.Torrent, ServiceId.Identity);
 
         var jwt = Read(token);
-        jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.ServiceId && c.Value == ServiceId.Identity.ToString());
+        jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.ServiceId && c.Value == ((int)ServiceId.Torrent).ToString());
         jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.TokenType && c.Value == TokenType.Service.ToString());
+        jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.TargetService && c.Value == ((int)ServiceId.Identity).ToString());
+        jwt.Claims.Should().Contain(c => c.Type == IdentityClaims.Permissions && c.Value == ServicePermissions.RevocationRead);
+        expiresAt.Should().BeCloseTo(DateTimeOffset.UtcNow.Add(JwtService.ServiceTokenLifetime), TimeSpan.FromSeconds(5));
     }
 
     [Fact]
-    public void GenerateServerToken_HasFarFutureExpiration()
+    public void GenerateServiceToken_WebGetsFullAdminPermissionSet()
     {
         var sut = new JwtService(BuildSettings());
 
-        var token = sut.GenerateServerToken(ServiceId.Files);
+        var (token, _) = sut.GenerateServiceToken(ServiceId.Web, ServiceId.Files);
 
         var jwt = Read(token);
-        jwt.ValidTo.Year.Should().Be(9999);
+        var permissions = jwt.Claims.Single(c => c.Type == IdentityClaims.Permissions).Value;
+        permissions.Split(' ').Should().BeEquivalentTo(ServicePermissions.For(ServiceId.Web));
     }
 
     [Fact]
-    public void GenerateServerToken_DoesNotContainUserOrDeviceClaims()
+    public void GenerateServiceToken_LifetimeAboutTenMinutes()
     {
         var sut = new JwtService(BuildSettings());
 
-        var token = sut.GenerateServerToken(ServiceId.Files);
+        var (token, _) = sut.GenerateServiceToken(ServiceId.Files, ServiceId.Users);
+
+        var jwt = Read(token);
+        jwt.ValidTo.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(10), TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void GenerateServiceToken_DoesNotContainUserOrDeviceClaims()
+    {
+        var sut = new JwtService(BuildSettings());
+
+        var (token, _) = sut.GenerateServiceToken(ServiceId.Files, ServiceId.Users);
 
         var jwt = Read(token);
         jwt.Claims.Should().NotContain(c => c.Type == IdentityClaims.UserId);
         jwt.Claims.Should().NotContain(c => c.Type == IdentityClaims.DeviceId);
     }
 
-    // F23: ключ проверки в остальных сервисах (AddXAuth) обязан совпадать с ключом подписи Identity,
-    // в том числе при не-ASCII секрете (раньше проверка шла по ASCII и ключи расходились).
-    [Theory]
-    [MemberData(nameof(ValidSecrets))]
-    public void GeneratedTokens_AreAcceptedByXAuthValidation(string secret)
+    // Подпись Identity (RS256) обязана проходить проверку XAuth остальных сервисов по публичному ключу.
+    [Fact]
+    public void GeneratedTokens_AreAcceptedByXAuthValidation()
     {
-        var settings = BuildSettings();
-        settings.SecretKey = secret;
-        var sut = new JwtService(settings);
+        var sut = new JwtService(BuildSettings());
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["JwtSettings:SecretKey"] = secret,
-            ["JwtSettings:Issuer"] = settings.Issuer,
-            ["JwtSettings:Audience"] = settings.Audience
+            [RsaJwtKeys.PublicKeyConfigKey] = _keys.PublicKeyFile,
+            ["JwtSettings:Issuer"] = RsaJwtTestKeys.TestIssuer,
+            ["JwtSettings:Audience"] = RsaJwtTestKeys.TestAudience
         }).Build();
         var services = new ServiceCollection();
-        services.AddXAuth(configuration);
+        services.AddXAuth(configuration, ServiceId.Files);
         using var provider = services.BuildServiceProvider();
         var parameters = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
             .Get(JwtBearerDefaults.AuthenticationScheme).TokenValidationParameters;
         var handler = new JwtSecurityTokenHandler();
 
         var userToken = () => handler.ValidateToken(sut.GenerateUserToken(42, "device-abc", 7).Value, parameters, out _);
-        var serverToken = () => handler.ValidateToken(sut.GenerateServerToken(ServiceId.Files), parameters, out _);
+        var serviceToken = () => handler.ValidateToken(
+            sut.GenerateServiceToken(ServiceId.Identity, ServiceId.Files).Token, parameters, out _);
 
         userToken.Should().NotThrow();
-        serverToken.Should().NotThrow();
+        serviceToken.Should().NotThrow();
     }
 
-    public static TheoryData<string> ValidSecrets => new()
+    [Fact]
+    public void MissingPrivateKey_FailsWithConfigHint_WithoutLeakingValue()
     {
-        { "supersecretkey_at_least_32_chars_long_for_hs256!!" },
-        { "СекретныйКлючДляПодписиТокеновЮникод" },
-        { new string('a', 32) },
-        { new string('ж', 16) }
-    };
-
-    [Theory]
-    [MemberData(nameof(InvalidSecrets))]
-    public void AddXAuth_AndTokenGeneration_RejectInvalidSecrets(string? secret)
-    {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["JwtSettings:SecretKey"] = secret,
-            ["JwtSettings:Issuer"] = "bark-issuer",
-            ["JwtSettings:Audience"] = "bark-audience"
-        }).Build();
-        var services = new ServiceCollection();
-
-        var addXAuth = () => services.AddXAuth(configuration);
-        var addXAuthMessage = addXAuth.Should().Throw<InvalidOperationException>().Which.Message;
-        addXAuthMessage.Should().Contain("JwtSettings:SecretKey");
-
         var settings = BuildSettings();
-        settings.SecretKey = secret!;
+        settings.PrivateKeyFile = null;
+        Environment.SetEnvironmentVariable(RsaJwtKeys.PrivateKeyEnvName, null);
         var sut = new JwtService(settings);
 
         var userMessage = Record.Exception(() => sut.GenerateUserToken(42, "device-abc", 7))
             .Should().BeOfType<InvalidOperationException>().Which.Message;
-        var serverMessage = Record.Exception(() => sut.GenerateServerToken(ServiceId.Files))
+        var serviceMessage = Record.Exception(() => sut.GenerateServiceToken(ServiceId.Files, ServiceId.Users))
             .Should().BeOfType<InvalidOperationException>().Which.Message;
 
-        if (!string.IsNullOrEmpty(secret))
-        {
-            addXAuthMessage.Should().NotContain(secret);
-            userMessage.Should().NotContain(secret);
-            serverMessage.Should().NotContain(secret);
-        }
+        userMessage.Should().Contain(RsaJwtKeys.PrivateKeyConfigKey).And.Contain(RsaJwtKeys.PrivateKeyEnvName);
+        serviceMessage.Should().Contain(RsaJwtKeys.PrivateKeyConfigKey).And.Contain(RsaJwtKeys.PrivateKeyEnvName);
     }
 
-    public static TheoryData<string?> InvalidSecrets => new()
-    {
-        { null },
-        { string.Empty },
-        { new string('a', 31) },
-        { new string('ж', 15) }
-    };
-
     [Fact]
-    public void GenerateUserToken_ValidationWithWrongKey_IsRejected()
+    public void GenerateUserToken_ValidationWithOtherKey_IsRejected()
     {
         var sut = new JwtService(BuildSettings());
         var token = sut.GenerateUserToken(1, "d", 7);
 
+        using var otherKeys = new RsaJwtTestKeys();
         var handler = new JwtSecurityTokenHandler();
         var act = () => handler.ValidateToken(token.Value, new TokenValidationParameters
         {
             ValidateIssuer = false,
             ValidateAudience = false,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("a_completely_different_secret_key_32bytes!!")),
+            IssuerSigningKeys = RsaJwtKeys.LoadPublicKeyMap(otherKeys.PublicKeyFile).Values,
             ValidateLifetime = false
         }, out _);
 
         act.Should().Throw<SecurityTokenException>();
     }
+
+    public void Dispose() => _keys.Dispose();
 }

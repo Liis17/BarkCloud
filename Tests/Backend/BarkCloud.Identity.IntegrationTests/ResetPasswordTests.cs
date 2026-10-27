@@ -146,8 +146,8 @@ public class ResetPasswordTests
         await using var context = database.CreateContext();
         var reset = await Seed(context);
         var settings = new JwtSettings
-        {
-            SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!", Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+        { Issuer = "bark", Audience = "bark", ExpiryMinutes = 60,
+            PrivateKeyFile = IntegrationJwtKeys.Instance.PrivateKeyFile
         };
         var jwt = new JwtService(settings);
         var storage = new RefreshTokensStorage(context, settings);
@@ -178,8 +178,8 @@ public class ResetPasswordTests
         await using var context = database.CreateContext();
         var reset = await Seed(context);
         var settings = new JwtSettings
-        {
-            SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!", Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+        { Issuer = "bark", Audience = "bark", ExpiryMinutes = 60,
+            PrivateKeyFile = IntegrationJwtKeys.Instance.PrivateKeyFile
         };
         var jwt = new JwtService(settings);
 

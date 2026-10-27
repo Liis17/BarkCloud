@@ -152,8 +152,8 @@ public class AuthAtomicityTests
         };
         var jwtSettings = new JwtSettings
         {
-            SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!",
-            Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+            Issuer = "bark", Audience = "bark", ExpiryMinutes = 60,
+            PrivateKeyFile = IntegrationJwtKeys.Instance.PrivateKeyFile
         };
         var refreshTokens = new RefreshTokensStorage(context, jwtSettings);
         var outbox = new NotificationOutbox(context, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

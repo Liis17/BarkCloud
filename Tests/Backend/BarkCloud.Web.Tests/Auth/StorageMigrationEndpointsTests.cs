@@ -7,6 +7,7 @@ using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Shared.Identity;
+using BarkCloud.TestKit;
 using BarkCloud.Web;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
@@ -22,16 +23,23 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace BarkCloud.Web.Tests.Auth;
 
-public sealed class StorageMigrationEndpointsTests
+public sealed class StorageMigrationEndpointsTests : IDisposable
 {
+    private readonly RsaJwtTestKeys _keys = new();
+
     [Fact]
     public async Task EveryEndpoint_RequiresUserSessionAndAdministrativeUnlock_AndSourcesNeverReturnCredentials()
     {
-        const string secret = "migration-test-signing-key-at-least-32-bytes";
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0"); builder.Logging.ClearProviders();
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        { ["JwtSettings:SecretKey"] = secret, ["JwtSettings:Issuer"] = "bark", ["JwtSettings:Audience"] = "bark", ["App:AdminPassword"] = "admin-pass" }).Build();
+        {
+            [RsaJwtKeys.PublicKeyConfigKey] = _keys.PublicKeyFile,
+            ["JwtSettings:Issuer"] = "bark",
+            ["JwtSettings:Audience"] = "bark",
+            ["App:AdminPassword"] = "admin-pass",
+            ["App:AdminCookieKey"] = "admin-cookie-signing-key-at-least-32b"
+        }).Build();
         var auth = new AuthGateway(new Mock<IdentityApi.IdentityApiClient>(MockBehavior.Strict).Object,
             new TokenRevocationCache(), config, NullLogger<AuthGateway>.Instance);
         var admin = new AdminGate(config);
@@ -44,13 +52,11 @@ public sealed class StorageMigrationEndpointsTests
         await using var app = builder.Build(); app.MapGroup("/api/settings").MapStorageMigrationEndpoints();
         await app.StartAsync();
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity([new Claim(IdentityClaims.UserId, "42"), new Claim(IdentityClaims.TokenType, TokenType.User.ToString())]),
-            Issuer = "bark", Audience = "bark", IssuedAt = DateTime.UtcNow.AddMinutes(-1), Expires = DateTime.UtcNow.AddHours(1),
-            SigningCredentials = new(new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secret)), SecurityAlgorithms.HmacSha256)
-        };
-        var handler = new JwtSecurityTokenHandler(); var jwt = handler.WriteToken(handler.CreateToken(descriptor));
+        var jwt = _keys.IssueToken(
+        [
+            new Claim(IdentityClaims.UserId, "42"),
+            new Claim(IdentityClaims.TokenType, TokenType.User.ToString())
+        ], expires: DateTime.UtcNow.AddHours(1), issuer: "bark", audience: "bark");
         var unlocked = new DefaultHttpContext(); admin.Unlock(unlocked, "admin-pass").Should().BeTrue();
         var adminCookie = unlocked.Response.Headers.SetCookie.ToString().Split(';')[0];
         var endpoints = new (HttpMethod Method, string Path)[]
@@ -79,4 +85,6 @@ public sealed class StorageMigrationEndpointsTests
         using var sources = await client.SendAsync(allowed); sources.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await sources.Content.ReadAsStringAsync(); json.Should().Contain("images-v1").And.NotContain("PRIVATE_ACCESS").And.NotContain("PRIVATE_SECRET");
     }
+
+    public void Dispose() => _keys.Dispose();
 }

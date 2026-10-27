@@ -65,12 +65,6 @@ service UsersServerApi {
   // Найти по логину
   rpc FindByLogin(FindByLoginRequest) returns(FindByLoginResponse);
 
-  // Проверить существование юзернейма
-  rpc CheckExistUsername(CheckExistUsernameRequest) returns(CheckExistResponse);
-
-  // Проверить существование емейла
-  rpc CheckExistEmail(CheckExistEmailRequest) returns(CheckExistResponse);
-
   // Добавить черновик юзера
   rpc AddDraftUser(AddDraftUserRequest) returns(AddDraftUserResponse);
 
@@ -98,14 +92,8 @@ service UsersServerApi {
   // Удалить устройство пользователя
   rpc DeleteUserDevice(DeleteUserDeviceRequest) returns(DeleteUserDeviceResponse);
 
-  // Обновить лимит хранилища пользователя
-  rpc UpdateStorageLimit(UpdateStorageLimitRequest) returns(UpdateStorageLimitResponse);
-
-  // Установить аватарку пользователю (для админ-панели)
+  // Установить аватарку пользователю (вызывает Web после загрузки файла в Files)
   rpc SetProfilePictureServer(SetProfilePictureServerRequest) returns(SetProfilePictureServerResponse);
-
-  // Обновить профиль пользователя (для админ-панели)
-  rpc UpdateProfileServer(UpdateProfileServerRequest) returns(UpdateProfileServerResponse);
 }
 
 // Установить аватарку (серверный)
@@ -116,26 +104,6 @@ message SetProfilePictureServerRequest {
 }
 
 message SetProfilePictureServerResponse { }
-
-// Обновить профиль пользователя (серверный, для админ-панели)
-message UpdateProfileServerRequest {
-  int64 user_id = 1;
-  string first_name = 2;
-  string last_name = 3;
-  string username = 4;
-}
-
-message UpdateProfileServerResponse { }
-
-// Обновление лимита хранилища
-message UpdateStorageLimitRequest {
-  int64 user_id = 1;
-  int32 storage_limit_gb = 2; // 0 = весь диск, иначе лимит в ГБ
-}
-
-message UpdateStorageLimitResponse {
-  User user = 1;
-}
 
 message ChangeUsernameRequest {
   string username = 1; // Имя пользователя

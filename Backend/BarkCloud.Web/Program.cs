@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Configuration;
 using BarkCloud.Proto.Files;
@@ -6,7 +7,6 @@ using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.SessionRevocation;
 using BarkCloud.Proto.Torrent;
 using BarkCloud.Proto.Users;
-using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Web;
@@ -25,11 +25,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // JwtSettings и адреса микросервисов берутся из Configuration-сервиса (как у остальных сервисов).
 await builder.LoadConfigurationAsync(ServiceId.Web);
-
-// Непригодный секрет JWT иначе проявился бы лениво и непонятно (AuthGateway/AdminGate/ServiceToken) —
-// падаем на старте с внятным сообщением. Пустой секрет Web допускает: аутентификация просто отключена.
-if (!string.IsNullOrEmpty(builder.Configuration[JwtSecret.ConfigKey]))
-    JwtSecret.GetKeyBytes(builder.Configuration[JwtSecret.ConfigKey]);
 
 // Web подключает общий Serilog pipeline; ConsoleOutput и SeqEnable управляют его sinks.
 // Без Serilog на веб-хосте detached self-update было трудно диагностировать.
@@ -92,20 +87,24 @@ builder.WebHost.ConfigureKestrel(o =>
 });
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = long.MaxValue);
 
-// Серверные (inter-service) API. Авторизуются сервисным токеном, который Web
-// подписывает общим JWT-секретом (как Configuration): проверка занятости юзернейма/почты
-// при регистрации (Users) и загрузка аватара (Files).
-var serviceToken = ServiceToken.Generate(builder.Configuration);
+// Серверные (inter-service) API. Сервисный JWT выдаёт Identity по секрету Web
+// (ServiceAuth:Credential / SERVICE_CREDENTIAL): проверка занятости юзернейма/почты
+// при регистрации (Users), загрузка аватара и публичные страницы (Files), лента отзывов
+// сессий (Identity). Web — доверенный административный компонент с полным набором прав.
+builder.Services.AddServiceTokenClient(builder.Configuration);
 
 builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o => o.Address = new Uri(identityAddress))
-    .AddInterceptor(() => new JwtClientInterceptor(serviceToken))
+    .AddInterceptor(sp => new ServiceTokenClientInterceptor(
+        sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Identity))
     .AddInterceptor(() => new ExceptionClientInterceptor());
 builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
 
 builder.Services.AddGrpcClient<UsersServerApi.UsersServerApiClient>(o => o.Address = new Uri(usersAddress))
-    .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
+    .AddInterceptor(sp => new ServiceTokenClientInterceptor(
+        sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Users));
 builder.Services.AddGrpcClient<FilesServerApi.FilesServerApiClient>(o => o.Address = new Uri(filesAddress))
-    .AddInterceptor(() => new JwtClientInterceptor(serviceToken));
+    .AddInterceptor(sp => new ServiceTokenClientInterceptor(
+        sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Files));
 
 builder.Services.AddSingleton<TemplateRenderer>();
 builder.Services.AddSingleton<PageService>();
@@ -145,6 +144,10 @@ builder.Services.AddSingleton<TokenRevocationCache>();
 builder.Services.AddHostedService<RevocationSyncService>();
 
 var app = builder.Build();
+
+// Админ-cookie подписывается отдельным секретом App:AdminCookieKey (не общий JWT-ключ):
+// если админ-пароль задан, секрет обязан быть задан и достаточно длинким — fail-closed.
+AdminGate.EnsureConfigured(app.Configuration);
 
 // За nginx TLS терминируется снаружи, поэтому Kestrel видит scheme=http.
 // Доверяем X-Forwarded-Proto/Host только reverse-proxy из известных сетей:

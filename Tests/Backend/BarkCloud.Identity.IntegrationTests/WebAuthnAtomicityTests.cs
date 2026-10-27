@@ -342,7 +342,7 @@ public class WebAuthnAtomicityTests
 
     private static JwtSettings Settings() => new()
     {
-        SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!",
-        Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+        Issuer = "bark", Audience = "bark", ExpiryMinutes = 60,
+        PrivateKeyFile = IntegrationJwtKeys.Instance.PrivateKeyFile
     };
 }
