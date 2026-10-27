@@ -1,10 +1,42 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using BarkCloud.Builder;
 
 namespace BarkCloud.Builder.Tests;
 
 public sealed class BuilderGeneratorTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Identity_and_users_keep_jwt_and_lognara_mounts_in_one_volumes_section(bool includeLognara)
+    {
+        var model = new BuilderModel { IncludeLognara = includeLognara };
+        if (includeLognara)
+            model.SetGlobalLognara(true);
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var identity = ComposeService(compose, "cloud-identity");
+        var users = ComposeService(compose, "cloud-users");
+
+        Assert.Single(Regex.Matches(identity, "(?m)^    volumes:$").Cast<System.Text.RegularExpressions.Match>());
+        Assert.Single(Regex.Matches(users, "(?m)^    volumes:$").Cast<System.Text.RegularExpressions.Match>());
+        Assert.Contains("./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro", identity);
+        Assert.Contains("./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro", identity);
+        Assert.Contains("./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro", users);
+
+        if (includeLognara)
+        {
+            Assert.Contains("${LOGNARA_IDENTITY_SPOOL_PATH:-lognara_identity_spool}:/var/lib/lognara-agent/spool", identity);
+            Assert.Contains("${LOGNARA_USERS_SPOOL_PATH:-lognara_users_spool}:/var/lib/lognara-agent/spool", users);
+        }
+        else
+        {
+            Assert.DoesNotContain("/var/lib/lognara-agent/spool", identity);
+            Assert.DoesNotContain("/var/lib/lognara-agent/spool", users);
+        }
+    }
+
     [Fact]
     public void Default_external_mode_generates_config_without_nginx_service_or_host_ports()
     {
@@ -362,6 +394,15 @@ public sealed class BuilderGeneratorTests
         Assert.Contains(errors, x => x.Contains("Torrent HTTP/1"));
         Assert.Contains(errors, x => x.Contains("Порт 8005 указан"));
         Assert.Contains(errors, x => x.Contains("Путь к сертификату внешнего nginx"));
+    }
+
+    private static string ComposeService(string compose, string service)
+    {
+        compose = compose.Replace("\r\n", "\n");
+        var match = Regex.Match(compose,
+            $"(?ms)^  {Regex.Escape(service)}:\\n(?<section>.*?)(?=^  [a-z0-9-]+:\\n|\\z)");
+        Assert.True(match.Success, $"Compose service {service} was not generated.");
+        return match.Groups["section"].Value;
     }
 
     [Theory]

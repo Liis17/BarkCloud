@@ -54,6 +54,7 @@ public static class BuilderConfigLoader
         Set("FILES_SERVICE_CREDENTIAL", v => m.FilesServiceCredential = v);
         Set("TORRENT_SERVICE_CREDENTIAL", v => m.TorrentServiceCredential = v);
         Set("WEB_SERVICE_CREDENTIAL", v => m.WebServiceCredential = v);
+        RestoreSecretRegistries(m, e);
         Set("WEB_ADMIN_COOKIE_KEY", v => m.WebAdminCookieKey = v);
         Set("DOCKER_NETWORK_NAME", v => m.DockerNetworkName = v);
         Set("CONFIGURATION_CONTAINER_NAME", v => m.ConfigurationContainerName = v);
@@ -210,10 +211,128 @@ public static class BuilderConfigLoader
                 continue;
             int eq = line.IndexOf('=');
             if (eq > 0)
-                result[line[..eq].Trim()] = line[(eq + 1)..];
+            {
+                var key = line[..eq].Trim();
+                result[key] = ParseEnvValue(key, line[(eq + 1)..]);
+            }
         }
         return result;
     }
+
+    private static string ParseEnvValue(string key, string raw)
+    {
+        var value = raw.Trim();
+        if (value.Length == 0)
+            return "";
+
+        var quote = value[0];
+        if (quote is not ('\'' or '"'))
+        {
+            var comment = value.IndexOf(" #", StringComparison.Ordinal);
+            value = (comment < 0 ? value : value[..comment]).TrimEnd();
+            if (IsSecretVariable(key) && value.Contains('$'))
+                throw new InvalidDataException($"Значение {key} содержит знак доллара, который Docker Compose интерпретирует; используйте одинарные кавычки.");
+            return value;
+        }
+
+        var decoded = new System.Text.StringBuilder();
+        var closingIndex = -1;
+        for (var index = 1; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (character == '\\' && index + 1 < value.Length)
+            {
+                var next = value[++index];
+                if (quote == '"')
+                {
+                    decoded.Append(next switch
+                    {
+                        '"' => '"',
+                        '\\' => '\\',
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        _ => throw new InvalidDataException($"Неподдерживаемая escape-последовательность в {key}.")
+                    });
+                }
+                else if (next == '\'')
+                    decoded.Append('\'');
+                else
+                    decoded.Append('\\').Append(next);
+                continue;
+            }
+
+            if (character == quote)
+            {
+                closingIndex = index;
+                break;
+            }
+            decoded.Append(character);
+        }
+
+        if (closingIndex < 0)
+            throw new InvalidDataException($"Незакрытая кавычка в значении {key}.");
+        var suffix = value[(closingIndex + 1)..];
+        if (suffix.Length > 0 && !(char.IsWhiteSpace(suffix[0]) && suffix.TrimStart().StartsWith('#')))
+            throw new InvalidDataException($"Текст после закрывающей кавычки в значении {key} не поддерживается.");
+
+        var decodedValue = decoded.ToString();
+        if (quote == '"' && IsSecretVariable(key) && decodedValue.Contains('$'))
+            throw new InvalidDataException($"Значение {key} содержит знак доллара, который Docker Compose интерпретирует; используйте одинарные кавычки.");
+        return decodedValue;
+    }
+
+    private static void RestoreSecretRegistries(BuilderModel model, IReadOnlyDictionary<string, string> env)
+    {
+        var configurationKeys = ParseSecretRegistry(env.GetValueOrDefault("CONFIGURATION_ACCESS_KEYS"), "CONFIGURATION_ACCESS_KEYS");
+        var serviceCredentials = ParseSecretRegistry(env.GetValueOrDefault("SERVICE_CREDENTIALS"), "SERVICE_CREDENTIALS");
+
+        model.IdentityConfigAccessKey = RegistryFallback(model.IdentityConfigAccessKey, configurationKeys, "Identity");
+        model.UsersConfigAccessKey = RegistryFallback(model.UsersConfigAccessKey, configurationKeys, "Users");
+        model.NotificationConfigAccessKey = RegistryFallback(model.NotificationConfigAccessKey, configurationKeys, "Notification");
+        model.FilesConfigAccessKey = RegistryFallback(model.FilesConfigAccessKey, configurationKeys, "Files");
+        model.TorrentConfigAccessKey = RegistryFallback(model.TorrentConfigAccessKey, configurationKeys, "Torrent");
+        model.WebConfigAccessKey = RegistryFallback(model.WebConfigAccessKey, configurationKeys, "Web");
+        model.IdentityServiceCredential = RegistryFallback(model.IdentityServiceCredential, serviceCredentials, "Identity");
+        model.UsersServiceCredential = RegistryFallback(model.UsersServiceCredential, serviceCredentials, "Users");
+        model.FilesServiceCredential = RegistryFallback(model.FilesServiceCredential, serviceCredentials, "Files");
+        model.TorrentServiceCredential = RegistryFallback(model.TorrentServiceCredential, serviceCredentials, "Torrent");
+        model.WebServiceCredential = RegistryFallback(model.WebServiceCredential, serviceCredentials, "Web");
+    }
+
+    private static Dictionary<string, string> ParseSecretRegistry(string? registry, string key)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(registry))
+            return result;
+
+        foreach (var entry in registry.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = entry.IndexOf('=');
+            if (separator <= 0)
+                throw new InvalidDataException($"Некорректная запись в {key}; ожидается имя=секрет.");
+            var name = entry[..separator].Trim();
+            if (!result.TryAdd(name, entry[(separator + 1)..]))
+                throw new InvalidDataException($"Повторная запись {name} в {key}.");
+        }
+        return result;
+    }
+
+    private static string RegistryFallback(string current, IReadOnlyDictionary<string, string> registry, string service)
+    {
+        if (!string.IsNullOrWhiteSpace(current) && !current.StartsWith("replace-", StringComparison.OrdinalIgnoreCase))
+            return current;
+        return registry.TryGetValue(service, out var value)
+               && !string.IsNullOrWhiteSpace(value)
+               && !value.StartsWith("replace-", StringComparison.OrdinalIgnoreCase)
+            ? value
+            : current;
+    }
+
+    private static bool IsSecretVariable(string key) =>
+        key is "CONFIGURATION_ACCESS_KEYS" or "SERVICE_CREDENTIALS" or "WEB_ADMIN_COOKIE_KEY"
+        || key.EndsWith("_CONFIG_ACCESS_KEY", StringComparison.Ordinal)
+        || key.EndsWith("_SERVICE_CREDENTIAL", StringComparison.Ordinal);
 
     private static bool ParseBoolean(string value, bool fallback) =>
         bool.TryParse(value, out var parsed) ? parsed : fallback;

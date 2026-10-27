@@ -50,8 +50,9 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 - `SettingsHistory` хранит изменения ключей; `ReservedNames` — нормализованные имена.
 - `StorageProfiles` и `StorageProfileRevisions` хранят версии подключений и их ревизии; `StorageQuotaGroups` и `StorageQuotaGroupBuckets` — группы и их бакеты. В `StorageProfiles` столбца квоты нет.
 - На старте `EnsureSeedAsync` добавляет недостающие строки каталога, а `PopulateDefaultsAsync` заполняет только пустые значения. Непустые значения оператора не перезаписываются.
+- Каталог Identity содержит `IdentityService:Host`, используемый `AddServiceTokenClient` перед серверным вызовом к Users; значение по умолчанию указывает на `cloud-identity` и `IDENTITY_PORT`.
 - Identity, Users, Files, Torrent, Notification и Web получают снимок через `LoadConfigurationAsync(ServiceId)` и `CONFIGURATION_SERVICE_URL`, предварительно опрашивая `GetReadiness` по правилам [[Backend/GrpcServer]]. Обновления не рассылаются потребителям. Identity отдельно перечитывает `Features:RegistrationEnabled` при запросе регистрации.
-- Валидация принимает только ключи каталога; Boolean нормализуются, URL ограничены абсолютными HTTP(S), порты — `1..65535`, другие integer-значения должны быть положительными. `JwtSettings:SecretKey` при изменении требует не менее 32 UTF-8 байт.
+- Валидация принимает только ключи каталога; Boolean нормализуются, URL ограничены абсолютными HTTP(S), порты — `1..65535`, другие integer-значения должны быть положительными.
 
 ## Ограничения и важные детали
 

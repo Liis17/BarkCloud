@@ -72,6 +72,21 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
         (await _context.StorageProfiles.CountAsync()).Should().Be(0);
     }
 
+    [Fact]
+    public async Task Startup_SeedsIdentityServiceHostRequiredByServiceTokenClient()
+    {
+        var populator = CreatePopulator(minioAccessKey: "", minioSecretKey: "");
+
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+
+        var storage = new ConfigurationStorage(_context, new MetricsCollector());
+        var identitySettings = await storage.GetAllAsync();
+        identitySettings.Single(x => x.ServiceId == ServiceId.Identity
+                                     && x.Section == "IdentityService"
+                                     && x.Key == "Host").Value.Should().Be("http://cloud-identity:7020");
+    }
+
     [Theory]
     [InlineData(ServiceId.Users)]
     [InlineData(ServiceId.Files)]

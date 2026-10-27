@@ -118,11 +118,11 @@ services:
       SERVICE_CREDENTIALS: "${SERVICE_CREDENTIALS}"
       SERVICE_CREDENTIAL: ${IDENTITY_SERVICE_CREDENTIAL}
       JwtSettings__PrivateKeyFile: /keys/jwt/jwt-private.pem
-      SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}{{AppVolumeSection("IDENTITY")}}
+      SERVICE_PORT: ${IDENTITY_PORT}{{identityAgentSettings}}
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
     volumes:
       - ./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro
-      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("IDENTITY")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -136,9 +136,9 @@ services:
       <<: *common-variables
       CONFIGURATION_ACCESS_KEY: ${USERS_CONFIG_ACCESS_KEY}
       SERVICE_CREDENTIAL: ${USERS_SERVICE_CREDENTIAL}
-      SERVICE_PORT: ${USERS_PORT}{{usersAgentSettings}}{{AppVolumeSection("USERS")}}
+      SERVICE_PORT: ${USERS_PORT}{{usersAgentSettings}}
     volumes:
-      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("USERS")}}
     networks:
       - barkcloud-network
     depends_on:
@@ -447,6 +447,7 @@ networks:
             sb.Append("# ").Append(title).Append('\n');
         }
         void K(string key, string value) => sb.Append(key).Append('=').Append(value).Append('\n');
+        void KS(string key, string value) => K(key, $"'{value.Replace("'", "\\'", StringComparison.Ordinal)}'");
 
         sb.Append("# Сгенерировано BarkCloud.Builder\n");
 
@@ -457,19 +458,21 @@ networks:
         // Разделённые секреты (аудит, п. 9): bootstrap-ключ у каждого сервиса свой,
         // реестр — только у Configuration; секреты сервисов обмениваются на короткоживущие
         // JWT у Identity. RSA-ключи JWT лежат в ./secrets/jwt (генерируются вместе с .env).
-        K("CONFIGURATION_ACCESS_KEYS", m.ConfigurationAccessKeysRegistry);
-        K("IDENTITY_CONFIG_ACCESS_KEY", m.IdentityConfigAccessKey);
-        K("USERS_CONFIG_ACCESS_KEY", m.UsersConfigAccessKey);
-        K("NOTIFICATION_CONFIG_ACCESS_KEY", m.NotificationConfigAccessKey);
-        K("FILES_CONFIG_ACCESS_KEY", m.FilesConfigAccessKey);
-        K("TORRENT_CONFIG_ACCESS_KEY", m.TorrentConfigAccessKey);
-        K("WEB_CONFIG_ACCESS_KEY", m.WebConfigAccessKey);
-        K("SERVICE_CREDENTIALS", m.ServiceCredentialsRegistry);
-        K("IDENTITY_SERVICE_CREDENTIAL", m.IdentityServiceCredential);
-        K("USERS_SERVICE_CREDENTIAL", m.UsersServiceCredential);
-        K("FILES_SERVICE_CREDENTIAL", m.FilesServiceCredential);
-        K("TORRENT_SERVICE_CREDENTIAL", m.TorrentServiceCredential);
-        K("WEB_SERVICE_CREDENTIAL", m.WebServiceCredential);
+        sb.Append("# После копирования вывода на Linux выполните в этой папке: bash ./migrate-secrets.sh (ключ останется закрытым для всех, кроме владельца и Identity uid 1654).\n");
+        KS("CONFIGURATION_ACCESS_KEYS", m.ConfigurationAccessKeysRegistry);
+        KS("IDENTITY_CONFIG_ACCESS_KEY", m.IdentityConfigAccessKey);
+        KS("USERS_CONFIG_ACCESS_KEY", m.UsersConfigAccessKey);
+        KS("NOTIFICATION_CONFIG_ACCESS_KEY", m.NotificationConfigAccessKey);
+        KS("FILES_CONFIG_ACCESS_KEY", m.FilesConfigAccessKey);
+        KS("TORRENT_CONFIG_ACCESS_KEY", m.TorrentConfigAccessKey);
+        KS("WEB_CONFIG_ACCESS_KEY", m.WebConfigAccessKey);
+        KS("SERVICE_CREDENTIALS", m.ServiceCredentialsRegistry);
+        KS("IDENTITY_SERVICE_CREDENTIAL", m.IdentityServiceCredential);
+        KS("USERS_SERVICE_CREDENTIAL", m.UsersServiceCredential);
+        KS("FILES_SERVICE_CREDENTIAL", m.FilesServiceCredential);
+        KS("TORRENT_SERVICE_CREDENTIAL", m.TorrentServiceCredential);
+        KS("WEB_SERVICE_CREDENTIAL", m.WebServiceCredential);
+        KS("WEB_ADMIN_COOKIE_KEY", m.WebAdminCookieKey);
 
         Section("Docker-сеть и имена контейнеров");
         K("DOCKER_NETWORK_NAME", m.DockerNetworkName);
@@ -583,7 +586,6 @@ networks:
         K("WEB_PUBLIC_HOST", m.WebPublicHost);
         K("WEB_TRUSTED_PROXY_NETWORKS", m.WebTrustedProxyNetworks);
         K("WEB_ADMIN_PASSWORD", m.WebAdminPassword);
-        K("WEB_ADMIN_COOKIE_KEY", m.WebAdminCookieKey);
 
         Section("Внешние адреса сервисов для клиентов (обязательны)");
         K("EXTERNAL_IDENTITY_HOST", m.ExternalIdentityHost);

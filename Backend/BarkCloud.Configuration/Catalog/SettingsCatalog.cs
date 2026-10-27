@@ -91,6 +91,7 @@ public static class SettingsCatalog
         AddService(entries, ServiceId.Identity,
             ("RunSettings", "Port", SettingValueKind.Integer, false, true),
             ("IdentityDb", "", SettingValueKind.Password, true, true),
+            ("IdentityService", "Host", SettingValueKind.Url, false, false),
             ("UsersService", "Host", SettingValueKind.Url, false, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false),
             ("WebAuthn", "RpId", SettingValueKind.String, false, false),

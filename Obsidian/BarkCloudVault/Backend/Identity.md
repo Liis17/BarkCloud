@@ -16,6 +16,7 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 | `Backend/BarkCloud.Identity/Host/IdentityServerApiService.cs` | `IdentityServerApiService` | Служебные RPC |
 | `Backend/BarkCloud.Identity/Services/JwtService.cs` | `JwtService` | Выпуск access и сервисных JWT (RS256, приватный ключ только у Identity) |
 | `Backend/BarkCloud.Identity/Host/ServiceCredentialsApiService.cs` | `ServiceCredentialsApiService` | Обмен секрета сервиса на короткоживущий сервисный JWT (реестр `SERVICE_CREDENTIALS`) |
+| `Backend/BarkCloud.Identity/Program.cs` | `Main` | Загрузка настроек и регистрация server-to-server клиентов |
 | `Backend/BarkCloud.Identity/Services/SessionIssuer.cs` | `SessionIssuer` | Создание сессии и регистрация устройства |
 | `Backend/BarkCloud.Identity/Persistence/Services/RefreshTokensStorage.cs` | `RefreshTokensStorage` | Refresh-токены и атомарная запись отзывов |
 | `Backend/BarkCloud.Identity/Services/AuthRateLimiter.cs` | `AuthRateLimiter` | Ограничение частоты auth/OTP-запросов |
@@ -61,12 +62,14 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 
 ## Зависимости и взаимодействия
 
-Identity использует PostgreSQL, `BarkCloud.GrpcServer`, `BarkCloud.Shared.Identity`, `BarkCloud.Shared.Auth`, `BarkCloud.Shared.Exceptions` и `BarkCloud.Shared.Queue`. Через gRPC обращается к Configuration и Users; письма публикует в RabbitMQ, WebAuthn обслуживает Fido2. Сервис принимает `UserDeleted` и удаляет связанные с пользователем данные Identity, включая reauth-разрешения и WebAuthn challenge'и; см. [[Backend/Users]].
+Identity использует PostgreSQL, `BarkCloud.GrpcServer`, `BarkCloud.Shared.Identity`, `BarkCloud.Shared.Auth`, `BarkCloud.Shared.Exceptions` и `BarkCloud.Shared.Queue`. Через gRPC обращается к Configuration и Users; письма публикует в RabbitMQ, WebAuthn обслуживает Fido2. `Program` использует `IdentityService:Host` для регистрации клиента получения сервисного JWT, которым Identity авторизует server-to-server вызов к Users. Сервис принимает `UserDeleted` и удаляет связанные с пользователем данные Identity, включая reauth-разрешения и WebAuthn challenge'и; см. [[Backend/Users]].
 
 ## Ограничения и важные детали
 
 - Android Credential Manager origin строится из `BarkCloud:AndroidCertificateSha256Fingerprint` (Compose: `BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT`): SHA-256 fingerprint сертификата преобразуется в `android:apk-key-hash:<base64url>`. Отпечаток должен совпадать с подписью APK и с ответом Web `/.well-known/assetlinks.json`. Builder и `Backend/sample.env` по умолчанию задают сертификат официального APK; при собственной подписи нужен её публичный отпечаток.
 
 `CreateToken` проверяет наличие и срок действия refresh-записи и выпускает access для её `UserId`, `DeviceId` и ID; refresh в этом RPC не ротируется. Access lifetime задаёт `JwtSettings:ExpiryMinutes`; текущий refresh lifetime — 9999 дней, клиенты должны ориентироваться на `expiration_date` в ответе. Имена JWT claims, типы токенов и UTF-8 обработка секрета описаны в [[Shared/SharedLibraries]].
+
+RS256 приватный ключ используется только Identity; валидаторы читают соответствующий публичный ключ. При переходе с прежнего алгоритма подписи старые access JWT могут перестать проходить валидацию, но миграция Configuration не удаляет сохранённые refresh-записи Identity. Пока Identity DB и согласованная RSA-пара сохранены, действующая refresh-сессия может получить новый access без повторного входа.
 
 Отмена выдачи сессии проверяется после завершения регистрации устройства и до начала enqueue. Уже начатая запись уведомления в outbox использует `CancellationToken.None` и не прерывается этим caller token. Сохранение refresh-токена и регистрация устройства по RPC не объединены SQL-транзакцией.
