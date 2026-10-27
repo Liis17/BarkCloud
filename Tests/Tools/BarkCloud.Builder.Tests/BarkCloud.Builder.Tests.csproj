@@ -13,6 +13,9 @@
     <Compile Include="../../../Tools/BarkCloud.Builder/BuilderModelValidator.cs" Link="BuilderModelValidator.cs" />
     <Compile Include="../../../Tools/BarkCloud.Builder/BackendComposeGenerator.cs" Link="BackendComposeGenerator.cs" />
     <Compile Include="../../../Tools/BarkCloud.Builder/BuilderConfigLoader.cs" Link="BuilderConfigLoader.cs" />
+    <Compile Include="../../../Tools/BarkCloud.Builder/JwtKeyFileWriter.cs" Link="JwtKeyFileWriter.cs" />
+    <Compile Include="../../../Tools/BarkCloud.Builder/MigrationScriptWriter.cs" Link="MigrationScriptWriter.cs" />
+    <EmbeddedResource Include="../../../Backend/migrate-secrets.sh" LogicalName="BarkCloud.Builder.migrate-secrets.sh" />
   </ItemGroup>
 
 </Project>

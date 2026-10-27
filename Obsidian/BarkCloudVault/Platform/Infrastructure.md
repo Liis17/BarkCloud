@@ -46,6 +46,16 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 - Внутренние порты сервисов не опубликованы секцией `ports` базового compose. Прокси/внешняя инфраструктура отвечает за публикацию портов. Приложения по умолчанию используют Identity 8000, Users 8001, Configuration 8003, Files 8005/8006 и Torrent 8007/8008; стандартные listener-порты PostgreSQL 5432, RabbitMQ 5672, MinIO 9000/9001, Seq 80/5341 и Web 8080 остаются внутри Docker-сети.
 - Почта передаётся в Configuration переменными `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SENDER_EMAIL` и `EMAIL_SENDER_PASSWORD`; отправку выполняет Notification.
 
+## Переход на разделённые секреты и RS256
+
+`Backend/migrate-secrets.sh` заполняет отсутствующие или `replace-*` индивидуальные ключи Configuration и сервисных credentials, сохраняя заданные значения и восстанавливая пропущенные из старых реестров. Реестры `CONFIGURATION_ACCESS_KEYS` и `SERVICE_CREDENTIALS` являются производными от индивидуальных переменных и синхронизируются при каждом запуске. Builder помещает тот же скрипт в папку вывода. Скрипт создаёт резервную копию `.env`, но не меняет БД.
+
+Перед переключением остановите старый стек, затем установите согласованные обновлённые `docker-compose.yml` и `.env` вместе с `secrets/jwt/` до любого перезапуска. Запустите `bash ./migrate-secrets.sh` из папки Compose. Запустите Configuration первым для `RemoveLegacySharedSecrets`, после успешной миграции — остальные сервисы; старые и новые backend-образы не должны работать вперемешку. Миграция удаляет прежний `JwtSettings:SecretKey` и `*Service:Token` из БД Configuration. После этого откат требует совместного восстановления старых образов, compose, `.env` и резервной копии Configuration DB; замена только бинарников недостаточна.
+
+Builder создаёт приватный JWT PEM на Windows. После копирования вывода на Linux запустите `migrate-secrets.sh` от владельца ключа. Скрипт оставляет чтение владельцу и выдаёт его только UID 1654 через ACL; группа и остальные пользователи доступа не получают. Если `setfacl` недоступен, запуск от root передаёт файл UID 1654 с mode `600`. Не задавайте общий режим чтения `644` для private PEM.
+
+Переход на RS256 может сделать старые access JWT неприемлемыми для новых валидаторов. `RemoveLegacySharedSecrets` не удаляет refresh-записи из Identity DB; действующие refresh-сессии могут получить новые access JWT, если Identity DB и согласованная пара RSA ключей сохранены. При откате на прежнюю версию нужно вернуть соответствующую ей Configuration DB, где старые настройки ещё присутствуют.
+
 ## Lognara relay и агенты
 
 Builder включает sink отдельно для каждого приложения. При включённом Lognara каждый выбранный агент получает свой вручную созданный token и spool volume или bind-путь. Relay использует `LOGNARA_CORE_URL` и `LOGNARA_CORE_TOKEN` для внешнего Core; он не регистрирует агентов автоматически. URL должен использовать HTTP или HTTPS и заканчиваться на `/v1/batches`.

@@ -142,11 +142,12 @@ namespace BarkCloud.Builder
             try
             {
                 var encoding = new UTF8Encoding(false);
-                WriteJwtKeys(dir);
+                JwtKeyFileWriter.WriteJwtKeys(dir);
                 File.WriteAllText(Path.Combine(dir, "docker-compose.yml"),
                     ToLf(BackendComposeGenerator.BuildCompose(_model)), encoding);
                 File.WriteAllText(Path.Combine(dir, ".env"),
                     ToLf(BackendComposeGenerator.BuildEnv(_model)), encoding);
+                MigrationScriptWriter.WriteTo(dir);
 
                 var lognaraDockerfiles = BackendComposeGenerator.BuildLognaraDockerfiles(_model);
                 if (lognaraDockerfiles.Count > 0)
@@ -181,7 +182,7 @@ namespace BarkCloud.Builder
                     }
                 }
 
-                SetStatus($"Готово: docker-compose.yml, .env{extra} записаны в {dir}", error: false);
+                SetStatus($"Готово: docker-compose.yml, .env, migrate-secrets.sh{extra} записаны в {dir}", error: false);
             }
             catch (Exception ex)
             {
@@ -220,24 +221,5 @@ namespace BarkCloud.Builder
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Пара RSA-3072 для подписи JWT (RS256): приватный ключ — только Identity, публичный —
-        /// всем валидаторам. Существующие ключи не перезаписываем: повторная генерация конфигурации
-        /// не должна инвалидировать уже выданные токены.
-        /// </summary>
-        private static void WriteJwtKeys(string dir)
-        {
-            var keysDir = Path.Combine(dir, "secrets", "jwt");
-            Directory.CreateDirectory(keysDir);
-
-            var privateKey = Path.Combine(keysDir, "jwt-private.pem");
-            var publicKey = Path.Combine(keysDir, "jwt-public.pem");
-            if (File.Exists(privateKey) && File.Exists(publicKey))
-                return;
-
-            using var rsa = System.Security.Cryptography.RSA.Create(3072);
-            File.WriteAllText(privateKey, rsa.ExportPkcs8PrivateKeyPem());
-            File.WriteAllText(publicKey, rsa.ExportSubjectPublicKeyInfoPem());
-        }
     }
 }

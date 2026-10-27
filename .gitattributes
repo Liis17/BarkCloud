@@ -1,0 +1,2 @@
+Backend/migrate-secrets.sh text eol=lf
+Tests/Backend/migrate-secrets-test.sh text eol=lf

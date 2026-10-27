@@ -6,6 +6,35 @@ namespace BarkCloud.Builder.Tests;
 public sealed class BuilderConfigLoaderTests
 {
     [Fact]
+    public void Registry_only_env_restores_split_secrets_and_prefers_explicit_values()
+    {
+        const string env = """
+IDENTITY_CONFIG_ACCESS_KEY="replace-identity-key" # old placeholder
+USERS_CONFIG_ACCESS_KEY="custom-users-key"
+CONFIGURATION_ACCESS_KEYS='Identity=registry-identity-key;Users=registry-users-key;Notification=notification-key;Files=files-key;Torrent=torrent-key;Web=web-key'
+SERVICE_CREDENTIALS='Identity=identity-credential;Users=users-credential;Files=files-credential;Torrent=torrent-credential;Web=web-credential'
+""";
+
+        var model = new BuilderModel();
+        var loaded = BuilderConfigLoader.Load(BackendComposeGenerator.BuildCompose(model), env, null, "C:\\out");
+        var generatedEnv = BackendComposeGenerator.BuildEnv(loaded);
+
+        Assert.Equal("registry-identity-key", loaded.IdentityConfigAccessKey);
+        Assert.Equal("custom-users-key", loaded.UsersConfigAccessKey);
+        Assert.Equal("notification-key", loaded.NotificationConfigAccessKey);
+        Assert.Equal("files-key", loaded.FilesConfigAccessKey);
+        Assert.Equal("torrent-key", loaded.TorrentConfigAccessKey);
+        Assert.Equal("web-key", loaded.WebConfigAccessKey);
+        Assert.Equal("identity-credential", loaded.IdentityServiceCredential);
+        Assert.Equal("users-credential", loaded.UsersServiceCredential);
+        Assert.Equal("files-credential", loaded.FilesServiceCredential);
+        Assert.Equal("torrent-credential", loaded.TorrentServiceCredential);
+        Assert.Equal("web-credential", loaded.WebServiceCredential);
+        Assert.Contains("IDENTITY_CONFIG_ACCESS_KEY='registry-identity-key'\n", generatedEnv);
+        Assert.Contains("USERS_CONFIG_ACCESS_KEY='custom-users-key'\n", generatedEnv);
+    }
+
+    [Fact]
     public void External_mode_round_trip_restores_all_generated_files()
     {
         var model = new BuilderModel
@@ -22,7 +51,17 @@ public sealed class BuilderConfigLoaderTests
             LognaraAgentVersion = "agent-20261018-120000-123456abcdef",
             DockerNetworkName = "custom-net",
             WebContainerName = "my-web",
-            ConfigurationAccessKey = "key=with=equals",
+            IdentityConfigAccessKey = "identity-key=with=equals",
+            UsersConfigAccessKey = "users-key",
+            NotificationConfigAccessKey = "notification-key",
+            FilesConfigAccessKey = "files-key",
+            TorrentConfigAccessKey = "torrent-key",
+            WebConfigAccessKey = "web-key",
+            IdentityServiceCredential = "identity-credential",
+            UsersServiceCredential = "users-credential",
+            FilesServiceCredential = "files-credential",
+            TorrentServiceCredential = "torrent-credential",
+            WebServiceCredential = "web-credential",
             WebCookieSecure = true,
             WebAdminPassword = "admin",
             AndroidCertificateSha256Fingerprint = "AA:BB:CC:DD",
@@ -57,6 +96,17 @@ public sealed class BuilderConfigLoaderTests
         Assert.True(loaded.UseNginx);
         Assert.True(loaded.NginxSeqProxy);
         Assert.False(loaded.NginxMinioConsoleProxy);
+        Assert.Equal(model.IdentityConfigAccessKey, loaded.IdentityConfigAccessKey);
+        Assert.Equal(model.UsersConfigAccessKey, loaded.UsersConfigAccessKey);
+        Assert.Equal(model.NotificationConfigAccessKey, loaded.NotificationConfigAccessKey);
+        Assert.Equal(model.FilesConfigAccessKey, loaded.FilesConfigAccessKey);
+        Assert.Equal(model.TorrentConfigAccessKey, loaded.TorrentConfigAccessKey);
+        Assert.Equal(model.WebConfigAccessKey, loaded.WebConfigAccessKey);
+        Assert.Equal(model.IdentityServiceCredential, loaded.IdentityServiceCredential);
+        Assert.Equal(model.UsersServiceCredential, loaded.UsersServiceCredential);
+        Assert.Equal(model.FilesServiceCredential, loaded.FilesServiceCredential);
+        Assert.Equal(model.TorrentServiceCredential, loaded.TorrentServiceCredential);
+        Assert.Equal(model.WebServiceCredential, loaded.WebServiceCredential);
         AssertSameOutput(model, loaded);
     }
 
