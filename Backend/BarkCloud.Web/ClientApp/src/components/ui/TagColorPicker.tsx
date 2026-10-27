@@ -117,6 +117,10 @@ export function TagColorPicker({ value, disabled = false, onChange, onValidityCh
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (disabled) {
+      finishPointer(event);
+      return;
+    }
     if (dragPointer.current === event.pointerId) updateFromPointer(event);
   }
 
@@ -163,11 +167,11 @@ export function TagColorPicker({ value, disabled = false, onChange, onValidityCh
         </div>
         <div className="tag-color-controls">
           <label className="tag-color-slider-label" htmlFor="tag-color-hue">Оттенок</label>
-          <input id="tag-color-hue" className="tag-color-hue" type="range" min="0" max="359" step="1" value={Math.round(hue)} disabled={disabled} aria-label="Оттенок" onChange={(event) => updateHsv(Number(event.currentTarget.value), saturation, brightness)} />
+          <input id="tag-color-hue" className="tag-color-range tag-color-hue" type="range" min="0" max="359" step="1" value={Math.round(hue)} disabled={disabled} aria-label="Оттенок" onChange={(event) => updateHsv(Number(event.currentTarget.value), saturation, brightness)} />
           <label className="tag-color-slider-label" htmlFor="tag-color-saturation">Насыщенность</label>
-          <input id="tag-color-saturation" type="range" min="0" max="100" step="1" value={Math.round(saturation * 100)} disabled={disabled} aria-label="Насыщенность" onChange={(event) => updateHsv(hue, Number(event.currentTarget.value) / 100, brightness)} />
+          <input id="tag-color-saturation" className="tag-color-range tag-color-adjustment" type="range" min="0" max="100" step="1" value={Math.round(saturation * 100)} style={{ '--tag-color-progress': `${saturation * 100}%` } as React.CSSProperties} disabled={disabled} aria-label="Насыщенность" onChange={(event) => updateHsv(hue, Number(event.currentTarget.value) / 100, brightness)} />
           <label className="tag-color-slider-label" htmlFor="tag-color-brightness">Яркость</label>
-          <input id="tag-color-brightness" type="range" min="0" max="100" step="1" value={Math.round(brightness * 100)} disabled={disabled} aria-label="Яркость" onChange={(event) => updateHsv(hue, saturation, Number(event.currentTarget.value) / 100)} />
+          <input id="tag-color-brightness" className="tag-color-range tag-color-adjustment" type="range" min="0" max="100" step="1" value={Math.round(brightness * 100)} style={{ '--tag-color-progress': `${brightness * 100}%` } as React.CSSProperties} disabled={disabled} aria-label="Яркость" onChange={(event) => updateHsv(hue, saturation, Number(event.currentTarget.value) / 100)} />
         </div>
       </div>
       <div className="tag-color-hex-row">

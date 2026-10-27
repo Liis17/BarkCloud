@@ -1351,15 +1351,16 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
 .df-comb .seg.on { border-color: var(--md-primary); color: var(--md-primary); background: var(--md-surface-container-high); }
 .df-rules { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .df-rule { display: flex; align-items: center; gap: 8px; }
-.df-rule input[type=text], .df-rule input[type=number], .df-rule input[type=date] {
+.df-rule > input[type=date] {
   background: var(--md-surface-container-low);
   border: 1px solid var(--md-outline);
   border-radius: var(--r-sm);
   padding: 8px 10px; color: var(--md-on-surface); font: inherit; font-size: 13px;
 }
 .df-rule .m3-select { flex: 0 0 auto; max-width: 40%; }
-.df-rule input { min-width: 0; flex: 1; }
-.df-rule .df-suffix { display: flex; align-items: center; gap: 6px; flex: 1; font-size: 12px; color: var(--md-on-surface-variant); }
+.df-rule > input[type=date], .df-rule > .md-text-field, .df-rule > .df-suffix { min-width: 0; flex: 1; }
+.df-rule .df-suffix { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--md-on-surface-variant); }
+.df-rule .df-suffix .md-text-field { width: auto; min-width: 0; flex: 1; }
 
 /* Списочный вид содержимого умной папки (folder.viewMode === 1) */
 .df-list { display: flex; flex-direction: column; }

@@ -1296,9 +1296,7 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 18px 0; }
 .qr-wrap img { width: 200px; height: 200px; border-radius: var(--r-md); background: #fff; padding: 8px; }
 .qr-code { font-family: 'Roboto Mono', monospace; font-size: 13px; color: var(--md-on-surface-variant); word-break: break-all; text-align: center; max-width: 320px; }
-.dlg-input { width: 100%; background: var(--md-surface-container); border: none; border-bottom: 1px solid var(--md-outline); border-radius: var(--r-xs) var(--r-xs) 0 0; color: var(--md-on-surface); font-family: inherit; font-size: 15px; padding: 14px 16px; outline: none; margin-top: 8px; }
-.dlg-input:focus { border-bottom: 2px solid var(--md-primary); padding-bottom: 13px; }
-
+.sys-dialog .sys-dialog-code { margin-top: 8px; }
 /* Публичные страницы шаринга (дизайн из шаблонов new-design: M3, токены --md-*) */
 .public-shell {
   min-height: 100vh;

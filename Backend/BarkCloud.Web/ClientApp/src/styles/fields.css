@@ -43,12 +43,13 @@
   float: none;
   width: auto;
   max-width: 0.01px;
-  height: 12px;
+  height: 2px;
+  margin-left: 7px;
   padding: 0;
   overflow: hidden;
   visibility: hidden;
   font-size: 12px;
-  line-height: 12px;
+  line-height: 2px;
   transition: max-width 150ms ease;
 }
 
@@ -114,7 +115,7 @@
 .md-text-field__box:has(.md-text-field__control:not(:placeholder-shown)) .md-text-field__outline legend,
 .md-text-field__box:has(.md-text-field__control:autofill) .md-text-field__outline legend,
 .md-text-field__box:has(.md-text-field__control:-webkit-autofill) .md-text-field__outline legend {
-  max-width: 100%;
+  max-width: calc(75% - 14px);
 }
 
 .md-text-field__box:focus-within .md-text-field__label,

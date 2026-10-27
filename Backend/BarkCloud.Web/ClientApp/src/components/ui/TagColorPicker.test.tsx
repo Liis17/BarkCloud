@@ -64,6 +64,27 @@ describe('выбор цвета тега', () => {
     expect(release).toHaveBeenCalledWith(7);
   });
 
+  it('stops an active pointer drag when the picker becomes disabled', () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(<TagColorPicker value="#FF0000" onChange={onChange} onValidityChange={vi.fn()} />);
+    const area = container.querySelector('.tag-color-sv')!;
+    vi.spyOn(area, 'getBoundingClientRect').mockReturnValue({
+      x: 100, y: 50, left: 100, top: 50, right: 200, bottom: 150, width: 100, height: 100, toJSON: () => ({}),
+    } as DOMRect);
+    const pointer = (type: string, pointerId: number, clientX: number, clientY: number) => {
+      const event = new Event(type, { bubbles: true });
+      Object.assign(event, { pointerId, pointerType: 'mouse', clientX, clientY });
+      fireEvent(area, event);
+    };
+
+    pointer('pointerdown', 9, 150, 75);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    rerender(<TagColorPicker value="#BF6060" disabled onChange={onChange} onValidityChange={vi.fn()} />);
+    pointer('pointermove', 9, 200, 100);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it('сохраняет оттенок при редактировании серого цвета', () => {
     const onChange = vi.fn();
     render(<TagColorPicker value="#777777" onChange={onChange} onValidityChange={vi.fn()} />);

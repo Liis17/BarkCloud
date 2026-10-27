@@ -1582,10 +1582,10 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
             {reauthDlg !== 'setInitialPassword' && (reauthDlg !== 'passkeyAdd' && reauthDlg !== 'passkeyRemove' || !reauthEmailRequired || !reauthChallengeId) ? (
               <TextField label="Пароль" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
             ) : null}
-            {reauthOtpRequired && <input className="dlg-input" value={reauthOtpCode} onChange={(e) => setReauthOtpCode(e.target.value)} placeholder="Код из приложения-аутентификатора" inputMode="numeric" autoComplete="one-time-code" />}
+            {reauthOtpRequired && <TextField label="Код из приложения-аутентификатора" value={reauthOtpCode} onChange={(e) => setReauthOtpCode(e.target.value)} placeholder="Код из приложения-аутентификатора" inputMode="numeric" autoComplete="one-time-code" containerClassName="sys-dialog-code" />}
             {reauthEmailPrompt && (
               <>
-                <input className="dlg-input" value={reauthEmailCode} onChange={(e) => setReauthEmailCode(e.target.value)} placeholder="Код из письма" inputMode="numeric" autoComplete="one-time-code" />
+                <TextField label="Код из письма" value={reauthEmailCode} onChange={(e) => setReauthEmailCode(e.target.value)} placeholder="Код из письма" inputMode="numeric" autoComplete="one-time-code" containerClassName="sys-dialog-code" />
                 {passkeyReauth ? (
                   <button className="btn text" onClick={resendReauthEmail} disabled={reauthBusy || reauthRetrySeconds > 0}>
                     {reauthRetrySeconds > 0 ? `Повторная отправка через ${reauthRetrySeconds} с` : 'Отправить код повторно'}
@@ -1627,7 +1627,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
               {enableDlg.qr && <img src={'data:image/png;base64,' + enableDlg.qr} alt="QR" />}
               {enableDlg.code && <div className="qr-code">Ключ: {enableDlg.code}</div>}
             </div>
-            <input className="dlg-input" value={enableCode} onChange={(e) => setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmEnable(); }} />
+            <TextField label="Код подтверждения" value={enableCode} onChange={(e) => setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmEnable(); }} containerClassName="sys-dialog-code" />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setEnableDlg(null)} disabled={enableBusy}>
                 Отмена
@@ -1645,7 +1645,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
           <div className="sys-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Отключить 2FA</h3>
             <div className="sub">Введите текущий код из приложения-аутентификатора.</div>
-            <input className="dlg-input" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="Код" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmDisable(); }} />
+            <TextField label="Код" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="Код" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmDisable(); }} containerClassName="sys-dialog-code" />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setDisableDlg(null)} disabled={disableBusy}>
                 Отмена
