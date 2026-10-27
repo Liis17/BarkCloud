@@ -62,6 +62,18 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public string TorrentServiceCredential { get; set; } = "";
     public string WebServiceCredential { get; set; } = "";
 
+    // Deployment-only credentials are generated internally; they are not exposed as UI fields.
+    public string ConfigurationDbPassword { get; set; } = GenerateSecret(48);
+    public string IdentityDbPassword { get; set; } = GenerateSecret(48);
+    public string UsersDbPassword { get; set; } = GenerateSecret(48);
+    public string FilesDbPassword { get; set; } = GenerateSecret(48);
+    public string TorrentDbPassword { get; set; } = GenerateSecret(48);
+    public string IdentityRabbitPassword { get; set; } = GenerateSecret(48);
+    public string UsersRabbitPassword { get; set; } = GenerateSecret(48);
+    public string FilesRabbitPassword { get; set; } = GenerateSecret(48);
+    public string TorrentRabbitPassword { get; set; } = GenerateSecret(48);
+    public string NotificationRabbitPassword { get; set; } = GenerateSecret(48);
+
     public string ConfigurationAccessKeysRegistry =>
         $"Identity={IdentityConfigAccessKey};Users={UsersConfigAccessKey};Notification={NotificationConfigAccessKey};Files={FilesConfigAccessKey};Torrent={TorrentConfigAccessKey};Web={WebConfigAccessKey}";
 
@@ -77,11 +89,14 @@ public sealed class BuilderModel : INotifyPropertyChanged
 
     // RabbitMQ
     public string RabbitUser { get; set; } = "user";
-    public string RabbitPass { get; set; } = "password";
+    public string RabbitPass { get; set; } = GenerateSecret(48);
+    public string RabbitHost { get; set; } = "cloud-rabbitmq";
+    public string RabbitVirtualHost { get; set; } = "/";
 
     // PostgreSQL
     public string PostgresUser { get; set; } = "user";
-    public string PostgresPassword { get; set; } = "password";
+    public string PostgresPassword { get; set; } = GenerateSecret(48);
+    public string PostgresHost { get; set; } = "cloud-postgres";
     public string PostgresDb { get; set; } = "postgrescloud";
     public string PostgresPort { get; set; } = "5432";
     public string PostgresDataPath { get; set; } = "./data/pgdata";

@@ -27,11 +27,12 @@ public class Program
 
             x.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                cfg.Host(builder.Configuration["RabbitMQ:Host"], builder.Configuration["RabbitMQ:VirtualHost"], h =>
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
                 });
+                cfg.OverrideDefaultBusEndpointQueueName("bark-notification-bus-" + Guid.NewGuid().ToString("N"));
 
                 cfg.ReceiveEndpoint("notifications-email-handler", e =>
                 {

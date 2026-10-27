@@ -16,6 +16,13 @@
     <Compile Include="../../../Tools/BarkCloud.Builder/JwtKeyFileWriter.cs" Link="JwtKeyFileWriter.cs" />
     <Compile Include="../../../Tools/BarkCloud.Builder/MigrationScriptWriter.cs" Link="MigrationScriptWriter.cs" />
     <EmbeddedResource Include="../../../Backend/migrate-secrets.sh" LogicalName="BarkCloud.Builder.migrate-secrets.sh" />
+    <EmbeddedResource Include="../../../Backend/provision-isolation.sh" LogicalName="BarkCloud.Builder.provision-isolation.sh" />
+    <EmbeddedResource Include="../../../Backend/provision-postgres.sql" LogicalName="BarkCloud.Builder.provision-postgres.sql" />
+    <EmbeddedResource Include="../../../Backend/provision-postgres-ownership.sql" LogicalName="BarkCloud.Builder.provision-postgres-ownership.sql" />
+    <EmbeddedResource Include="../../../Backend/provision-rabbitmq.sh" LogicalName="BarkCloud.Builder.provision-rabbitmq.sh" />
+    <EmbeddedResource Include="../../../Backend/postgres-isolation-smoke.sh" LogicalName="BarkCloud.Builder.postgres-isolation-smoke.sh" />
+    <EmbeddedResource Include="../../../Backend/rabbitmq-isolation-smoke.sh" LogicalName="BarkCloud.Builder.rabbitmq-isolation-smoke.sh" />
+    <EmbeddedResource Include="../../../Backend/isolation-guide.md" LogicalName="BarkCloud.Builder.isolation-guide.md" />
   </ItemGroup>
 
 </Project>

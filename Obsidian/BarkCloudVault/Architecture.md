@@ -56,6 +56,10 @@ BarkCloud — самохостируемое облако файлов и мед
 
 События между сервисами идут через RabbitMQ (MassTransit). Users и Files публикуют их через EF Core outbox MassTransit, Identity фиксирует письмо в собственном outbox в той же локальной транзакции, что и бизнес-операцию, затем фоновый воркер доставляет его; отзыв сессий реплики забирают служебным gRPC-фидом. Подтверждение email-регистрации вызывает Users до локального коммита Identity. При первичной парольной регистрации с отключённой почтой Identity сначала фиксирует пароль и refresh, а верный пароль позволяет повторно завершить draft после сбоя Users. См. [[Backend/AccountDeletionOutbox]], [[Backend/IdentityNotificationOutbox]], [[Backend/SessionRevocation]].
 
+### Секреты и границы доверия
+
+PostgreSQL и RabbitMQ используют отдельные service-role accounts: сервисы с БД подключаются к собственной базе, а каждый backend получает отдельного брокерного пользователя с правами на свои события и очереди. Configuration остаётся доверенным источником настроек и получает индивидуальные пароли этих сервисов из явных environment-переменных; Compose не передаёт ему bootstrap/admin credentials PostgreSQL и RabbitMQ. Web остаётся доверенным администратором: контейнер запускается от root, получает полный `.env` и Docker socket, поэтому его компрометация не изолирована от инфраструктуры. Provisioning и переход существующих установок описаны в [[Platform/Infrastructure]].
+
 ### Вход в Web
 
 `BarkCloud.Web` отдаёт auth React entry через отдельную HTML-оболочку; Identity остаётся источником учётных данных, 2FA-кодов и reset-кодов. Web хранит продолжение browser flow в ограниченном process-local кеше, привязанном к device cookie, и защищает формы antiforgery. Регистрация использует атомарные Identity RPC с первоначальным паролем; публичный контракт и ограничения потока описаны в [[Web/WebApp]].

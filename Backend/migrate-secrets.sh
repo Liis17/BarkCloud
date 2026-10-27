@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Переход на разделённые секреты (аудит безопасности, п. 9): RSA-ключи JWT, bootstrap-ключи
-# сервисов, секреты сервисных токенов и ключ админ-cookie. Индивидуальные значения не меняет,
-# если они заданы; реестры собирает из фактических значений. Базы данных НЕ трогает — старые
-# секреты из БД Configuration удалит EF-миграция RemoveLegacySharedSecrets при следующем старте.
+# Подготавливает RSA-ключи JWT, bootstrap-ключи и пароли сервисных PostgreSQL/RabbitMQ-пользователей.
+# Индивидуальные значения не меняет, если они заданы; реестры собирает из фактических значений.
+# Инфраструктуру не меняет. Для создания/перехода ролей и ACL отдельно запустите
+# provision-isolation.sh fresh (новая установка) или provision-isolation.sh existing.
 #
 # Использование из каталога с docker-compose.yml и .env:
 # bash /path/to/BarkCloud/Backend/migrate-secrets.sh
@@ -198,6 +198,15 @@ ensure_env() {
   fi
 }
 
+ensure_generated_env() {
+  local key="$1" generated="$2" current
+  current=$(env_value "$key")
+  if [[ -z "$current" || "$current" == replace-* ]]; then
+    write_env "$key" "$(quote_env_value "$generated")"
+    echo "  + $key"
+  fi
+}
+
 ensure_secret_env() {
   local key="$1" service="$2" registry_key="$3" generated="$4" current restored
   current=$(env_value "$key")
@@ -325,14 +334,22 @@ sync_registry "SERVICE_CREDENTIALS" "${svc_registry%;}"
 
 ensure_env "WEB_ADMIN_COOKIE_KEY" "$(gen_secret)$(gen_secret)"
 
+# Сервисные роли никогда не используют root-учётные данные инфраструктуры.
+for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILES_DB_PASSWORD TORRENT_DB_PASSWORD \
+           RABBITMQ_IDENTITY_PASSWORD RABBITMQ_USERS_PASSWORD RABBITMQ_FILES_PASSWORD \
+           RABBITMQ_TORRENT_PASSWORD RABBITMQ_NOTIFICATION_PASSWORD; do
+  ensure_generated_env "$key" "$(gen_secret)"
+done
+
 # --- Убираем упразднённый общий ключ, если он ещё в .env ---
 sed -i -E '/^CONFIGURATION_ACCESS_KEY=/d' "$ENV_FILE" || true
 
 echo "Готово. Порядок перехода (окно обслуживания):"
-echo "  1) Остановите старый стек обычной командой docker compose down (без удаления volumes)."
-echo "  2) До любого перезапуска установите вместе обновлённые docker-compose.yml и .env и сохраните secrets/jwt/; одного обновления .env недостаточно."
-echo "  3) Запустите cloud-configuration первым: его EF-миграция удалит JwtSettings:SecretKey и *Service:Token из БД Configuration."
-echo "  4) После успешного старта Configuration запустите остальные сервисы; не смешивайте старые и новые backend-образы."
-echo "  5) Сохранённые refresh-записи в Identity DB этой миграцией не удаляются и продолжают выпускать access JWT с новыми RS256-ключами."
-echo "  Откат после шага 3 требует совместно восстановить старые образы, compose, .env и резервную копию БД Configuration; одних старых образов недостаточно."
-echo "  Старые access JWT могут не проходить новую проверку подписи; для действующих refresh-сессий повторный вход не требуется."
+echo "  1) Сделайте проверенные резервные копии PostgreSQL и RabbitMQ, затем остановите все приложения."
+echo "  2) До любого перезапуска установите вместе обновлённые docker-compose.yml, .env и provisioning-скрипты; сохраните secrets/jwt/."
+echo "  3) Для существующей установки выполните BARKCLOUD_BACKUP_VERIFIED=YES BARKCLOUD_APPS_STOPPED=YES bash ./provision-isolation.sh existing."
+echo "  4) Запустите Configuration: миграция удалит устаревшие общие RabbitMQ credentials и root-credential connection strings вместе с их историей; новые значения заполняются из сервисных секретов."
+echo "  5) После успешного старта Configuration запустите остальные новые backend-образы. Не смешивайте старые и новые образы."
+echo "  Откат после шага 3 требует совместно восстановить старые образы, compose, .env, дамп PostgreSQL и definitions/резервную копию RabbitMQ."
+echo "  Refresh-сессии Identity в этой миграции не удаляются; возможность их использования определяется действующими ключами и конфигурацией, поэтому проверьте сессию до планирования повторного входа."
+echo "  Подробные шаги для свежей установки, внешней инфраструктуры и границы доверия Web: isolation-guide.md."

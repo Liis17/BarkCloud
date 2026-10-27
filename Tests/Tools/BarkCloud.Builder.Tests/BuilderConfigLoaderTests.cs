@@ -35,6 +35,63 @@ SERVICE_CREDENTIALS='Identity=identity-credential;Users=users-credential;Files=f
     }
 
     [Fact]
+    public void Service_database_and_rabbit_passwords_round_trip_and_legacy_placeholders_are_replaced()
+    {
+        var model = new BuilderModel
+        {
+            ConfigurationDbPassword = "configuration-db-secret",
+            IdentityDbPassword = "identity-db-secret",
+            UsersDbPassword = "users-db-secret",
+            FilesDbPassword = "files-db-secret",
+            TorrentDbPassword = "torrent-db-secret",
+            IdentityRabbitPassword = "identity'quoted;secret",
+            UsersRabbitPassword = "users-rabbit-secret",
+            FilesRabbitPassword = "files-rabbit-secret",
+            TorrentRabbitPassword = "torrent-rabbit-secret",
+            NotificationRabbitPassword = "notification-rabbit-secret",
+            PostgresHost = "postgres.example.test",
+            RabbitHost = "rabbit.example.test",
+            RabbitVirtualHost = "/barkcloud"
+        };
+
+        var loaded = RoundTrip(model, "C:\\out");
+        Assert.Equal(model.ConfigurationDbPassword, loaded.ConfigurationDbPassword);
+        Assert.Equal(model.IdentityDbPassword, loaded.IdentityDbPassword);
+        Assert.Equal(model.UsersDbPassword, loaded.UsersDbPassword);
+        Assert.Equal(model.FilesDbPassword, loaded.FilesDbPassword);
+        Assert.Equal(model.TorrentDbPassword, loaded.TorrentDbPassword);
+        Assert.Equal(model.IdentityRabbitPassword, loaded.IdentityRabbitPassword);
+        Assert.Equal(model.UsersRabbitPassword, loaded.UsersRabbitPassword);
+        Assert.Equal(model.FilesRabbitPassword, loaded.FilesRabbitPassword);
+        Assert.Equal(model.TorrentRabbitPassword, loaded.TorrentRabbitPassword);
+        Assert.Equal(model.NotificationRabbitPassword, loaded.NotificationRabbitPassword);
+        Assert.Equal(model.PostgresHost, loaded.PostgresHost);
+        Assert.Equal(model.RabbitHost, loaded.RabbitHost);
+        Assert.Equal(model.RabbitVirtualHost, loaded.RabbitVirtualHost);
+        var env = BackendComposeGenerator.BuildEnv(loaded);
+        Assert.Contains("POSTGRES_HOST='postgres.example.test'\n", env);
+        Assert.Contains("RABBITMQ_HOST='rabbit.example.test'\n", env);
+        Assert.Contains("RABBITMQ_VIRTUAL_HOST='/barkcloud'\n", env);
+        AssertSameOutput(model, loaded);
+
+        const string legacyEnv = "CONFIGURATION_DB_PASSWORD=replace-configuration-db-password\n"
+                                 + "IDENTITY_DB_PASSWORD=replace-identity-db-password\n"
+                                 + "RABBITMQ_TORRENT_PASSWORD=replace-torrent-rabbitmq-password\n";
+        var repaired = BuilderConfigLoader.Load(
+            BackendComposeGenerator.BuildCompose(new BuilderModel()), legacyEnv, null, "C:\\out");
+        Assert.False(repaired.ConfigurationDbPassword.StartsWith("replace-", StringComparison.Ordinal));
+        Assert.False(repaired.IdentityDbPassword.StartsWith("replace-", StringComparison.Ordinal));
+        Assert.False(repaired.TorrentRabbitPassword.StartsWith("replace-", StringComparison.Ordinal));
+        Assert.NotEqual(string.Empty, repaired.ConfigurationDbPassword);
+        Assert.Equal(BackendComposeGenerator.BuildEnv(repaired), BackendComposeGenerator.BuildEnv(repaired));
+
+        var reopened = RoundTrip(repaired, "C:\\out");
+        Assert.Equal(repaired.ConfigurationDbPassword, reopened.ConfigurationDbPassword);
+        Assert.Equal(repaired.IdentityDbPassword, reopened.IdentityDbPassword);
+        Assert.Equal(repaired.TorrentRabbitPassword, reopened.TorrentRabbitPassword);
+    }
+
+    [Fact]
     public void External_mode_round_trip_restores_all_generated_files()
     {
         var model = new BuilderModel

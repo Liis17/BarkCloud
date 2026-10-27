@@ -34,6 +34,23 @@ public class SettingsCatalogTests
     }
 
     [Fact]
+    public void RabbitCredentials_AreEnvironmentManagedAndScopedPerService()
+    {
+        SettingsCatalog.All.Should().NotContain(x => x.ServiceId == ServiceId.Unknown
+                                                     && x.Section == "RabbitMQ"
+                                                     && (x.Key == "Username" || x.Key == "Password"));
+
+        var torrentUsername = SettingsCatalog.Resolve(ServiceId.Torrent, "RabbitMQ", "Username");
+        var torrentPassword = SettingsCatalog.Resolve(ServiceId.Torrent, "RabbitMQ", "Password");
+
+        torrentUsername.ServiceId.Should().Be(ServiceId.Torrent);
+        torrentUsername.IsEnvironmentManaged.Should().BeTrue();
+        torrentPassword.ServiceId.Should().Be(ServiceId.Torrent);
+        torrentPassword.IsEnvironmentManaged.Should().BeTrue();
+        torrentPassword.IsSensitive.Should().BeTrue();
+    }
+
+    [Fact]
     public void All_DoesNotExposeLegacyS3RowsOrReservedNamesAsScalarSettings()
     {
         SettingsCatalog.All.Should().NotContain(x => x.Section.StartsWith("S3Buckets:", StringComparison.Ordinal));
@@ -104,9 +121,9 @@ public class SettingsCatalogTests
     }
 
     [Fact]
-    public void ValidateAndNormalize_OtherPassword_StillAcceptsShortValue()
+    public void ValidateAndNormalize_ServiceRabbitPassword_StillAcceptsShortValue()
     {
-        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "RabbitMQ", "Password");
+        var entry = SettingsCatalog.Resolve(ServiceId.Files, "RabbitMQ", "Password");
 
         SettingsValueValidator.ValidateAndNormalize(entry, "pw").Should().Be("pw");
     }
