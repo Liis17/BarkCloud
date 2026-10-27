@@ -182,9 +182,8 @@ fun GalleryScreen(
     var selectionToolbarHeightPx by remember { mutableStateOf(0) }
 
     val openRemote = rememberRemoteOpener()
-    val timeline = remember(state.items, cloudPhotos.items, cloudVideos.items) {
-        (state.items.map { PhotoTimelineItem.Device(it) } +
-            (cloudPhotos.items + cloudVideos.items).map { PhotoTimelineItem.Cloud(it) })
+    val timeline = remember(cloudPhotos.items, cloudVideos.items) {
+        (cloudPhotos.items + cloudVideos.items).map { PhotoTimelineItem.Cloud(it) }
             .sortedByDescending { it.dateMillis }
     }
     val dateSections = remember(timeline) { mediaDateSections(timeline) { it.dateMillis } }
@@ -226,7 +225,7 @@ fun GalleryScreen(
     val statusBarHeightPx = with(density) { statusBarHeight.toPx() }
     val headerHeight = statusBarHeight + 64.dp
     val headerHeightPx = with(density) { headerHeight.toPx() }
-    val maxHeaderCollapsePx = with(density) { 64.dp.toPx() }
+    val maxHeaderCollapsePx = headerHeightPx
     val pullThresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
     var headerCollapsePx by rememberSaveable { mutableStateOf(0f) }
     val headerScrollConnection = remember(gridState, maxHeaderCollapsePx) {
@@ -239,7 +238,7 @@ fun GalleryScreen(
                         headerCollapsePx += consumed
                         return Offset(0f, -consumed)
                     }
-                } else if (delta > 0f && !gridState.canScrollBackward) {
+                } else if (delta > 0f) {
                     val consumed = min(delta, headerCollapsePx)
                     if (consumed > 0f) {
                         headerCollapsePx -= consumed
@@ -445,14 +444,7 @@ fun GalleryScreen(
                         bottom = 20.dp + if (state.selecting) with(density) { selectionToolbarHeightPx.toDp() } else 0.dp,
                     ),
                 ) {
-                    if (!state.permissionGranted) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            TextButton(onClick = { permissionLauncher.launch(permissions) }) {
-                                Text(stringResource(R.string.photos_permission))
-                            }
-                        }
-                    }
-                    if (!refreshing && timeline.isEmpty() && (state.isLoading || cloudPhotos.isLoading || cloudVideos.isLoading)) {
+                    if (!refreshing && timeline.isEmpty() && (cloudPhotos.isLoading || cloudVideos.isLoading)) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 LoadingIndicator()
@@ -498,7 +490,7 @@ fun GalleryScreen(
                             }
                         }
                     }
-                    if (timeline.isEmpty() && !state.isLoading && !cloudPhotos.isLoading && !cloudVideos.isLoading) {
+                    if (timeline.isEmpty() && !cloudPhotos.isLoading && !cloudVideos.isLoading) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(stringResource(R.string.photos_empty), modifier = Modifier.padding(24.dp))
                         }
