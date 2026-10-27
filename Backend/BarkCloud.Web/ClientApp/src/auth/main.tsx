@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AuthPage } from './AuthPage';
 import type { AuthPageState } from './types';
+import '../styles/fields.css';
 
 const rootElement = document.getElementById('root');
 const stateElement = document.getElementById('auth-page-state');

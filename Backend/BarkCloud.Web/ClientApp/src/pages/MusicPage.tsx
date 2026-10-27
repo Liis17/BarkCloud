@@ -6,6 +6,7 @@ import { FileDropOverlay } from '../components/ui/FileDropOverlay';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { useContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { Modal } from '../components/ui/Modal';
+import { SearchField, TextField } from '../components/ui/TextField';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { RenameModal } from '../components/ui/RenameModal';
 import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
@@ -85,10 +86,7 @@ export function MusicPage() {
     actions: (
       <>
         {tab === 'tracks' && (
-          <label className="top-search music-search">
-            <Icon.search size={18} />
-            <input value={query} onChange={(e) => setQuery(e.currentTarget.value)} placeholder="Поиск по трекам" />
-          </label>
+          <SearchField label="Поиск по трекам" containerClassName="music-search" leading={<Icon.search size={18} />} value={query} onChange={(e) => setQuery(e.currentTarget.value)} placeholder="Поиск по трекам" />
         )}
         <button className="btn primary" onClick={() => { setName(''); setCreating(true); }}>
           <Icon.plus size={16} /> Плейлист
@@ -532,8 +530,7 @@ export function MusicPage() {
           onClose={() => setCreating(false)}
           actions={<><button className="btn text" onClick={() => setCreating(false)}>Отмена</button><button className="btn primary" onClick={createPlaylist}>Создать</button></>}
         >
-          <label className="field-label">Название</label>
-          <input type="text" value={name} autoFocus onChange={(e) => setName(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === 'Enter') createPlaylist(); }} />
+          <TextField label="Название" value={name} autoFocus onChange={(e) => setName(e.currentTarget.value)} onKeyDown={(e) => { if (e.key === 'Enter') createPlaylist(); }} />
         </Modal>
       )}
 

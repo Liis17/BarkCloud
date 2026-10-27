@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from '../components/Icon';
 import { Loading } from '../components/ui/EmptyState';
 import { StorageStatsStatus } from '../components/ui/StorageStatsStatus';
+import { SearchField, TextAreaField, TextField } from '../components/ui/TextField';
 import { useApiResource } from '../hooks/useApiResource';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
@@ -615,7 +616,7 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
       <div>
         <div style={{ color: 'var(--md-on-surface-variant)', fontSize: 14, marginBottom: 16 }}>Введите админ-пароль, чтобы управлять обновлением бэкенда.</div>
         <div className="unlock-row">
-          <input type="password" placeholder="Админ-пароль" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doUnlock(); }} autoFocus />
+          <TextField label="Админ-пароль" type="password" placeholder="Админ-пароль" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doUnlock(); }} autoFocus />
           <button className="btn primary" onClick={doUnlock} disabled={unlocking || !password}>
             {unlocking ? <span className="spin" /> : <Icon.lock size={16} />} Разблокировать
           </button>
@@ -1010,10 +1011,8 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
           </div>
           <hr className="divider" />
           <div className="form-stack">
-            <label>Имя</label>
-            <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Имя" />
-            <label>Фамилия</label>
-            <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Фамилия" />
+            <TextField label="Имя" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Имя" />
+            <TextField label="Фамилия" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Фамилия" />
             <div>
               <SaveBtn saving={savingName} onClick={saveName} icon={<Icon.check size={16} />}>
                 Сохранить имя
@@ -1021,9 +1020,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
             </div>
           </div>
           <hr className="divider" />
-          <Field label="Email" help="Используется для входа, изменить нельзя">
-            <input type="email" value={profile.email || ''} disabled placeholder="—" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
-          </Field>
+          <TextField label="Email" type="email" value={profile.email || ''} disabled placeholder="—" hint="Используется для входа, изменить нельзя" />
         </div>
       </div>
 
@@ -1035,7 +1032,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
         <div className="set-card-body">
           <div className="uname-wrap">
             <div className="row">
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))} placeholder="username" />
+              <TextField label="Имя пользователя" type="text" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))} placeholder="username" />
               {uPill}
             </div>
             <div>
@@ -1053,7 +1050,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
           <div className="sub">Короткое описание профиля (до 200 символов)</div>
         </div>
         <div className="set-card-body">
-          <textarea value={bio} maxLength={200} onChange={(e) => setBio(e.target.value)} placeholder="Расскажите о себе…" />
+          <TextAreaField label="О себе" value={bio} maxLength={200} onChange={(e) => setBio(e.target.value)} placeholder="Расскажите о себе…" />
           <div className="char-counter">{bio.length}/200</div>
           <div>
             <SaveBtn saving={savingBio} onClick={saveBio} icon={<Icon.check size={16} />}>
@@ -1088,7 +1085,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
             <div className="sub">
               Это необратимо. Введите <b>УДАЛИТЬ</b> для подтверждения.
             </div>
-            <input className="dlg-input" value={delText} onChange={(e) => setDelText(e.target.value)} placeholder="УДАЛИТЬ" autoFocus />
+            <TextField label="Введите УДАЛИТЬ" value={delText} onChange={(e) => setDelText(e.target.value)} placeholder="УДАЛИТЬ" autoFocus />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setDelOpen(false)} disabled={deleting}>
                 Отмена
@@ -1505,12 +1502,9 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
             </div>
           ) : (
             <div className="form-stack">
-              <label>Текущий пароль</label>
-              <input type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} autoFocus />
-              <label>Новый пароль</label>
-              <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-              <label>Повторите новый пароль</label>
-              <input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+              <TextField label="Текущий пароль" type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} autoFocus />
+              <TextField label="Новый пароль" type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+              <TextField label="Повторите новый пароль" type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
               <div style={{ display: 'flex', gap: 8 }}>
                 <SaveBtn saving={savingPwd} onClick={savePassword} icon={<Icon.check size={16} />}>
                   Сохранить
@@ -1586,12 +1580,12 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
                 ? 'Подтвердите действие паролем и активным вторым фактором или существующим passkey.'
               : 'Введите текущий пароль, чтобы подтвердить изменение двухфакторной защиты.'}</div>
             {reauthDlg !== 'setInitialPassword' && (reauthDlg !== 'passkeyAdd' && reauthDlg !== 'passkeyRemove' || !reauthEmailRequired || !reauthChallengeId) ? (
-              <input className="dlg-input" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
+              <TextField label="Пароль" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
             ) : null}
-            {reauthOtpRequired && <input className="dlg-input" value={reauthOtpCode} onChange={(e) => setReauthOtpCode(e.target.value)} placeholder="Код из приложения-аутентификатора" inputMode="numeric" autoComplete="one-time-code" />}
+            {reauthOtpRequired && <TextField label="Код из приложения-аутентификатора" value={reauthOtpCode} onChange={(e) => setReauthOtpCode(e.target.value)} placeholder="Код из приложения-аутентификатора" inputMode="numeric" autoComplete="one-time-code" containerClassName="sys-dialog-code" />}
             {reauthEmailPrompt && (
               <>
-                <input className="dlg-input" value={reauthEmailCode} onChange={(e) => setReauthEmailCode(e.target.value)} placeholder="Код из письма" inputMode="numeric" autoComplete="one-time-code" />
+                <TextField label="Код из письма" value={reauthEmailCode} onChange={(e) => setReauthEmailCode(e.target.value)} placeholder="Код из письма" inputMode="numeric" autoComplete="one-time-code" containerClassName="sys-dialog-code" />
                 {passkeyReauth ? (
                   <button className="btn text" onClick={resendReauthEmail} disabled={reauthBusy || reauthRetrySeconds > 0}>
                     {reauthRetrySeconds > 0 ? `Повторная отправка через ${reauthRetrySeconds} с` : 'Отправить код повторно'}
@@ -1633,7 +1627,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
               {enableDlg.qr && <img src={'data:image/png;base64,' + enableDlg.qr} alt="QR" />}
               {enableDlg.code && <div className="qr-code">Ключ: {enableDlg.code}</div>}
             </div>
-            <input className="dlg-input" value={enableCode} onChange={(e) => setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmEnable(); }} />
+            <TextField label="Код подтверждения" value={enableCode} onChange={(e) => setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmEnable(); }} containerClassName="sys-dialog-code" />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setEnableDlg(null)} disabled={enableBusy}>
                 Отмена
@@ -1651,7 +1645,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
           <div className="sys-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Отключить 2FA</h3>
             <div className="sub">Введите текущий код из приложения-аутентификатора.</div>
-            <input className="dlg-input" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="Код" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmDisable(); }} />
+            <TextField label="Код" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="Код" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmDisable(); }} containerClassName="sys-dialog-code" />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setDisableDlg(null)} disabled={disableBusy}>
                 Отмена
@@ -1848,9 +1842,8 @@ function SessionsTab({ sessions: initial, flash }: { sessions: Session[]; flash:
             </div>
             <div style={{ minWidth: 0 }}>
               {renaming === s.deviceId ? (
-                <input
-                  className="dlg-input"
-                  style={{ marginTop: 0 }}
+                <TextField
+                  label="Название устройства"
                   value={renameVal}
                   autoFocus
                   onChange={(e) => setRenameVal(e.target.value)}
@@ -2070,9 +2063,9 @@ export function SettingsPage() {
       <div className="set-nav">
         <div className="settings-search">
           <label htmlFor="settings-search">Поиск по настройкам</label>
-          <div className="settings-search-input"><Icon.search size={18} /><input id="settings-search" type="search" value={search}
-            placeholder="Название пункта…" onChange={(event) => setSearch(event.target.value)} />
-            {search && <button className="icon-btn" aria-label="Очистить поиск настроек" onClick={() => setSearch('')}><Icon.x size={16} /></button>}</div>
+          <SearchField id="settings-search" label="Поиск по настройкам" containerClassName="settings-search-input" leading={<Icon.search size={18} />} value={search}
+            placeholder="Название пункта…" onChange={(event) => setSearch(event.target.value)}
+            trailing={search ? <button type="button" className="icon-btn" aria-label="Очистить поиск настроек" onClick={() => setSearch('')}><Icon.x size={16} /></button> : undefined} />
           {query && <div className="settings-search-results" aria-label="Результаты поиска настроек">
             {results.length === 0 ? <div className="server-empty">Ничего не найдено</div> : results.map(([key, label, help]) =>
               <button key={`${key}:${label}`} onClick={() => { go(key); setTarget(label); setSearch(''); }}><strong>{label}</strong><small>{SECTIONS.find((item) => item.key === key)?.label} · {help}</small></button>)}
