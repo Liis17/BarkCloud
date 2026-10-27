@@ -1,5 +1,7 @@
 package com.barkfluff.BarkCloud.files.ui
 
+import android.os.storage.StorageManager
+import android.os.storage.StorageVolume
 import android.content.ActivityNotFoundException
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +69,7 @@ import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderFormDialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilesRootScreen(
+    menu: @Composable () -> Unit = {},
     onOpenLocal: (String) -> Unit,
     onOpenCloud: () -> Unit,
     onOpenShared: () -> Unit,
@@ -84,14 +87,22 @@ fun FilesRootScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshPermission()
+                viewModel.refreshPermission(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    DisposableEffect(context) {
+        val manager = context.getSystemService(StorageManager::class.java)
+        val callback = object : StorageManager.StorageVolumeCallback() {
+            override fun onStateChanged(volume: StorageVolume) { viewModel.refreshPermission(context) }
+        }
+        manager.registerStorageVolumeCallback(context.mainExecutor, callback)
+        onDispose { manager.unregisterStorageVolumeCallback(callback) }
+    }
     LaunchedEffect(Unit) {
-        viewModel.refreshPermission()
+        viewModel.refreshPermission(context)
         viewModel.loadSmartFolders()
     }
     LaunchedEffect(state.snackbar) {
@@ -104,6 +115,7 @@ fun FilesRootScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.files_root_title)) },
+                actions = { menu() },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -129,6 +141,17 @@ fun FilesRootScreen(
                         }
                     },
                 )
+            }
+            if (state.storageGranted) {
+                items(state.removableStorage, key = { it.path }) { volume ->
+                    Spacer(Modifier.height(8.dp))
+                    NavCard(
+                        icon = Icons.Outlined.Storage,
+                        title = volume.name,
+                        subtitle = volume.path,
+                        onClick = { onOpenLocal(volume.path) },
+                    )
+                }
             }
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item {

@@ -6,7 +6,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -15,13 +19,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.barkfluff.BarkCloud.DeepLinkEvent
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.files.ui.FilesRootScreen
 import com.barkfluff.BarkCloud.files.ui.LocalBrowserScreen
@@ -50,58 +57,69 @@ import com.barkfluff.BarkCloud.ui.upload.UploadQueueViewModel
 import com.barkfluff.BarkCloud.ui.vault.VaultScreen
 import kotlinx.coroutines.flow.first
 
-/**
- * Главный экран с нижней навигацией из 5 вкладок (как в iOS). Каждая вкладка — свой
- * вложенный граф со своим back-stack (сохраняется через [MainBottomBar]). Реальные
- * экраны вкладок Галерея/Альбомы/Корзина/Настройки добавляются в фазе 4; пока — заглушки.
- */
+/** Основная навигация с отдельным стеком каждой вкладки. */
 @Composable
 fun MainScreen(
-    deepLink: Uri? = null,
+    deepLink: DeepLinkEvent? = null,
     onSignOut: () -> Unit,
 ) {
     val navController = rememberNavController()
     val rootCloudTitle = stringResource(R.string.cloud_storage_title)
     val uploadViewModel: UploadQueueViewModel = viewModel(factory = UploadQueueViewModel.factory())
     val uploadState by uploadViewModel.state.collectAsStateWithLifecycle()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val isRootScreen = currentRoute in setOf("gallery/root", "files/root", "albums/root", "search/root")
+    val isGalleryRoot = currentRoute == "gallery/root"
 
     LaunchedEffect(deepLink) {
-        val target = deepLink?.host ?: return@LaunchedEffect
+        val target = deepLink?.uri?.host ?: return@LaunchedEffect
         val route = when (target) {
-            "gallery" -> MainDestination.Gallery.route
-            "files" -> MainDestination.Files.route
-            "albums", "media" -> MainDestination.Albums.route
-            "trash" -> MainDestination.Trash.route
-            "settings" -> MainDestination.Settings.route
+            "search" -> "search/root"
+            "gallery" -> "gallery/root"
+            "files" -> "files/root"
+            "albums", "media" -> "albums/root"
+            "trash" -> "trash/root"
+            "settings" -> "settings/root"
             "vault" -> "settings/vault"
             else -> return@LaunchedEffect
         }
         // Scaffold installs its NavHost during subcomposition, after this effect can start.
         navController.currentBackStackEntryFlow.first()
+        if (navController.popBackStack(route, inclusive = false)) return@LaunchedEffect
         navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            Column {
-                AnimatedVisibility(
-                    visible = uploadState.isActive,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
-                ) {
-                    GlobalUploadBanner(uploadState) { navController.navigate("uploads/root") }
+            if (isRootScreen) {
+                Column {
+                    AnimatedVisibility(
+                        visible = !isGalleryRoot && uploadState.isActive,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        GlobalUploadBanner(uploadState) { navController.navigate("uploads/root") }
+                    }
+                    MainBottomBar(navController)
                 }
-                MainBottomBar(navController)
             }
         },
     ) { padding ->
+        val shellInsets = when {
+            isGalleryRoot -> WindowInsets(0, 0, 0, 0)
+            isRootScreen -> WindowInsets.statusBars
+            else -> WindowInsets.systemBars
+        }
         NavHost(
             navController = navController,
             startDestination = MainDestination.Default.route,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.padding(padding).windowInsetsPadding(shellInsets),
             enterTransition = FadeThroughEnter,
             exitTransition = FadeThroughExit,
             popEnterTransition = FadeThroughEnter,
@@ -109,13 +127,20 @@ fun MainScreen(
         ) {
             navigation(startDestination = "gallery/root", route = MainDestination.Gallery.route) {
                 composable("gallery/root") {
-                    GalleryScreen()
+                    GalleryScreen(
+                        uploadState = uploadState,
+                        onOpenProfile = { navController.navigate("settings/editProfile") },
+                        onOpenSettings = { navController.navigate("settings") },
+                        onOpenTrash = { navController.navigate("trash") },
+                        onOpenUploads = { navController.navigate("uploads/root") },
+                    )
                 }
             }
 
             navigation(startDestination = "files/root", route = MainDestination.Files.route) {
                 composable("files/root") {
                     FilesRootScreen(
+                        menu = { MainMenu(onSettings = { navController.navigate("settings") }, onTrash = { navController.navigate("trash") }) },
                         onOpenLocal = { path ->
                             navController.navigate("files/local?path=${Uri.encode(path)}")
                         },
@@ -195,6 +220,7 @@ fun MainScreen(
             navigation(startDestination = "albums/root", route = MainDestination.Albums.route) {
                 composable("albums/root") {
                     MediaTabScreen(
+                        menu = { MainMenu(onSettings = { navController.navigate("settings") }, onTrash = { navController.navigate("trash") }) },
                         onOpenAlbum = { id, name ->
                             navController.navigate("albums/detail/$id?name=${Uri.encode(name)}")
                         },
@@ -219,15 +245,27 @@ fun MainScreen(
                 }
             }
 
-            navigation(startDestination = "trash/root", route = MainDestination.Trash.route) {
-                composable("trash/root") {
-                    TrashScreen()
+            navigation(startDestination = "search/root", route = MainDestination.Search.route) {
+                composable("search/root") {
+                    com.barkfluff.BarkCloud.ui.search.SearchScreen(
+                        onOpenAlbum = { id, name -> navController.navigate("albums/detail/$id?name=${Uri.encode(name)}") },
+                        onOpenFolder = { id, name -> navController.navigate("files/cloud?dir=$id&title=${Uri.encode(name)}") },
+                        onOpenSmartFolder = { id, name -> navController.navigate("files/smart/$id?title=${Uri.encode(name)}") },
+                        menu = { MainMenu(onSettings = { navController.navigate("settings") }, onTrash = { navController.navigate("trash") }) },
+                    )
                 }
             }
 
-            navigation(startDestination = "settings/root", route = MainDestination.Settings.route) {
+            navigation(startDestination = "trash/root", route = "trash") {
+                composable("trash/root") {
+                    TrashScreen(onNavigateUp = { navController.popBackStack() })
+                }
+            }
+
+            navigation(startDestination = "settings/root", route = "settings") {
                 composable("settings/root") {
                     SettingsScreen(
+                        onNavigateUp = { navController.popBackStack() },
                         onEditProfile = { navController.navigate("settings/editProfile") },
                         onPrivacy = { navController.navigate("settings/privacy") },
                         onDevices = { navController.navigate("settings/devices") },
@@ -235,11 +273,10 @@ fun MainScreen(
                         onCache = { navController.navigate("settings/cache") },
                         onAppLock = { navController.navigate("settings/applock") },
                         onVault = { navController.navigate("settings/vault") },
-                        onSignedOut = onSignOut,
                     )
                 }
                 drillIn("settings/editProfile") {
-                    EditProfileScreen(onNavigateUp = { navController.popBackStack() })
+                    EditProfileScreen(onNavigateUp = { navController.popBackStack() }, onSignedOut = onSignOut)
                 }
                 drillIn("settings/privacy") {
                     PrivacySettingsScreen(onNavigateUp = { navController.popBackStack() })

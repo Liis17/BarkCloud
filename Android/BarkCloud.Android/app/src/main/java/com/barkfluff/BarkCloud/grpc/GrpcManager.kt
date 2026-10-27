@@ -3,6 +3,7 @@ package com.barkfluff.BarkCloud.grpc
 import barkcloud.files.AlbumApiGrpcKt
 import barkcloud.files.CloudApiGrpcKt
 import barkcloud.files.DynamicFolderApiGrpcKt
+import barkcloud.files.SearchApiGrpcKt
 import barkcloud.files.FilesApiGrpcKt
 import barkcloud.identity.IdentityApiGrpcKt
 import barkcloud.identity.IdentityApiOuterClass.CreateTokenRequest
@@ -65,6 +66,9 @@ class GrpcManager(
 
     fun dynamicFolderStub(): DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub =
         DynamicFolderApiGrpcKt.DynamicFolderApiCoroutineStub(channelFor(ServerSettings.filesAddress))
+
+    fun searchStub(): SearchApiGrpcKt.SearchApiCoroutineStub =
+        SearchApiGrpcKt.SearchApiCoroutineStub(channelFor(ServerSettings.filesAddress))
 
     suspend fun validAccessToken(): String? = tokenRefresher.validAccessToken()
 

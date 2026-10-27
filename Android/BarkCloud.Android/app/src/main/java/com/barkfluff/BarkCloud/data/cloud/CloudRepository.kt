@@ -7,6 +7,7 @@ import barkcloud.files.FilesApiOuterClass.CreateDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.DeleteDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.DeleteFileEntryRequest
 import barkcloud.files.FilesApiOuterClass.DeleteFromTrashRequest
+import barkcloud.files.FilesApiOuterClass.DeleteUserMediaRequest
 import barkcloud.files.FilesApiOuterClass.EmptyTrashRequest
 import barkcloud.files.FilesApiOuterClass.GetPathRequest
 import barkcloud.files.FilesApiOuterClass.ListDirectoryRequest
@@ -32,6 +33,15 @@ class CloudRepository(
     val transfer: FileTransferService,
 ) {
 
+    suspend fun search(
+        query: String,
+        pages: List<barkcloud.files.FilesApiOuterClass.SearchSectionPage>,
+    ): List<barkcloud.files.FilesApiOuterClass.SearchSectionResult> =
+        grpc.searchStub().search(
+            barkcloud.files.FilesApiOuterClass.SearchRequest.newBuilder()
+                .setQuery(query).addAllPages(pages).build(),
+        ).sectionsList
+
     // MARK: Галерея
 
     suspend fun listUserMedia(
@@ -50,6 +60,12 @@ class CloudRepository(
             items = resp.itemsList.map { MediaAsset.from(it.file) },
             nextCursorCreatedAtMillis = if (resp.hasNextCursorCreatedAt()) resp.nextCursorCreatedAt.toEpochMillis() else null,
             nextCursorFileId = resp.nextCursorFileId,
+        )
+    }
+
+    suspend fun deleteUserMedia(fileId: String) {
+        grpc.cloudStub().deleteUserMedia(
+            DeleteUserMediaRequest.newBuilder().setFileId(fileId).build(),
         )
     }
 

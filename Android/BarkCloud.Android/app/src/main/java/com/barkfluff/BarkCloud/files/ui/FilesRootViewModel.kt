@@ -1,5 +1,8 @@
 package com.barkfluff.BarkCloud.files.ui
 
+import android.content.Context
+import android.os.Environment
+import android.os.storage.StorageManager
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,9 +20,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class StorageLocation(val path: String, val name: String)
+
 data class ServerFolder(val id: String, val name: String)
 
 data class FilesRootUiState(
+    val removableStorage: List<StorageLocation> = emptyList(),
     val storageGranted: Boolean = false,
     val serverFolders: List<ServerFolder> = emptyList(),
     val smartFolders: List<DynamicFolderCard> = emptyList(),
@@ -34,8 +40,18 @@ class FilesRootViewModel(
     private val _state = MutableStateFlow(FilesRootUiState())
     val state: StateFlow<FilesRootUiState> = _state.asStateFlow()
 
-    fun refreshPermission() {
-        _state.value = _state.value.copy(storageGranted = StoragePermission.isGranted())
+    fun refreshPermission(context: Context) {
+        val volumes = context.getSystemService(StorageManager::class.java).storageVolumes
+        _state.update { state ->
+            state.copy(
+                storageGranted = StoragePermission.isGranted(),
+                removableStorage = volumes.filter {
+                    !it.isPrimary && it.state in listOf(Environment.MEDIA_MOUNTED, Environment.MEDIA_MOUNTED_READ_ONLY)
+                }.mapNotNull { volume ->
+                    volume.directory?.let { StorageLocation(it.absolutePath, volume.getDescription(context)) }
+                },
+            )
+        }
     }
 
     fun loadSmartFolders() {
