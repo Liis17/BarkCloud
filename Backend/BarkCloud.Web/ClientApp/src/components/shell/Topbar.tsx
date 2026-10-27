@@ -2,6 +2,7 @@ import React from 'react';
 import { useTextSearchOpen } from '../../hooks/useTextSearchOpen';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../Icon';
+import { SearchField } from '../ui/TextField';
 import { UploadIndicator } from '../upload/UploadIndicator';
 import { apiGet } from '../../lib/api';
 import { searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse } from '../../lib/search';
@@ -106,11 +107,11 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
       <div className="tb-search" onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
       }}>
-        <span className="si"><Icon.search size={20} /></span>
-        <input
-          type="search"
+        <SearchField
+          containerClassName="tb-search-control"
+          label="Поиск по BarkCloud"
+          leading={<Icon.search size={20} />}
           role="combobox"
-          aria-label="Поиск по BarkCloud"
           aria-autocomplete="list"
           aria-expanded={showMenu}
           aria-controls={LISTBOX_ID}

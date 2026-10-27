@@ -6,6 +6,7 @@ import '@fontsource-variable/roboto-flex';
 import '@fontsource/roboto-mono/400.css';
 import './styles/shared.css';
 import './styles/pages.css';
+import './styles/fields.css';
 
 import { AppShell } from './components/shell/AppShell';
 import { PhotosPage } from './pages/PhotosPage';

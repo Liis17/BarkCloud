@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { Modal } from '../components/ui/Modal';
+import { TextField } from '../components/ui/TextField';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { FolderPropertiesModal } from '../components/ui/FolderPropertiesModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
@@ -897,8 +898,7 @@ export function FilesPage() {
             </>
           }
         >
-          <label className="field-label">Имя папки</label>
-          <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createDir(); }} />
+          <TextField label="Имя папки" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createDir(); }} />
         </Modal>
       )}
 
@@ -917,8 +917,7 @@ export function FilesPage() {
             </>
           }
         >
-          <label className="field-label">Новое имя</label>
-          <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doRename(); }} />
+          <TextField label="Новое имя" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doRename(); }} />
         </Modal>
       )}
 
