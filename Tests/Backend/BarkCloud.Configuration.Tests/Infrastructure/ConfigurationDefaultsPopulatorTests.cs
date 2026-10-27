@@ -46,9 +46,9 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
         second.Single(item => item.ServiceId == ServiceId.Unknown
                               && item.Section == "JwtSettings"
                               && item.Key == "Issuer").Value.Should().Be("manual-issuer");
-        second.Single(item => item.ServiceId == ServiceId.Unknown
-                              && item.Section == "RabbitMQ"
-                              && item.Key == "Username").Value.Should().BeEmpty();
+        second.Should().NotContain(item => item.ServiceId == ServiceId.Unknown
+                                           && item.Section == "RabbitMQ"
+                                           && (item.Key == "Username" || item.Key == "Password"));
         second.Where(item => item.ServiceId == ServiceId.Notification && item.Section == "Email" && item.Key != "AllowInsecure")
             .Should().OnlyContain(item => item.Value == string.Empty);
         second.Single(item => item.ServiceId == ServiceId.Notification
@@ -129,14 +129,85 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
             .Should().OnlyContain(x => x.Value == string.Empty);
     }
 
+    [Fact]
+    public async Task Populate_RefreshesPersistedDeploymentCredentials()
+    {
+        var populator = CreatePopulator(minioAccessKey: "", minioSecretKey: "");
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+        await _context.Settings(SettingsScopes.Get(ServiceId.Torrent))
+            .Where(row => row.Key == "TorrentDb" || row.Key == "RabbitMQ:Password")
+            .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, "previous-credential"));
+        _context.ChangeTracker.Clear();
+
+        await populator.PopulateDefaultsAsync();
+
+        var settings = await new ConfigurationStorage(_context, new MetricsCollector()).GetConfiguration(ServiceId.Torrent);
+        settings.Single(row => row.Section == "RabbitMQ" && row.Key == "Password")
+            .Value.Should().Be("torrent-rabbit-secret");
+        new Npgsql.NpgsqlConnectionStringBuilder(settings.Single(row => row.Section == "TorrentDb").Value)
+            .Password.Should().Be("torrent-db-secret");
+    }
+
+    [Fact]
+    public async Task Populate_UsesOnlyPerServiceDatabaseAndRabbitCredentials()
+    {
+        var populator = CreatePopulator(minioAccessKey: "", minioSecretKey: "");
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+
+        var settings = await new ConfigurationStorage(_context, new MetricsCollector()).GetAllAsync();
+        foreach (var (serviceId, database, username, databasePassword, rabbitPassword) in new[]
+                 {
+                     (ServiceId.Identity, "IdentityDb", "barkcloud_identity", "identity-db-secret", "identity-rabbit-secret"),
+                     (ServiceId.Users, "UsersDb", "barkcloud_users", "users-db-secret", "users-rabbit-secret"),
+                     (ServiceId.Files, "FilesDb", "barkcloud_files", "files-db-secret", "files-rabbit-secret"),
+                     (ServiceId.Torrent, "TorrentDb", "barkcloud_torrent", "torrent-db-secret", "torrent-rabbit-secret")
+                 })
+        {
+            var connectionString = settings.Single(x => x.ServiceId == serviceId && x.Section == database).Value;
+            var connection = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+            connection.Database.Should().Be(database.Replace("Db", "", StringComparison.Ordinal).ToLowerInvariant());
+            connection.Username.Should().Be(username);
+            connection.Password.Should().Be(databasePassword);
+
+            settings.Single(x => x.ServiceId == serviceId && x.Section == "RabbitMQ" && x.Key == "Username")
+                .Value.Should().Be(username);
+            settings.Single(x => x.ServiceId == serviceId && x.Section == "RabbitMQ" && x.Key == "Password")
+                .Value.Should().Be(rabbitPassword);
+        }
+
+        settings.Single(x => x.ServiceId == ServiceId.Notification && x.Section == "RabbitMQ" && x.Key == "Username")
+            .Value.Should().Be("barkcloud_notification");
+        settings.Single(x => x.ServiceId == ServiceId.Notification && x.Section == "RabbitMQ" && x.Key == "Password")
+            .Value.Should().Be("notification-rabbit-secret");
+        settings.Should().NotContain(x => x.ServiceId == ServiceId.Unknown
+                                          && x.Section == "RabbitMQ"
+                                          && (x.Key == "Username" || x.Key == "Password"));
+    }
+
     private ConfigurationDefaultsPopulator CreatePopulator(string minioAccessKey, string minioSecretKey) => new(
         _context,
         NullLogger<ConfigurationDefaultsPopulator>.Instance,
         "postgres",
-        "postgres-user",
-        "postgres-secret",
-        "",
-        "",
+        5432,
+        new Dictionary<ServiceId, string>
+        {
+            [ServiceId.Identity] = "identity-db-secret",
+            [ServiceId.Users] = "users-db-secret",
+            [ServiceId.Files] = "files-db-secret",
+            [ServiceId.Torrent] = "torrent-db-secret"
+        },
+        "rabbitmq",
+        "/",
+        new Dictionary<ServiceId, string>
+        {
+            [ServiceId.Identity] = "identity-rabbit-secret",
+            [ServiceId.Users] = "users-rabbit-secret",
+            [ServiceId.Files] = "files-rabbit-secret",
+            [ServiceId.Torrent] = "torrent-rabbit-secret",
+            [ServiceId.Notification] = "notification-rabbit-secret"
+        },
         "minio",
         "9000",
         minioAccessKey,

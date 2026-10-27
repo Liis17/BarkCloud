@@ -37,6 +37,34 @@ public sealed class BuilderGeneratorTests
         }
     }
 
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    public void Configuration_receives_only_service_credentials_and_builder_carries_provisioning_artifacts(
+        bool includeLognara, bool includeRabbitmq, bool includePostgres)
+    {
+        var model = new BuilderModel { IncludeRabbitmq = includeRabbitmq, IncludePostgres = includePostgres };
+        model.SetGlobalLognara(includeLognara);
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+        var configuration = ComposeService(compose, "cloud-configuration");
+        var web = ComposeService(compose, "cloud-web");
+
+        Assert.DoesNotContain("env_file:", configuration);
+        Assert.DoesNotContain("POSTGRES_USER:", configuration);
+        Assert.DoesNotContain("POSTGRES_PASSWORD:", configuration);
+        Assert.DoesNotContain("RABBITMQ_DEFAULT_USER:", configuration);
+        Assert.DoesNotContain("RABBITMQ_DEFAULT_PASS:", configuration);
+        Assert.Contains("CONFIGURATION_USERNAME: barkcloud_configuration", configuration);
+        Assert.Contains("IDENTITY_DB_PASSWORD:", configuration);
+        Assert.Contains("RABBITMQ_TORRENT_PASSWORD:", configuration);
+        Assert.Contains("env_file:", web);
+        Assert.Contains("/var/run/docker.sock:/var/run/docker.sock", web);
+        Assert.Contains("CONFIGURATION_DB_PASSWORD='", env);
+        Assert.Contains("IDENTITY_DB_PASSWORD='", env);
+        Assert.Contains("RABBITMQ_NOTIFICATION_PASSWORD='", env);
+    }
+
     [Fact]
     public void Default_external_mode_generates_config_without_nginx_service_or_host_ports()
     {
@@ -625,12 +653,14 @@ public sealed class BuilderGeneratorTests
 
         var compose = BackendComposeGenerator.BuildCompose(model);
         var env = BackendComposeGenerator.BuildEnv(model);
+        var configuration = ComposeService(compose, "cloud-configuration");
 
         Assert.Empty(BuilderModelValidator.Validate(model));
         Assert.DoesNotContain("  cloud-minio:\n", compose);
         Assert.DoesNotContain("  cloud-rabbitmq:\n", compose);
         Assert.DoesNotContain("  cloud-postgres:\n", compose);
         Assert.DoesNotContain("  cloud-seq:\n", compose);
+        Assert.DoesNotContain("MINIO_HOST:", configuration);
         Assert.DoesNotContain("barkcloud-lognara-minio", compose);
         Assert.DoesNotContain("barkcloud-lognara-postgres", compose);
         Assert.DoesNotContain("LOGNARA_MINIO_TOKEN=", env);

@@ -15,6 +15,7 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 | `Backend/BarkCloud.Configuration/Infrastructure/StorageProfileStorage.cs` | `StorageProfileStorage` | Версии и активация S3-профилей |
 | `Backend/BarkCloud.Configuration/Infrastructure/StorageQuotaGroupStorage.cs` | `StorageQuotaGroupStorage` | Группы квот и членство физических бакетов |
 | `Backend/BarkCloud.Configuration/Infrastructure/ConfigurationDefaultsPopulator.cs` | `ConfigurationDefaultsPopulator` | Заполнение начальных значений |
+| `Backend/BarkCloud.Configuration/Persistence/Migrations/20261028120000_IsolateServiceCredentials.cs` | `IsolateServiceCredentials` | Удаление прежних общих broker credentials и root-based service connection strings вместе с историей |
 | `Backend/BarkCloud.Configuration/Host/ConfigurationApiService.cs` | `ConfigurationApiService` | gRPC-реализация |
 | `Backend/BarkCloud.Configuration/Program.cs` | `Main` | Запуск сервиса с общим logging lifecycle |
 | `Shared/BarkCloud.Proto/configuration_api.proto` | `ConfigurationApi` | gRPC-контракт |
@@ -49,14 +50,17 @@ Parent: [[Index]] · See also: [[Backend/Identity]], [[Backend/Notification]], [
 - Отдельные key/value-таблицы: `GlobalSettings`, `IdentitySettings`, `UsersSettings`, `NotificationSettings`, `FilesSettings`, `WebSettings`, `TorrentSettings`.
 - `SettingsHistory` хранит изменения ключей; `ReservedNames` — нормализованные имена.
 - `StorageProfiles` и `StorageProfileRevisions` хранят версии подключений и их ревизии; `StorageQuotaGroups` и `StorageQuotaGroupBuckets` — группы и их бакеты. В `StorageProfiles` столбца квоты нет.
-- На старте `EnsureSeedAsync` добавляет недостающие строки каталога, а `PopulateDefaultsAsync` заполняет только пустые значения. Непустые значения оператора не перезаписываются.
+- На старте `EnsureSeedAsync` добавляет недостающие строки каталога, а `PopulateDefaultsAsync` заполняет пустые значения и синхронизирует управляемые deployment сервисные credentials. Непустые редактируемые настройки оператора не перезаписываются.
+- `RabbitMQ:Host` и `RabbitMQ:VirtualHost` остаются в global scope; `RabbitMQ:Username` и `RabbitMQ:Password` принадлежат scope каждого сервиса. Configuration получает service-specific passwords из environment, собирает отдельные PostgreSQL connection strings с фиксированными ролями `barkcloud_identity`, `barkcloud_users`, `barkcloud_files` и `barkcloud_torrent`, а Rabbit users — `barkcloud_<service>`.
 - Каталог Identity содержит `IdentityService:Host`, используемый `AddServiceTokenClient` перед серверным вызовом к Users; значение по умолчанию указывает на `cloud-identity` и `IDENTITY_PORT`.
 - Identity, Users, Files, Torrent, Notification и Web получают снимок через `LoadConfigurationAsync(ServiceId)` и `CONFIGURATION_SERVICE_URL`, предварительно опрашивая `GetReadiness` по правилам [[Backend/GrpcServer]]. Обновления не рассылаются потребителям. Identity отдельно перечитывает `Features:RegistrationEnabled` при запросе регистрации.
 - Валидация принимает только ключи каталога; Boolean нормализуются, URL ограничены абсолютными HTTP(S), порты — `1..65535`, другие integer-значения должны быть положительными.
 
 ## Ограничения и важные детали
 
-Собственная БД и порт сервиса задаются bootstrap-переменными `CONFIGURATION_HOST`, `CONFIGURATION_DBPORT`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD` и `CONFIGURATION_PORT`. SMTP-поля могут оставаться пустыми; тогда `Features:EmailEnabled=false`. Вне Development обязательны внешние адреса Identity, Users, Files и Torrent.
+Сервисные строки подключения к БД и RabbitMQ credentials управляются deployment-переменными: `PopulateDefaultsAsync` синхронизирует и ранее заполненные строки с текущим окружением при каждом старте. При ротации паролей сначала останавливают приложения, обновляют `.env` и выполняют provisioning, затем запускают Configuration и его потребителей; остальные редактируемые настройки сохраняются.
+
+Собственная БД и порт сервиса задаются bootstrap-переменными `CONFIGURATION_HOST`, `CONFIGURATION_DBPORT`, `CONFIGURATION_DATABASE`, `CONFIGURATION_USERNAME`, `CONFIGURATION_PASSWORD` и `CONFIGURATION_PORT`. Compose передаёт Configuration только индивидуальные service passwords и необходимые настройки; root PostgreSQL и RabbitMQ bootstrap credentials ему не передаются. Нет fallback на общий broker password или PostgreSQL operator connection string. При переходе существующей установки data migration удаляет прежние shared RabbitMQ credentials и connection strings с root-учётными данными вместе с относящимися к ним записями истории; затем `PopulateDefaultsAsync` заполняет новые значения из service passwords. SMTP-поля могут оставаться пустыми; тогда `Features:EmailEnabled=false`. Вне Development обязательны внешние адреса Identity, Users, Files и Torrent.
 
 Configuration использует общий с остальными backend-приложениями logging lifecycle из `BarkCloud.GrpcServer`. Локальные `ConsoleOutput`, `SeqEnable` и `LognaraEnable` задаются до запуска и не перекрываются remote overlay; Lognara подключается отдельным sink к loopback HTTP endpoint внутри того же контейнера. Агент не захватывает stdout/stderr и не читает файловые sources. Его запуск и остановка принадлежат общему lifecycle; настройки и ограничения описаны в [[Backend/GrpcServer]].
 

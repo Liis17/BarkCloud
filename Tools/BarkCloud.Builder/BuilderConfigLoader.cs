@@ -43,6 +43,14 @@ public static class BuilderConfigLoader
                 setter(value);
         }
 
+        void SetSecret(string key, Action<string> setter)
+        {
+            if (e.TryGetValue(key, out var value)
+                && !string.IsNullOrWhiteSpace(value)
+                && !value.StartsWith("replace-", StringComparison.OrdinalIgnoreCase))
+                setter(value);
+        }
+
         Set("IDENTITY_CONFIG_ACCESS_KEY", v => m.IdentityConfigAccessKey = v);
         Set("USERS_CONFIG_ACCESS_KEY", v => m.UsersConfigAccessKey = v);
         Set("NOTIFICATION_CONFIG_ACCESS_KEY", v => m.NotificationConfigAccessKey = v);
@@ -54,6 +62,16 @@ public static class BuilderConfigLoader
         Set("FILES_SERVICE_CREDENTIAL", v => m.FilesServiceCredential = v);
         Set("TORRENT_SERVICE_CREDENTIAL", v => m.TorrentServiceCredential = v);
         Set("WEB_SERVICE_CREDENTIAL", v => m.WebServiceCredential = v);
+        SetSecret("CONFIGURATION_DB_PASSWORD", v => m.ConfigurationDbPassword = v);
+        SetSecret("IDENTITY_DB_PASSWORD", v => m.IdentityDbPassword = v);
+        SetSecret("USERS_DB_PASSWORD", v => m.UsersDbPassword = v);
+        SetSecret("FILES_DB_PASSWORD", v => m.FilesDbPassword = v);
+        SetSecret("TORRENT_DB_PASSWORD", v => m.TorrentDbPassword = v);
+        SetSecret("RABBITMQ_IDENTITY_PASSWORD", v => m.IdentityRabbitPassword = v);
+        SetSecret("RABBITMQ_USERS_PASSWORD", v => m.UsersRabbitPassword = v);
+        SetSecret("RABBITMQ_FILES_PASSWORD", v => m.FilesRabbitPassword = v);
+        SetSecret("RABBITMQ_TORRENT_PASSWORD", v => m.TorrentRabbitPassword = v);
+        SetSecret("RABBITMQ_NOTIFICATION_PASSWORD", v => m.NotificationRabbitPassword = v);
         RestoreSecretRegistries(m, e);
         Set("WEB_ADMIN_COOKIE_KEY", v => m.WebAdminCookieKey = v);
         Set("DOCKER_NETWORK_NAME", v => m.DockerNetworkName = v);
@@ -77,9 +95,12 @@ public static class BuilderConfigLoader
         Set("MINIO_WEBPORT", v => m.MinioWebPort = v);
         Set("MINIO_DATA_PATH", v => m.MinioDataPath = v);
         Set("RABBITMQ_DEFAULT_USER", v => m.RabbitUser = v);
-        Set("RABBITMQ_DEFAULT_PASS", v => m.RabbitPass = v);
+        SetSecret("RABBITMQ_DEFAULT_PASS", v => m.RabbitPass = v);
+        Set("RABBITMQ_HOST", v => m.RabbitHost = v);
+        Set("RABBITMQ_VIRTUAL_HOST", v => m.RabbitVirtualHost = v);
         Set("POSTGRES_USER", v => m.PostgresUser = v);
-        Set("POSTGRES_PASSWORD", v => m.PostgresPassword = v);
+        SetSecret("POSTGRES_PASSWORD", v => m.PostgresPassword = v);
+        Set("POSTGRES_HOST", v => m.PostgresHost = v);
         Set("POSTGRES_DB", v => m.PostgresDb = v);
         Set("POSTGRES_PORT", v => m.PostgresPort = v);
         Set("POSTGRES_DATA_PATH", v => m.PostgresDataPath = v);
@@ -331,6 +352,10 @@ public static class BuilderConfigLoader
 
     private static bool IsSecretVariable(string key) =>
         key is "CONFIGURATION_ACCESS_KEYS" or "SERVICE_CREDENTIALS" or "WEB_ADMIN_COOKIE_KEY"
+        or "RABBITMQ_DEFAULT_PASS" or "POSTGRES_PASSWORD"
+        || (key.StartsWith("RABBITMQ_", StringComparison.Ordinal)
+            && key.EndsWith("_PASSWORD", StringComparison.Ordinal))
+        || key.EndsWith("_DB_PASSWORD", StringComparison.Ordinal)
         || key.EndsWith("_CONFIG_ACCESS_KEY", StringComparison.Ordinal)
         || key.EndsWith("_SERVICE_CREDENTIAL", StringComparison.Ordinal);
 

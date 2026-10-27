@@ -10,11 +10,11 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 | Файл | Символ | Роль |
 |---|---|---|
-| `Tools/BarkCloud.Builder/BuilderModel.cs` | `BuilderModel` | Настройки сервисов, Lognara, Docker-сетей, имён контейнеров и прокси |
+| `Tools/BarkCloud.Builder/BuilderModel.cs` | `BuilderModel` | Настройки deployment, включая автоматически создаваемые service DB/RabbitMQ secrets и инфраструктурные адреса |
 | `Tools/BarkCloud.Builder/BuilderModelValidator.cs` | `Validate` | Проверка режима, Lognara, имён, путей сертификатов и портов до записи файлов |
 | `Tools/BarkCloud.Builder/BackendComposeGenerator.cs` | `BuildCompose`, `BuildEnv`, `BuildNginxConf` | Генерация compose, env и nginx |
 | `Tools/BarkCloud.Builder/MainWindow.xaml.cs` | `OnGenerate` | Проверка, запись файлов и копирование локальных сертификатов |
-| `Tools/BarkCloud.Builder/MigrationScriptWriter.cs` | `WriteTo` | Копирование миграционного скрипта в папку сгенерированного deployment |
+| `Tools/BarkCloud.Builder/MigrationScriptWriter.cs` | `WriteTo` | Копирование migration/provisioning/smoke scripts и руководства в deployment output |
 | `Tools/BarkCloud.Builder/JwtKeyFileWriter.cs` | `WriteJwtKeys` | Создание и проверка согласованной пары JWT ключей без замены существующего приватного ключа |
 | `Tools/BarkCloud.Builder/BuilderConfigLoader.cs` | `Load` | Восстановление модели из ранее созданных compose, env и nginx-конфига (кнопка «Открыть») |
 | `Tools/BarkCloud.Builder/BarkCloud.Builder.csproj` | TargetFramework, WPF-UI | Технологическая основа |
@@ -23,7 +23,7 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 
 | Контракт | Поведение |
 |---|---|
-| Выходные файлы | Создаёт `docker-compose.yml`, `.env` и `migrate-secrets.sh` в выбранной существующей папке |
+| Выходные файлы | Создаёт `docker-compose.yml`, `.env`, `migrate-secrets.sh`, provisioning/smoke scripts и `isolation-guide.md` в выбранной существующей папке |
 | Открытие конфигурации | «Открыть» требует `docker-compose.yml` и `.env` в папке; значения берутся из `.env`, состав сервисов и канал образа — из compose, домен и пути сертификатов — из `nginx/cloud.barkfluff.conf`. Без nginx-конфига nginx считается выключенным (ошибка, если compose содержит `cloud-nginx`). Папка становится папкой вывода; локальные сертификаты Compose-режима указывают на уже лежащие в `certs/` файлы |
 | Режим без nginx | Создаёт только compose и env; Builder показывает предупреждение об отсутствии TLS reverse proxy |
 | Compose nginx | Добавляет контейнер `cloud-nginx`, публикует HTTPS/gRPC и выбранные порты консолей, создаёт `nginx/cloud.barkfluff.conf` и копирует выбранные сертификаты в `certs/` |
@@ -63,6 +63,8 @@ Parent: [[Architecture]] · See also: [[Platform/Infrastructure]]
 - Если `ARCHIVE_TEMP_PATH` пуст, compose использует named volume `archive_temp`. Владелец такого тома — root, поэтому Files под uid 1654 не сможет записать туда временный архив; для архивов нужна хост-папка с правом записи для uid 1654.
 - До обновления приложения нужно развернуть новый Compose вместе с `.env` и сгенерированными Dockerfile-инструкциями для инфраструктурных агентов, сохранив существующие named volumes spool. Затем обновить образы приложений: новые образы при запуске со старым Compose без явных startup flags будут использовать только Console и отключат Seq; старые образы сохраняют прежнее включение Seq. Старый Compose `entrypoint`-wrapper агента приложения нужно убрать, поскольку standalone runtime запускается внутри образа.
 - После переноса Builder-конфигурации с Windows на Linux запустите `bash ./migrate-secrets.sh` из папки вывода. Builder включает скрипт в deployment. Он синхронизирует реестры из индивидуальных значений (или восстанавливает пропущенные индивидуальные значения из реестра), проверяет RSA-пару и на Linux оставляет приватный ключ доступным владельцу и UID 1654 (ACL `setfacl` либо передача владельца UID 1654), без доступа для остальных.
-- Существующие Configuration и Web получают полный `.env` через `env_file`; token-переменные агентов видны обоим сервисам, поэтому изоляция agent tokens средствами Compose не обеспечивается.
+- Builder сохраняет service DB/RabbitMQ passwords при загрузке и повторной генерации; если их нет в legacy `.env`, создаёт случайные значения. Значения не настраиваются через UI. Configuration получает отдельные service passwords явными переменными, а не полный `env_file`; Web остаётся доверенной admin-границей: получает полный `.env`, запускается от root и монтирует Docker socket.
+- Для custom PostgreSQL/RabbitMQ host и RabbitMQ vhost значения сохраняются при round-trip и сериализуются как literal `.env` values. Нестандартный RabbitMQ vhost должен существовать до provisioning. Внешний PostgreSQL и RabbitMQ выбираются отдельно параметрами provisioning guide.
+- Сгенерированный deployment содержит provisioning и smoke scripts, поэтому для создания PostgreSQL roles/RabbitMQ ACL и запуска изолированных проверок не нужен checkout репозитория. Существующая установка требует backups, остановки приложений, установки нового Compose до restart и coordinated rollback — см. `isolation-guide.md`.
 - При остановке agent run пересылает полученный сигнал остановки группе foreground-процессов (nginx получает `SIGQUIT`, PostgreSQL — `SIGINT`); после `SIGTERM`, `SIGINT` или `SIGQUIT` агент ждёт не более 10 секунд, затем отправляет группе `SIGKILL`. Для BarkCloud-контейнеров Builder выставляет grace period 75 секунд, для инфраструктурных агентов — 30 секунд; более длинное значение Compose не увеличивает внутреннее окно agent run.
 - Seq agent получает только stdout контейнера, без источников внутренних файлов или базы Seq. При Lognara PostgreSQL переводит свои логи на stderr, отключая logging collector. Внешний nginx не оборачивается агентом; его текущие upstream/сертификаты настраиваются независимо.

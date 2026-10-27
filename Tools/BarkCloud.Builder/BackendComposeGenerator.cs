@@ -44,6 +44,12 @@ public static class BackendComposeGenerator
               + "\n      EMAIL_SENDER_EMAIL: ${EMAIL_SENDER_EMAIL}"
               + "\n      EMAIL_SENDER_PASSWORD: ${EMAIL_SENDER_PASSWORD}"
             : "";
+        string minioEnv = m.IncludeMinio
+            ? "\n      MINIO_HOST: cloud-minio"
+              + "\n      MINIO_PORT: \"9000\""
+              + "\n      MINIO_ROOT_USER: ${MINIO_ROOT_USER}"
+              + "\n      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}"
+            : "";
         string torrentDependency = m.IncludeTorrent ? "\n      - cloud-torrent" : "";
         string webOptionalContainerNames = string.Concat(
             m.IncludeNotification ? "\n      Docker__ContainerNames__Notification: \"${NOTIFICATION_CONTAINER_NAME}\"" : "",
@@ -78,24 +84,29 @@ services:
     image: {{Img("configuration")}}
     container_name: ${CONFIGURATION_CONTAINER_NAME}
     restart: always{{AppControls("CONFIGURATION")}}
-    env_file:
-      - .env
     environment:
       <<: *common-variables
       # Реестр bootstrap-ключей сервисов: доступ к своему разделу, админ-операции — только Web
       CONFIGURATION_ACCESS_KEYS: "${CONFIGURATION_ACCESS_KEYS}"
-      CONFIGURATION_HOST:  cloud-postgres:5432
+      CONFIGURATION_HOST: ${POSTGRES_HOST}
       CONFIGURATION_DATABASE: configuration
-      CONFIGURATION_USERNAME: ${POSTGRES_USER}
-      CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
+      CONFIGURATION_USERNAME: barkcloud_configuration
+      CONFIGURATION_PASSWORD: "${CONFIGURATION_DB_PASSWORD}"
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
-      CONFIGURATION_DBPORT: "5432"
-      MINIO_HOST: cloud-minio
-      MINIO_PORT: "9000"
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}{{emailEnv}}
+      CONFIGURATION_DBPORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      IDENTITY_DB_PASSWORD: "${IDENTITY_DB_PASSWORD}"
+      USERS_DB_PASSWORD: "${USERS_DB_PASSWORD}"
+      FILES_DB_PASSWORD: "${FILES_DB_PASSWORD}"
+      TORRENT_DB_PASSWORD: "${TORRENT_DB_PASSWORD}"
+      RABBITMQ_HOST: ${RABBITMQ_HOST}{{minioEnv}}
+      RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VIRTUAL_HOST}
+      RABBITMQ_IDENTITY_PASSWORD: "${RABBITMQ_IDENTITY_PASSWORD}"
+      RABBITMQ_USERS_PASSWORD: "${RABBITMQ_USERS_PASSWORD}"
+      RABBITMQ_FILES_PASSWORD: "${RABBITMQ_FILES_PASSWORD}"
+      RABBITMQ_TORRENT_PASSWORD: "${RABBITMQ_TORRENT_PASSWORD}"
+      RABBITMQ_NOTIFICATION_PASSWORD: "${RABBITMQ_NOTIFICATION_PASSWORD}"{{emailEnv}}
       # Внешние адреса сервисов для клиентов (обязательны)
       EXTERNAL_IDENTITY_HOST: ${EXTERNAL_IDENTITY_HOST}
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
@@ -496,19 +507,33 @@ networks:
         {
             Section("RabbitMQ");
             K("RABBITMQ_DEFAULT_USER", m.RabbitUser);
-            K("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
+            KS("RABBITMQ_DEFAULT_PASS", m.RabbitPass);
         }
 
-        if (m.IncludePostgres)
-        {
-            Section("Postgres");
-            K("POSTGRES_USER", m.PostgresUser);
-            K("POSTGRES_PASSWORD", m.PostgresPassword);
-            K("POSTGRES_DB", m.PostgresDb);
-            K("POSTGRES_PORT", m.PostgresPort);
-            K("POSTGRES_DATA_PATH", m.PostgresDataPath);
-            K("BACKUP_PATH", m.BackupPath);
-        }
+        Section("Сервисные учётные данные PostgreSQL и RabbitMQ");
+        KS("CONFIGURATION_DB_PASSWORD", m.ConfigurationDbPassword);
+        KS("IDENTITY_DB_PASSWORD", m.IdentityDbPassword);
+        KS("USERS_DB_PASSWORD", m.UsersDbPassword);
+        KS("FILES_DB_PASSWORD", m.FilesDbPassword);
+        KS("TORRENT_DB_PASSWORD", m.TorrentDbPassword);
+        KS("RABBITMQ_IDENTITY_PASSWORD", m.IdentityRabbitPassword);
+        KS("RABBITMQ_USERS_PASSWORD", m.UsersRabbitPassword);
+        KS("RABBITMQ_FILES_PASSWORD", m.FilesRabbitPassword);
+        KS("RABBITMQ_TORRENT_PASSWORD", m.TorrentRabbitPassword);
+        KS("RABBITMQ_NOTIFICATION_PASSWORD", m.NotificationRabbitPassword);
+
+        Section("Postgres");
+        KS("POSTGRES_HOST", m.PostgresHost);
+        K("POSTGRES_USER", m.PostgresUser);
+        KS("POSTGRES_PASSWORD", m.PostgresPassword);
+        K("POSTGRES_DB", m.PostgresDb);
+        K("POSTGRES_PORT", m.PostgresPort);
+        K("POSTGRES_DATA_PATH", m.PostgresDataPath);
+        K("BACKUP_PATH", m.BackupPath);
+
+        // RabbitMQ host and vhost also apply when infrastructure is externally managed.
+        KS("RABBITMQ_HOST", m.RabbitHost);
+        KS("RABBITMQ_VIRTUAL_HOST", m.RabbitVirtualHost);
 
         Section("Порты сервисов");
         K("IDENTITY_PORT", m.IdentityPort);

@@ -134,11 +134,12 @@ public class Program
 
             x.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                cfg.Host(builder.Configuration["RabbitMQ:Host"], builder.Configuration["RabbitMQ:VirtualHost"], h =>
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
                 });
+                cfg.OverrideDefaultBusEndpointQueueName("bark-identity-bus-" + Guid.NewGuid().ToString("N"));
 
                 cfg.ReceiveEndpoint("user-deleted-identity", e =>
                 {

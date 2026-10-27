@@ -92,8 +92,21 @@ sample_env_file="$sample_dir/.env"
 assert_registry_matches "$sample_env_file" CONFIGURATION_ACCESS_KEYS _CONFIG_ACCESS_KEY "Identity Users Notification Files Torrent Web"
 assert_registry_matches "$sample_env_file" SERVICE_CREDENTIALS _SERVICE_CREDENTIAL "Identity Users Files Torrent Web"
 sample_snapshot="$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)"
+for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILES_DB_PASSWORD TORRENT_DB_PASSWORD \
+           RABBITMQ_IDENTITY_PASSWORD RABBITMQ_USERS_PASSWORD RABBITMQ_FILES_PASSWORD \
+           RABBITMQ_TORRENT_PASSWORD RABBITMQ_NOTIFICATION_PASSWORD; do
+  value=$(read_env_value "$sample_env_file" "$key")
+  [[ -n "$value" && "$value" != replace-* ]] || fail "$key was not generated from sample.env"
+  sample_snapshot+="|$value"
+done
 run_migration "$sample_dir" "$temp_root/sample-repeat.log" || fail "sample.env repeat failed"
-assert_equal "$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)" "$sample_snapshot" "sample.env repeat changed generated secrets"
+repeat_snapshot="$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)"
+for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILES_DB_PASSWORD TORRENT_DB_PASSWORD \
+           RABBITMQ_IDENTITY_PASSWORD RABBITMQ_USERS_PASSWORD RABBITMQ_FILES_PASSWORD \
+           RABBITMQ_TORRENT_PASSWORD RABBITMQ_NOTIFICATION_PASSWORD; do
+  repeat_snapshot+="|$(read_env_value "$sample_env_file" "$key")"
+done
+assert_equal "$repeat_snapshot" "$sample_snapshot" "sample.env repeat changed generated secrets"
 
 partial_dir="$temp_root/partial"
 make_fixture "$partial_dir"
@@ -103,11 +116,15 @@ replace_env_line "$partial_env_file" SERVICE_CREDENTIALS "'Identity=identity-cre
 replace_env_line "$partial_env_file" IDENTITY_CONFIG_ACCESS_KEY "'known-identity-key'"
 replace_env_line "$partial_env_file" USERS_CONFIG_ACCESS_KEY '"known-users-key" # operator value'
 replace_env_line "$partial_env_file" USERS_SERVICE_CREDENTIAL "'known-users-credential=with=equals'"
+replace_env_line "$partial_env_file" IDENTITY_DB_PASSWORD "'keep-identity-db-password'"
+replace_env_line "$partial_env_file" RABBITMQ_USERS_PASSWORD '"keep-users-rabbit-password" # preserved custom value'
 run_migration "$partial_dir" "$temp_root/partial-first.log" || fail "quoted CRLF fixture migration failed"
 assert_equal "$(read_env_value "$partial_env_file" IDENTITY_CONFIG_ACCESS_KEY)" "known-identity-key" "single-quoted custom key was not preserved"
 assert_equal "$(read_env_value "$partial_env_file" USERS_CONFIG_ACCESS_KEY)" "known-users-key" "double-quoted custom key was not preserved"
 assert_equal "$(read_env_value "$partial_env_file" IDENTITY_SERVICE_CREDENTIAL)" "identity-credential" "missing service credential was not restored from its registry"
 assert_equal "$(read_env_value "$partial_env_file" USERS_SERVICE_CREDENTIAL)" "known-users-credential=with=equals" "single-quoted custom credential was not preserved"
+assert_equal "$(read_env_value "$partial_env_file" IDENTITY_DB_PASSWORD)" "keep-identity-db-password" "single-quoted database password was not preserved"
+assert_equal "$(read_env_value "$partial_env_file" RABBITMQ_USERS_PASSWORD)" "keep-users-rabbit-password" "double-quoted RabbitMQ password was not preserved"
 assert_registry_matches "$partial_env_file" CONFIGURATION_ACCESS_KEYS _CONFIG_ACCESS_KEY "Identity Users Notification Files Torrent Web"
 assert_registry_matches "$partial_env_file" SERVICE_CREDENTIALS _SERVICE_CREDENTIAL "Identity Users Files Torrent Web"
 partial_snapshot="$(read_env_value "$partial_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$partial_env_file" USERS_CONFIG_ACCESS_KEY)|$(read_env_value "$partial_env_file" USERS_SERVICE_CREDENTIAL)|$(read_env_value "$partial_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$partial_env_file" SERVICE_CREDENTIALS)"
@@ -135,4 +152,4 @@ if run_migration "$padded_dir" "$temp_root/padded.log"; then
 fi
 grep -q 'крайние пробелы' "$temp_root/padded.log" || fail "secret padding did not report an actionable error"
 
-echo "PASS: sample generation/rerun, CRLF quoted custom values, partial registry recovery, and malformed-value rejection."
+echo "PASS: sample generation/rerun, CRLF quoted custom values, partial registry recovery, service password stability, and malformed-value rejection."
