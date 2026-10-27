@@ -14,7 +14,8 @@ Parent: [[Index]] · See also: [[Backend/SessionRevocation]], [[Backend/Identity
 | `Backend/BarkCloud.Identity/Persistence/Contexts/IdentityContext.cs` | `IdentityContext` | Таблицы аутентификации, токенов и уведомлений |
 | `Backend/BarkCloud.Identity/Persistence/Services/ConfirmationCodesStorage.cs` | `ConfirmationCodesStorage` | Резервирование попытки и условное погашение кода регистрации |
 | `Backend/BarkCloud.Identity/Host/IdentityServerApiService.cs` | `IdentityServerApiService` | Служебные RPC |
-| `Backend/BarkCloud.Identity/Services/JwtService.cs` | `JwtService` | Выпуск access и service JWT |
+| `Backend/BarkCloud.Identity/Services/JwtService.cs` | `JwtService` | Выпуск access и сервисных JWT (RS256, приватный ключ только у Identity) |
+| `Backend/BarkCloud.Identity/Host/ServiceCredentialsApiService.cs` | `ServiceCredentialsApiService` | Обмен секрета сервиса на короткоживущий сервисный JWT (реестр `SERVICE_CREDENTIALS`) |
 | `Backend/BarkCloud.Identity/Services/SessionIssuer.cs` | `SessionIssuer` | Создание сессии и регистрация устройства |
 | `Backend/BarkCloud.Identity/Persistence/Services/RefreshTokensStorage.cs` | `RefreshTokensStorage` | Refresh-токены и атомарная запись отзывов |
 | `Backend/BarkCloud.Identity/Services/AuthRateLimiter.cs` | `AuthRateLimiter` | Ограничение частоты auth/OTP-запросов |

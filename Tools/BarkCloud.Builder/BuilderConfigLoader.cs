@@ -43,7 +43,18 @@ public static class BuilderConfigLoader
                 setter(value);
         }
 
-        Set("CONFIGURATION_ACCESS_KEY", v => m.ConfigurationAccessKey = v);
+        Set("IDENTITY_CONFIG_ACCESS_KEY", v => m.IdentityConfigAccessKey = v);
+        Set("USERS_CONFIG_ACCESS_KEY", v => m.UsersConfigAccessKey = v);
+        Set("NOTIFICATION_CONFIG_ACCESS_KEY", v => m.NotificationConfigAccessKey = v);
+        Set("FILES_CONFIG_ACCESS_KEY", v => m.FilesConfigAccessKey = v);
+        Set("TORRENT_CONFIG_ACCESS_KEY", v => m.TorrentConfigAccessKey = v);
+        Set("WEB_CONFIG_ACCESS_KEY", v => m.WebConfigAccessKey = v);
+        Set("IDENTITY_SERVICE_CREDENTIAL", v => m.IdentityServiceCredential = v);
+        Set("USERS_SERVICE_CREDENTIAL", v => m.UsersServiceCredential = v);
+        Set("FILES_SERVICE_CREDENTIAL", v => m.FilesServiceCredential = v);
+        Set("TORRENT_SERVICE_CREDENTIAL", v => m.TorrentServiceCredential = v);
+        Set("WEB_SERVICE_CREDENTIAL", v => m.WebServiceCredential = v);
+        Set("WEB_ADMIN_COOKIE_KEY", v => m.WebAdminCookieKey = v);
         Set("DOCKER_NETWORK_NAME", v => m.DockerNetworkName = v);
         Set("CONFIGURATION_CONTAINER_NAME", v => m.ConfigurationContainerName = v);
         Set("IDENTITY_CONTAINER_NAME", v => m.IdentityContainerName = v);

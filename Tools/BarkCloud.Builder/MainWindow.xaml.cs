@@ -20,9 +20,22 @@ namespace BarkCloud.Builder
         public MainWindow()
         {
             InitializeComponent();
+            // Разделённые секреты генерируем при каждом запуске без загруженного конфига;
+            // при Load() из существующего .env они восстанавливаются оттуда.
             _model = new BuilderModel
             {
-                ConfigurationAccessKey = GenerateKey(50),
+                IdentityConfigAccessKey = BuilderModel.GenerateSecret(50),
+                UsersConfigAccessKey = BuilderModel.GenerateSecret(50),
+                NotificationConfigAccessKey = BuilderModel.GenerateSecret(50),
+                FilesConfigAccessKey = BuilderModel.GenerateSecret(50),
+                TorrentConfigAccessKey = BuilderModel.GenerateSecret(50),
+                WebConfigAccessKey = BuilderModel.GenerateSecret(50),
+                IdentityServiceCredential = BuilderModel.GenerateSecret(43),
+                UsersServiceCredential = BuilderModel.GenerateSecret(43),
+                FilesServiceCredential = BuilderModel.GenerateSecret(43),
+                TorrentServiceCredential = BuilderModel.GenerateSecret(43),
+                WebServiceCredential = BuilderModel.GenerateSecret(43),
+                WebAdminCookieKey = BuilderModel.GenerateSecret(64),
                 WebAdminPassword = GenerateKey(20),
             };
             DataContext = _model;
@@ -129,6 +142,7 @@ namespace BarkCloud.Builder
             try
             {
                 var encoding = new UTF8Encoding(false);
+                WriteJwtKeys(dir);
                 File.WriteAllText(Path.Combine(dir, "docker-compose.yml"),
                     ToLf(BackendComposeGenerator.BuildCompose(_model)), encoding);
                 File.WriteAllText(Path.Combine(dir, ".env"),
@@ -204,6 +218,26 @@ namespace BarkCloud.Builder
             foreach (var b in bytes)
                 sb.Append(chars[b % chars.Length]);
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Пара RSA-3072 для подписи JWT (RS256): приватный ключ — только Identity, публичный —
+        /// всем валидаторам. Существующие ключи не перезаписываем: повторная генерация конфигурации
+        /// не должна инвалидировать уже выданные токены.
+        /// </summary>
+        private static void WriteJwtKeys(string dir)
+        {
+            var keysDir = Path.Combine(dir, "secrets", "jwt");
+            Directory.CreateDirectory(keysDir);
+
+            var privateKey = Path.Combine(keysDir, "jwt-private.pem");
+            var publicKey = Path.Combine(keysDir, "jwt-public.pem");
+            if (File.Exists(privateKey) && File.Exists(publicKey))
+                return;
+
+            using var rsa = System.Security.Cryptography.RSA.Create(3072);
+            File.WriteAllText(privateKey, rsa.ExportPkcs8PrivateKeyPem());
+            File.WriteAllText(publicKey, rsa.ExportSubjectPublicKeyInfoPem());
         }
     }
 }
