@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 
 data class AlbumsUiState(
     val isLoading: Boolean = true,
@@ -31,6 +33,7 @@ class AlbumsViewModel(
 
     private var cursorUpdatedAt: Long? = null
     private var cursorAlbumId: String = ""
+    private var reloadJob: Job? = null
 
     fun loadIfNeeded() {
         if (_state.value.albums.isEmpty() && _state.value.isLoading) reload()
@@ -39,7 +42,7 @@ class AlbumsViewModel(
     fun reload() {
         cursorUpdatedAt = null
         cursorAlbumId = ""
-        viewModelScope.launch {
+        reloadJob = viewModelScope.launch {
             _state.update { it.copy(isRefreshing = it.albums.isNotEmpty(), isLoading = it.albums.isEmpty()) }
             try {
                 val page = albumRepository.listAlbums(limit = 50)
@@ -48,15 +51,23 @@ class AlbumsViewModel(
                 _state.update {
                     it.copy(isLoading = false, isRefreshing = false, albums = page.albums, canLoadMore = page.hasMore)
                 }
+            } catch (e: CancellationException) {
+                _state.update { it.copy(isLoading = false, isRefreshing = false) }
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, snackbar = e.message) }
             }
         }
     }
 
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
+    }
+
     fun loadMore() {
         val s = _state.value
-        if (!s.canLoadMore || s.isLoadingMore || s.isLoading) return
+        if (!s.canLoadMore || s.isLoadingMore || s.isLoading || s.isRefreshing) return
         _state.update { it.copy(isLoadingMore = true) }
         viewModelScope.launch {
             try {

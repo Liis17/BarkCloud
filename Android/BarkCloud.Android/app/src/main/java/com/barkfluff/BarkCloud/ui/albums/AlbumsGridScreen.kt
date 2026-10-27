@@ -24,7 +24,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -44,6 +43,7 @@ import com.barkfluff.BarkCloud.data.cloud.AlbumCard
 import com.barkfluff.BarkCloud.files.ui.formatChildCount
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 fun AlbumsGridScreen(
     onOpenAlbum: (id: String, name: String) -> Unit,
     onSnackbar: (String) -> Unit,
+    header: @Composable () -> Unit = {},
     viewModel: AlbumsViewModel = viewModel(factory = AlbumsViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -71,9 +72,9 @@ fun AlbumsGridScreen(
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
     Box(Modifier.fillMaxSize()) {
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::reload,
+        RefreshableContentSurface(
+            onRefresh = viewModel::reloadAndWait,
+            header = header,
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyVerticalGrid(
