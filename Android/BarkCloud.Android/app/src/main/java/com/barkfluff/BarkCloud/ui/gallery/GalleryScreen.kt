@@ -90,6 +90,7 @@ import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.RefreshContentSurface
 import com.barkfluff.BarkCloud.ui.components.RefreshIndicator
 import com.barkfluff.BarkCloud.ui.components.contentSurfaceTopPx
@@ -393,6 +394,7 @@ fun GalleryScreen(
         ?.takeIf { it.isNotBlank() }
         ?: profile?.username
     val avatarUrl = profile?.let { it.profilePicture.ifEmpty { it.profilePicturePreview }.ifEmpty { null } }
+    CloudMediaTransitionLayout(cloudViewer?.id) {
     Box(
         Modifier.fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
@@ -611,15 +613,14 @@ fun GalleryScreen(
         )
     }
 
-    cloudViewer?.let { asset ->
-        CloudMediaViewer(
-            assets = cloudAssets,
-            initialIndex = cloudAssets.indexOf(asset).coerceAtLeast(0),
-            onDismiss = { cloudViewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { message ->
+    CloudMediaViewer(
+        assets = cloudAssets,
+        selectedAsset = cloudViewer,
+        onDismiss = { cloudViewer = null },
+        onPlayVideo = { item -> openRemote(item.id, item.fileName) { message ->
                 android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
-            } },
-        )
+        } },
+    )
     }
     viewer?.let { media ->
         DeviceMediaViewer(

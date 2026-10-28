@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
@@ -51,9 +55,16 @@ fun CacheSettingsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var confirmClearAll by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.load()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(state.snackbar) {
         val msg = state.snackbar ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
@@ -104,17 +115,39 @@ fun CacheSettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (state.isOverLimit) {
+                        Text(
+                            stringResource(R.string.cache_over_limit),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
 
             ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Превью и аватары", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "${formatSize(context, state.previewCacheSize)} · записей: ${state.previewEntryCount}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.cache_contents), style = MaterialTheme.typography.titleMedium)
+                    CacheCategorySummary(
+                        title = stringResource(R.string.cache_preview),
+                        sizeBytes = state.previewCacheSize,
+                        entryCount = state.previewEntryCount,
+                        context = context,
                     )
+                    CacheCategorySummary(
+                        title = stringResource(R.string.cache_original),
+                        sizeBytes = state.originalCacheSize,
+                        entryCount = state.originalEntryCount,
+                        context = context,
+                    )
+                    if (state.legacyPreviewSize > 0 || state.legacyPreviewEntryCount > 0) {
+                        CacheCategorySummary(
+                            title = stringResource(R.string.cache_legacy_preview),
+                            sizeBytes = state.legacyPreviewSize,
+                            entryCount = null,
+                            context = context,
+                        )
+                    }
                 }
             }
 
@@ -166,6 +199,27 @@ fun CacheSettingsScreen(
                     Text(stringResource(R.string.common_cancel))
                 }
             },
+        )
+    }
+}
+
+@Composable
+private fun CacheCategorySummary(
+    title: String,
+    sizeBytes: Long,
+    entryCount: Int?,
+    context: android.content.Context,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            if (entryCount == null) {
+                stringResource(R.string.cache_size_only_summary, formatSize(context, sizeBytes))
+            } else {
+                stringResource(R.string.cache_category_summary, formatSize(context, sizeBytes), entryCount)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

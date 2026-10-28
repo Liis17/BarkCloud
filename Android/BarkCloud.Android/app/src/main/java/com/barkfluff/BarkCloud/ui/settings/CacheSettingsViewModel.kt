@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import coil3.SingletonImageLoader
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.cache.CacheCategory
+import com.barkfluff.BarkCloud.data.cache.CacheCategoryStats
+import com.barkfluff.BarkCloud.data.cache.FileCacheStats
 import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,10 +23,39 @@ data class CacheSettingsUiState(
     val entryCount: Int = 0,
     val previewCacheSize: Long = 0,
     val previewEntryCount: Int = 0,
+    val originalCacheSize: Long = 0,
+    val originalEntryCount: Int = 0,
+    val legacyPreviewSize: Long = 0,
+    val legacyPreviewEntryCount: Int = 0,
+    val isOverLimit: Boolean = false,
     val maxCacheBytes: Long = FileCacheSettings.DEFAULT_MAX_BYTES,
     val staleMaxAgeMillis: Long = FileCacheSettings.DEFAULT_STALE_AGE_MILLIS,
     val snackbar: String? = null,
 )
+
+internal fun cacheStatisticsToUiState(
+    stats: FileCacheStats,
+    maxCacheBytes: Long,
+    staleMaxAgeMillis: Long,
+): CacheSettingsUiState {
+    val previews = stats.categories[CacheCategory.PREVIEW] ?: CacheCategoryStats(0, 0)
+    val jpegViews = stats.categories[CacheCategory.JPEG_VIEW] ?: CacheCategoryStats(0, 0)
+    val originals = stats.categories[CacheCategory.ORIGINAL] ?: CacheCategoryStats(0, 0)
+    return CacheSettingsUiState(
+        isLoading = false,
+        cacheSize = stats.totalSizeBytes,
+        entryCount = stats.entryCount,
+        previewCacheSize = previews.sizeBytes + jpegViews.sizeBytes,
+        previewEntryCount = previews.entryCount + jpegViews.entryCount,
+        originalCacheSize = originals.sizeBytes,
+        originalEntryCount = originals.entryCount,
+        legacyPreviewSize = stats.legacyPreviewSizeBytes,
+        legacyPreviewEntryCount = stats.legacyPreviewEntryCount,
+        isOverLimit = stats.isOverLimit,
+        maxCacheBytes = maxCacheBytes,
+        staleMaxAgeMillis = staleMaxAgeMillis,
+    )
+}
 
 class CacheSettingsViewModel(
     private val app: BarkCloudApplication,
@@ -37,17 +69,12 @@ class CacheSettingsViewModel(
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            _state.update {
-                it.copy(
-                    isLoading = false,
-                    cacheSize = fileCache.totalSize(),
-                    entryCount = fileCache.entryCount(),
-                    previewCacheSize = fileCache.previewSize(),
-                    previewEntryCount = fileCache.previewEntryCount(),
-                    maxCacheBytes = settings.maxCacheBytes,
-                    staleMaxAgeMillis = settings.staleMaxAgeMillis,
-                )
-            }
+            val loaded = cacheStatisticsToUiState(
+                stats = fileCache.statistics(),
+                maxCacheBytes = settings.maxCacheBytes,
+                staleMaxAgeMillis = settings.staleMaxAgeMillis,
+            )
+            _state.update { loaded.copy(snackbar = it.snackbar) }
         }
     }
 
