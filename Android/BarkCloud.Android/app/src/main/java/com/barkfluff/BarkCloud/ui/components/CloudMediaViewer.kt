@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cache.CacheInvalidatedException
 import com.barkfluff.BarkCloud.data.cache.CloudImageModel
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
@@ -60,6 +61,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.IOException
 
 private val DismissDistance = 120.dp
 private val SheetOpenDistance = 80.dp
@@ -146,6 +148,7 @@ private fun CloudMediaViewerContent(
     }
     var retryCount by remember(currentAsset.id) { mutableIntStateOf(0) }
     var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
+    var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
 
     BackHandler(enabled = isOpen, onBack = onDismiss)
 
@@ -157,26 +160,24 @@ private fun CloudMediaViewerContent(
                     imageState = ViewerImageState.Error
                     return@LaunchedEffect
                 }
-                if (app.fileCache.getJpegView(currentAsset.id) == null) {
-                    imageState = ViewerImageState.Loading
-                    app.fileCache.loadJpegView(currentAsset.id, model.url)
-                }
-                app.fileCache.withPinnedJpegView(currentAsset.id) {
+                imageState = ViewerImageState.Loading
+                app.fileCache.withLoadedPinnedJpegView(currentAsset.id, model.url, model.previewFileId) {
                     imageState = ViewerImageState.JpegView(model)
                     awaitCancellation()
                 }
             } else {
-                if (app.fileCache.getOriginal(currentAsset.id) == null) {
-                    imageState = ViewerImageState.Loading
-                    app.fileCache.loadOriginal(currentAsset.id, currentAsset.fileName)
-                }
-                app.fileCache.withPinnedOriginal(currentAsset.id) { file ->
+                imageState = ViewerImageState.Loading
+                app.fileCache.withLoadedPinnedOriginal(currentAsset.id, currentAsset.fileName) { file ->
                     imageState = ViewerImageState.Original(file)
                     awaitCancellation()
                 }
             }
         } catch (error: CancellationException) {
             throw error
+        } catch (_: CacheInvalidatedException) {
+            imageState = ViewerImageState.Error
+        } catch (_: IOException) {
+            imageState = ViewerImageState.Error
         } catch (_: Exception) {
             imageState = ViewerImageState.Error
         }
@@ -247,9 +248,12 @@ private fun CloudMediaViewerContent(
                                 contentScale = ContentScale.Fit,
                                 onError = {
                                     if (!useJpegView && jpegViewModel != null) {
+                                        failedDecodeCache = null
+                                        scope.launch { app.fileCache.invalidateOriginal(asset.id) }
                                         imageState = ViewerImageState.Loading
                                         useJpegView = true
                                     } else {
+                                        failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView)
                                         imageState = ViewerImageState.Error
                                     }
                                 },
@@ -259,7 +263,10 @@ private fun CloudMediaViewerContent(
                                 contentDescription = asset.fileName,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit,
-                                onError = { imageState = ViewerImageState.Error },
+                                onError = {
+                                    failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView = true)
+                                    imageState = ViewerImageState.Error
+                                },
                             )
                             else -> Unit
                         }
@@ -271,9 +278,20 @@ private fun CloudMediaViewerContent(
                 if (isCurrentPage && pageImageState == ViewerImageState.Error) {
                     Button(
                         onClick = {
-                            imageState = ViewerImageState.Preview
-                            useJpegView = requiresJpegView(asset.fileName, jpegViewModel != null)
-                            retryCount++
+                            scope.launch {
+                                when (failedDecodeCache) {
+                                    ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateOriginal(asset.id)
+                                    ViewerCacheKind.JPEG_VIEW -> app.fileCache.invalidateJpegView(
+                                        asset.id,
+                                        jpegViewModel?.previewFileId,
+                                    )
+                                    null -> Unit
+                                }
+                                failedDecodeCache = null
+                                imageState = ViewerImageState.Preview
+                                useJpegView = requiresJpegView(asset.fileName, jpegViewModel != null)
+                                retryCount++
+                            }
                         },
                         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
                     ) {

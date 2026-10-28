@@ -7,9 +7,12 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class GlobalParam(context: Context) {
     private val store = TokenStore(context)
+    private val identityLock = Any()
+    @Volatile private var cachedUserId = store.read()?.userId?.takeIf { it.isNotBlank() }
     private val _sessionActive = MutableStateFlow(hasValidRefreshToken())
     val sessionActive: StateFlow<Boolean> = _sessionActive.asStateFlow()
-    var onCacheIdentityChanged: (() -> Unit)? = null
+    var onCacheIdentityChanging: ((previousAccountId: String?, nextAccountId: String?) -> Unit)? = null
+    var onCacheIdentityChanged: ((previousAccountId: String?, nextAccountId: String?) -> Unit)? = null
 
     var accessToken: String?
         get() = store.read()?.accessToken?.takeIf { it.isNotBlank() }
@@ -28,12 +31,19 @@ class GlobalParam(context: Context) {
         set(value) = update { it.copy(refreshTokenExpiresAt = value) }
 
     var userId: String?
-        get() = store.read()?.userId?.takeIf { it.isNotBlank() }
+        get() = cachedUserId
         set(value) {
             val next = value.orEmpty()
-            val changed = store.read()?.userId.orEmpty() != next
-            update { it.copy(userId = next) }
-            if (changed) onCacheIdentityChanged?.invoke()
+            val previous: String?
+            val nextId = next.takeIf { it.isNotBlank() }
+            synchronized(identityLock) {
+                previous = cachedUserId
+                if (previous.orEmpty() == next) return
+                update { it.copy(userId = next) }
+                onCacheIdentityChanging?.invoke(previous, nextId)
+                cachedUserId = nextId
+            }
+            onCacheIdentityChanged?.invoke(previous, nextId)
         }
 
     fun saveTokens(
@@ -42,8 +52,14 @@ class GlobalParam(context: Context) {
         refreshToken: String,
         refreshTokenExpiresAt: Long,
     ) {
-        store.save(TokenBundle(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt))
-        onCacheIdentityChanged?.invoke()
+        val previous: String?
+        synchronized(identityLock) {
+            previous = cachedUserId
+            store.save(TokenBundle(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt))
+            if (previous != null) onCacheIdentityChanging?.invoke(previous, null)
+            cachedUserId = null
+        }
+        if (previous != null) onCacheIdentityChanged?.invoke(previous, null)
         publishSessionState()
     }
 
@@ -59,14 +75,22 @@ class GlobalParam(context: Context) {
     }
 
     fun clearSession() {
-        store.clear()
-        onCacheIdentityChanged?.invoke()
+        val previous: String?
+        synchronized(identityLock) {
+            previous = cachedUserId
+            store.clear()
+            onCacheIdentityChanging?.invoke(previous, null)
+            cachedUserId = null
+        }
+        onCacheIdentityChanged?.invoke(previous, null)
         publishSessionState()
     }
 
     private fun update(transform: (TokenBundle) -> TokenBundle) {
-        val current = store.read() ?: TokenBundle("", 0L, "", 0L)
-        store.save(transform(current))
+        synchronized(identityLock) {
+            val current = store.read() ?: TokenBundle("", 0L, "", 0L)
+            store.save(transform(current))
+        }
         publishSessionState()
     }
 

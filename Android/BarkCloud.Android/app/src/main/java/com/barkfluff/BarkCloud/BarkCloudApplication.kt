@@ -137,7 +137,16 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
             settings = fileCacheSettings,
             currentScope = ::currentCacheScope,
         )
-        globalParam.onCacheIdentityChanged = fileCache::cancelInFlightLoads
+        globalParam.onCacheIdentityChanging = { previous, next ->
+            fileCache.accountIdentityChanged(ServerSettings.config.key, previous, next)
+        }
+        globalParam.onCacheIdentityChanged = { previous, next ->
+            if (previous == null && next != null) {
+                val serverKey = ServerSettings.config.key
+                appScope.launch { fileCache.rebindUnknownAccount(serverKey, next) }
+            }
+        }
+        ServerSettings.onChanged = fileCache::cancelInFlightLoads
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         vaultStore = VaultStore(this)

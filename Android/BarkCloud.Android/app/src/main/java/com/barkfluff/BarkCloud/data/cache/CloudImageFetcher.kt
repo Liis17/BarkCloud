@@ -77,6 +77,8 @@ internal class CloudImageFetcher(
                         fileName = model.cacheFileName,
                         sourceFile = File(snapshot.data.toString()),
                     )
+                } catch (error: CacheInvalidatedException) {
+                    throw error
                 } catch (_: IOException) {
                     // A stale legacy entry must not prevent downloading a usable preview.
                 }
@@ -96,7 +98,7 @@ private fun CloudImageModel.cacheKey(scope: CacheScope): FileCacheKey {
     val ownerFileId = fileId?.takeIf(String::isNotBlank) ?: "url:$url"
     return when (variant) {
         CloudImageVariant.PREVIEW -> FileCacheKey.preview(scope, ownerFileId, previewFileId, url)
-        CloudImageVariant.JPEG_VIEW -> FileCacheKey.jpegView(scope, ownerFileId)
+        CloudImageVariant.JPEG_VIEW -> FileCacheKey.jpegView(scope, ownerFileId, previewFileId)
     }
 }
 

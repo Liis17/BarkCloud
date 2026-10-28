@@ -99,7 +99,8 @@ fun SharedFolderBrowserScreen(
                             onDownload = {
                                 viewModel.download(file) { downloaded ->
                                     val mime = MimeIcon.mimeFor(file.name)
-                                    context.startActivity(FileShareHelper.buildOpenIntent(context, downloaded, mime))
+                                    val shareFile = FileShareHelper.prepareLocalFile(context, downloaded, file.name)
+                                    context.startActivity(FileShareHelper.buildOpenIntent(context, shareFile, mime))
                                 }
                             },
                         )

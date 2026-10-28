@@ -3,10 +3,16 @@ package com.barkfluff.BarkCloud.data.cache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -36,20 +42,36 @@ class FileCacheService(
     private val legacyPreviewsDir = File(root, "previews")
 
     private val stateMutex = Mutex()
+    private val loaderScope = CoroutineScope(SupervisorJob() + ioDispatcher)
     private val epochGuard = Any()
     private val epoch = AtomicLong(0L)
     private val flights = ConcurrentHashMap<String, Flight>()
-    private val pins = mutableMapOf<String, Int>()
+    private val pins = mutableMapOf<String, MutableSet<Long>>()
+    private val pinKeys = mutableMapOf<Long, String>()
+    private val nextPinToken = AtomicLong(0L)
+    private val reboundAccounts = ConcurrentHashMap<String, String>()
     private var initialized = false
     private var clearing = false
     private var clearFinished = CompletableDeferred<Unit>().apply { complete(Unit) }
     private var latestTimestamp = 0L
 
     private data class Flight(
-        val storageKey: String,
+        @Volatile var storageKey: String,
+        @Volatile var key: FileCacheKey,
         val epoch: Long,
         val ownerJob: Job?,
         val result: CompletableDeferred<File> = CompletableDeferred(),
+        val usersDrained: CompletableDeferred<Unit> = CompletableDeferred(),
+        @Volatile var users: Int = 0,
+        var pinToken: Long = 0L,
+        var job: Job? = null,
+    )
+
+    private data class LoadedFile(val file: File, val pin: FileCachePin?)
+
+    private data class LoadSelection(
+        val cached: LoadedFile? = null,
+        val flight: Flight? = null,
     )
 
     /** Возвращает кешированный файл и обновляет lastUsedAt. */
@@ -68,62 +90,120 @@ class FileCacheService(
         fileName: String,
         sourceUrl: String? = null,
         sourceFile: File? = null,
-    ): File = withContext(ioDispatcher) {
+    ): File = loadInternal(key, fileName, sourceUrl, sourceFile, pinResult = false).file
+
+    private suspend fun loadInternal(
+        key: FileCacheKey,
+        fileName: String,
+        sourceUrl: String? = null,
+        sourceFile: File? = null,
+        pinResult: Boolean,
+        onPinAcquired: ((FileCachePin) -> Unit)? = null,
+    ): LoadedFile = withContext(ioDispatcher) {
         ensureInitialized()
         val operationEpoch = withCacheState { epoch.get() }
         val request = FileCacheLoadRequest(key, fileName, sourceUrl, sourceFile)
-        val cached = withCacheState {
-            ensureCurrent(key, operationEpoch)
-            findFileLocked(key)
-        }
-        if (cached != null) return@withContext cached
 
-        val (flight, isOwner) = withCacheState {
-            ensureCurrent(key, operationEpoch)
-            while (true) {
-                val existing = flights[key.storageKey]
-                if (existing != null && existing.epoch == operationEpoch) {
-                    return@withCacheState existing to false
+        while (true) {
+            val selection = withCacheState {
+                ensureCurrent(key, operationEpoch)
+                val activeKey = canonicalKey(key)
+                val cached = findFileLocked(activeKey)
+                if (cached != null) {
+                    val pin = if (pinResult) {
+                        FileCachePin(addPinLocked(activeKey.storageKey)).also { onPinAcquired?.invoke(it) }
+                    } else {
+                        null
+                    }
+                    return@withCacheState LoadSelection(cached = LoadedFile(cached, pin))
+                }
+
+                val existing = flights[activeKey.storageKey]
+                    ?: flights.values.firstOrNull {
+                        it.epoch == operationEpoch && canonicalKey(it.key) == activeKey
+                    }
+                if (existing != null && existing.result.isCancelled) {
+                    flights.remove(existing.storageKey, existing)
+                    return@withCacheState null
                 }
                 if (existing != null) {
-                    flights.remove(key.storageKey, existing)
-                    cancelFlight(existing, "Кеш изменился во время загрузки")
+                    existing.users++
+                    return@withCacheState LoadSelection(flight = existing)
                 }
+
                 val candidate = Flight(
-                    storageKey = key.storageKey,
+                    storageKey = activeKey.storageKey,
+                    key = activeKey,
                     epoch = operationEpoch,
                     ownerJob = currentCoroutineContext()[Job],
                 )
-                val active = synchronized(epochGuard) {
-                    if (epoch.get() != operationEpoch) throw CancellationException("Кеш изменился во время загрузки")
-                    flights.putIfAbsent(key.storageKey, candidate)
-                }
-                if (active == null) {
-                    pins[key.storageKey] = (pins[key.storageKey] ?: 0) + 1
+                candidate.users = 1
+                synchronized(epochGuard) {
                     if (epoch.get() != operationEpoch) {
-                        flights.remove(key.storageKey, candidate)
-                        unpinLocked(key.storageKey)
-                        cancelFlight(candidate, "Кеш изменился во время загрузки")
-                        throw CancellationException("Кеш изменился во время загрузки")
+                        throw CacheInvalidatedException("Область кеша изменилась")
                     }
-                    return@withCacheState candidate to true
+                    flights[candidate.storageKey] = candidate
+                    candidate.pinToken = addPinLocked(candidate.storageKey)
+                }
+                candidate.job = loaderScope.launch(
+                    start = CoroutineStart.UNDISPATCHED,
+                ) {
+                    performFlight(candidate, request, cacheFile(activeKey, cacheFileName(activeKey, fileName)))
+                }
+                candidate.ownerJob?.invokeOnCompletion { cause ->
+                    if (cause is CancellationException && candidate.users == 0) candidate.job?.cancel(cause)
+                }
+                candidate.job?.invokeOnCompletion { cause ->
+                    if (cause is CancellationException && !candidate.result.isCompleted) {
+                        candidate.result.cancel(cause)
+                    }
+                }
+                LoadSelection(flight = candidate)
+            } ?: continue
+
+            val cached = selection.cached
+            if (cached != null) return@withContext cached
+            val flight = requireNotNull(selection.flight)
+
+            try {
+                flight.result.await()
+                val loaded = withCacheState {
+                    ensureCurrent(key, operationEpoch)
+                    val activeKey = canonicalKey(key)
+                    val file = findFileLocked(activeKey)
+                    if (file == null) {
+                        flights.remove(flight.storageKey, flight)
+                        null
+                    } else {
+                        val pin = if (pinResult) {
+                            FileCachePin(addPinLocked(activeKey.storageKey)).also { onPinAcquired?.invoke(it) }
+                        } else {
+                            null
+                        }
+                        LoadedFile(file, pin)
+                    }
+                }
+                if (loaded != null) return@withContext loaded
+            } catch (error: CancellationException) {
+                if (!currentCoroutineContext().isActive) throw error
+                if (!flight.result.isCancelled) throw error
+                // Владелец отменился сам; активный ожидающий займёт освободившийся flight.
+            } finally {
+                withContext(NonCancellable) {
+                    stateMutex.withLock {
+                        flight.users--
+                        if (flight.users == 0) flight.usersDrained.complete(Unit)
+                    }
                 }
             }
-            error("unreachable")
         }
+        error("unreachable")
+    }
 
-        if (!isOwner) {
-            val result = flight.result.await()
-            withCacheState {
-                ensureCurrent(key, operationEpoch)
-                findFileLocked(key) ?: throw CancellationException("Файл был удалён из кеша")
-            }
-            return@withContext result
-        }
-
-        val target = cacheFile(key, cacheFileName(key, fileName))
+    private suspend fun performFlight(flight: Flight, request: FileCacheLoadRequest, target: File) {
         val temporary = File(target.parentFile, ".${target.name}.${UUID.randomUUID()}.tmp")
         try {
+            withCacheState { ensureCurrent(flight.key, flight.epoch) }
             target.parentFile?.mkdirs()
             loader.load(request, temporary)
             currentCoroutineContext().ensureActive()
@@ -132,7 +212,9 @@ class FileCacheService(
             }
 
             withCacheState {
-                ensureCurrent(key, operationEpoch)
+                ensureCurrent(flight.key, flight.epoch)
+                val activeKey = canonicalKey(flight.key)
+                moveFlightToKeyLocked(flight, activeKey)
                 Files.move(
                     temporary.toPath(),
                     target.toPath(),
@@ -140,34 +222,38 @@ class FileCacheService(
                     StandardCopyOption.REPLACE_EXISTING,
                 )
                 val entry = FileCacheEntry(
-                    key = key,
+                    key = activeKey,
                     sizeBytes = target.length(),
                     lastUsedAt = nextTimestampLocked(),
                     fileName = target.name,
                 )
                 try {
                     index.upsert(entry)
-                    ensureCurrent(key, operationEpoch)
+                    ensureCurrent(activeKey, flight.epoch)
                     evictLocked()
                     synchronized(epochGuard) {
-                        ensureCurrent(key, operationEpoch)
+                        ensureCurrent(activeKey, flight.epoch)
                         flight.result.complete(target)
                     }
-                    target
                 } catch (error: Throwable) {
-                    index.delete(key.storageKey)
+                    index.delete(activeKey.storageKey)
                     target.delete()
                     throw error
                 }
             }
+            withContext(NonCancellable) { flight.usersDrained.await() }
         } catch (error: Throwable) {
-            flight.result.completeExceptionally(error)
-            throw error
+            if (!flight.result.isCompleted) {
+                if (error is CancellationException) flight.result.cancel(error)
+                else flight.result.completeExceptionally(error)
+            }
         } finally {
-            temporary.delete()
-            stateMutex.withLock {
-                flights.remove(key.storageKey, flight)
-                unpinLocked(key.storageKey)
+            withContext(NonCancellable) {
+                temporary.delete()
+                stateMutex.withLock {
+                    flights.remove(flight.storageKey, flight)
+                    removePinLocked(flight.pinToken)
+                }
             }
         }
     }
@@ -187,40 +273,106 @@ class FileCacheService(
     suspend fun <T> withPinnedOriginal(fileId: String, action: suspend (File) -> T): T =
         withPinnedEntry(FileCacheKey.original(currentScope(), fileId), action)
 
-    suspend fun getJpegView(fileId: String): File? =
-        get(FileCacheKey.jpegView(currentScope(), fileId))
+    suspend fun getJpegView(fileId: String, jpegViewFileId: String? = null): File? =
+        get(FileCacheKey.jpegView(currentScope(), fileId, jpegViewFileId))
 
-    suspend fun loadJpegView(fileId: String, sourceUrl: String): File =
-        load(FileCacheKey.jpegView(currentScope(), fileId), "jpeg-view.jpg", sourceUrl)
+    suspend fun loadJpegView(fileId: String, sourceUrl: String, jpegViewFileId: String? = null): File =
+        load(FileCacheKey.jpegView(currentScope(), fileId, jpegViewFileId), "jpeg-view.jpg", sourceUrl)
 
-    suspend fun <T> withPinnedJpegView(fileId: String, action: suspend (File) -> T): T =
-        withPinnedEntry(FileCacheKey.jpegView(currentScope(), fileId), action)
+    suspend fun <T> withPinnedJpegView(
+        fileId: String,
+        jpegViewFileId: String? = null,
+        action: suspend (File) -> T,
+    ): T = withPinnedEntry(FileCacheKey.jpegView(currentScope(), fileId, jpegViewFileId), action)
+
+    suspend fun <T> withLoadedPinnedOriginal(
+        fileId: String,
+        fileName: String,
+        action: suspend (File) -> T,
+    ): T = withLoadedPinnedEntry(FileCacheKey.original(currentScope(), fileId), fileName, action = action)
+
+    suspend fun <T> withLoadedPinnedJpegView(
+        fileId: String,
+        sourceUrl: String,
+        jpegViewFileId: String? = null,
+        action: suspend (File) -> T,
+    ): T = withLoadedPinnedEntry(
+        FileCacheKey.jpegView(currentScope(), fileId, jpegViewFileId),
+        "jpeg-view.jpg",
+        sourceUrl = sourceUrl,
+        action = action,
+    )
+
+    suspend fun <T> withLoadedPinnedSharedOriginal(
+        fileId: String,
+        fileName: String,
+        sourceUrl: String,
+        action: suspend (File) -> T,
+    ): T = withLoadedPinnedEntry(
+        FileCacheKey.sharedOriginal(currentScope(), fileId),
+        fileName,
+        sourceUrl = sourceUrl,
+        action = action,
+    )
 
     /** Пин удерживает запись от LRU-вытеснения до соответствующего unpin. */
-    suspend fun pin(key: FileCacheKey): File? = withContext(ioDispatcher) {
+    suspend fun pin(key: FileCacheKey): PinnedFile? = pin(key, null)
+
+    private suspend fun pin(
+        key: FileCacheKey,
+        onPinAcquired: ((FileCachePin) -> Unit)?,
+    ): PinnedFile? = withContext(ioDispatcher) {
         ensureInitialized()
         val operationEpoch = epoch.get()
         withCacheState {
             ensureCurrent(key, operationEpoch)
-            val file = findFileLocked(key) ?: return@withCacheState null
-            pins[key.storageKey] = (pins[key.storageKey] ?: 0) + 1
-            file
+            val activeKey = canonicalKey(key)
+            val file = findFileLocked(activeKey) ?: return@withCacheState null
+            val pin = FileCachePin(addPinLocked(activeKey.storageKey)).also { onPinAcquired?.invoke(it) }
+            PinnedFile(file, pin)
         }
     }
 
-    suspend fun unpin(key: FileCacheKey) = withContext(ioDispatcher) {
-        withCacheState {
-            unpinLocked(key.storageKey)
-            evictLocked()
+    suspend fun unpin(pin: FileCachePin) = withContext(NonCancellable) {
+        withContext(ioDispatcher) {
+            withCacheState {
+                removePinLocked(pin.token)
+                evictLocked()
+            }
         }
     }
 
     suspend fun <T> withPinnedEntry(key: FileCacheKey, action: suspend (File) -> T): T {
-        val file = pin(key) ?: throw IOException("Файл отсутствует в кеше")
+        var acquiredPin: FileCachePin? = null
         try {
-            return action(file)
+            val pinned = pin(key) { acquiredPin = it } ?: throw IOException("Файл отсутствует в кеше")
+            acquiredPin = pinned.pin
+            return action(pinned.file)
         } finally {
-            unpin(key)
+            acquiredPin?.let { unpin(it) }
+        }
+    }
+
+    private suspend fun <T> withLoadedPinnedEntry(
+        key: FileCacheKey,
+        fileName: String,
+        sourceUrl: String? = null,
+        action: suspend (File) -> T,
+    ): T {
+        var acquiredPin: FileCachePin? = null
+        try {
+            val loaded = loadInternal(
+                key,
+                fileName,
+                sourceUrl,
+                pinResult = true,
+                onPinAcquired = { acquiredPin = it },
+            )
+            val pin = requireNotNull(loaded.pin)
+            acquiredPin = pin
+            return action(loaded.file)
+        } finally {
+            acquiredPin?.let { unpin(it) }
         }
     }
 
@@ -268,8 +420,10 @@ class FileCacheService(
             initialized = true
             latestTimestamp = nowMillis()
         } finally {
-            stateMutex.withLock { clearing = false }
-            gate.complete(Unit)
+            withContext(NonCancellable) {
+                stateMutex.withLock { clearing = false }
+                gate.complete(Unit)
+            }
         }
     }
 
@@ -294,15 +448,63 @@ class FileCacheService(
         withCacheState { evictLocked() }
     }
 
+    suspend fun invalidateOriginal(fileId: String) =
+        invalidate(FileCacheKey.original(currentScope(), fileId))
+
+    suspend fun invalidateJpegView(fileId: String, jpegViewFileId: String? = null) =
+        invalidate(FileCacheKey.jpegView(currentScope(), fileId, jpegViewFileId))
+
+    private suspend fun invalidate(key: FileCacheKey) = withContext(ioDispatcher) {
+        ensureInitialized()
+        val operationEpoch = epoch.get()
+        withCacheState {
+            ensureCurrent(key, operationEpoch)
+            val activeKey = canonicalKey(key)
+            val entry = index.get(activeKey.storageKey) ?: return@withCacheState
+            resolveFile(entry)?.delete()
+            index.delete(activeKey.storageKey)
+        }
+    }
+
     /** Вызывается при смене сервера; старые операции отменяются и не пройдут epoch-check. */
     fun cancelInFlightLoads() {
         val active = synchronized(epochGuard) {
             val currentEpoch = epoch.incrementAndGet()
+            reboundAccounts.clear()
             flights.values.filter { it.epoch < currentEpoch }
         }
         active.forEach { flight ->
             flights.remove(flight.storageKey, flight)
             cancelFlight(flight, "Область кеша изменилась")
+        }
+    }
+
+    fun prepareUnknownAccountRebind(serverKey: String, accountId: String) {
+        reboundAccounts[serverKey] = accountId
+    }
+
+    suspend fun rebindUnknownAccount(serverKey: String, accountId: String) = withContext(ioDispatcher) {
+        val oldScope = CacheScope(serverKey, CacheScope.UNKNOWN_ACCOUNT)
+        val newScope = CacheScope(serverKey, accountId)
+        if (currentScope() != newScope) return@withContext
+        val operationEpoch = epoch.get()
+        reboundAccounts[serverKey] = accountId
+        ensureInitialized()
+        withCacheState {
+            if (epoch.get() != operationEpoch || currentScope() != newScope) return@withCacheState
+            index.rebindScope(oldScope, newScope)
+            if (epoch.get() != operationEpoch || currentScope() != newScope) return@withCacheState
+            flights.values.toList().forEach { flight ->
+                if (flight.key.scope == oldScope) moveFlightToKeyLocked(flight, flight.key.copy(scope = newScope))
+            }
+        }
+    }
+
+    fun accountIdentityChanged(serverKey: String, previousAccountId: String?, nextAccountId: String?) {
+        when {
+            nextAccountId == null -> cancelInFlightLoads()
+            previousAccountId == null -> prepareUnknownAccountRebind(serverKey, nextAccountId)
+            previousAccountId != nextAccountId -> cancelInFlightLoads()
         }
     }
 
@@ -325,9 +527,14 @@ class FileCacheService(
                 }
             }
 
-            listOf(originalsDir, previewsDir, jpegViewsDir).forEach { dir ->
-                filesIn(dir).filter { it.name.startsWith(".") && it.name.endsWith(".tmp") }.forEach(File::delete)
+            listOf(CacheCategory.PREVIEW to previewsDir, CacheCategory.JPEG_VIEW to jpegViewsDir).forEach { (category, dir) ->
+                filesIn(dir)
+                    .filterNot { file -> (category to file.name) in presentNames }
+                    .forEach(File::delete)
             }
+            filesIn(originalsDir)
+                .filter { it.name.startsWith(".") && it.name.endsWith(".tmp") }
+                .forEach(File::delete)
 
             latestTimestamp = maxOf(latestTimestamp, entries.maxOfOrNull { it.lastUsedAt } ?: 0L)
             val scope = currentScope()
@@ -335,6 +542,10 @@ class FileCacheService(
                 .filterNot { it.name.startsWith(".") && it.name.endsWith(".tmp") }
                 .filterNot { (CacheCategory.ORIGINAL to it.name) in presentNames }
                 .forEach { file ->
+                    if (file.name.startsWith("entry-")) {
+                        file.delete()
+                        return@forEach
+                    }
                     if (file.length() <= 0L) {
                         file.delete()
                         return@forEach
@@ -351,27 +562,49 @@ class FileCacheService(
                         ),
                     )
                 }
+            if (scope.accountId != CacheScope.UNKNOWN_ACCOUNT) {
+                index.rebindScope(CacheScope(scope.serverKey, CacheScope.UNKNOWN_ACCOUNT), scope)
+            }
             initialized = true
         }
     }
 
     private suspend fun findFileLocked(key: FileCacheKey): File? {
-        val entry = index.get(key.storageKey) ?: return null
+        val activeKey = canonicalKey(key)
+        var entry = index.get(activeKey.storageKey)
+        if (entry == null && activeKey.scope.accountId == reboundAccounts[activeKey.scope.serverKey]) {
+            val unknownKey = activeKey.copy(scope = activeKey.scope.copy(accountId = CacheScope.UNKNOWN_ACCOUNT))
+            val unknownEntry = index.get(unknownKey.storageKey)
+            if (unknownEntry != null) {
+                entry = unknownEntry.copy(key = activeKey)
+                index.delete(unknownKey.storageKey)
+                index.upsert(entry)
+            }
+        }
+        entry ?: return null
         val file = resolveFile(entry)
         if (file == null || !file.isFile || file.length() <= 0L) {
             file?.delete()
-            index.delete(key.storageKey)
+            index.delete(activeKey.storageKey)
             return null
         }
         val age = settings.staleMaxAgeMillis
         if (age != FileCacheSettings.NEVER && nowMillis() - entry.lastUsedAt > age) {
-            if (pins[key.storageKey] == null) {
+            if (pins[activeKey.storageKey].isNullOrEmpty()) {
                 file.delete()
-                index.delete(key.storageKey)
+                index.delete(activeKey.storageKey)
                 return null
             }
         }
-        index.upsert(entry.copy(sizeBytes = file.length(), lastUsedAt = nextTimestampLocked(entry.lastUsedAt)))
+        val now = nowMillis()
+        val touchedAt = if (now - entry.lastUsedAt >= LRU_TOUCH_INTERVAL_MILLIS) {
+            nextTimestampLocked(entry.lastUsedAt)
+        } else {
+            entry.lastUsedAt
+        }
+        if (entry.sizeBytes != file.length() || touchedAt != entry.lastUsedAt) {
+            index.upsert(entry.copy(sizeBytes = file.length(), lastUsedAt = touchedAt))
+        }
         return file
     }
 
@@ -381,7 +614,7 @@ class FileCacheService(
         val cutoff = now - age
         var removed = 0
         index.all()
-            .filter { it.lastUsedAt < cutoff && pins[it.key.storageKey] == null }
+            .filter { it.lastUsedAt < cutoff && pins[it.key.storageKey].isNullOrEmpty() }
             .forEach { entry ->
                 resolveFile(entry)?.delete()
                 index.delete(entry.key.storageKey)
@@ -391,19 +624,33 @@ class FileCacheService(
     }
 
     private suspend fun evictLocked() {
-        val entries = index.all().sortedWith(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
-        var total = entries.sumOf { it.sizeBytes }
+        var total = index.totalSizeBytes()
         val max = settings.maxCacheBytes
-        if (total <= max || entries.isEmpty()) return
-        val survivor = entries.maxWithOrNull(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
-        for (entry in entries) {
-            if (total <= max) break
-            val id = entry.key.storageKey
-            if (entry == survivor || pins[id] != null || flights.containsKey(id)) continue
-            val file = resolveFile(entry)
-            if (file != null && file.exists() && !file.delete()) continue
-            index.delete(id)
-            total -= entry.sizeBytes
+        if (total <= max) return
+        val survivor = index.newest()?.key?.storageKey ?: return
+        var offset = 0
+        while (total > max) {
+            val candidates = index.oldest(EVICTION_BATCH_SIZE, offset)
+            if (candidates.isEmpty()) break
+            var removed = false
+            for (entry in candidates) {
+                val id = entry.key.storageKey
+                if (id == survivor || !pins[id].isNullOrEmpty() || flights.containsKey(id)) {
+                    offset++
+                    continue
+                }
+                val file = resolveFile(entry)
+                if (file != null && file.exists() && !file.delete()) {
+                    offset++
+                    continue
+                }
+                index.delete(id)
+                total -= entry.sizeBytes
+                offset = 0
+                removed = true
+                break
+            }
+            if (!removed && candidates.size < EVICTION_BATCH_SIZE) break
         }
     }
 
@@ -413,9 +660,19 @@ class FileCacheService(
     }
 
     private fun ensureCurrent(key: FileCacheKey, operationEpoch: Long) {
-        if (epoch.get() != operationEpoch || currentScope() != key.scope) {
-            throw CancellationException("Область кеша изменилась")
+        if (epoch.get() != operationEpoch || !isCurrentScope(key)) {
+            throw CacheInvalidatedException("Область кеша изменилась")
         }
+    }
+
+    private fun isCurrentScope(key: FileCacheKey): Boolean {
+        val activeScope = currentScope()
+        val canonicalScope = canonicalKey(key).scope
+        return canonicalScope == activeScope || (
+            activeScope.accountId == CacheScope.UNKNOWN_ACCOUNT &&
+                canonicalScope.serverKey == activeScope.serverKey &&
+                reboundAccounts[activeScope.serverKey] == canonicalScope.accountId
+            )
     }
 
     private suspend fun <T> withCacheState(action: suspend () -> T): T {
@@ -450,19 +707,54 @@ class FileCacheService(
             val active = flights.values.toList()
             flights.clear()
             pins.clear()
+            pinKeys.clear()
             stateMutex.unlock()
             return gate to active
         }
     }
 
     private fun cancelFlight(flight: Flight, message: String) {
-        flight.ownerJob?.cancel(CancellationException(message))
-        flight.result.cancel(CancellationException(message))
+        flight.result.completeExceptionally(CacheInvalidatedException(message))
+        flight.job?.cancel(CancellationException(message))
     }
 
-    private fun unpinLocked(storageKey: String) {
-        val count = pins[storageKey] ?: return
-        if (count <= 1) pins.remove(storageKey) else pins[storageKey] = count - 1
+    private fun canonicalKey(key: FileCacheKey): FileCacheKey {
+        val reboundAccount = reboundAccounts[key.scope.serverKey]
+        return if (key.scope.accountId == CacheScope.UNKNOWN_ACCOUNT && reboundAccount != null) {
+            key.copy(scope = key.scope.copy(accountId = reboundAccount))
+        } else {
+            key
+        }
+    }
+
+    private fun addPinLocked(storageKey: String): Long {
+        val token = nextPinToken.incrementAndGet()
+        pins.getOrPut(storageKey) { mutableSetOf() }.add(token)
+        pinKeys[token] = storageKey
+        return token
+    }
+
+    private fun removePinLocked(token: Long) {
+        val storageKey = pinKeys.remove(token) ?: return
+        val active = pins[storageKey] ?: return
+        active.remove(token)
+        if (active.isEmpty()) pins.remove(storageKey)
+    }
+
+    private fun moveFlightToKeyLocked(flight: Flight, key: FileCacheKey) {
+        val oldKey = flight.storageKey
+        val newKey = key.storageKey
+        if (oldKey != newKey) {
+            flights.remove(oldKey, flight)
+            val activePins = pins.remove(oldKey)
+            if (activePins != null) {
+                pins.getOrPut(newKey) { mutableSetOf() }.addAll(activePins)
+                activePins.forEach { pinKeys[it] = newKey }
+            }
+            flight.storageKey = newKey
+        }
+        flight.key = key
+        flights[newKey] = flight
     }
 
     private fun resolveFile(entry: FileCacheEntry): File? {
@@ -505,4 +797,9 @@ class FileCacheService(
     // Coil's two-value DiskCache stores image data as .0 and metadata as .1 beside its journal.
     private fun legacyPreviewFiles(): List<File> =
         filesIn(legacyPreviewsDir).filter { it.name.endsWith(".0") }
+
+    private companion object {
+        const val LRU_TOUCH_INTERVAL_MILLIS = 30_000L
+        const val EVICTION_BATCH_SIZE = 64
+    }
 }

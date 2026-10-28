@@ -18,4 +18,10 @@ class CloudMediaViewerLogicTest {
         assertFalse(requiresJpegView("photo.jpg", hasJpegView = true))
         assertFalse(requiresJpegView("photo.PNG", hasJpegView = true))
     }
+
+    @Test
+    fun decodeRetryInvalidatesTheCachedRepresentationThatFailed() {
+        assertTrue(viewerCacheKindAfterDecodeFailure(useJpegView = false) == ViewerCacheKind.ORIGINAL)
+        assertTrue(viewerCacheKindAfterDecodeFailure(useJpegView = true) == ViewerCacheKind.JPEG_VIEW)
+    }
 }

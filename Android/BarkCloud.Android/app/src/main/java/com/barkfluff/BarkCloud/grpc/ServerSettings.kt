@@ -49,6 +49,7 @@ fun validateServerConfig(
 object ServerSettings {
     private const val PREFS_NAME = "barkcloud_server"
     private var prefs: SharedPreferences? = null
+    var onChanged: (() -> Unit)? = null
 
     fun init(context: Context) {
         if (prefs != null) return
@@ -94,6 +95,7 @@ object ServerSettings {
     val webHostBase: String get() = config.address()
 
     fun save(config: ServerConfig) {
+        val changed = this.config.key != config.key
         checkNotNull(prefs).edit()
             .putString("host", config.host)
             .putInt("identity_port", config.identityPort)
@@ -102,5 +104,6 @@ object ServerSettings {
             .putBoolean("allow_self_signed", config.allowSelfSigned)
             .putBoolean("configured", true)
             .apply()
+        if (changed) onChanged?.invoke()
     }
 }

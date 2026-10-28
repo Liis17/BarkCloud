@@ -104,7 +104,6 @@ fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
                         val serverChanged = config.key != ServerSettings.config.key
                         if (serverChanged) app.authFlowRepository.discardPendingRegistration()
                         ServerSettings.save(config)
-                        if (serverChanged) app.fileCache.cancelInFlightLoads()
                         app.grpcManager.shutdown()
                         com.barkfluff.BarkCloud.net.InsecureHttp.reset()
                     }

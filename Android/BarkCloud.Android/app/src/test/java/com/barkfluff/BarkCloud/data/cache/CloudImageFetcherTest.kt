@@ -133,6 +133,52 @@ class CloudImageFetcherTest {
         }
     }
 
+    @Test
+    fun jpegViewFileIdChangesTheManagedCacheKey() = runTest {
+        val root = Files.createTempDirectory("cloud-image-jpeg-view-id-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val loader = RecordingLoader(byteArrayOf(2, 3, 4))
+            val cache = cache(root, scope, loader)
+            val diskCache = FakeDiskCache(root)
+            val first = CloudImageModel("https://cdn/view-1", "file-4", "view-1", CloudImageVariant.JPEG_VIEW)
+            val regenerated = CloudImageModel("https://cdn/view-2", "file-4", "view-2", CloudImageVariant.JPEG_VIEW)
+
+            val firstResult = fetcher(first, cache, scope, diskCache).fetch() as SourceFetchResult
+            val secondResult = fetcher(regenerated, cache, scope, diskCache).fetch() as SourceFetchResult
+
+            assertEquals(2, cache.entryCount())
+            assertTrue(cache.get(FileCacheKey.jpegView(scope, "file-4", "view-1"))?.isFile == true)
+            assertTrue(cache.get(FileCacheKey.jpegView(scope, "file-4", "view-2"))?.isFile == true)
+            firstResult.source.close()
+            secondResult.source.close()
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun cacheInvalidationIsReturnedAsAnImageRequestError() = runTest {
+        val root = Files.createTempDirectory("cloud-image-invalidated-").toFile()
+        try {
+            val cacheScope = CacheScope("server", "user-a")
+            val requestScope = CacheScope("server", "user-b")
+            val cache = cache(root, cacheScope, RecordingLoader(byteArrayOf(1)))
+            val error = runCatching {
+                fetcher(
+                    CloudImageModel("https://cdn/preview", "file-5", "preview-5"),
+                    cache,
+                    requestScope,
+                    FakeDiskCache(root),
+                ).fetch()
+            }.exceptionOrNull()
+
+            assertTrue(error is CacheInvalidatedException)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun fetcher(
         model: CloudImageModel,
         cache: FileCacheService,

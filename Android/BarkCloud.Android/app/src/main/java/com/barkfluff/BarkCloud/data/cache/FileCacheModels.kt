@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.data.cache
 
+import java.io.IOException
 import java.security.MessageDigest
 
 data class CacheScope(
@@ -49,7 +50,15 @@ data class FileCacheKey(
         }
 
         fun jpegView(scope: CacheScope, fileId: String) =
-            FileCacheKey(scope, fileId, JPEG_VIEW_VARIANT, CacheCategory.JPEG_VIEW)
+            jpegView(scope, fileId, null)
+
+        fun jpegView(scope: CacheScope, fileId: String, jpegViewFileId: String?) =
+            FileCacheKey(
+                scope,
+                fileId,
+                jpegViewFileId?.takeIf { it.isNotBlank() }?.let { "$JPEG_VIEW_VARIANT:$it" } ?: JPEG_VIEW_VARIANT,
+                CacheCategory.JPEG_VIEW,
+            )
 
         private const val ORIGINAL_VARIANT = "original"
         private const val SHARED_ORIGINAL_VARIANT = "shared-original"
@@ -81,7 +90,34 @@ interface FileCacheIndex {
     suspend fun upsert(entry: FileCacheEntry)
     suspend fun delete(storageKey: String)
     suspend fun clear()
+
+    suspend fun totalSizeBytes(): Long = all().sumOf { it.sizeBytes }
+
+    suspend fun oldest(limit: Int, offset: Int): List<FileCacheEntry> = all()
+        .sortedWith(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
+        .drop(offset)
+        .take(limit)
+
+    suspend fun newest(): FileCacheEntry? = all()
+        .maxWithOrNull(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
+
+    suspend fun entriesInScope(scope: CacheScope): List<FileCacheEntry> =
+        all().filter { it.key.scope == scope }
+
+    suspend fun rebindScope(oldScope: CacheScope, newScope: CacheScope) {
+        entriesInScope(oldScope).forEach { entry ->
+            val rebound = entry.copy(key = entry.key.copy(scope = newScope))
+            if (get(rebound.key.storageKey) == null) upsert(rebound)
+            delete(entry.key.storageKey)
+        }
+    }
 }
+
+class CacheInvalidatedException(message: String) : IOException(message)
+
+class FileCachePin internal constructor(internal val token: Long)
+
+class PinnedFile internal constructor(val file: java.io.File, internal val pin: FileCachePin)
 
 interface FileCachePolicy {
     val maxCacheBytes: Long
