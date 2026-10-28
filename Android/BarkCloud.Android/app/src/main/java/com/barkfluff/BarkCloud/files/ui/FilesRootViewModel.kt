@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 data class StorageLocation(val path: String, val name: String)
 
@@ -39,6 +40,7 @@ class FilesRootViewModel(
 
     private val _state = MutableStateFlow(FilesRootUiState())
     val state: StateFlow<FilesRootUiState> = _state.asStateFlow()
+    private var smartFoldersJob: Job? = null
 
     fun refreshPermission(context: Context) {
         val volumes = context.getSystemService(StorageManager::class.java).storageVolumes
@@ -57,7 +59,7 @@ class FilesRootViewModel(
     fun loadSmartFolders() {
         if (_state.value.isLoadingSmartFolders) return
         _state.update { it.copy(isLoadingSmartFolders = true) }
-        viewModelScope.launch {
+        smartFoldersJob = viewModelScope.launch {
             runCatching { dynamicFolderRepository.listFolders() }
                 .onSuccess { folders ->
                     _state.update {
@@ -66,10 +68,16 @@ class FilesRootViewModel(
                 }
                 .onFailure { error ->
                     _state.update {
-                        it.copy(isLoadingSmartFolders = false, smartFolders = emptyList(), snackbar = error.message)
+                        it.copy(isLoadingSmartFolders = false, snackbar = error.message)
                     }
                 }
         }
+    }
+
+    suspend fun reloadAndWait(context: Context) {
+        refreshPermission(context)
+        loadSmartFolders()
+        smartFoldersJob?.join()
     }
 
     fun saveSmartFolder(

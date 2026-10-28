@@ -44,7 +44,7 @@ data class GalleryUiState(
     val selected: Set<String> = emptySet(),
     val cloudStates: Map<String, MediaCloudStatus> = emptyMap(),
     val isQueueing: Boolean = false,
-    val autoUploadPolicy: AutoUploadNetworkPolicy = AutoUploadNetworkPolicy.WIFI_ONLY,
+    val autoUploadPolicy: AutoUploadNetworkPolicy = AutoUploadNetworkPolicy.OFF,
     val lastAutoUploadCount: Int = 0,
     val snackbar: String? = null,
 ) {

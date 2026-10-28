@@ -3,6 +3,7 @@ package com.barkfluff.BarkCloud.ui.favorites
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -24,7 +25,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -43,6 +43,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,22 +73,23 @@ fun FavoritesScreen(
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.tab_favorites)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
-        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::reload,
+            RefreshableContentSurface(
+                onRefresh = viewModel::reloadAndWait,
+                header = {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.tab_favorites)) },
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        navigationIcon = {
+                            IconButton(onClick = onNavigateUp) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
+                            }
+                        },
+                    )
+                },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyVerticalGrid(
@@ -116,9 +118,10 @@ fun FavoritesScreen(
 
     viewer?.let { asset ->
         CloudMediaViewer(
-            asset = asset,
+            assets = state.items,
+            initialIndex = state.items.indexOf(asset).coerceAtLeast(0),
             onDismiss = { viewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { } },
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
         )
     }
 }

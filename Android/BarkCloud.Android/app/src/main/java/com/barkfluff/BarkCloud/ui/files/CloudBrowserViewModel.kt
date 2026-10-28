@@ -15,6 +15,7 @@ import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadDestination
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.net.queryFileName
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +48,7 @@ class CloudBrowserViewModel(
     private var started = false
     private var cursorName: String? = null
     private var cursorEntryId = ""
+    private var reloadJob: Job? = null
     private val observedCompleted = mutableSetOf<String>()
 
     init {
@@ -74,8 +76,14 @@ class CloudBrowserViewModel(
     fun reload() {
         cursorName = null
         cursorEntryId = ""
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, isLoadingMore = false, canLoadMore = false) }
+        reloadJob = viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isLoading = it.subdirs.isEmpty() && it.files.isEmpty(),
+                    isLoadingMore = false,
+                    canLoadMore = false,
+                )
+            }
             try {
                 val listing = cloudRepository.listDirectoryPage(directoryId, limit = DIRECTORY_PAGE_SIZE)
                 cursorName = listing.nextCursorName
@@ -96,6 +104,11 @@ class CloudBrowserViewModel(
                 _state.update { it.copy(isLoading = false, snackbar = e.message) }
             }
         }
+    }
+
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
     }
 
     fun loadMore() {

@@ -8,6 +8,7 @@ import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.cloud.PublicShareItem
 import com.barkfluff.BarkCloud.data.cloud.PublicShareKind
 import com.barkfluff.BarkCloud.data.cloud.SharedRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,12 +38,19 @@ class MySharesViewModel(
     private val _state = MutableStateFlow(MySharesUiState())
     val state: StateFlow<MySharesUiState> = _state.asStateFlow()
 
+    private var reloadJob: Job? = null
+
     fun loadIfNeeded() {
         if (_state.value.items.isEmpty() && _state.value.isLoading) reload()
     }
 
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
+    }
+
     fun reload() {
-        viewModelScope.launch {
+        reloadJob = viewModelScope.launch {
             _state.update { it.copy(isRefreshing = it.items.isNotEmpty(), isLoading = it.items.isEmpty()) }
             try {
                 val merged = coroutineScope {

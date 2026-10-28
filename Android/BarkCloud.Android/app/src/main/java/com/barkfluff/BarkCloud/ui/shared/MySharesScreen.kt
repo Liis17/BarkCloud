@@ -21,9 +21,9 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ import com.barkfluff.BarkCloud.data.cloud.PublicShareKind
 import com.barkfluff.BarkCloud.data.cloud.publicUrl
 import com.barkfluff.BarkCloud.files.ui.formatDate
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -60,9 +62,9 @@ fun MySharesScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::reload,
+        RefreshableContentSurface(
+            onRefresh = viewModel::reloadAndWait,
+            header = {},
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(Modifier.fillMaxSize()) {
@@ -109,6 +111,7 @@ private fun PublicShareRow(
     var menuOpen by remember { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(item.name, maxLines = 1) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         supportingContent = {
             Text(
                 text = stringResource(R.string.shared_click_count, item.clickCount) + " · " + formatDate(item.createdAtMillis),

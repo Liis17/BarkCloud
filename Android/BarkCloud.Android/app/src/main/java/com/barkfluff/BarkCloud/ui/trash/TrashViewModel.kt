@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.TrashItem
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,15 +35,21 @@ class TrashViewModel(
 
     private var cursorDeletedAt: Long? = null
     private var cursorEntryId: String = ""
+    private var reloadJob: Job? = null
 
     fun loadIfNeeded() {
         if (_state.value.items.isEmpty() && _state.value.isLoading) reload()
     }
 
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
+    }
+
     fun reload() {
         cursorDeletedAt = null
         cursorEntryId = ""
-        viewModelScope.launch {
+        reloadJob = viewModelScope.launch {
             _state.update { it.copy(isRefreshing = it.items.isNotEmpty(), isLoading = it.items.isEmpty()) }
             try {
                 val page = cloudRepository.listTrash(limit = 50)

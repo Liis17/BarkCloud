@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -80,7 +79,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -92,6 +90,9 @@ import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.RefreshContentSurface
+import com.barkfluff.BarkCloud.ui.components.RefreshIndicator
+import com.barkfluff.BarkCloud.ui.components.contentSurfaceTopPx
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
@@ -102,9 +103,9 @@ import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 private fun requiredMediaPermissions(): Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -181,12 +182,12 @@ fun GalleryScreen(
     var selectionToolbarHeightPx by remember { mutableStateOf(0) }
 
     val openRemote = rememberRemoteOpener()
-    val timeline = remember(state.items, cloudPhotos.items, cloudVideos.items) {
-        (state.items.map { PhotoTimelineItem.Device(it) } +
-            (cloudPhotos.items + cloudVideos.items).map { PhotoTimelineItem.Cloud(it) })
+    val timeline = remember(cloudPhotos.items, cloudVideos.items) {
+        (cloudPhotos.items + cloudVideos.items).map { PhotoTimelineItem.Cloud(it) }
             .sortedByDescending { it.dateMillis }
     }
     val dateSections = remember(timeline) { mediaDateSections(timeline) { it.dateMillis } }
+    val cloudAssets = remember(timeline) { timeline.mapNotNull { (it as? PhotoTimelineItem.Cloud)?.asset } }
     val selectedDeviceMediaKeys = state.selected
         .filter { it.startsWith(DEVICE_SELECTION_PREFIX) }
         .map { it.removePrefix(DEVICE_SELECTION_PREFIX) }
@@ -206,6 +207,7 @@ fun GalleryScreen(
                 do {
                     refreshQueued = false
                     coroutineScope {
+                        launch { delay(1_500) }
                         val local = async { if (state.permissionGranted) viewModel.reloadAndWait() }
                         val cloudPhotosReload = async { photos.reloadAndWait() }
                         val cloudVideosReload = async { videos.reloadAndWait() }
@@ -220,9 +222,11 @@ fun GalleryScreen(
         }
     }
 
-    val headerHeight = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp
+    val statusBarHeight = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarHeightPx = with(density) { statusBarHeight.toPx() }
+    val headerHeight = statusBarHeight + 64.dp
     val headerHeightPx = with(density) { headerHeight.toPx() }
-    val maxHeaderCollapsePx = with(density) { 64.dp.toPx() }
+    val maxHeaderCollapsePx = headerHeightPx
     val pullThresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
     var headerCollapsePx by rememberSaveable { mutableStateOf(0f) }
     val headerScrollConnection = remember(gridState, maxHeaderCollapsePx) {
@@ -235,7 +239,7 @@ fun GalleryScreen(
                         headerCollapsePx += consumed
                         return Offset(0f, -consumed)
                     }
-                } else if (delta > 0f && !gridState.canScrollBackward) {
+                } else if (delta > 0f) {
                     val consumed = min(delta, headerCollapsePx)
                     if (consumed > 0f) {
                         headerCollapsePx -= consumed
@@ -412,24 +416,26 @@ fun GalleryScreen(
             onRefresh = ::requestRefresh,
             modifier = Modifier.fillMaxSize().nestedScroll(headerScrollConnection),
             indicator = {
-                PullToRefreshDefaults.Indicator(
-                    state = pullToRefreshState,
+                RefreshIndicator(
+                    pullProgress = { pullToRefreshState.distanceFraction },
                     isRefreshing = refreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).offset {
-                        IntOffset(0, (headerHeightPx - if (state.selecting) 0f else headerCollapsePx).roundToInt())
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = statusBarHeight),
+                    gapHeightPx = {
+                        headerHeightPx - statusBarHeightPx - (if (state.selecting) 0f else headerCollapsePx) +
+                            pullThresholdPx * pullToRefreshState.distanceFraction
                     },
                 )
             },
         ) {
-            GalleryContentSurface(
+            RefreshContentSurface(
                 modifier = Modifier.fillMaxSize(),
                 topOffsetPx = {
-                    gallerySurfaceTopPx(
+                    contentSurfaceTopPx(
                         headerHeightPx = headerHeightPx,
                         collapsedHeaderPx = if (state.selecting) 0f else headerCollapsePx,
-                        pullOffsetPx = pullThresholdPx * pullToRefreshState.distanceFraction,
                     )
                 },
+                pullOffsetPx = { pullThresholdPx * pullToRefreshState.distanceFraction },
             ) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 120.dp),
@@ -439,17 +445,10 @@ fun GalleryScreen(
                         bottom = 20.dp + if (state.selecting) with(density) { selectionToolbarHeightPx.toDp() } else 0.dp,
                     ),
                 ) {
-                    if (!state.permissionGranted) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            TextButton(onClick = { permissionLauncher.launch(permissions) }) {
-                                Text(stringResource(R.string.photos_permission))
-                            }
-                        }
-                    }
-                    if (state.isLoading || cloudPhotos.isLoading || cloudVideos.isLoading) {
+                    if (!refreshing && timeline.isEmpty() && (cloudPhotos.isLoading || cloudVideos.isLoading)) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
+                                LoadingIndicator()
                             }
                         }
                     }
@@ -492,7 +491,7 @@ fun GalleryScreen(
                             }
                         }
                     }
-                    if (timeline.isEmpty() && !state.isLoading && !cloudPhotos.isLoading && !cloudVideos.isLoading) {
+                    if (timeline.isEmpty() && !cloudPhotos.isLoading && !cloudVideos.isLoading) {
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(stringResource(R.string.photos_empty), modifier = Modifier.padding(24.dp))
                         }
@@ -614,9 +613,10 @@ fun GalleryScreen(
 
     cloudViewer?.let { asset ->
         CloudMediaViewer(
-            asset = asset,
+            assets = cloudAssets,
+            initialIndex = cloudAssets.indexOf(asset).coerceAtLeast(0),
             onDismiss = { cloudViewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { message ->
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { message ->
                 android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
             } },
         )
