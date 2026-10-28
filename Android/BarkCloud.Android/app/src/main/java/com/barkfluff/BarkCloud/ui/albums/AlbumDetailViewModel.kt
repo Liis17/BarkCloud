@@ -12,6 +12,7 @@ import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.net.queryFileName
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +47,7 @@ class AlbumDetailViewModel(
     private var cursorAddedAt: Long? = null
     private var cursorFileId: String = ""
     private var started = false
+    private var reloadJob: Job? = null
 
     fun start(albumId: String, name: String) {
         if (started) return
@@ -58,7 +60,7 @@ class AlbumDetailViewModel(
     fun reload() {
         cursorAddedAt = null
         cursorFileId = ""
-        viewModelScope.launch {
+        reloadJob = viewModelScope.launch {
             _state.update { it.copy(isRefreshing = it.items.isNotEmpty(), isLoading = it.items.isEmpty()) }
             try {
                 val page = albumRepository.listItems(albumId, limit = 60)
@@ -71,6 +73,11 @@ class AlbumDetailViewModel(
                 _state.update { it.copy(isLoading = false, isRefreshing = false, snackbar = e.message) }
             }
         }
+    }
+
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
     }
 
     fun loadMore() {
