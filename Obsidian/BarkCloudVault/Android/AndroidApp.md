@@ -19,6 +19,7 @@ Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] �
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/cloud/CloudRepository.kt` | `CloudRepository` | Клиентские операции с файлами, каталогами, корзиной, избранным и удалением медиа |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/persistence/BarkCloudDatabase.kt` | `BarkCloudDatabase` | Room-хранилище очереди, медиатеки и индекса файлового кеша |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/cache/FileCacheService.kt` | `FileCacheService` | Индексируемое scoped-хранилище и управление сроком/размером кеша |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/cache/CloudImageFetcher.kt` | `CloudImageFetcher` | Загрузка облачных превью в общий кеш через Coil |
 
 ## Публичные контракты
 
@@ -52,6 +53,8 @@ Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] �
 - Нативный вход реализован через AndroidX Credential Manager; связь с доменом и ограничение сервера описаны в [[Android/Authentication]].
 
 - Клиент поддерживает Android API 30 и выше; системные разрешения для медиатеки и широкого доступа к файлам запрашиваются отдельно.
-- Состояние очереди загрузок, присутствия медиа в облаке и индекса файлового кеша хранится в Room (`BarkCloudDatabase`, версия 3). `FileCacheService` индексирует оригиналы, загруженные превью и полноразмерные JPEG-виды по ключу сервер + аккаунт + file ID + вариант; превью использует `PreviewFileId`, а при его отсутствии — SHA-256 полного URL. Старые оригиналы при первом запуске принимаются в индекс. Лимит и срок хранения по умолчанию — 5 GiB и 7 дней от последнего использования. Coil disk cache превью остаётся отдельным каталогом.
+- Состояние очереди загрузок, присутствия медиа в облаке и индекса файлового кеша хранится в Room (`BarkCloudDatabase`, версия 3). `FileCacheService` индексирует оригиналы, загруженные превью и полноразмерные JPEG-виды по ключу сервер + аккаунт + file ID + вариант; превью использует `PreviewFileId`, а при его отсутствии — SHA-256 полного URL. Общие файлы используют вариант `shared-original`, отдельный от собственных оригиналов. Старые оригиналы при первом запуске принимаются в индекс. Лимит и срок хранения по умолчанию — 5 GiB и 7 дней от последнего использования.
+- Облачные миниатюры в экранах галереи, файлов, альбомов, избранного, умных папок, корзины и общих папок, а также в `CloudMediaViewer`, передаются Coil как модель с URL и идентификаторами файла/превью. `CloudImageFetcher` сначала читает общий кеш; старые записи Coil ищутся по полному URL и при обращении переносятся в общий индекс. Новые облачные превью не записываются в Coil disk cache. Его каталог и лимит 256 MiB остаются для аватаров/обложек и чтения старых превью. `SessionManager` при выходе очищает оба кеша.
+- Для скачивания входящего общего файла `SharedWithMeViewModel` сначала получает URL через `SharedRepository.getSharedFileDownloadUrl`, а `SharedFolderBrowserViewModel` использует `download_url` ответа списка; обе загрузки проходят через общий кеш и переиспользуют файл при повторном открытии. Проверки доступа остаются на API получения URL или списка.
 - Выход через `SessionManager` отзывает сессию и очищает токены, очередь, кеш,
   локальные статусы медиатеки и Vault; автозагрузка отключается.

@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.cloud.SharedFolderEntry
 import com.barkfluff.BarkCloud.data.cloud.SharedRepository
 import com.barkfluff.BarkCloud.data.cloud.SharedWithMeEntry
 import com.barkfluff.BarkCloud.data.users.UserRepository
-import com.barkfluff.BarkCloud.net.FileTransferService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +40,7 @@ data class SharedWithMeUiState(
 class SharedWithMeViewModel(
     private val repo: SharedRepository,
     private val users: UserRepository,
-    private val transfer: FileTransferService,
+    private val fileCache: FileCacheService,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SharedWithMeUiState())
@@ -121,7 +121,7 @@ class SharedWithMeViewModel(
         viewModelScope.launch {
             try {
                 val url = repo.getSharedFileDownloadUrl(entry.asset.id)
-                val file = transfer.download(url, entry.asset.fileName)
+                val file = fileCache.loadSharedOriginal(entry.asset.id, entry.asset.fileName, url)
                 _state.update { it.copy(downloadingFileId = null) }
                 onDownloaded(file)
             } catch (e: Exception) {
@@ -138,7 +138,7 @@ class SharedWithMeViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return SharedWithMeViewModel(app.sharedRepository, app.userRepository, app.fileTransfer) as T
+                return SharedWithMeViewModel(app.sharedRepository, app.userRepository, app.fileCache) as T
             }
         }
     }

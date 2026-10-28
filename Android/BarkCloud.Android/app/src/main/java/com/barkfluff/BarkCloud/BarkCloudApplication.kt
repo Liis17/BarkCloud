@@ -23,6 +23,8 @@ import com.barkfluff.BarkCloud.data.SessionManager
 import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.data.cache.CacheScope
+import com.barkfluff.BarkCloud.data.cache.CloudImageFetcherFactory
+import com.barkfluff.BarkCloud.data.cache.CloudImageKeyer
 import com.barkfluff.BarkCloud.data.cache.FileTransferCacheLoader
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
@@ -133,12 +135,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
             index = RoomFileCacheIndex(BarkCloudDatabase.get(this).fileCacheEntryDao()),
             loader = FileTransferCacheLoader(fileTransfer, cacheDir),
             settings = fileCacheSettings,
-            currentScope = {
-                CacheScope(
-                    serverKey = ServerSettings.config.key,
-                    accountId = globalParam.userId ?: CacheScope.UNKNOWN_ACCOUNT,
-                )
-            },
+            currentScope = ::currentCacheScope,
         )
         globalParam.onCacheIdentityChanged = fileCache::cancelInFlightLoads
         autoUploadSettings = AutoUploadSettings(this)
@@ -161,6 +158,8 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components {
+                add(CloudImageKeyer(::currentCacheScope))
+                add(CloudImageFetcherFactory(fileCache, ::currentCacheScope))
                 // Превью используют ту же выбранную TLS-политику, что и upload/download.
                 add(OkHttpNetworkFetcherFactory(callFactory = { InsecureHttp.client }))
                 add(VideoFrameDecoder.Factory())
@@ -197,6 +196,11 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, observer)
         contentResolver.registerContentObserver(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true, observer)
     }
+
+    private fun currentCacheScope() = CacheScope(
+        serverKey = ServerSettings.config.key,
+        accountId = globalParam.userId ?: CacheScope.UNKNOWN_ACCOUNT,
+    )
 
     private companion object {
         const val PREVIEW_CACHE_MAX_BYTES = 256L * 1024L * 1024L

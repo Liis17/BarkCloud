@@ -24,8 +24,10 @@ fun rememberRemoteOpener(): (fileId: String, fileName: String, onError: (String)
         { fileId, fileName, onError ->
             scope.launch {
                 runCatching {
-                    val file = app.fileCache.loadOriginal(fileId, fileName)
-                    context.startActivity(FileShareHelper.buildOpenIntent(context, file, MimeIcon.mimeFor(fileName)))
+                    app.fileCache.loadOriginal(fileId, fileName)
+                    app.fileCache.withPinnedOriginal(fileId) { file ->
+                        context.startActivity(FileShareHelper.buildOpenIntent(context, file, MimeIcon.mimeFor(fileName)))
+                    }
                 }.onFailure { onError(it.message ?: "open failed") }
             }
         }

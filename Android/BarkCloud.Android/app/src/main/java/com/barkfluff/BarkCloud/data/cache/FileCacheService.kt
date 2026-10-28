@@ -67,10 +67,11 @@ class FileCacheService(
         key: FileCacheKey,
         fileName: String,
         sourceUrl: String? = null,
+        sourceFile: File? = null,
     ): File = withContext(ioDispatcher) {
         ensureInitialized()
         val operationEpoch = withCacheState { epoch.get() }
-        val request = FileCacheLoadRequest(key, fileName, sourceUrl)
+        val request = FileCacheLoadRequest(key, fileName, sourceUrl, sourceFile)
         val cached = withCacheState {
             ensureCurrent(key, operationEpoch)
             findFileLocked(key)
@@ -174,6 +175,14 @@ class FileCacheService(
     /** Совместимый API для существующих вызовов открытия оригинала. */
     suspend fun loadOriginal(fileId: String, fileName: String): File =
         load(FileCacheKey.original(currentScope(), fileId), fileName)
+
+    /** Загрузка файла из общей папки с ключом, отдельным от собственного оригинала. */
+    suspend fun loadSharedOriginal(fileId: String, fileName: String, sourceUrl: String): File =
+        load(FileCacheKey.sharedOriginal(currentScope(), fileId), fileName, sourceUrl)
+
+    /** Удерживает оригинал в кеше, пока внешний просмотрщик запускается. */
+    suspend fun <T> withPinnedOriginal(fileId: String, action: suspend (File) -> T): T =
+        withPinnedEntry(FileCacheKey.original(currentScope(), fileId), action)
 
     /** Пин удерживает запись от LRU-вытеснения до соответствующего unpin. */
     suspend fun pin(key: FileCacheKey): File? = withContext(ioDispatcher) {

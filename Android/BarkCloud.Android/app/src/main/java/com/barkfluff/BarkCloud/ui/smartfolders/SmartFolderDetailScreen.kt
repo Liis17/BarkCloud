@@ -144,7 +144,7 @@ private fun SmartFolderMediaCell(
             .combinedClickable(onClick = onTap),
     ) {
         MediaThumb(
-            model = asset.previewUrl(512),
+            model = asset.previewModel(512),
             isVideo = asset.isVideo,
             contentDescription = asset.fileName,
             modifier = Modifier.fillMaxSize(),
