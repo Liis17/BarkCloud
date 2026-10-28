@@ -62,6 +62,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -230,6 +233,34 @@ fun GalleryScreen(
     val maxHeaderCollapsePx = headerHeightPx
     val pullThresholdPx = with(density) { PullToRefreshDefaults.PositionalThreshold.toPx() }
     var headerCollapsePx by rememberSaveable { mutableStateOf(0f) }
+    val paginationSectionSizes by rememberUpdatedState(remember(dateSections) { dateSections.map { it.items.size } })
+    var dateHeadingHeightPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(gridState, photos, videos) {
+        snapshotFlow {
+            val layout = gridState.layoutInfo
+            val last = layout.visibleItemsInfo.lastOrNull()
+            val columns = (layout.viewportSize.width / with(density) { 120.dp.toPx() }).toInt().coerceAtLeast(1)
+            val cellHeight = layout.visibleItemsInfo.firstOrNull { it.size.height == it.size.width }?.size?.height
+                ?: (layout.viewportSize.width / columns)
+            val remaining = if (last != null) galleryRemainingPx(
+                paginationSectionSizes, columns, last.index,
+                last.offset.y + last.size.height - layout.viewportEndOffset + layout.afterContentPadding,
+                cellHeight, dateHeadingHeightPx,
+            ) else Int.MAX_VALUE
+            Triple(
+                remaining <= 500 && paginationSectionSizes.isNotEmpty() && !deletionState.isBusy && !refreshing &&
+                    !cloudPhotos.isLoading && !cloudVideos.isLoading,
+                cloudPhotos.items.size,
+                cloudVideos.items.size,
+            )
+        }.collect { (nearEnd, _, _) ->
+            if (nearEnd) {
+                if (cloudPhotos.canLoadMore && !cloudPhotos.isLoadingMore) photos.loadMore()
+                if (cloudVideos.canLoadMore && !cloudVideos.isLoadingMore) videos.loadMore()
+            }
+        }
+    }
+
     val headerScrollConnection = remember(gridState, maxHeaderCollapsePx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
@@ -459,7 +490,7 @@ fun GalleryScreen(
                             Text(
                                 section.title,
                                 style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                                modifier = Modifier.onSizeChanged { dateHeadingHeightPx = it.height }.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
                             )
                         }
                         items(section.items, key = { it.key }) { item ->
@@ -498,15 +529,7 @@ fun GalleryScreen(
                             Text(stringResource(R.string.photos_empty), modifier = Modifier.padding(24.dp))
                         }
                     }
-                    if (cloudPhotos.canLoadMore || cloudVideos.canLoadMore) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            TextButton(
-                                onClick = { photos.loadMore(); videos.loadMore() },
-                                enabled = !deletionState.isBusy && !cloudPhotos.isLoadingMore && !cloudVideos.isLoadingMore,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text(stringResource(R.string.common_load_more)) }
-                        }
-                    }
+
                 }
             }
         }

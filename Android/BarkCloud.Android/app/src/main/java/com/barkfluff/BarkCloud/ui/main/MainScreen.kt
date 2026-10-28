@@ -220,7 +220,8 @@ fun MainScreen(
             navigation(startDestination = "albums/root", route = MainDestination.Albums.route) {
                 composable("albums/root") {
                     MediaTabScreen(
-                        menu = { MainMenu(onSettings = { navController.navigate("settings") }, onTrash = { navController.navigate("trash") }) },
+                        onOpenTrash = { navController.navigate("trash") },
+                        onOpenDevice = { navController.navigate("albums/device") },
                         onOpenAlbum = { id, name ->
                             navController.navigate("albums/detail/$id?name=${Uri.encode(name)}")
                         },
@@ -239,6 +240,9 @@ fun MainScreen(
                         albumName = entry.arguments?.getString("name").orEmpty(),
                         onNavigateUp = { navController.popBackStack() },
                     )
+                }
+                drillIn("albums/device") {
+                    com.barkfluff.BarkCloud.ui.media.DeviceFoldersScreen(onNavigateUp = { navController.popBackStack() })
                 }
                 drillIn("albums/favorites") {
                     FavoritesScreen(onNavigateUp = { navController.popBackStack() })
