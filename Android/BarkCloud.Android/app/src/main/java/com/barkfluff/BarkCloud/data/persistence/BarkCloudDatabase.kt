@@ -11,14 +11,15 @@ import com.barkfluff.BarkCloud.data.gallery.MediaCloudState
 import com.barkfluff.BarkCloud.data.upload.UploadJob
 
 @Database(
-    entities = [UploadJob::class, MediaCloudState::class],
-    version = 2,
+    entities = [UploadJob::class, MediaCloudState::class, FileCacheEntryEntity::class],
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(BarkCloudConverters::class)
 abstract class BarkCloudDatabase : RoomDatabase() {
     abstract fun uploadDao(): UploadDao
     abstract fun mediaCloudStateDao(): MediaCloudStateDao
+    abstract fun fileCacheEntryDao(): FileCacheEntryDao
 
     companion object {
         @Volatile private var instance: BarkCloudDatabase? = null
@@ -32,13 +33,35 @@ abstract class BarkCloudDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `file_cache_entries` (" +
+                        "`key` TEXT NOT NULL, " +
+                        "`scopeServer` TEXT NOT NULL, " +
+                        "`accountId` TEXT NOT NULL, " +
+                        "`fileId` TEXT NOT NULL, " +
+                        "`variant` TEXT NOT NULL, " +
+                        "`category` TEXT NOT NULL, " +
+                        "`sizeBytes` INTEGER NOT NULL, " +
+                        "`lastUsedAt` INTEGER NOT NULL, " +
+                        "`fileName` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`key`))",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_file_cache_entries_scopeServer_accountId_lastUsedAt` " +
+                        "ON `file_cache_entries` (`scopeServer`, `accountId`, `lastUsedAt`)",
+                )
+            }
+        }
+
         fun get(context: Context): BarkCloudDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
                 context.applicationContext,
                 BarkCloudDatabase::class.java,
                 "barkcloud-local.db",
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }

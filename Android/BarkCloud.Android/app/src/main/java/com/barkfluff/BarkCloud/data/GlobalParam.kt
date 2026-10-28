@@ -9,6 +9,7 @@ class GlobalParam(context: Context) {
     private val store = TokenStore(context)
     private val _sessionActive = MutableStateFlow(hasValidRefreshToken())
     val sessionActive: StateFlow<Boolean> = _sessionActive.asStateFlow()
+    var onCacheIdentityChanged: (() -> Unit)? = null
 
     var accessToken: String?
         get() = store.read()?.accessToken?.takeIf { it.isNotBlank() }
@@ -26,6 +27,15 @@ class GlobalParam(context: Context) {
         get() = store.read()?.refreshTokenExpiresAt ?: 0L
         set(value) = update { it.copy(refreshTokenExpiresAt = value) }
 
+    var userId: String?
+        get() = store.read()?.userId?.takeIf { it.isNotBlank() }
+        set(value) {
+            val next = value.orEmpty()
+            val changed = store.read()?.userId.orEmpty() != next
+            update { it.copy(userId = next) }
+            if (changed) onCacheIdentityChanged?.invoke()
+        }
+
     fun saveTokens(
         accessToken: String,
         accessTokenExpiresAt: Long,
@@ -33,6 +43,7 @@ class GlobalParam(context: Context) {
         refreshTokenExpiresAt: Long,
     ) {
         store.save(TokenBundle(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt))
+        onCacheIdentityChanged?.invoke()
         publishSessionState()
     }
 
@@ -49,6 +60,7 @@ class GlobalParam(context: Context) {
 
     fun clearSession() {
         store.clear()
+        onCacheIdentityChanged?.invoke()
         publishSessionState()
     }
 

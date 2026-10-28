@@ -17,7 +17,8 @@ Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] �
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/ui/main/MainDestination.kt`, `MainScreen.kt` | `MainDestination`, `MainScreen` | Вкладки и вложенная навигация |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/ui/gallery/GalleryScreen.kt`, `GalleryViewModel.kt`, `PhotoTimelineItem.kt` | `GalleryScreen`, `GalleryViewModel`, `PhotoTimelineItem` | Лента, выбор и действия с медиа |
 | `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/cloud/CloudRepository.kt` | `CloudRepository` | Клиентские операции с файлами, каталогами, корзиной, избранным и удалением медиа |
-| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/persistence/BarkCloudDatabase.kt` | `BarkCloudDatabase` | Локальные записи очереди и состояния медиатеки |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/persistence/BarkCloudDatabase.kt` | `BarkCloudDatabase` | Room-хранилище очереди, медиатеки и индекса файлового кеша |
+| `Android/BarkCloud.Android/app/src/main/java/com/barkfluff/BarkCloud/data/cache/FileCacheService.kt` | `FileCacheService` | Индексируемое scoped-хранилище и управление сроком/размером кеша |
 
 ## Публичные контракты
 
@@ -51,6 +52,6 @@ Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] �
 - Нативный вход реализован через AndroidX Credential Manager; связь с доменом и ограничение сервера описаны в [[Android/Authentication]].
 
 - Клиент поддерживает Android API 30 и выше; системные разрешения для медиатеки и широкого доступа к файлам запрашиваются отдельно.
-- Состояние очереди загрузок и присутствия медиа в облаке хранится локально в Room; оригиналы кешируются службой `FileCacheService`, превью — отдельным Coil disk cache.
+- Состояние очереди загрузок, присутствия медиа в облаке и индекса файлового кеша хранится в Room (`BarkCloudDatabase`, версия 3). `FileCacheService` индексирует оригиналы, загруженные превью и полноразмерные JPEG-виды по ключу сервер + аккаунт + file ID + вариант; превью использует `PreviewFileId`, а при его отсутствии — SHA-256 полного URL. Старые оригиналы при первом запуске принимаются в индекс. Лимит и срок хранения по умолчанию — 5 GiB и 7 дней от последнего использования. Coil disk cache превью остаётся отдельным каталогом.
 - Выход через `SessionManager` отзывает сессию и очищает токены, очередь, кеш,
   локальные статусы медиатеки и Vault; автозагрузка отключается.

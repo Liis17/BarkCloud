@@ -22,6 +22,8 @@ import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.SessionManager
 import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
+import com.barkfluff.BarkCloud.data.cache.CacheScope
+import com.barkfluff.BarkCloud.data.cache.FileTransferCacheLoader
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.DynamicFolderRepository
@@ -30,6 +32,8 @@ import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.users.UserRepository
+import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
+import com.barkfluff.BarkCloud.data.persistence.RoomFileCacheIndex
 import com.barkfluff.BarkCloud.data.vault.VaultStore
 import com.barkfluff.BarkCloud.files.data.LocalFileRepository
 import com.barkfluff.BarkCloud.grpc.ClientMetadataInterceptor
@@ -122,9 +126,21 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         albumRepository = AlbumRepository(grpcManager)
         dynamicFolderRepository = DynamicFolderRepository(grpcManager)
         sharedRepository = SharedRepository(grpcManager)
-        userRepository = UserRepository(grpcManager, fileTransfer)
+        userRepository = UserRepository(grpcManager, fileTransfer, globalParam = globalParam)
         fileCacheSettings = FileCacheSettings(this)
-        fileCache = FileCacheService(this, fileTransfer, fileCacheSettings)
+        fileCache = FileCacheService(
+            baseDirectory = cacheDir,
+            index = RoomFileCacheIndex(BarkCloudDatabase.get(this).fileCacheEntryDao()),
+            loader = FileTransferCacheLoader(fileTransfer, cacheDir),
+            settings = fileCacheSettings,
+            currentScope = {
+                CacheScope(
+                    serverKey = ServerSettings.config.key,
+                    accountId = globalParam.userId ?: CacheScope.UNKNOWN_ACCOUNT,
+                )
+            },
+        )
+        globalParam.onCacheIdentityChanged = fileCache::cancelInFlightLoads
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         vaultStore = VaultStore(this)
