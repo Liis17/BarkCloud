@@ -73,10 +73,9 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active 
       <td className="selcell" />
       <td className="name">
         <div className="name-cell">
-          <div className="file-icon folder">DIR</div>
+          <div className="file-icon folder"><Icon.folder size={22} /></div>
           <div className="file-name-col">
             <div className="fn">{dir.name}</div>
-            <div className="meta">Папка</div>
           </div>
         </div>
       </td>
