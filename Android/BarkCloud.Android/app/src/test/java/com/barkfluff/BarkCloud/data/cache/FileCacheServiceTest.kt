@@ -4,7 +4,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -13,6 +12,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.withContext
@@ -889,22 +889,22 @@ class FileCacheServiceTest {
         }
     }
 
-    private fun cache(
+    private fun TestScope.cache(
         root: File,
         loader: FileCacheLoader,
         initialScope: CacheScope,
         policy: TestPolicy = TestPolicy(),
         nowMillis: () -> Long = { 100L },
-        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ioDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(testScheduler),
         index: FileCacheIndex? = null,
     ) = cache(root, loader, policy, nowMillis, ioDispatcher, index) { initialScope }
 
-    private fun cache(
+    private fun TestScope.cache(
         root: File,
         loader: FileCacheLoader,
         policy: TestPolicy = TestPolicy(),
         nowMillis: () -> Long = { 100L },
-        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ioDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(testScheduler),
         index: FileCacheIndex? = null,
         scope: () -> CacheScope,
     ) = FileCacheService(
