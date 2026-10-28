@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
+    val pendingJobs: List<UploadJob>
+        get() = jobs.filter { it.phase != UploadPhase.COMPLETED && it.phase != UploadPhase.CANCELLED }
     private val sessionJobs: List<UploadJob>
         get() = jobs.filter { it.createdAtMillis >= System.currentTimeMillis() - SESSION_WINDOW_MILLIS }
     val current: UploadJob? get() = sessionJobs.firstOrNull { it.phase in ACTIVE_PHASES }
