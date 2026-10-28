@@ -54,11 +54,9 @@ function directoryCursorOf(listing: Listing): DirectoryCursor | null {
 
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 
-function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active }: {
+function DirRow({ dir, onOpen, onMenu, dropHandlers, active }: {
   dir: DirInfo;
   onOpen: (d: DirInfo) => void;
-  onRename: (d: DirInfo) => void;
-  onDelete: (d: DirInfo) => void;
   onMenu: (e: React.MouseEvent, d: DirInfo) => void;
   dropHandlers: FileDropHandlers;
   active: boolean;
@@ -81,16 +79,7 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active 
       </td>
       <td className="size">—</td>
       <td className="modified">{fmtDate(dir.updatedAt)}</td>
-      <td>
-        <span className="row-actions">
-          <button title="Переименовать" onClick={(e) => { e.stopPropagation(); onRename(dir); }}>
-            <Icon.pencil size={18} />
-          </button>
-          <button title="Удалить" onClick={(e) => { e.stopPropagation(); onDelete(dir); }}>
-            <Icon.trash size={18} />
-          </button>
-        </span>
-      </td>
+      <td />
     </tr>
   );
 }
@@ -833,8 +822,6 @@ export function FilesPage() {
                         active={dropTarget?.id === d.id}
                         dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
                         onOpen={openDir}
-                        onRename={(t) => startRename(t, true)}
-                        onDelete={(t) => requestDelete(t, true)}
                         onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                       />
                     ))}
