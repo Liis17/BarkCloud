@@ -416,6 +416,8 @@ fun GalleryScreen(
         GalleryHeader(
             height = headerHeight,
             avatarUrl = avatarUrl,
+            uploadActive = uploadState.isActive,
+            uploadProgress = uploadState.progress,
             onAccount = { accountDialogOpen = true },
             selecting = state.selecting,
             selectedCount = state.selected.size,
@@ -645,6 +647,8 @@ fun GalleryScreen(
 internal fun GalleryHeader(
     height: androidx.compose.ui.unit.Dp,
     avatarUrl: String?,
+    uploadActive: Boolean = false,
+    uploadProgress: Float = 0f,
     onAccount: () -> Unit,
     selecting: Boolean = false,
     selectedCount: Int = 0,
@@ -669,7 +673,15 @@ internal fun GalleryHeader(
                 IconButton(onClick = onClearSelection, enabled = enabled) {
                     Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.common_cancel))
                 }
-            } else Box(
+            } else Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                if (uploadActive) {
+                    if (uploadProgress > 0f) CircularProgressIndicator(
+                        progress = { uploadProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxSize(),
+                        strokeWidth = 2.dp,
+                    ) else CircularProgressIndicator(Modifier.fillMaxSize(), strokeWidth = 2.dp)
+                }
+                Box(
                 Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
                     .combinedClickable(onClick = onAccount),
                 contentAlignment = Alignment.Center,
@@ -684,6 +696,7 @@ internal fun GalleryHeader(
                 } else {
                     Icon(Icons.Outlined.Person, contentDescription = stringResource(R.string.gallery_account_menu))
                 }
+            }
             }
         }
     }
