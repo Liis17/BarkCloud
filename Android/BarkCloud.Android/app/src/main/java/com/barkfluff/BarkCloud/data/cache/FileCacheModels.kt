@@ -34,6 +34,9 @@ data class FileCacheKey(
         fun original(scope: CacheScope, fileId: String) =
             FileCacheKey(scope, fileId, ORIGINAL_VARIANT, CacheCategory.ORIGINAL)
 
+        fun sharedOriginal(scope: CacheScope, fileId: String) =
+            FileCacheKey(scope, fileId, SHARED_ORIGINAL_VARIANT, CacheCategory.ORIGINAL)
+
         fun preview(
             scope: CacheScope,
             fileId: String,
@@ -49,6 +52,7 @@ data class FileCacheKey(
             FileCacheKey(scope, fileId, JPEG_VIEW_VARIANT, CacheCategory.JPEG_VIEW)
 
         private const val ORIGINAL_VARIANT = "original"
+        private const val SHARED_ORIGINAL_VARIANT = "shared-original"
         private const val JPEG_VIEW_VARIANT = "jpeg-view"
     }
 }
@@ -64,6 +68,7 @@ data class FileCacheLoadRequest(
     val key: FileCacheKey,
     val fileName: String,
     val sourceUrl: String? = null,
+    val sourceFile: java.io.File? = null,
 )
 
 fun interface FileCacheLoader {

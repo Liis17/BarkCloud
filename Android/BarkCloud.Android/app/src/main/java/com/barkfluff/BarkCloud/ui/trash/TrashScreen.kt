@@ -199,7 +199,7 @@ private fun TrashRow(
             leadingContent = {
                 if (hasPreview) {
                     MediaThumb(
-                        model = item.asset.previewUrl(128),
+                        model = item.asset.previewModel(128),
                         isVideo = item.asset.isVideo,
                         contentDescription = item.name,
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),

@@ -122,7 +122,7 @@ private fun SharedFileRow(
         leadingContent = {
             if (hasPreview) {
                 MediaThumb(
-                    model = entry.asset.previewUrl(128),
+                    model = entry.asset.previewModel(128),
                     isVideo = entry.asset.isVideo,
                     contentDescription = entry.asset.fileName,
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),

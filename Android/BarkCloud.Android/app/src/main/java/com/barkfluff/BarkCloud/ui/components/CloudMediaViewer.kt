@@ -112,7 +112,7 @@ fun CloudMediaViewer(
                 val asset = assets[page]
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     AsyncImage(
-                        model = asset.previewUrl(1024),
+                        model = asset.previewModel(1024),
                         contentDescription = asset.fileName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,

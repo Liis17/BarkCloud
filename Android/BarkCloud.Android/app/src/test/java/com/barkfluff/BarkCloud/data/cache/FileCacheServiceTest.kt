@@ -124,6 +124,40 @@ class FileCacheServiceTest {
     }
 
     @Test
+    fun previewIdFallbackJpegViewAndSharedOriginalUseDistinctKeys() = runTest {
+        val root = Files.createTempDirectory("file-cache-variants-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val loader = RecordingLoader { request, destination ->
+                destination.writeBytes((request.sourceUrl ?: request.key.variant).encodeToByteArray())
+            }
+            val cache = cache(root, loader, scope)
+            val withPreviewId = FileCacheKey.preview(scope, "photo", "preview-1", "https://cdn/preview")
+            val urlFallback = FileCacheKey.preview(scope, "photo", null, "https://cdn/preview")
+            val jpegView = FileCacheKey.jpegView(scope, "photo")
+            val ownOriginal = FileCacheKey.original(scope, "shared-file")
+            val sharedOriginal = FileCacheKey.sharedOriginal(scope, "shared-file")
+
+            assertEquals(5, listOf(withPreviewId, urlFallback, jpegView, ownOriginal, sharedOriginal)
+                .map { it.storageKey }
+                .toSet()
+                .size)
+            cache.load(withPreviewId, "preview.jpg", "https://cdn/preview")
+            cache.load(urlFallback, "preview.jpg", "https://cdn/preview")
+            cache.load(jpegView, "view.jpg", "https://cdn/view")
+            cache.load(ownOriginal, "shared.bin", "https://cdn/original")
+            val firstShared = cache.loadSharedOriginal("shared-file", "shared.bin", "https://cdn/shared")
+            val secondShared = cache.loadSharedOriginal("shared-file", "shared.bin", "https://cdn/shared")
+
+            assertEquals(firstShared, secondShared)
+            assertEquals(5, loader.calls.get())
+            assertEquals(5, cache.entryCount())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun failedAndCancelledLoadsLeaveNoIndexEntryOrTemporaryFile() = runTest {
         val root = Files.createTempDirectory("file-cache-failure-").toFile()
         try {

@@ -14,16 +14,20 @@ class FileTransferCacheLoader(
         val transferTemp = File(temporaryDirectory, transferTempName)
         var downloaded: File? = null
         try {
-            val url = request.sourceUrl ?: run {
-                if (request.key.category != CacheCategory.ORIGINAL) {
-                    throw IOException("Для превью требуется URL загрузки")
+            if (request.sourceFile != null) {
+                request.sourceFile.copyTo(destination, overwrite = true)
+            } else {
+                val url = request.sourceUrl ?: run {
+                    if (request.key.category != CacheCategory.ORIGINAL) {
+                        throw IOException("Для превью требуется URL загрузки")
+                    }
+                    transfer.tempDownloadUrls(listOf(request.key.fileId))[request.key.fileId]
+                        ?: throw IOException("Ссылка загрузки не найдена")
                 }
-                transfer.tempDownloadUrls(listOf(request.key.fileId))[request.key.fileId]
-                    ?: throw IOException("Ссылка загрузки не найдена")
+                val completedDownload = transfer.download(url, transferTempName)
+                downloaded = completedDownload
+                completedDownload.copyTo(destination, overwrite = true)
             }
-            val completedDownload = transfer.download(url, transferTempName)
-            downloaded = completedDownload
-            completedDownload.copyTo(destination, overwrite = true)
             if (destination.length() <= 0L) throw IOException("Загружен пустой файл")
         } finally {
             downloaded?.delete()
