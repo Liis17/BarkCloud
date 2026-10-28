@@ -25,7 +25,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { pickDocumentIcon } from '../hooks/useDocumentHead';
 import { useUploadActions } from '../hooks/useUploadManager';
-import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
+import { DynamicFoldersSkeleton, DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
 import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
@@ -271,6 +271,7 @@ export function FilesPage() {
   const [bulkMoving, setBulkMoving] = React.useState(false);
   const [archiving, setArchiving] = React.useState(false);
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
+  const [smartFoldersLoading, setSmartFoldersLoading] = React.useState(true);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
   const [directoryCursor, setDirectoryCursor] = React.useState<DirectoryCursor | null>(null);
@@ -356,7 +357,8 @@ export function FilesPage() {
   const loadSmartFolders = React.useCallback(() => {
     apiGet<{ folders: DynamicFolder[] }>('/api/dynamic-folders')
       .then((d) => setSmartFolders(d.folders || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSmartFoldersLoading(false));
   }, []);
   React.useEffect(() => {
     loadSmartFolders();
@@ -761,9 +763,11 @@ export function FilesPage() {
             )}
           </div>
 
-          {!openSmart && !searchQuery && !currentDir && smartFolders.length > 0 && (
+          {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading ? (
+            <DynamicFoldersSkeleton />
+          ) : smartFolders.length > 0 && (
             <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
-          )}
+          ))}
 
           {openSmart ? (
             <div className="files-list">
