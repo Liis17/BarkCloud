@@ -114,7 +114,7 @@ public static class CloudApiEndpoints
         // ───────────────────────── Каталоги ─────────────────────────
 
         api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            string? dir, int? limit, string? cursorName, string? cursorId) =>
+            DirectorySizeApi.DirectorySizeApiClient directorySizes, string? dir, int? limit, string? cursorName, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
                 var req = new ListDirectoryRequest
@@ -125,10 +125,19 @@ public static class CloudApiEndpoints
                 if (!string.IsNullOrWhiteSpace(cursorName)) req.CursorName = cursorName;
                 if (!string.IsNullOrWhiteSpace(cursorId)) req.CursorEntryId = cursorId;
 
-                var listing = await cloud.ListDirectoryDetailedAsync(req, token);
+                // Листинг и размеры подпапок — параллельно; размеры берутся из кеша Files-сервиса.
+                var listingTask = cloud.ListDirectoryDetailedAsync(req, token).ResponseAsync;
+                var sizesTask = directorySizes.GetSubdirectorySizesAsync(
+                    new GetSubdirectorySizesRequest { ParentId = dir ?? string.Empty }, token).ResponseAsync;
+                await Task.WhenAll(listingTask, sizesTask);
+                var listing = listingTask.Result;
+                var sizeById = sizesTask.Result.Sizes.ToDictionary(s => s.DirectoryId, s => s.SizeBytes);
+
                 return Results.Json(new
                 {
-                    dirs = listing.Subdirs.Select(CloudJson.Dir).ToArray(),
+                    dirs = listing.Subdirs
+                        .Select(d => CloudJson.Dir(d, sizeById.TryGetValue(d.Id, out var size) ? size : (long?)null))
+                        .ToArray(),
                     files = listing.Files.Select(CloudJson.Entry).ToArray(),
                     nextCursorName = listing.NextCursorName,
                     nextCursorId = listing.NextCursorEntryId

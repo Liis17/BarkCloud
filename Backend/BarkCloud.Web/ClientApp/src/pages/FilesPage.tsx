@@ -77,7 +77,7 @@ function DirRow({ dir, onOpen, onMenu, dropHandlers, active }: {
           </div>
         </div>
       </td>
-      <td className="size">—</td>
+      <td className="size">{dir.sizeLabel || '—'}</td>
       <td className="modified">{fmtDate(dir.updatedAt)}</td>
       <td />
     </tr>
