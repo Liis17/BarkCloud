@@ -258,6 +258,7 @@ export function FilesPage() {
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [bulkMoving, setBulkMoving] = React.useState(false);
+  const [moveProgress, setMoveProgress] = React.useState<{ done: number; total: number } | null>(null);
   const [archiving, setArchiving] = React.useState(false);
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
   const [smartFoldersLoading, setSmartFoldersLoading] = React.useState(true);
@@ -615,21 +616,35 @@ export function FilesPage() {
   }
 
   async function bulkMove(targetDir: string) {
+    if (moveProgress) return;
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
     let ok = 0;
-    for (const e of chosen) {
-      try {
-        await apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir });
-        ok++;
-      } catch (err) {
-        toast(`«${e.name}»: ${(err as Error).message}`, 'err');
+    let failed = 0;
+    let firstError: { name: string; message: string } | null = null;
+    setMoveProgress({ done: 0, total: chosen.length });
+    try {
+      for (const e of chosen) {
+        try {
+          await apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir });
+          ok++;
+        } catch (err) {
+          failed++;
+          if (!firstError) firstError = { name: e.name, message: (err as Error).message };
+        }
+        setMoveProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
       }
+    } finally {
+      setMoveProgress(null);
+      setBulkMoving(false);
+      fsel.clear();
     }
-    setBulkMoving(false);
-    fsel.clear();
     if (ok) {
-      toast(`Перемещено: ${ok}`);
+      toast(failed ? `Перемещено: ${ok}, не удалось: ${failed}` : `Перемещено: ${ok}`);
       load();
+    } else if (failed === 1 && firstError) {
+      toast(`«${firstError.name}»: ${firstError.message}`, 'err');
+    } else if (failed) {
+      toast(`Не удалось переместить выбранные файлы (${failed})`, 'err');
     }
   }
   async function bulkCopyLinks() {
@@ -961,7 +976,13 @@ export function FilesPage() {
       )}
 
       {bulkMoving && (
-        <MoveToFolderModal count={fsel.count} currentDir={currentDir} onPick={bulkMove} onClose={() => setBulkMoving(false)} />
+        <MoveToFolderModal
+          count={fsel.count}
+          currentDir={currentDir}
+          progress={moveProgress ?? undefined}
+          onPick={bulkMove}
+          onClose={() => setBulkMoving(false)}
+        />
       )}
 
       {menu}
