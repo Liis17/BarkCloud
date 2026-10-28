@@ -88,6 +88,33 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
     }
 
     [Theory]
+    [InlineData(8000)]
+    [InlineData(18000)]
+    public async Task Startup_ExistingDeployment_SeedsNewHostsFromPersistedServicePort(int port)
+    {
+        var populator = CreatePopulator(minioAccessKey: "", minioSecretKey: "");
+        await populator.EnsureSeedAsync();
+        var storage = new ConfigurationStorage(_context, new MetricsCollector());
+        await _context.Settings(SettingsScopes.Get(ServiceId.Identity))
+            .Where(row => row.Key == "RunSettings:Port")
+            .ExecuteUpdateAsync(update => update.SetProperty(row => row.Value, port.ToString()));
+        await _context.Settings(SettingsScopes.Get(ServiceId.Identity))
+            .Where(row => row.Key == "IdentityService:Host").ExecuteDeleteAsync();
+        _context.ChangeTracker.Clear();
+
+        await populator.EnsureSeedAsync();
+        await populator.PopulateDefaultsAsync();
+        await populator.PopulateDefaultsAsync();
+
+        var settings = await storage.GetAllAsync();
+        settings.Where(row => row.Section == "IdentityService" && row.Key == "Host")
+            .Should().OnlyContain(row => row.Value == $"http://cloud-identity:{port}");
+        settings.Single(row => row.ServiceId == ServiceId.Identity
+                               && row.Section == "RunSettings" && row.Key == "Port")
+            .Value.Should().Be(port.ToString());
+    }
+
+    [Theory]
     [InlineData(ServiceId.Users)]
     [InlineData(ServiceId.Files)]
     [InlineData(ServiceId.Torrent)]
@@ -113,6 +140,23 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
         // их выдаёт Identity (ServiceCredentialsApi) по секрету сервиса.
         settings.Where(x => x.ServiceId == serviceId && x.Section == "IdentityService" && x.Key == "Token")
             .Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Populate_PreservesExplicitServiceAddress()
+    {
+        var populator = CreatePopulator(minioAccessKey: "", minioSecretKey: "");
+        await populator.EnsureSeedAsync();
+        var storage = new ConfigurationStorage(_context, new MetricsCollector());
+        await storage.UpdateConfigurationAsync(
+            "IdentityService", "Host", "https://identity.internal:18443", ServiceId.Identity, "admin", "test");
+
+        await populator.PopulateDefaultsAsync();
+        await populator.PopulateDefaultsAsync();
+
+        var settings = await storage.GetConfiguration(ServiceId.Identity);
+        settings.Single(row => row.Section == "IdentityService" && row.Key == "Host")
+            .Value.Should().Be("https://identity.internal:18443");
     }
 
     [Fact]
