@@ -161,6 +161,10 @@
     <string name="gallery_account_menu">Меню аккаунта</string>
     <string name="gallery_account_profile_unavailable">Профиль недоступен</string>
     <string name="gallery_account_storage_unavailable">Не удалось получить данные хранилища</string>
+    <string name="gallery_self_hosted" translatable="false">self-hosted</string>
+    <string name="gallery_storage_unlimited">%1$s · Без лимита</string>
+    <string name="gallery_storage_avatars">Аватары</string>
+    <string name="gallery_storage_other">Прочее</string>
     <string name="photos_auto_upload_off">Выключена</string>
     <string name="photos_auto_upload_wifi">Только Wi-Fi</string>
     <string name="photos_auto_upload_any">Любая сеть</string>

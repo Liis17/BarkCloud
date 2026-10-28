@@ -28,14 +28,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
-import com.barkfluff.BarkCloud.files.ui.formatSize
+import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
 
@@ -44,8 +43,7 @@ internal fun GalleryAccountDialog(
     displayName: String?,
     username: String?,
     avatarUrl: String?,
-    storageUsed: Long?,
-    storageLimit: Long?,
+    storageInfo: FileTransferService.StorageInfo?,
     storageLoading: Boolean,
     autoUploadPolicy: AutoUploadNetworkPolicy,
     uploadState: UploadQueueUiState,
@@ -58,7 +56,6 @@ internal fun GalleryAccountDialog(
     onOpenTrash: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scrollState: ScrollState = rememberScrollState()
     Dialog(
         onDismissRequest = onDismiss,
@@ -109,30 +106,24 @@ internal fun GalleryAccountDialog(
                             Text("@$it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Text(
+                            stringResource(R.string.gallery_self_hosted),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                 }
 
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.settings_storage_title), style = MaterialTheme.typography.titleSmall)
                     when {
                         storageLoading -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                        storageUsed != null && storageLimit != null -> {
-                            LinearProgressIndicator(
-                                progress = {
-                                    if (storageLimit > 0L) (storageUsed.toFloat() / storageLimit).coerceIn(0f, 1f) else 0f
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.settings_storage_usage,
-                                    formatSize(context, storageUsed),
-                                    formatSize(context, storageLimit),
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        storageInfo != null -> GalleryStorageCard(storageInfo)
                         else -> Text(
                             stringResource(R.string.gallery_account_storage_unavailable),
                             style = MaterialTheme.typography.bodySmall,

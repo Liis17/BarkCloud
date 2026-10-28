@@ -88,6 +88,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
@@ -178,8 +179,7 @@ fun GalleryScreen(
     var pendingNavigation by remember { mutableStateOf<AccountMenuDestination?>(null) }
     var requestReclaimAfterDismiss by remember { mutableStateOf(false) }
     var profile by remember { mutableStateOf<User?>(null) }
-    var storageUsed by remember { mutableStateOf<Long?>(null) }
-    var storageLimit by remember { mutableStateOf<Long?>(null) }
+    var storageInfo by remember { mutableStateOf<FileTransferService.StorageInfo?>(null) }
     var storageLoading by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var refreshQueued by remember { mutableStateOf(false) }
@@ -302,11 +302,9 @@ fun GalleryScreen(
         if (accountDialogOpen) {
             viewModel.refreshAutoUploadPolicy()
             storageLoading = true
-            storageUsed = null
-            storageLimit = null
+            storageInfo = null
             runCatching { app.fileTransfer.storageInfo() }.onSuccess {
-                storageUsed = it.used
-                storageLimit = it.limit
+                storageInfo = it
             }
             storageLoading = false
         }
@@ -620,8 +618,7 @@ fun GalleryScreen(
             displayName = profileName,
             username = profile?.username,
             avatarUrl = avatarUrl,
-            storageUsed = storageUsed,
-            storageLimit = storageLimit,
+            storageInfo = storageInfo,
             storageLoading = storageLoading,
             autoUploadPolicy = state.autoUploadPolicy,
             uploadState = uploadState,
