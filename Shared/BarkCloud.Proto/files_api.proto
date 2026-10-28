@@ -1271,6 +1271,8 @@ message SearchHit {
   int64 size = 13;
   string owner_name = 14;
   FilePlaceholderInfo placeholder = 15;
+  // Ссылка на полноразмерный JPEG-вид для просмотра (HEIC и др.); пусто — оригинал/превью.
+  string jpeg_view_url = 16;
 }
 
 message UserTagData {

@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ContextMenu, type ContextItem } from '../components/ui/ContextMenu';
 import { RenameModal } from '../components/ui/RenameModal';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -7,13 +6,15 @@ import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
 import { useMediaActions } from './useMediaActions';
 import { apiGet, apiPost, downloadArchive } from '../lib/api';
 import { createAlbumShare, createFolderShare, createMusicPlaylistShare } from '../lib/share';
-import { openSearchHit, searchHitToMediaItem, type SearchHit } from '../lib/search';
+import { searchHitToMediaItem, type SearchHit } from '../lib/search';
 import * as T from '../lib/torrents';
 import type { Album } from '../lib/types';
 import type { ToastPush } from './useToast';
 
 interface UseSearchHitMenuArgs {
   toast: ToastPush;
+  /** Открытие хита обычным кликом: то же поведение у пункта «Открыть» контекстного меню. */
+  onOpen: (hit: SearchHit) => void;
   onRenamed: (hit: SearchHit, title: string) => void;
   onRemoved: (hit: SearchHit) => void;
   onPatched: (hit: SearchHit, patch: Partial<SearchHit>) => void;
@@ -32,8 +33,7 @@ function isOwnedFileHit(hit: SearchHit): boolean {
 }
 
 /** ПКМ-меню результатов поиска. Файлы/медиа — через useMediaActions, остальные типы — своё меню. */
-export function useSearchHitMenu({ toast, onRenamed, onRemoved, onPatched }: UseSearchHitMenuArgs) {
-  const navigate = useNavigate();
+export function useSearchHitMenu({ toast, onOpen, onRenamed, onRemoved, onPatched }: UseSearchHitMenuArgs) {
   const [menu, setMenu] = React.useState<{ x: number; y: number; hit: SearchHit } | null>(null);
   const [rename, setRename] = React.useState<SearchHit | null>(null);
   const [confirm, setConfirm] = React.useState<PendingConfirm | null>(null);
@@ -57,6 +57,7 @@ export function useSearchHitMenu({ toast, onRenamed, onRemoved, onPatched }: Use
     toast,
     deleteByEntry: true,
     reloadAlbums: loadAlbums,
+    onOpen: () => mediaHit.current && onOpen(mediaHit.current),
     onRenamed: (_m, name) => mediaHit.current && onRenamed(mediaHit.current, name),
     onRemoved: () => mediaHit.current && onRemoved(mediaHit.current),
   });
@@ -141,7 +142,7 @@ export function useSearchHitMenu({ toast, onRenamed, onRemoved, onPatched }: Use
   }
 
   function buildItems(hit: SearchHit): ContextItem[] {
-    const out: ContextItem[] = [{ label: 'Открыть', icon: 'eye', onClick: () => openSearchHit(hit, navigate) }];
+    const out: ContextItem[] = [{ label: 'Открыть', icon: 'eye', onClick: () => onOpen(hit) }];
     switch (hit.kind) {
       case 'folder':
         out.push(
