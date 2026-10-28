@@ -80,6 +80,23 @@ public sealed class BuilderModel : INotifyPropertyChanged
     public string ServiceCredentialsRegistry =>
         $"Identity={IdentityServiceCredential};Users={UsersServiceCredential};Files={FilesServiceCredential};Torrent={TorrentServiceCredential};Web={WebServiceCredential}";
 
+    public void RegenerateServiceSecrets()
+    {
+        IdentityConfigAccessKey = GenerateSecret(50);
+        UsersConfigAccessKey = GenerateSecret(50);
+        NotificationConfigAccessKey = GenerateSecret(50);
+        FilesConfigAccessKey = GenerateSecret(50);
+        TorrentConfigAccessKey = GenerateSecret(50);
+        WebConfigAccessKey = GenerateSecret(50);
+        IdentityServiceCredential = GenerateSecret(43);
+        UsersServiceCredential = GenerateSecret(43);
+        FilesServiceCredential = GenerateSecret(43);
+        TorrentServiceCredential = GenerateSecret(43);
+        WebServiceCredential = GenerateSecret(43);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ConfigurationAccessKeysRegistry)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ServiceCredentialsRegistry)));
+    }
+
     // MinIO
     public string MinioRootUser { get; set; } = "user";
     public string MinioRootPassword { get; set; } = "password";

@@ -245,6 +245,10 @@
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Секреты сервисов (разделённые, аудит №9): bootstrap-ключи Configuration, секреты сервисных токенов и RSA-ключи JWT (secrets/jwt) генерируются автоматически и пишутся в .env. При загрузке существующего .env значения сохраняются." TextWrapping="Wrap" />
                         <ui:TextBox x:Name="AccessKeyBox" IsReadOnly="True" ClearButtonEnabled="False"
                                     Text="{Binding ConfigurationAccessKeysRegistry, Mode=OneWay}" />
+                        <ui:Button Content="Сгенерировать новые данные" Click="OnRegenerateServiceSecrets"
+                                   Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource FieldLabel}" TextWrapping="Wrap"
+                                   Text="Кнопка заменяет bootstrap-ключи Configuration и секреты сервисных токенов. Для сохранения нажмите «Создать». После сохранения обновите конфигурацию всех сервисов. Существующие RSA-ключи JWT сохраняются." />
                     </StackPanel>
                 </ui:CardExpander>
 

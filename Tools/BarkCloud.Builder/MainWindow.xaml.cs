@@ -24,22 +24,15 @@ namespace BarkCloud.Builder
             // при Load() из существующего .env они восстанавливаются оттуда.
             _model = new BuilderModel
             {
-                IdentityConfigAccessKey = BuilderModel.GenerateSecret(50),
-                UsersConfigAccessKey = BuilderModel.GenerateSecret(50),
-                NotificationConfigAccessKey = BuilderModel.GenerateSecret(50),
-                FilesConfigAccessKey = BuilderModel.GenerateSecret(50),
-                TorrentConfigAccessKey = BuilderModel.GenerateSecret(50),
-                WebConfigAccessKey = BuilderModel.GenerateSecret(50),
-                IdentityServiceCredential = BuilderModel.GenerateSecret(43),
-                UsersServiceCredential = BuilderModel.GenerateSecret(43),
-                FilesServiceCredential = BuilderModel.GenerateSecret(43),
-                TorrentServiceCredential = BuilderModel.GenerateSecret(43),
-                WebServiceCredential = BuilderModel.GenerateSecret(43),
                 WebAdminCookieKey = BuilderModel.GenerateSecret(64),
                 WebAdminPassword = GenerateKey(20),
             };
+            _model.RegenerateServiceSecrets();
             DataContext = _model;
         }
+
+        private void OnRegenerateServiceSecrets(object sender, RoutedEventArgs e) =>
+            _model.RegenerateServiceSecrets();
 
         // Единый обработчик кнопок «Случайно»: целевое поле — в CommandParameter, длина — в Tag.
         private void OnRandom(object sender, RoutedEventArgs e)
