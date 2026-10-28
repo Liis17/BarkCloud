@@ -143,7 +143,7 @@ export function Sidebar({ collapsed, onToggle, profileError = false, storageErro
         <div className="who">
           <div className="uname">{user?.displayName || (profileError ? 'Профиль недоступен' : 'Загрузка профиля…')}</div>
           <div className="uhost">
-            {[user?.role, shell?.server.host].filter(Boolean).join(' · ')}
+            {shell?.server.host}
           </div>
         </div>
         <span className="chev">
