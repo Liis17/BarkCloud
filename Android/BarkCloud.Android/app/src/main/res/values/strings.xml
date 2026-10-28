@@ -388,4 +388,11 @@
     <string name="viewer_info_save">Сохранить</string>
     <string name="viewer_info_saving">Сохраняем…</string>
     <string name="viewer_info_save_error">Не удалось сохранить: %1$s</string>
+    <string name="collections_people">Люди</string>
+    <string name="collections_device">Устройство</string>
+    <string name="collections_cloud_albums">Альбомы в облаке</string>
+    <string name="device_folders_empty">Нет папок с фото или видео</string>
+    <string name="device_media_permission">Разрешите доступ к фото и видео, чтобы увидеть папки устройства</string>
+    <string name="device_media_allow">Разрешить доступ</string>
+    <string name="device_media_error">Не удалось прочитать медиатеку</string>
 </resources>
