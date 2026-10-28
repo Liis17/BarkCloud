@@ -49,6 +49,7 @@ fun validateServerConfig(
 object ServerSettings {
     private const val PREFS_NAME = "barkcloud_server"
     private var prefs: SharedPreferences? = null
+    private val cachedServerKey = MemoizedServerKey { config.key }
     var onChanged: (() -> Unit)? = null
 
     fun init(context: Context) {
@@ -83,6 +84,7 @@ object ServerSettings {
             prefs?.getBoolean("allow_self_signed", false) ?: false,
         ).config ?: d
     }
+    val serverKey: String get() = cachedServerKey.get()
     val host: String get() = config.host
     val identityPort: Int get() = config.identityPort
     val usersPort: Int get() = config.usersPort
@@ -104,6 +106,21 @@ object ServerSettings {
             .putBoolean("allow_self_signed", config.allowSelfSigned)
             .putBoolean("configured", true)
             .apply()
-        if (changed) onChanged?.invoke()
+        if (changed) {
+            cachedServerKey.invalidate()
+            onChanged?.invoke()
+        }
+    }
+}
+
+internal class MemoizedServerKey(private val read: () -> String) {
+    @Volatile private var value: String? = null
+
+    fun get(): String = value ?: synchronized(this) {
+        value ?: read().also { value = it }
+    }
+
+    fun invalidate() = synchronized(this) {
+        value = null
     }
 }

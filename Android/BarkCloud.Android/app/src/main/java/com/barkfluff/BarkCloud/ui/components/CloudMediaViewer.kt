@@ -249,7 +249,9 @@ private fun CloudMediaViewerContent(
                                 onError = {
                                     if (!useJpegView && jpegViewModel != null) {
                                         failedDecodeCache = null
-                                        scope.launch { app.fileCache.invalidateOriginal(asset.id) }
+                                        scope.launch {
+                                            invalidateViewerCacheSafely { app.fileCache.invalidateOriginal(asset.id) }
+                                        }
                                         imageState = ViewerImageState.Loading
                                         useJpegView = true
                                     } else {
@@ -279,13 +281,15 @@ private fun CloudMediaViewerContent(
                     Button(
                         onClick = {
                             scope.launch {
-                                when (failedDecodeCache) {
-                                    ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateOriginal(asset.id)
-                                    ViewerCacheKind.JPEG_VIEW -> app.fileCache.invalidateJpegView(
-                                        asset.id,
-                                        jpegViewModel?.previewFileId,
-                                    )
-                                    null -> Unit
+                                invalidateViewerCacheSafely {
+                                    when (failedDecodeCache) {
+                                        ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateOriginal(asset.id)
+                                        ViewerCacheKind.JPEG_VIEW -> app.fileCache.invalidateJpegView(
+                                            asset.id,
+                                            jpegViewModel?.previewFileId,
+                                        )
+                                        null -> Unit
+                                    }
                                 }
                                 failedDecodeCache = null
                                 imageState = ViewerImageState.Preview

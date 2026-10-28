@@ -93,13 +93,8 @@ interface FileCacheIndex {
 
     suspend fun totalSizeBytes(): Long = all().sumOf { it.sizeBytes }
 
-    suspend fun oldest(limit: Int, offset: Int): List<FileCacheEntry> = all()
+    suspend fun evictionCandidates(): List<FileCacheEntry> = all()
         .sortedWith(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
-        .drop(offset)
-        .take(limit)
-
-    suspend fun newest(): FileCacheEntry? = all()
-        .maxWithOrNull(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
 
     suspend fun entriesInScope(scope: CacheScope): List<FileCacheEntry> =
         all().filter { it.key.scope == scope }
