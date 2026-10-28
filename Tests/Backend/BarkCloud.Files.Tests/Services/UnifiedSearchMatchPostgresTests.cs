@@ -163,6 +163,46 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
     }
 
     [PostgresFact]
+    public async Task Search_ExactPhotoNameSuppressesRankOneNoiseAcrossSections()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        const string query = "PXL_20261003_112607622.jpg";
+        var target = NewFile(MediaKind.Photo, query);
+        var shortNoise = NewFile(MediaKind.Photo, "32.JPG");
+        var imageNoise = NewFile(MediaKind.Document, "IMG_3622.JPG");
+        var neighboringVideo = NewFile(MediaKind.Video, "PXL_20261003_115000000.jpg");
+        var similarFolder = NewFolder("PXL_20261003_115000000", Owner);
+        await Seed(db,
+            target, NewEntry(target, query),
+            shortNoise, NewEntry(shortNoise, "32.JPG"),
+            imageNoise, NewEntry(imageNoise, "IMG_3622.JPG"),
+            neighboringVideo, NewEntry(neighboringVideo, "PXL_20261003_115000000.jpg"),
+            similarFolder);
+
+        foreach (var noise in new[] { "32.JPG", "IMG_3622.JPG", "PXL_20261003_115000000.jpg", "PXL_20261003_115000000" })
+        {
+            var score = await WordSimilarity(db, noise, query);
+            Assert.True(score >= .45f, $"Expected the old trigram rule to include {noise}; PostgreSQL word_similarity={score}");
+        }
+
+        var response = await SearchPages(db, query,
+            new SearchSectionPage { Section = SearchSection.Photos, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Videos, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Files, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Tracks, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Albums, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Playlists, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Folders, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Shared, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Trash, Limit = 20 });
+
+        var hit = Assert.Single(response.Sections.SelectMany(section => section.Hits));
+        Assert.Equal(target.Id.ToString(), hit.FileId);
+        Assert.Equal(SearchHitKind.Photo, hit.Kind);
+        Assert.Equal(SearchSection.Photos, response.Sections.Single(section => section.Hits.Count > 0).Section);
+    }
+
+    [PostgresFact]
     public async Task Search_MultifieldWinnerUsesRankSimilarityPriorityAndUtf8Order()
     {
         await using var db = await PostgresFilesDatabase.CreateAsync();
@@ -190,8 +230,18 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
         AssertMatch(report.Hits.Single(hit => hit.FileId == rankFile.Id.ToString()), "tag", "report");
         AssertMatch(report.Hits.Single(hit => hit.FileId == tieFile.Id.ToString()), "name", "report");
         AssertMatch(report.Hits.Single(hit => hit.FileId == unicodeFile.Id.ToString()), "tag", "report\uE000");
-        AssertMatch(report.Hits.Single(hit => hit.FileId == similarityFile.Id.ToString()), "tag", "repot");
+        Assert.DoesNotContain(report.Hits, hit => hit.FileId == similarityFile.Id.ToString());
         AssertMatch((await Search(db, SearchSection.Albums, "report")).Hits.Single(), "name", "report");
+    }
+
+    [PostgresFact]
+    public async Task Search_FuzzyMatchUsesRankAndSimilarityWhenNoStrictMatchesExist()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        var similarityFile = NewFile(MediaKind.Photo, "similarity.jpg");
+        await Seed(db,
+            similarityFile, NewEntry(similarityFile, "repro"),
+            new FileTag { OwnerId = Owner, FileId = similarityFile.Id, Value = "repot", NormalizedValue = "repot", CreatedAt = DateTime.UtcNow });
 
         var reproScore = await WordSimilarity(db, "repro", "report");
         var repotScore = await WordSimilarity(db, "repot", "report");
@@ -199,6 +249,93 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
         Assert.Equal(1, await SearchRank(db, "repot", "report"));
         Assert.True(reproScore >= .45f, $"Expected SQL similarity for the name to meet the rank-1 threshold: {reproScore}");
         Assert.True(repotScore > reproScore, $"Expected SQL similarity {repotScore} > {reproScore}");
+
+        var report = await Search(db, SearchSection.Photos, "report");
+        Assert.Collection(report.Hits, hit =>
+        {
+            Assert.Equal(similarityFile.Id.ToString(), hit.FileId);
+            AssertMatch(hit, "tag", "repot");
+        });
+    }
+
+    [PostgresFact]
+    public async Task Search_StrictCursorTraversalExcludesRankOneNoiseAcrossSections()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        const string query = "report";
+        var prefixFolder = NewFolder("report alpha", Owner);
+        var substringFolder = NewFolder("quarterly report", Owner);
+        var fuzzyFolder = NewFolder("repro", Owner);
+        var photoNoise = NewFile(MediaKind.Photo, "noise.jpg");
+        var strictAlbum = NewAlbum("report", null, Owner);
+        var fuzzyAlbum = NewAlbum("misc", "repot", Owner);
+        await Seed(db,
+            prefixFolder, substringFolder, fuzzyFolder,
+            photoNoise, NewEntry(photoNoise, "unrelated"),
+            new FileTag { OwnerId = Owner, FileId = photoNoise.Id, Value = "repro", NormalizedValue = "repro", CreatedAt = DateTime.UtcNow },
+            strictAlbum, fuzzyAlbum);
+
+        var response = await SearchPages(db, query,
+            new SearchSectionPage { Section = SearchSection.Photos, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Albums, Limit = 20 },
+            new SearchSectionPage { Section = SearchSection.Folders, Limit = 20 });
+
+        Assert.Empty(response.Sections.Single(section => section.Section == SearchSection.Photos).Hits);
+        Assert.Equal(strictAlbum.Id.ToString(), Assert.Single(response.Sections.Single(section => section.Section == SearchSection.Albums).Hits).Id);
+        var folderHits = response.Sections.Single(section => section.Section == SearchSection.Folders).Hits;
+        Assert.Equal(new[] { prefixFolder.Id.ToString(), substringFolder.Id.ToString() }, folderHits.Select(hit => hit.Id));
+
+        var traversed = await Traverse(db, SearchSection.Folders, query, 1);
+        Assert.Equal(folderHits.Select(hit => hit.Id), traversed.Select(hit => hit.Id));
+        Assert.Equal(traversed.Count, traversed.Select(hit => hit.Id).Distinct().Count());
+        Assert.DoesNotContain(traversed, hit => hit.Id == fuzzyFolder.Id.ToString());
+    }
+
+    [PostgresFact]
+    public async Task Search_FuzzyCursorTraversalMatchesSinglePage()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        var first = NewFolder("repro", Owner);
+        var second = NewFolder("repot", Owner);
+        await Seed(db, first, second);
+
+        var all = await Search(db, SearchSection.Folders, "report", 20);
+        Assert.Equal(2, all.Hits.Count);
+        var traversed = await Traverse(db, SearchSection.Folders, "report", 1);
+
+        Assert.Equal(all.Hits.Select(hit => hit.Id), traversed.Select(hit => hit.Id));
+        Assert.Equal(traversed.Count, traversed.Select(hit => hit.Id).Distinct().Count());
+    }
+
+    [PostgresFact]
+    public async Task Search_FuzzyCursorKeepsModeAlongsideStrictFirstPage()
+    {
+        await using var db = await PostgresFilesDatabase.CreateAsync();
+        const string query = "report";
+        var firstPhoto = NewFile(MediaKind.Photo, "first.jpg");
+        var secondPhoto = NewFile(MediaKind.Photo, "second.jpg");
+        var firstFolder = NewFolder("report alpha", Owner);
+        var secondFolder = NewFolder("quarterly report", Owner);
+        await Seed(db,
+            firstPhoto, NewEntry(firstPhoto, "first"),
+            secondPhoto, NewEntry(secondPhoto, "second"),
+            new FileTag { OwnerId = Owner, FileId = firstPhoto.Id, Value = "repro", NormalizedValue = "repro", CreatedAt = DateTime.UtcNow },
+            new FileTag { OwnerId = Owner, FileId = secondPhoto.Id, Value = "repot", NormalizedValue = "repot", CreatedAt = DateTime.UtcNow },
+            firstFolder, secondFolder);
+
+        var firstPhotoPage = await Search(db, SearchSection.Photos, query, 1);
+        Assert.True(firstPhotoPage.HasMore);
+        var mixed = await SearchPages(db, query,
+            new SearchSectionPage { Section = SearchSection.Photos, Limit = 1, Cursor = firstPhotoPage.NextCursor },
+            new SearchSectionPage { Section = SearchSection.Folders, Limit = 1 });
+
+        var photoContinuation = Assert.Single(mixed.Sections.Single(section => section.Section == SearchSection.Photos).Hits);
+        Assert.NotEqual(firstPhotoPage.Hits.Single().FileId, photoContinuation.FileId);
+        Assert.Contains(photoContinuation.FileId, new[] { firstPhoto.Id.ToString(), secondPhoto.Id.ToString() });
+        var folderPage = mixed.Sections.Single(section => section.Section == SearchSection.Folders);
+        Assert.Equal(firstFolder.Id.ToString(), Assert.Single(folderPage.Hits).Id);
+        Assert.True(folderPage.HasMore);
+        Assert.NotEmpty(folderPage.NextCursor);
     }
 
     [PostgresFact]
@@ -411,6 +548,14 @@ public sealed class UnifiedSearchMatchPostgresTests(ITestOutputHelper output)
             Pages = { new SearchSectionPage { Section = section, Limit = limit, Cursor = cursor } }
         }, default);
         return response.Sections.Single();
+    }
+
+    private static async Task<SearchResponse> SearchPages(PostgresFilesDatabase db, string query, params SearchSectionPage[] pages)
+    {
+        await using var context = db.CreateContext();
+        var request = new SearchRequest { Query = query };
+        request.Pages.Add(pages);
+        return await CreateService(context).Search(request, default);
     }
 
     private static async Task<List<SearchHit>> Traverse(PostgresFilesDatabase db, SearchSection section, string query, int pageSize)

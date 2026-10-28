@@ -12,14 +12,14 @@ namespace BarkCloud.Files.Services;
 /// <summary>
 /// Нормализованный запрос и SQL-выражения ранжирования одного поля. Правила совпадают с
 /// правилами поиска: 4 — полное совпадение, 3 — префикс, 2 — подстрока, 1 — опечатка
-/// (запрос от 4 символов и word_similarity ≥ 0.45). Сходство равно 1 для рангов 2–4, иначе word_similarity.
+/// (нечёткий режим, запрос от 4 символов и word_similarity ≥ 0.45). Сходство равно 1 для рангов 2–4, иначе word_similarity.
 /// </summary>
 internal sealed class SearchTerms
 {
     private const double TrigramThreshold = .45d;
     private const int TrigramMinLength = 4;
 
-    public SearchTerms(string query)
+    public SearchTerms(string query, bool fuzzy = true)
     {
         Query = query;
         if (query.Length == 0)
@@ -27,7 +27,7 @@ internal sealed class SearchTerms
 
         var pattern = "%" + Escape(query) + "%";
         var prefix = Escape(query) + "%";
-        var trigram = query.Length >= TrigramMinLength;
+        var trigram = fuzzy && query.Length >= TrigramMinLength;
 
         Match = trigram
             ? v => EF.Functions.ILike(v!, pattern, "\\") || EF.Functions.TrigramsWordSimilarity(v!, query) >= TrigramThreshold
