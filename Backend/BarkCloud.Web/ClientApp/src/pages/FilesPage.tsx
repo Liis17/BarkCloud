@@ -72,10 +72,12 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active 
     >
       <td className="selcell" />
       <td className="name">
-        <div className="file-icon folder">DIR</div>
-        <div className="file-name-col">
-          <div className="fn">{dir.name}</div>
-          <div className="meta">Папка</div>
+        <div className="name-cell">
+          <div className="file-icon folder">DIR</div>
+          <div className="file-name-col">
+            <div className="fn">{dir.name}</div>
+            <div className="meta">Папка</div>
+          </div>
         </div>
       </td>
       <td className="size">—</td>
@@ -126,14 +128,16 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
         />
       </td>
       <td className="name">
-        {isMedia && hasPreview ? (
-          <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
-        ) : (
-          <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
-        )}
-        <div className="file-name-col">
-          <div className="fn">{entry.name}</div>
-          <div className="meta">{kindLabel(m?.kind)}</div>
+        <div className="name-cell">
+          {isMedia && hasPreview ? (
+            <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
+          ) : (
+            <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
+          )}
+          <div className="file-name-col">
+            <div className="fn">{entry.name}</div>
+            <div className="meta">{kindLabel(m?.kind)}</div>
+          </div>
         </div>
       </td>
       <td className="size">{m?.sizeLabel || '—'}</td>
