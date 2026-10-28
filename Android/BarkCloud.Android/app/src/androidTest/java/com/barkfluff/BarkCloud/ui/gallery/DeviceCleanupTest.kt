@@ -22,6 +22,18 @@ import org.junit.Rule
 import org.junit.Test
 
 class DeviceCleanupTest {
+    @Test fun particleAnimationFinishesWithoutDeletingFiles() {
+        val dissolving = androidx.compose.runtime.mutableStateOf(false)
+        var finished = false
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            BarkCloudTheme { CleanupPreviewGrid(listOf(media(1, 100)), dissolving.value) { finished = true } }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { dissolving.value = true }
+        compose.mainClock.advanceTimeBy(2400)
+        compose.waitUntil(5000) { finished }
+    }
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test fun accountButtonOpensCleanupScreenAndBackReturnsToPhotos() {
@@ -34,7 +46,7 @@ class DeviceCleanupTest {
         compose.setContent { BarkCloudTheme { MainScreen(onSignOut = {}) } }
         compose.onNodeWithContentDescription("Меню аккаунта").performClick()
         compose.onNodeWithText("Освободить место").performScrollTo().performClick()
-        compose.onNodeWithText("Можно освободить", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Удалить локальные копии", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Назад").performClick()
         compose.onNodeWithContentDescription("Меню аккаунта").assertIsDisplayed()
     }
