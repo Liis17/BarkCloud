@@ -70,7 +70,11 @@ class FileTransferService(
     /** Информация о хранилище (использовано / лимит, в байтах). */
     suspend fun storageInfo(): StorageInfo {
         val resp = grpc.filesStub().getUserStorageInfo(GetUserStorageInfoRequest.getDefaultInstance())
-        return StorageInfo(resp.totalUsedStorage, resp.storageLimit)
+        return StorageInfo(
+            resp.totalUsedStorage,
+            resp.storageLimit,
+            resp.storageByTypesList.groupBy { it.fileType }.mapValues { (_, items) -> items.sumOf { it.usedStorage } },
+        )
     }
 
     // MARK: Upload 2.0 — control plane
@@ -207,7 +211,11 @@ class FileTransferService(
         errorMessage = errorMessage.takeIf { it.isNotEmpty() },
     )
 
-    data class StorageInfo(val used: Long, val limit: Long)
+    data class StorageInfo(
+        val used: Long,
+        val limit: Long,
+        val byType: Map<UploadFileType, Long> = emptyMap(),
+    )
 
     internal inner class GrpcAvatarUploadApi : AvatarUploadApi {
         override var lastAccessToken: String? = null

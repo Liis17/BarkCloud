@@ -14,6 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,14 +32,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import coil3.compose.AsyncImage
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.NotificationPermissionRequests
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.files.ui.formatChildCount
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.gallery.DeviceMediaViewer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 internal data class DeviceFolder(val key: String, val name: String, val media: List<DeviceMedia>)
 
@@ -49,6 +57,10 @@ internal fun deviceFolders(media: List<DeviceMedia>): List<DeviceFolder> =
 @Composable
 fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
     val context = LocalContext.current
+    val backup = remember { AutoUploadSettings(context) }
+    val scope = rememberCoroutineScope()
+    var backupRevision by remember { mutableIntStateOf(0) }
+    val syncEnabled: (String) -> Boolean = { backupRevision; backup.enabled && backup.includesFolder(it) }
     var folders by remember { mutableStateOf(emptyList<DeviceFolder>()) }
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     var viewer by remember { mutableStateOf<DeviceMedia?>(null) }
@@ -63,7 +75,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
         } else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { revision++ }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { revision++ }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { revision++; backupRevision++ }
 
     suspend fun reload() {
         fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -120,6 +132,31 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(bottom = 12.dp, top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Text(stringResource(R.string.device_folder_sync), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                        val label = stringResource(R.string.device_folder_sync)
+                        Switch(
+                            checked = syncEnabled(selectedKey!!),
+                            onCheckedChange = { enabled ->
+                                backup.setFolderEnabled(selectedKey!!, enabled, folders.map { it.key }.toSet())
+                                backupRevision++
+                                scope.launch {
+                                    if (enabled) {
+                                        NotificationPermissionRequests.request()
+                                        (context.applicationContext as BarkCloudApplication).uploadQueue.resumeBackup()
+                                    }
+                                    AutoUploadScheduler.apply(context, backup.policy)
+                                }
+                            },
+                            modifier = Modifier.semantics { contentDescription = label },
+                        )
+                    }
+                }
                 items(selected?.media.orEmpty(), key = { it.mediaKey }) { media ->
                     Box(Modifier.aspectRatio(1f).clip(MaterialTheme.shapes.small).clickable { viewer = media }) {
                         AsyncImage(media.uri, media.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -138,9 +175,17 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                 items(folders, key = { it.key }) { folder ->
                     ElevatedCard(Modifier.fillMaxWidth().clickable { selectedKey = folder.key }) {
                         AsyncImage(folder.media.first().uri, folder.name, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop)
-                        Column(Modifier.padding(12.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
                             Text(folder.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                             Text(formatChildCount(context, folder.media.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (syncEnabled(folder.key)) Icon(
+                            Icons.Outlined.CloudDone,
+                            stringResource(R.string.device_folder_sync_enabled),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
                         }
                     }
                 }

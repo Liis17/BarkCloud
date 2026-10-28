@@ -1,7 +1,6 @@
 package com.barkfluff.BarkCloud.ui.gallery
 
 import android.content.Context
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -49,6 +48,9 @@ data class GalleryUiState(
     val snackbar: String? = null,
 ) {
     val reclaimableCount: Int get() = items.count { cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
+    val reclaimableBytes: Long get() = items.sumOf {
+        if (cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD) it.sizeBytes.coerceAtLeast(0) else 0L
+    }
     internal val selectionActions: PhotoSelectionActions get() = photoSelectionActions(selected)
 }
 
@@ -229,19 +231,20 @@ class GalleryViewModel(
     }
 
     /** Revalidates every candidate before Android shows its destructive system dialog. */
-    fun prepareDeviceCopyDeletion(onReady: (List<Uri>, List<String>) -> Unit) {
-        viewModelScope.launch {
-            val items = _state.value.items.filter { _state.value.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
-            val states = mediaDao.all().associateBy { it.mediaKey }
-            val hashes = items.mapNotNull { states[it.mediaKey]?.hash }.distinct()
-            val presence = runCatching { cloudRepository.checkFileHashes(hashes) }.getOrDefault(emptyMap())
-            val confirmed = items.filter { media ->
-                val state = states[media.mediaKey]
-                val exists = state?.hash?.let { presence[it] } == true
-                if (!exists && state != null) mediaDao.upsert(state.copy(status = MediaCloudStatus.NOT_IN_CLOUD))
-                exists
-            }
-            if (confirmed.isNotEmpty()) onReady(confirmed.map { it.uri }, confirmed.map { it.mediaKey })
+    suspend fun prepareDeviceCopyDeletion(): List<DeviceMedia> {
+        val localItems = DeviceMediaStore.query(appContext)
+        _state.update { it.copy(items = localItems) }
+        val items = localItems.filter { _state.value.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
+        val states = mediaDao.all().associateBy { it.mediaKey }
+        val hashes = items.mapNotNull { states[it.mediaKey]?.hash }.distinct()
+        if (hashes.isEmpty()) return emptyList()
+        val presence = cloudRepository.checkFileHashes(hashes)
+        return items.filter { media ->
+            val state = states[media.mediaKey]
+            val exists = state?.hash?.let { presence[it] } == true &&
+                state.sizeBytes == media.sizeBytes && state.dateModifiedSeconds == media.dateModifiedSeconds
+            if (!exists && state != null) mediaDao.upsert(state.copy(status = MediaCloudStatus.NOT_IN_CLOUD))
+            exists
         }
     }
 

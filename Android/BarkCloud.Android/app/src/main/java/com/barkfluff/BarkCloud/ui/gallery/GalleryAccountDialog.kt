@@ -10,16 +10,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,15 +30,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.barkfluff.BarkCloud.R
-import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
+import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.files.ui.formatSize
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
+import com.barkfluff.BarkCloud.ui.upload.UploadJobRow
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
 
 @Composable
@@ -44,13 +47,10 @@ internal fun GalleryAccountDialog(
     displayName: String?,
     username: String?,
     avatarUrl: String?,
-    storageUsed: Long?,
-    storageLimit: Long?,
+    storageInfo: FileTransferService.StorageInfo?,
     storageLoading: Boolean,
-    autoUploadPolicy: AutoUploadNetworkPolicy,
     uploadState: UploadQueueUiState,
-    reclaimableCount: Int,
-    onAutoUploadPolicyChange: (AutoUploadNetworkPolicy) -> Unit,
+    reclaimableBytes: Long,
     onOpenUploads: () -> Unit,
     onFreeDeviceSpace: () -> Unit,
     onOpenProfile: () -> Unit,
@@ -58,7 +58,6 @@ internal fun GalleryAccountDialog(
     onOpenTrash: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scrollState: ScrollState = rememberScrollState()
     Dialog(
         onDismissRequest = onDismiss,
@@ -109,30 +108,24 @@ internal fun GalleryAccountDialog(
                             Text("@$it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Text(
+                            stringResource(R.string.gallery_self_hosted),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                 }
 
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.settings_storage_title), style = MaterialTheme.typography.titleSmall)
                     when {
                         storageLoading -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                        storageUsed != null && storageLimit != null -> {
-                            LinearProgressIndicator(
-                                progress = {
-                                    if (storageLimit > 0L) (storageUsed.toFloat() / storageLimit).coerceIn(0f, 1f) else 0f
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.settings_storage_usage,
-                                    formatSize(context, storageUsed),
-                                    formatSize(context, storageLimit),
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        storageInfo != null -> GalleryStorageCard(storageInfo)
                         else -> Text(
                             stringResource(R.string.gallery_account_storage_unavailable),
                             style = MaterialTheme.typography.bodySmall,
@@ -142,56 +135,46 @@ internal fun GalleryAccountDialog(
                 }
 
                 HorizontalDivider()
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.gallery_auto_upload), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        when (autoUploadPolicy) {
-                            AutoUploadNetworkPolicy.OFF -> stringResource(R.string.photos_auto_upload_off)
-                            AutoUploadNetworkPolicy.WIFI_ONLY -> stringResource(R.string.photos_auto_upload_wifi)
-                            AutoUploadNetworkPolicy.ANY_NETWORK -> stringResource(R.string.photos_auto_upload_any)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    PolicyChoice(
-                        stringResource(R.string.photos_auto_upload_off),
-                        AutoUploadNetworkPolicy.OFF,
-                        autoUploadPolicy,
-                        onAutoUploadPolicyChange,
-                    )
-                    PolicyChoice(
-                        stringResource(R.string.photos_auto_upload_wifi),
-                        AutoUploadNetworkPolicy.WIFI_ONLY,
-                        autoUploadPolicy,
-                        onAutoUploadPolicyChange,
-                    )
-                    PolicyChoice(
-                        stringResource(R.string.photos_auto_upload_any),
-                        AutoUploadNetworkPolicy.ANY_NETWORK,
-                        autoUploadPolicy,
-                        onAutoUploadPolicyChange,
-                    )
-                }
-
-                HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.gallery_uploads_title), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        stringResource(R.string.gallery_uploads_progress, uploadState.completed, uploadState.total),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    uploadState.current?.let {
-                        Text(it.fileName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (uploadState.pendingJobs.isEmpty()) {
+                        Text(
+                            stringResource(R.string.gallery_uploads_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(uploadState.pendingJobs, key = { it.id }) { job ->
+                                UploadJobRow(job = job, modifier = Modifier.fillMaxWidth())
+                            }
+                        }
                     }
-                    LinearProgressIndicator(progress = { uploadState.progress }, modifier = Modifier.fillMaxWidth())
                     TextButton(onClick = onOpenUploads) {
                         Text(stringResource(R.string.gallery_open_uploads))
                     }
                 }
 
                 HorizontalDivider()
-                TextButton(onClick = onFreeDeviceSpace, enabled = reclaimableCount > 0) {
-                    Text(stringResource(R.string.gallery_free_device_space, reclaimableCount))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = onFreeDeviceSpace,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(10.dp))
+                        Text(stringResource(R.string.gallery_free_device_space), modifier = Modifier.weight(1f))
+                        Text(formatSize(LocalContext.current, reclaimableBytes), style = MaterialTheme.typography.labelLarge)
+                    }
+                    Text(
+                        stringResource(R.string.gallery_cleanup_cloud_kept),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 HorizontalDivider()
@@ -204,18 +187,4 @@ internal fun GalleryAccountDialog(
             }
         }
     }
-}
-
-@Composable
-private fun PolicyChoice(
-    title: String,
-    policy: AutoUploadNetworkPolicy,
-    selected: AutoUploadNetworkPolicy,
-    onSelect: (AutoUploadNetworkPolicy) -> Unit,
-) {
-    FilterChip(
-        selected = policy == selected,
-        onClick = { onSelect(policy) },
-        label = { Text(title) },
-    )
 }

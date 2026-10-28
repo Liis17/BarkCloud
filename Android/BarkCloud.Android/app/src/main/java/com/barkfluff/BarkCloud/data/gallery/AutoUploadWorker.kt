@@ -55,6 +55,7 @@ class AutoUploadWorker(
         if (capacity == 0) return
 
         val candidates = DeviceMediaStore.query(applicationContext)
+            .filter { settings.includesFolder(it.folderKey) }
             .filter { media ->
                 val state = existing[media.mediaKey]
                 state == null ||
@@ -85,6 +86,7 @@ class AutoUploadWorker(
             }
             val presence = cloud.checkFileHashes(hashed.map { it.second })
             for ((media, hash) in hashed) {
+                if (!settings.enabled || !settings.includesFolder(media.folderKey)) continue
                 if (presence[hash] == true) {
                     mediaDao.upsert(
                         MediaCloudState(
