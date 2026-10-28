@@ -675,11 +675,13 @@ internal fun GalleryHeader(
                 }
             } else Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                 if (uploadActive) {
-                    if (uploadProgress > 0f) CircularProgressIndicator(
+                    CircularProgressIndicator(
                         progress = { uploadProgress.coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxSize(),
-                        strokeWidth = 2.dp,
-                    ) else CircularProgressIndicator(Modifier.fillMaxSize(), strokeWidth = 2.dp)
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.outlineVariant,
+                    )
                 }
                 Box(
                 Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
