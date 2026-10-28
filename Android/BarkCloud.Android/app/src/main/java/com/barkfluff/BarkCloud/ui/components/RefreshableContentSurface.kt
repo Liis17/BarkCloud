@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LoadingIndicatorDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,9 +58,14 @@ internal fun RefreshIndicator(
         contentAlignment = Alignment.Center,
     ) {
         if (isRefreshing || pullProgress() > 0f) {
+            val polygons = remember {
+                val pool = LoadingIndicatorDefaults.IndeterminateIndicatorPolygons
+                val start = pool.indices.random()
+                pool.drop(start) + pool.take(start)
+            }
             Crossfade(targetState = isRefreshing, label = "refreshIndicator") { refreshing ->
-                if (refreshing) LoadingIndicator()
-                else LoadingIndicator(progress = pullProgress)
+                if (refreshing) LoadingIndicator(polygons = polygons)
+                else LoadingIndicator(progress = pullProgress, polygons = polygons)
             }
         }
     }
