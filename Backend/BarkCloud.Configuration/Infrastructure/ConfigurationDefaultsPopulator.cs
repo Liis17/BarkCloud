@@ -136,10 +136,21 @@ public class ConfigurationDefaultsPopulator
         var jwtAudience = GetNonEmpty(globalRows, "JwtSettings:Audience") ?? "BarkCloudMicroservices";
 
         ValidateRequiredExternalEndpoints();
+        // New service addresses must agree with existing deployment ports during upgrades.
+        var servicePorts = new Dictionary<ServiceId, int>();
+        foreach (var (serviceId, setting) in ServicePorts)
+        {
+            var persistedPort = await _context.Settings(SettingsScopes.Get(serviceId))
+                .Where(row => row.Key == "RunSettings:Port")
+                .Select(row => row.Value).FirstOrDefaultAsync();
+            var fallback = int.TryParse(persistedPort, out var port) && port is > 0 and <= 65535
+                ? port : setting.Fallback;
+            servicePorts[serviceId] = setting.EnvName is null ? fallback : ResolvePort(setting.EnvName, fallback);
+        }
         var beforeEmpty = await CountEmptySettingsAsync();
         var storage = new ConfigurationStorage(_context, _metrics);
         await storage.SeedMissingCatalogRowsAsync(entry =>
-            ResolveDefault(entry, jwtIssuer, jwtAudience));
+            ResolveDefault(entry, jwtIssuer, jwtAudience, servicePorts));
         // These credentials are deployment-managed: a password rotation must also refresh
         // previously seeded rows, while operator-editable settings retain their values.
         foreach (var group in SettingsCatalog.All.Where(entry =>
@@ -154,7 +165,7 @@ public class ConfigurationDefaultsPopulator
                 .Where(row => keys.Contains(row.Key)).ToListAsync();
             foreach (var row in rows)
             {
-                var value = ResolveDefault(entries[row.Key], jwtIssuer, jwtAudience);
+                var value = ResolveDefault(entries[row.Key], jwtIssuer, jwtAudience, servicePorts);
                 if (value is null || value == row.Value)
                     continue;
                 row.Value = value;
@@ -175,10 +186,11 @@ public class ConfigurationDefaultsPopulator
     private string? ResolveDefault(
         SettingsCatalogEntry entry,
         string jwtIssuer,
-        string jwtAudience)
+        string jwtAudience,
+        IReadOnlyDictionary<ServiceId, int> servicePorts)
     {
         if (entry.Section == "RunSettings" && entry.Key == "Port")
-            return ResolveServicePort(entry.ServiceId).ToString();
+            return servicePorts[entry.ServiceId].ToString();
         if (entry.Section == "RunSettings" && entry.Key == "Http1Port")
             return entry.ServiceId == ServiceId.Files ? ResolvePort("FILES_HTTP1PORT", 7026).ToString()
                 : ResolvePort("TORRENT_HTTP1PORT", 7028).ToString();
@@ -266,7 +278,7 @@ public class ConfigurationDefaultsPopulator
             if (target != ServiceId.Unknown)
                 return entry.Key switch
                 {
-                    "Host" => $"http://{ContainerNames[target]}:{ResolveServicePort(target)}",
+                    "Host" => $"http://{ContainerNames[target]}:{servicePorts[target]}",
                     // Сервисные JWT больше не генерируются и не хранятся в Configuration:
                     // их выдаёт Identity (ServiceCredentialsApi) по секрету сервиса.
                     _ => null
@@ -369,12 +381,6 @@ public class ConfigurationDefaultsPopulator
             ServiceId.Torrent => "https://torrent.example.com",
             _ => null
         };
-    }
-
-    private static int ResolveServicePort(ServiceId serviceId)
-    {
-        var setting = ServicePorts[serviceId];
-        return setting.EnvName is null ? setting.Fallback : ResolvePort(setting.EnvName, setting.Fallback);
     }
 
     private static int ResolvePort(string envName, int fallback) =>
