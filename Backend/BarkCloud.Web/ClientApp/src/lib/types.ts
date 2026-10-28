@@ -74,6 +74,8 @@ export interface DirInfo {
   name: string;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Размер поддерева, отформатированный сервером; null — в ответе не запрашивали. */
+  sizeLabel?: string | null;
 }
 
 /** Свойства каталога и его собственные/итоговые настройки видимости. */

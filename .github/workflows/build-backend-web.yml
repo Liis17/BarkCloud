@@ -12,6 +12,7 @@ on:
       - 'Shared/BarkCloud.Proto/configuration_api.proto'
       - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
       - 'Shared/BarkCloud.Proto/files_api.proto'
+      - 'Shared/BarkCloud.Proto/directory_sizes_api.proto'
       - 'Shared/BarkCloud.Proto/shared.proto'
       - 'Shared/BarkCloud.Proto/identity_api.proto'
       - 'Backend/rebuild.trigger'
@@ -29,6 +30,7 @@ on:
       - 'Shared/BarkCloud.Proto/configuration_api.proto'
       - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
       - 'Shared/BarkCloud.Proto/files_api.proto'
+      - 'Shared/BarkCloud.Proto/directory_sizes_api.proto'
       - 'Shared/BarkCloud.Proto/shared.proto'
       - 'Shared/BarkCloud.Proto/identity_api.proto'
       - 'Backend/rebuild.trigger'
@@ -59,6 +61,7 @@ jobs:
         Shared/BarkCloud.Proto/configuration_api.proto
         Shared/BarkCloud.Proto/session_revocation_api.proto
         Shared/BarkCloud.Proto/files_api.proto
+        Shared/BarkCloud.Proto/directory_sizes_api.proto
         Shared/BarkCloud.Proto/shared.proto
         Shared/BarkCloud.Proto/identity_api.proto
         Backend/rebuild.trigger
