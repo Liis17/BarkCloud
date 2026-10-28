@@ -43,6 +43,7 @@
 
     <ItemGroup>
         <Protobuf Include="..\..\Shared\BarkCloud.Proto\files_api.proto" GrpcServices="Server" />
+        <Protobuf Include="..\..\Shared\BarkCloud.Proto\directory_sizes_api.proto" GrpcServices="Server" />
         <Protobuf Include="..\..\Shared\BarkCloud.Proto\users_api.proto" GrpcServices="Client" />
         <Protobuf Include="..\..\Shared\BarkCloud.Proto\shared.proto" GrpcServices="None" />
     </ItemGroup>

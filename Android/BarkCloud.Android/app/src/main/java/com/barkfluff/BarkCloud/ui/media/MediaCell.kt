@@ -30,7 +30,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -55,10 +57,13 @@ internal fun MediaCell(
             ),
     ) {
         MediaThumb(
-            model = asset.previewUrl(512),
+            model = asset.previewModel(512),
             isVideo = asset.isVideo,
             contentDescription = asset.fileName,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().cloudMediaSharedElement(
+                key = asset.id,
+                visible = LocalCloudMediaViewerAssetId.current != asset.id,
+            ),
         )
         if (selecting) {
             Box(

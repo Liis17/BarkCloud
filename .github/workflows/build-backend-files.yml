@@ -13,6 +13,7 @@ on:
       - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
       - 'Shared/BarkCloud.Proto/BarkCloud.Proto.csproj'
       - 'Shared/BarkCloud.Proto/files_api.proto'
+      - 'Shared/BarkCloud.Proto/directory_sizes_api.proto'
       - 'Shared/BarkCloud.Proto/shared.proto'
       - 'Backend/rebuild.trigger'
       - 'Tests/Backend/BarkCloud.Files.Tests/**'
@@ -32,6 +33,7 @@ on:
       - 'Shared/BarkCloud.Proto/session_revocation_api.proto'
       - 'Shared/BarkCloud.Proto/BarkCloud.Proto.csproj'
       - 'Shared/BarkCloud.Proto/files_api.proto'
+      - 'Shared/BarkCloud.Proto/directory_sizes_api.proto'
       - 'Shared/BarkCloud.Proto/shared.proto'
       - 'Backend/rebuild.trigger'
       - 'Tests/Backend/BarkCloud.Files.Tests/**'
@@ -67,6 +69,7 @@ jobs:
         Shared/BarkCloud.Proto/session_revocation_api.proto
         Shared/BarkCloud.Proto/BarkCloud.Proto.csproj
         Shared/BarkCloud.Proto/files_api.proto
+        Shared/BarkCloud.Proto/directory_sizes_api.proto
         Shared/BarkCloud.Proto/shared.proto
         Backend/rebuild.trigger
       test-path: Tests/Backend/BarkCloud.Files.Tests

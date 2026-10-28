@@ -6,6 +6,17 @@ namespace BarkCloud.Builder.Tests;
 
 public sealed class BuilderGeneratorTests
 {
+    [Fact]
+    public void Configuration_receives_service_ports_used_to_seed_internal_addresses()
+    {
+        var compose = BackendComposeGenerator.BuildCompose(new BuilderModel());
+        var configuration = ComposeService(compose, "cloud-configuration");
+
+        foreach (var service in new[] { "IDENTITY", "USERS", "FILES", "TORRENT" })
+            Assert.Contains(service + "_PORT: ${" + service + "_PORT}", configuration);
+        Assert.Contains("FILES_HTTP1PORT: ${FILES_HTTP1PORT}", configuration);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

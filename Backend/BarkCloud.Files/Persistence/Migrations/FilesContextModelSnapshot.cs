@@ -171,6 +171,14 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uuid");
 
+                    b.Property<long>("SizeVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.Property<long?>("SubtreeSizeBytes")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("SystemKind")
                         .HasColumnType("integer");
 
