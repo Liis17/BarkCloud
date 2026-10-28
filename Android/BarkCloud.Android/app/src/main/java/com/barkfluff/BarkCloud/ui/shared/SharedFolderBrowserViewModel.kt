@@ -9,6 +9,7 @@ import com.barkfluff.BarkCloud.data.cloud.PublicDir
 import com.barkfluff.BarkCloud.data.cloud.PublicFile
 import com.barkfluff.BarkCloud.data.cloud.SharedRepository
 import com.barkfluff.BarkCloud.net.FileTransferService
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,9 +40,22 @@ class SharedFolderBrowserViewModel(
     private val _state = MutableStateFlow(SharedFolderUiState())
     val state: StateFlow<SharedFolderUiState> = _state.asStateFlow()
 
+    private var directoryId = ""
+    private var reloadJob: Job? = null
+
     fun start(directoryId: String) {
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+        this.directoryId = directoryId
+        reload()
+    }
+
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
+    }
+
+    fun reload() {
+        reloadJob = viewModelScope.launch {
+            _state.update { it.copy(isLoading = it.subdirs.isEmpty() && it.files.isEmpty()) }
             try {
                 val listing = repo.listSharedDirectory(directoryId)
                 _state.update {
