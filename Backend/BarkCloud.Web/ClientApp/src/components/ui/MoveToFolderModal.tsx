@@ -14,11 +14,14 @@ export function MoveToFolderModal({
   currentDir,
   onPick,
   onClose,
+  progress,
 }: {
   count: number;
   currentDir: string;
   onPick: (dirId: string) => void;
   onClose: () => void;
+  /** Идущее массовое перемещение: пока задан, модалку закрыть нельзя. */
+  progress?: { done: number; total: number };
 }) {
   const [stack, setStack] = React.useState<{ id: string; name: string }[]>([]);
   const [dirs, setDirs] = React.useState<DirInfo[] | null>(null);
@@ -31,10 +34,17 @@ export function MoveToFolderModal({
   depthRef.current = stack.length;
   const onCloseRef = React.useRef(onClose);
   onCloseRef.current = onClose;
+  const busyRef = React.useRef(false);
+  busyRef.current = !!progress;
   const pendingRef = React.useRef<(() => void) | null>(null);
   React.useEffect(() => {
     window.history.pushState({ ...window.history.state, moveFolderLayer: true }, '');
     const onPop = () => {
+      // Во время перемещения «назад» не должен ни закрыть модалку, ни сдвинуть дерево: возвращаем слой.
+      if (busyRef.current) {
+        window.history.pushState({ ...window.history.state, moveFolderLayer: true }, '');
+        return;
+      }
       const pending = pendingRef.current;
       if (pending) {
         pendingRef.current = null;
@@ -71,6 +81,7 @@ export function MoveToFolderModal({
     setStack((s) => [...s, dir]);
   };
   const gotoIndex = (i: number) => {
+    if (progress) return;
     const steps = stack.length - (i + 1);
     if (steps > 0) {
       pendingRef.current = () => {};
@@ -79,18 +90,19 @@ export function MoveToFolderModal({
     setStack((s) => s.slice(0, i + 1));
   };
   const isCurrent = here === currentDir;
+  const percent = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
     <Modal
       title={`Переместить (${count})`}
-      onClose={() => leave(onClose)}
+      onClose={progress ? undefined : () => leave(onClose)}
       actions={
         <>
-          <button className="btn text" onClick={() => leave(onClose)}>
+          <button className="btn text" onClick={() => leave(onClose)} disabled={!!progress}>
             Отмена
           </button>
-          <button className="btn primary" disabled={isCurrent} onClick={() => leave(() => onPick(here))}>
-            {isCurrent ? 'Файлы уже здесь' : 'Переместить сюда'}
+          <button className="btn primary" disabled={isCurrent || !!progress} onClick={() => leave(() => onPick(here))}>
+            {progress ? 'Перемещение…' : isCurrent ? 'Файлы уже здесь' : 'Переместить сюда'}
           </button>
         </>
       }
@@ -124,7 +136,10 @@ export function MoveToFolderModal({
               <button
                 className="album-pick-row"
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10 }}
-                onClick={() => enter({ id: d.id, name: d.name })}
+                onClick={() => {
+                  if (progress) return;
+                  enter({ id: d.id, name: d.name });
+                }}
               >
                 <Icon.folder size={18} />
                 <span style={{ flex: 1, textAlign: 'left' }}>{d.name}</span>
@@ -133,6 +148,24 @@ export function MoveToFolderModal({
             </li>
           ))}
         </ul>
+      )}
+
+      {progress && (
+        <div style={{ marginTop: 12 }}>
+          <div
+            className="bar"
+            role="progressbar"
+            aria-label="Перемещение файлов"
+            aria-valuemin={0}
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.done}
+          >
+            <div className="bar-fill" style={{ width: percent + '%' }} />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--md-on-surface-variant)', marginTop: 6 }}>
+            Перемещено {progress.done} из {progress.total}
+          </div>
+        </div>
       )}
     </Modal>
   );

@@ -86,8 +86,22 @@ public class UnifiedSearchServiceTests : IDisposable
         var hit = await CreateService().ResolveHit(new SearchHitReference { Kind = SearchHitKind.Photo, Id = entryId.ToString() }, default);
 
         hit.PreviewUrl.Should().Be($"http://localhost:7026/download/{previewId}");
+        hit.JpegViewUrl.Should().BeEmpty();
         hit.Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
         hit.Placeholder.AspectRatio.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResolveHit_PhotoWithJpegView_ReturnsJpegViewUrl()
+    {
+        var (fileId, entryId) = await AddCloudFile(MediaKind.Photo);
+        var (jpegViewId, _) = await AddCloudFile(MediaKind.Photo);
+        _db.Context.UploadedFiles.Single(x => x.Id == fileId).JpegViewFileId = jpegViewId;
+        await _db.Context.SaveChangesAsync();
+
+        var hit = await CreateService().ResolveHit(new SearchHitReference { Kind = SearchHitKind.Photo, Id = entryId.ToString() }, default);
+
+        hit.JpegViewUrl.Should().Be($"http://localhost:7026/download/{jpegViewId}");
     }
 
     [Fact]

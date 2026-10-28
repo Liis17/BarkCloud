@@ -66,15 +66,41 @@ public partial class UnifiedSearchService
             return response;
         }
 
-        var terms = new SearchTerms(query);
         var requests = pages
             .Select(page => (Page: page, Limit: page.Limit <= 0 ? DefaultLimit : Math.Min(page.Limit, MaxLimit), Cursor: SearchCursor.Parse(page.Cursor)))
             .ToList();
+        var strictTerms = new SearchTerms(query, fuzzy: false);
+        var fuzzyTerms = new SearchTerms(query);
+
+        Task<List<PendingHit>> LoadPage(SearchSectionPage page, int limit, SearchCursor? cursor, SearchTerms terms)
+            => LoadSection(page.Section, new SectionQuery(terms, cursor, limit + 1, null, null), cancellationToken);
 
         // Каждая секция запрашивает у БД только свою страницу (limit + 1 строка на источник).
+        // Курсорные страницы продолжают режим по рангу курсора и не влияют на общий fallback.
         var loaded = new List<List<PendingHit>>();
+        var hasPageWithoutCursor = false;
+        var hasStrictHits = false;
         foreach (var (page, limit, cursor) in requests)
-            loaded.Add(await LoadSection(page.Section, new SectionQuery(terms, cursor, limit + 1, null, null), cancellationToken));
+        {
+            var terms = cursor is null ? strictTerms : cursor.Rank >= 2 ? strictTerms : fuzzyTerms;
+            var section = await LoadPage(page, limit, cursor, terms);
+            loaded.Add(section);
+            if (cursor is null)
+            {
+                hasPageWithoutCursor = true;
+                hasStrictHits |= section.Count > 0;
+            }
+        }
+
+        if (hasPageWithoutCursor && !hasStrictHits)
+        {
+            for (var i = 0; i < requests.Count; i++)
+            {
+                var (page, limit, cursor) = requests[i];
+                if (cursor is null)
+                    loaded[i] = await LoadPage(page, limit, null, fuzzyTerms);
+            }
+        }
 
         // Связанные данные грузятся один раз и только для файлов, попавших на страницы.
         var fileIds = new HashSet<Guid>();
@@ -280,7 +306,8 @@ public partial class UnifiedSearchService
             : trash ? "В корзине" : FileSubtitle(file.MediaKind, meta);
         var id = trash ? entry!.Id.ToString() : (entry?.Id.ToString() ?? file.Id.ToString());
         return CreateHit(kind, id, title, subtitle, file.Id, data.FavoriteIds.Contains(file.Id), entry?.Id.ToString() ?? string.Empty,
-            trash ? entry!.DeletedAt ?? entry.CreatedAt : file.CreatedAt, file.MediaKind, file.Size, PreviewUrl(data, file.Id));
+            trash ? entry!.DeletedAt ?? entry.CreatedAt : file.CreatedAt, file.MediaKind, file.Size, PreviewUrl(data, file.Id),
+            JpegViewUrl(data, file));
     }
 
     /// <summary>Хит без данных файла (альбом, плейлист, папка, shared); порядок задан рангом из БД.</summary>
@@ -288,11 +315,11 @@ public partial class UnifiedSearchService
         SearchHitKind kind, string id, int rank, double similarity, DateTime sortAt, string title, string? subtitle, Guid? targetId,
         string matchField, string matchValue)
         => new(kind, id, rank, similarity, sortAt, null, matchField, matchValue,
-            _ => CreateHit(kind, id, title, subtitle, targetId, false, string.Empty, sortAt, DomainMediaKind.Other, 0, string.Empty));
+            _ => CreateHit(kind, id, title, subtitle, targetId, false, string.Empty, sortAt, DomainMediaKind.Other, 0, string.Empty, string.Empty));
 
     private static SearchHit CreateHit(
         SearchHitKind kind, string id, string title, string? subtitle, Guid? fileId, bool favorite, string entryId, DateTime sortAt,
-        DomainMediaKind mediaKind, long size, string previewUrl)
+        DomainMediaKind mediaKind, long size, string previewUrl, string jpegViewUrl)
     {
         return new SearchHit
         {
@@ -303,6 +330,7 @@ public partial class UnifiedSearchService
             Title = title,
             Subtitle = subtitle ?? string.Empty,
             PreviewUrl = previewUrl,
+            JpegViewUrl = jpegViewUrl,
             MediaKind = (ProtoMediaKind)(int)mediaKind,
             Favorite = favorite,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(sortAt, DateTimeKind.Utc)),
@@ -326,6 +354,10 @@ public partial class UnifiedSearchService
         var preview = previews.FirstOrDefault(x => x.TargetWidth == 512) ?? previews[^1];
         return FileUrlHelper.GenerateDownloadUrl(data.PublicBaseUrl, preview.PreviewFileId);
     }
+
+    /// <summary>Полноразмерный JPEG-вид для просмотра (HEIC и пр.); берётся из уже загруженной сущности файла.</summary>
+    private static string JpegViewUrl(FileEnrichment data, UploadFile file)
+        => file.JpegViewFileId is { } viewId ? FileUrlHelper.GenerateDownloadUrl(data.PublicBaseUrl, viewId) : string.Empty;
 
     private async Task RequireOwnedFile(Guid fileId, CancellationToken cancellationToken)
     {
