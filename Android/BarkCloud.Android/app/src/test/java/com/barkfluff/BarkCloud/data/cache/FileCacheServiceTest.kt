@@ -11,7 +11,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -221,14 +223,17 @@ class FileCacheServiceTest {
             val scope = CacheScope("server", "user")
             val started = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
+            val written = CompletableDeferred<Unit>()
             val cache = cache(root, RecordingLoader { _, destination ->
                 started.complete(Unit)
                 withContext(NonCancellable) {
                     release.await()
                     destination.parentFile?.mkdirs()
                     destination.writeBytes(byteArrayOf(7, 8))
+                    written.complete(Unit)
+                    yield()
                 }
-            }, scope)
+            }, scope, ioDispatcher = StandardTestDispatcher(testScheduler))
             val request = async {
                 runCatching { cache.load(FileCacheKey.original(scope, "in-flight"), "in-flight.bin") }
             }
@@ -238,8 +243,11 @@ class FileCacheServiceTest {
             release.complete(Unit)
             assertTrue(request.await().exceptionOrNull() is CacheInvalidatedException)
 
-            assertEquals(0, cache.entryCount())
+            written.await()
+            // Invalidating the request does not wait for a NonCancellable loader to finish.
+            advanceUntilIdle()
             assertTrue(managedFiles(root).isEmpty())
+            assertEquals(0, cache.entryCount())
         } finally {
             root.deleteRecursively()
         }
