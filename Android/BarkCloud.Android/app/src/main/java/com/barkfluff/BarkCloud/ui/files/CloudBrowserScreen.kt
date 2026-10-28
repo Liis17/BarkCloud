@@ -318,7 +318,7 @@ private fun FileRow(
         leadingContent = {
             if (hasPreview) {
                 MediaThumb(
-                    model = file.asset.previewUrl(128),
+                    model = file.asset.previewModel(128),
                     isVideo = file.asset.isVideo,
                     contentDescription = file.name,
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),

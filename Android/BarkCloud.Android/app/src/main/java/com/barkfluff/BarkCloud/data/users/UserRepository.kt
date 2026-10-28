@@ -21,6 +21,7 @@ import barkcloud.users.UsersApiOuterClass.UpdatePrivacySettingsRequest
 import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
+import com.barkfluff.BarkCloud.data.GlobalParam
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -39,13 +40,17 @@ class UserRepository(
     private val grpc: GrpcManager,
     private val transfer: FileTransferService,
     private val monotonicNowMillis: () -> Long = { SystemClock.elapsedRealtime() },
+    private val globalParam: GlobalParam? = null,
 ) {
 
     // MARK: Профиль
 
     /** Профиль пользователя. `userId = 0` — свой профиль. */
-    suspend fun getUser(userId: Long = 0): User =
-        grpc.usersStub().getUser(GetUserRequest.newBuilder().setUserId(userId).build()).user
+    suspend fun getUser(userId: Long = 0): User {
+        val user = grpc.usersStub().getUser(GetUserRequest.newBuilder().setUserId(userId).build()).user
+        if (userId == 0L && user.id > 0L) globalParam?.userId = user.id.toString()
+        return user
+    }
 
     suspend fun changeName(firstName: String, lastName: String) {
         grpc.usersStub().changeName(

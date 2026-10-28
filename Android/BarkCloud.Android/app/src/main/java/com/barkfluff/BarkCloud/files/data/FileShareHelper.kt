@@ -14,7 +14,10 @@ object FileShareHelper {
 
     private fun authority(): String = "${BuildConfig.APPLICATION_ID}.fileprovider"
 
-    suspend fun prepareLocalFile(context: Context, file: File): File = withContext(Dispatchers.IO) {
+    suspend fun prepareLocalFile(context: Context, file: File, displayName: String = file.name): File = withContext(Dispatchers.IO) {
+        if (displayName != file.name) {
+            return@withContext LocalShareFileCache.prepare(context.cacheDir, file, displayName = displayName)
+        }
         try {
             FileProvider.getUriForFile(context, authority(), file)
             file

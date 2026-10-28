@@ -7,6 +7,8 @@ import barkcloud.files.FilesApiOuterClass.FileEntryDetailed
 import barkcloud.files.FilesApiOuterClass.MediaKind
 import barkcloud.files.FilesApiOuterClass.TrashEntry
 import barkcloud.files.FilesApiOuterClass.UploadFileInfo
+import com.barkfluff.BarkCloud.data.cache.CloudImageModel
+import com.barkfluff.BarkCloud.data.cache.CloudImageVariant
 import com.google.protobuf.Timestamp
 
 /** Protobuf Timestamp → epoch миллисекунды. */
@@ -36,7 +38,7 @@ enum class CloudMediaKind {
 }
 
 /** Превью определённой ширины. */
-data class MediaPreview(val url: String, val width: Int)
+data class MediaPreview(val url: String, val width: Int, val previewFileId: String? = null)
 
 /**
  * Медиа-файл облака (фото/видео/документ) с превью и метаданными.
@@ -49,14 +51,28 @@ data class MediaAsset(
     val kind: CloudMediaKind,
     val previews: List<MediaPreview>,
     val createdAtMillis: Long,
+    val jpegViewFileId: String? = null,
+    val jpegViewUrl: String? = null,
 ) {
     val isVideo: Boolean get() = kind.isVideo
 
     /** Превью ближайшее к нужной ширине (или максимальное доступное). */
     fun previewUrl(preferredWidth: Int): String? {
+        return selectedPreview(preferredWidth)?.url
+    }
+
+    fun previewModel(preferredWidth: Int): CloudImageModel? = selectedPreview(preferredWidth)?.let { preview ->
+        CloudImageModel(url = preview.url, fileId = id, previewFileId = preview.previewFileId)
+    }
+
+    fun jpegViewModel(): CloudImageModel? = jpegViewUrl?.let { url ->
+        CloudImageModel(url, id, jpegViewFileId, CloudImageVariant.JPEG_VIEW)
+    }
+
+    private fun selectedPreview(preferredWidth: Int): MediaPreview? {
         if (previews.isEmpty()) return null
         val sorted = previews.sortedBy { it.width }
-        return (sorted.firstOrNull { it.width >= preferredWidth } ?: sorted.last()).url
+        return sorted.firstOrNull { it.width >= preferredWidth } ?: sorted.last()
     }
 
     companion object {
@@ -66,9 +82,15 @@ data class MediaAsset(
             fileSize = info.fileSize,
             kind = CloudMediaKind.from(info.mediaKind),
             previews = info.previewsList.mapNotNull { p ->
-                if (p.previewUrl.isEmpty()) null else MediaPreview(p.previewUrl, p.targetWidth)
+                if (p.previewUrl.isEmpty()) null else MediaPreview(
+                    url = p.previewUrl,
+                    width = p.targetWidth,
+                    previewFileId = p.previewFileId.ifEmpty { null },
+                )
             },
             createdAtMillis = if (info.hasCreatedAt()) info.createdAt.toEpochMillis() else 0L,
+            jpegViewFileId = info.jpegViewFileId.ifEmpty { null },
+            jpegViewUrl = info.jpegViewUrl.ifEmpty { null },
         )
     }
 }

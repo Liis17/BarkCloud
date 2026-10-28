@@ -74,7 +74,8 @@ fun SharedWithMeScreen(
                     onDownload = {
                         viewModel.download(entry) { file ->
                             val mime = MimeIcon.mimeFor(entry.asset.fileName)
-                            context.startActivity(FileShareHelper.buildOpenIntent(context, file, mime))
+                            val shareFile = FileShareHelper.prepareLocalFile(context, file, entry.asset.fileName)
+                            context.startActivity(FileShareHelper.buildOpenIntent(context, shareFile, mime))
                         }
                     },
                 )
@@ -122,7 +123,7 @@ private fun SharedFileRow(
         leadingContent = {
             if (hasPreview) {
                 MediaThumb(
-                    model = entry.asset.previewUrl(128),
+                    model = entry.asset.previewModel(128),
                     isVideo = entry.asset.isVideo,
                     contentDescription = entry.asset.fileName,
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
