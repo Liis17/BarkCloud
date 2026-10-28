@@ -128,7 +128,7 @@
 .ftable td { padding: 12px 16px; vertical-align: middle; color: var(--md-on-surface); border-bottom: 1px solid var(--md-outline-variant); }
 .ftable td:first-child { padding-left: 24px; }
 .ftable td:last-child { padding-right: 24px; text-align: right; }
-.ftable td.name { display: flex; align-items: center; gap: 14px; }
+.ftable .name-cell { display: flex; align-items: center; gap: 14px; }
 
 .file-icon {
   width: 40px; height: 40px; border-radius: var(--r-md);
