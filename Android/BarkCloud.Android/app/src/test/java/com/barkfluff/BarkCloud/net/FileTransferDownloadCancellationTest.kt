@@ -5,6 +5,7 @@ import com.barkfluff.BarkCloud.grpc.GrpcManager
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -53,6 +54,40 @@ class FileTransferDownloadCancellationTest {
             val retry = service.download(server.url("/retry").toString(), "retry.tmp")
             assertEquals("ok", retry.readText())
             assertTrue(retry.isFile)
+        } finally {
+            server.shutdown()
+            cacheDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun cancellingAfterResponseBodyCompletionBeforeResumeDeletesTheDownloadedFile() = runBlocking {
+        val server = MockWebServer()
+        val cacheDir = Files.createTempDirectory("download-cancel-before-resume-").toFile()
+        val context = mockk<Context>()
+        every { context.cacheDir } returns cacheDir
+        val callEnded = CountDownLatch(1)
+        lateinit var request: Job
+        val client = OkHttpClient.Builder().eventListener(object : EventListener() {
+            override fun callEnd(call: Call) {
+                request.cancel()
+                callEnded.countDown()
+            }
+        }).build()
+        val service = FileTransferService(context, mockk<GrpcManager>(relaxed = true), client)
+        server.enqueue(MockResponse().setBody("completed body"))
+        server.start()
+        try {
+            request = launch(Dispatchers.IO) {
+                service.download(server.url("/complete").toString(), "orphan.tmp")
+            }
+            assertNotNull(withContext(Dispatchers.IO) { server.takeRequest(5, TimeUnit.SECONDS) })
+
+            request.join()
+
+            assertTrue("response body did not finish", callEnded.await(5, TimeUnit.SECONDS))
+            assertTrue(request.isCancelled)
+            assertTrue("completed file was left behind", !File(cacheDir, "orphan.tmp").exists())
         } finally {
             server.shutdown()
             cacheDir.deleteRecursively()

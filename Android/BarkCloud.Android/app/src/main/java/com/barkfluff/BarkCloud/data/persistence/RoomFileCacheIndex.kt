@@ -11,10 +11,8 @@ class RoomFileCacheIndex(private val dao: FileCacheEntryDao) : FileCacheIndex {
 
     override suspend fun totalSizeBytes(): Long = dao.totalSizeBytes()
 
-    override suspend fun oldest(limit: Int, offset: Int): List<FileCacheEntry> =
-        dao.oldest(limit, offset).map(FileCacheEntryEntity::toEntry)
-
-    override suspend fun newest(): FileCacheEntry? = dao.newest()?.toEntry()
+    override suspend fun evictionCandidates(): List<FileCacheEntry> =
+        dao.evictionCandidates().map(FileCacheEntryEntity::toEntry)
 
     override suspend fun entriesInScope(scope: CacheScope): List<FileCacheEntry> =
         dao.inScope(scope.serverKey, scope.accountId).map(FileCacheEntryEntity::toEntry)

@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.ui.components
 
+import kotlinx.coroutines.CancellationException
 import java.util.Locale
 
 private val jpegViewRequiredExtensions = setOf(
@@ -14,6 +15,15 @@ internal enum class ViewerCacheKind {
 
 internal fun viewerCacheKindAfterDecodeFailure(useJpegView: Boolean): ViewerCacheKind =
     if (useJpegView) ViewerCacheKind.JPEG_VIEW else ViewerCacheKind.ORIGINAL
+
+internal suspend fun invalidateViewerCacheSafely(invalidate: suspend () -> Unit) {
+    try {
+        invalidate()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
+    }
+}
 
 internal fun requiresJpegView(fileName: String, hasJpegView: Boolean): Boolean {
     if (!hasJpegView) return false

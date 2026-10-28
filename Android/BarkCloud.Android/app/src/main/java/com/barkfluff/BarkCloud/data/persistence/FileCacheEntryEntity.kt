@@ -10,7 +10,10 @@ import com.barkfluff.BarkCloud.data.cache.FileCacheKey
 
 @Entity(
     tableName = "file_cache_entries",
-    indices = [Index(value = ["scopeServer", "accountId", "lastUsedAt"])],
+    indices = [
+        Index(value = ["scopeServer", "accountId", "lastUsedAt"]),
+        Index(value = ["lastUsedAt", "key"]),
+    ],
 )
 data class FileCacheEntryEntity(
     @PrimaryKey val key: String,

@@ -24,4 +24,20 @@ class ServerConfigTest {
         assertNotNull(validate(port = "65535").config)
     }
     @Test fun `HTTP cannot grant certificate exception`() { assertFalse(validate("http://localhost").config!!.allowSelfSigned) }
+
+    @Test fun `memoized server key is recomputed after invalidation`() {
+        var reads = 0
+        var current = "first"
+        val cached = MemoizedServerKey { reads++; current }
+
+        assertEquals("first", cached.get())
+        current = "second"
+        assertEquals("first", cached.get())
+        assertEquals(1, reads)
+
+        cached.invalidate()
+
+        assertEquals("second", cached.get())
+        assertEquals(2, reads)
+    }
 }

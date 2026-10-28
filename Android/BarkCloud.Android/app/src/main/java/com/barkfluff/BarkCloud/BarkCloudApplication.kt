@@ -138,11 +138,11 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
             currentScope = ::currentCacheScope,
         )
         globalParam.onCacheIdentityChanging = { previous, next ->
-            fileCache.accountIdentityChanged(ServerSettings.config.key, previous, next)
+            fileCache.accountIdentityChanged(ServerSettings.serverKey, previous, next)
         }
         globalParam.onCacheIdentityChanged = { previous, next ->
             if (previous == null && next != null) {
-                val serverKey = ServerSettings.config.key
+                val serverKey = ServerSettings.serverKey
                 appScope.launch { fileCache.rebindUnknownAccount(serverKey, next) }
             }
         }
@@ -207,7 +207,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     }
 
     private fun currentCacheScope() = CacheScope(
-        serverKey = ServerSettings.config.key,
+        serverKey = ServerSettings.serverKey,
         accountId = globalParam.userId ?: CacheScope.UNKNOWN_ACCOUNT,
     )
 

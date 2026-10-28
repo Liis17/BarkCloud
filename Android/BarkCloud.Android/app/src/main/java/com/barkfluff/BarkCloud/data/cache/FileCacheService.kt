@@ -59,7 +59,6 @@ class FileCacheService(
         @Volatile var storageKey: String,
         @Volatile var key: FileCacheKey,
         val epoch: Long,
-        val ownerJob: Job?,
         val result: CompletableDeferred<File> = CompletableDeferred(),
         val usersDrained: CompletableDeferred<Unit> = CompletableDeferred(),
         @Volatile var users: Int = 0,
@@ -135,7 +134,6 @@ class FileCacheService(
                     storageKey = activeKey.storageKey,
                     key = activeKey,
                     epoch = operationEpoch,
-                    ownerJob = currentCoroutineContext()[Job],
                 )
                 candidate.users = 1
                 synchronized(epochGuard) {
@@ -149,9 +147,6 @@ class FileCacheService(
                     start = CoroutineStart.UNDISPATCHED,
                 ) {
                     performFlight(candidate, request, cacheFile(activeKey, cacheFileName(activeKey, fileName)))
-                }
-                candidate.ownerJob?.invokeOnCompletion { cause ->
-                    if (cause is CancellationException && candidate.users == 0) candidate.job?.cancel(cause)
                 }
                 candidate.job?.invokeOnCompletion { cause ->
                     if (cause is CancellationException && !candidate.result.isCompleted) {
@@ -192,7 +187,12 @@ class FileCacheService(
                 withContext(NonCancellable) {
                     stateMutex.withLock {
                         flight.users--
-                        if (flight.users == 0) flight.usersDrained.complete(Unit)
+                        if (flight.users == 0) {
+                            flight.usersDrained.complete(Unit)
+                            if (!flight.result.isCompleted) {
+                                flight.job?.cancel(CancellationException("Нет ожидающих загрузку"))
+                            }
+                        }
                     }
                 }
             }
@@ -492,7 +492,11 @@ class FileCacheService(
         ensureInitialized()
         withCacheState {
             if (epoch.get() != operationEpoch || currentScope() != newScope) return@withCacheState
+            val oldEntries = index.entriesInScope(oldScope)
             index.rebindScope(oldScope, newScope)
+            oldEntries.forEach { entry ->
+                movePinsLocked(entry.key.storageKey, entry.key.copy(scope = newScope).storageKey)
+            }
             if (epoch.get() != operationEpoch || currentScope() != newScope) return@withCacheState
             flights.values.toList().forEach { flight ->
                 if (flight.key.scope == oldScope) moveFlightToKeyLocked(flight, flight.key.copy(scope = newScope))
@@ -579,6 +583,7 @@ class FileCacheService(
                 entry = unknownEntry.copy(key = activeKey)
                 index.delete(unknownKey.storageKey)
                 index.upsert(entry)
+                movePinsLocked(unknownKey.storageKey, activeKey.storageKey)
             }
         }
         entry ?: return null
@@ -627,30 +632,21 @@ class FileCacheService(
         var total = index.totalSizeBytes()
         val max = settings.maxCacheBytes
         if (total <= max) return
-        val survivor = index.newest()?.key?.storageKey ?: return
-        var offset = 0
-        while (total > max) {
-            val candidates = index.oldest(EVICTION_BATCH_SIZE, offset)
-            if (candidates.isEmpty()) break
-            var removed = false
-            for (entry in candidates) {
-                val id = entry.key.storageKey
-                if (id == survivor || !pins[id].isNullOrEmpty() || flights.containsKey(id)) {
-                    offset++
-                    continue
-                }
-                val file = resolveFile(entry)
-                if (file != null && file.exists() && !file.delete()) {
-                    offset++
-                    continue
-                }
-                index.delete(id)
-                total -= entry.sizeBytes
-                offset = 0
-                removed = true
-                break
-            }
-            if (!removed && candidates.size < EVICTION_BATCH_SIZE) break
+        val candidates = index.evictionCandidates()
+        val survivor = candidates.lastOrNull()?.key?.storageKey ?: return
+        val victims = mutableListOf<FileCacheEntry>()
+        for (entry in candidates) {
+            if (total <= max) break
+            val id = entry.key.storageKey
+            if (id == survivor || !pins[id].isNullOrEmpty() || flights.containsKey(id)) continue
+            victims += entry
+            total -= entry.sizeBytes
+        }
+        for (entry in victims) {
+            val id = entry.key.storageKey
+            val file = resolveFile(entry)
+            if (file != null && file.exists() && !file.delete()) continue
+            index.delete(id)
         }
     }
 
@@ -741,16 +737,19 @@ class FileCacheService(
         if (active.isEmpty()) pins.remove(storageKey)
     }
 
+    private fun movePinsLocked(oldKey: String, newKey: String) {
+        if (oldKey == newKey) return
+        val activePins = pins.remove(oldKey) ?: return
+        pins.getOrPut(newKey) { mutableSetOf() }.addAll(activePins)
+        activePins.forEach { pinKeys[it] = newKey }
+    }
+
     private fun moveFlightToKeyLocked(flight: Flight, key: FileCacheKey) {
         val oldKey = flight.storageKey
         val newKey = key.storageKey
         if (oldKey != newKey) {
             flights.remove(oldKey, flight)
-            val activePins = pins.remove(oldKey)
-            if (activePins != null) {
-                pins.getOrPut(newKey) { mutableSetOf() }.addAll(activePins)
-                activePins.forEach { pinKeys[it] = newKey }
-            }
+            movePinsLocked(oldKey, newKey)
             flight.storageKey = newKey
         }
         flight.key = key
@@ -800,6 +799,5 @@ class FileCacheService(
 
     private companion object {
         const val LRU_TOUCH_INTERVAL_MILLIS = 30_000L
-        const val EVICTION_BATCH_SIZE = 64
     }
 }

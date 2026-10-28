@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -517,6 +518,60 @@ class FileCacheServiceTest {
     }
 
     @Test
+    fun lastCancelledWaiterCancelsTheFlightAndReleasesItsPin() = runTest {
+        val root = Files.createTempDirectory("file-cache-last-waiter-cancel-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val started = CompletableDeferred<Unit>()
+            val loaderCancelled = CompletableDeferred<Unit>()
+            val attempts = AtomicInteger()
+            val cancelledKeyAttempts = AtomicInteger()
+            val cache = cache(
+                root,
+                RecordingLoader { request, destination ->
+                    attempts.incrementAndGet()
+                    if (request.key.fileId == "cancelled" && cancelledKeyAttempts.incrementAndGet() == 1) {
+                        started.complete(Unit)
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            loaderCancelled.complete(Unit)
+                        }
+                    }
+                    destination.writeBytes(ByteArray(2))
+                },
+                scope,
+                TestPolicy(maxCacheBytes = 2L),
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+            )
+            val key = FileCacheKey.original(scope, "cancelled")
+            val owner = launch(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "cancelled.bin") }
+            started.await()
+            val waiter = launch(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "cancelled.bin") }
+
+            owner.cancelAndJoin()
+            assertFalse(loaderCancelled.isCompleted)
+            waiter.cancelAndJoin()
+            withTimeout(5_000) { loaderCancelled.await() }
+            withTimeout(5_000) {
+                while (managedFiles(root).isNotEmpty()) yield()
+            }
+
+            val recovered = cache.load(key, "cancelled.bin")
+            assertTrue(recovered.exists())
+            val newest = cache.load(FileCacheKey.original(scope, "newest"), "newest.bin")
+
+            assertFalse(recovered.exists())
+            assertTrue(newest.exists())
+            assertEquals(3, attempts.get())
+            assertEquals(2, cancelledKeyAttempts.get())
+            assertEquals(1, cache.entryCount())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun cancellingClearAllAlwaysReleasesTheClearGate() = runTest {
         val root = Files.createTempDirectory("file-cache-clear-cancel-").toFile()
         try {
@@ -637,6 +692,44 @@ class FileCacheServiceTest {
     }
 
     @Test
+    fun rebindMovesCachedEntryPinsToTheKnownAccountKey() = runTest {
+        val root = Files.createTempDirectory("file-cache-account-rebind-pin-").toFile()
+        try {
+            var activeScope = CacheScope("server", CacheScope.UNKNOWN_ACCOUNT)
+            val unknownScope = activeScope
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val policy = TestPolicy(maxCacheBytes = 2L)
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination -> destination.writeBytes(ByteArray(2)) },
+                policy = policy,
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                index = index,
+            ) { activeScope }
+            val unknownKey = FileCacheKey.original(unknownScope, "pinned")
+            val file = cache.load(unknownKey, "pinned.bin")
+            val pin = requireNotNull(cache.pin(unknownKey))
+
+            activeScope = CacheScope("server", "42")
+            cache.accountIdentityChanged("server", null, "42")
+            cache.rebindUnknownAccount("server", "42")
+            val reboundKey = FileCacheKey.original(activeScope, "pinned")
+
+            assertEquals(file, cache.get(reboundKey))
+            cache.load(FileCacheKey.original(activeScope, "newest"), "newest.bin")
+
+            assertTrue(file.exists())
+            assertEquals(file, cache.get(reboundKey))
+            assertNotNull(index.get(reboundKey.storageKey))
+            assertTrue(index.entriesInScope(unknownScope).isEmpty())
+
+            cache.unpin(pin.pin)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun changingFromOneKnownAccountToAnotherInvalidatesLoadsAsIOException() = runTest {
         val root = Files.createTempDirectory("file-cache-account-change-").toFile()
         try {
@@ -694,6 +787,42 @@ class FileCacheServiceTest {
             assertFalse(old.exists())
             assertTrue(newest.exists())
             assertEquals(3L, cache.totalSize())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun evictionSelectsVictimsFromOneSortedIndexReadAndPreservesNewestEntry() = runTest {
+        val root = Files.createTempDirectory("file-cache-one-pass-eviction-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val policy = TestPolicy(maxCacheBytes = 100L)
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination -> destination.writeBytes(ByteArray(2)) },
+                scope,
+                policy,
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                index = index,
+            )
+            val oldest = cache.load(FileCacheKey.original(scope, "oldest"), "oldest.bin")
+            val second = cache.load(FileCacheKey.original(scope, "second"), "second.bin")
+            val third = cache.load(FileCacheKey.original(scope, "third"), "third.bin")
+            val newest = cache.load(FileCacheKey.original(scope, "newest"), "newest.bin")
+            val readsBeforeEviction = index.evictionQueries
+            policy.maxCacheBytes = 2L
+
+            cache.enforceSizeLimit()
+
+            assertEquals(readsBeforeEviction + 1, index.evictionQueries)
+            assertFalse(oldest.exists())
+            assertFalse(second.exists())
+            assertFalse(third.exists())
+            assertTrue(newest.exists())
+            assertEquals(2L, cache.totalSize())
+            assertEquals(1, cache.entryCount())
         } finally {
             root.deleteRecursively()
         }
@@ -769,6 +898,7 @@ class FileCacheServiceTest {
     private class DiskFileCacheIndex(private val file: File) : FileCacheIndex {
         private val mutex = Mutex()
         var upsertCalls = 0
+        var evictionQueries = 0
         var blockingGetStorageKey: String? = null
         val getBlocked = CompletableDeferred<Unit>()
         val releaseGet = CompletableDeferred<Unit>()
@@ -785,6 +915,11 @@ class FileCacheServiceTest {
         }
 
         override suspend fun all(): List<FileCacheEntry> = mutex.withLock { readEntries().values.toList() }
+
+        override suspend fun evictionCandidates(): List<FileCacheEntry> = mutex.withLock {
+            evictionQueries++
+            readEntries().values.sortedWith(compareBy<FileCacheEntry> { it.lastUsedAt }.thenBy { it.key.storageKey })
+        }
 
         override suspend fun upsert(entry: FileCacheEntry) {
             mutex.withLock {

@@ -141,7 +141,16 @@ class FileTransferService(
         withContext(Dispatchers.IO) {
             suspendCancellableCoroutine { continuation ->
                 val call = http.newCall(Request.Builder().url(urlString).get().build())
-                continuation.invokeOnCancellation { call.cancel() }
+                val destinationLock = Any()
+                var completedDestination: File? = null
+                var cancelled = false
+                continuation.invokeOnCancellation {
+                    call.cancel()
+                    synchronized(destinationLock) {
+                        cancelled = true
+                        completedDestination?.delete()
+                    }
+                }
                 call.enqueue(object : Callback {
                     override fun onFailure(call: Call, error: IOException) {
                         if (continuation.isActive) continuation.resumeWithException(error)
@@ -160,7 +169,15 @@ class FileTransferService(
                                     destination!!.outputStream().use { input.copyTo(it) }
                                 }
                             }
-                            continuation.resume(requireNotNull(destination))
+                            val completed = requireNotNull(destination)
+                            synchronized(destinationLock) {
+                                if (cancelled || !continuation.isActive) {
+                                    completed.delete()
+                                } else {
+                                    completedDestination = completed
+                                    continuation.resume(completed)
+                                }
+                            }
                         } catch (error: Throwable) {
                             destination?.delete()
                             if (continuation.isActive) continuation.resumeWithException(error)

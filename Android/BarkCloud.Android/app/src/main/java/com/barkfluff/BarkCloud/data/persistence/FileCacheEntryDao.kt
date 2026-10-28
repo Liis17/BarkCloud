@@ -21,11 +21,8 @@ interface FileCacheEntryDao {
     @Query("SELECT COALESCE(SUM(sizeBytes), 0) FROM file_cache_entries")
     suspend fun totalSizeBytes(): Long
 
-    @Query("SELECT * FROM file_cache_entries ORDER BY lastUsedAt ASC, `key` ASC LIMIT :limit OFFSET :offset")
-    suspend fun oldest(limit: Int, offset: Int): List<FileCacheEntryEntity>
-
-    @Query("SELECT * FROM file_cache_entries ORDER BY lastUsedAt DESC, `key` DESC LIMIT 1")
-    suspend fun newest(): FileCacheEntryEntity?
+    @Query("SELECT * FROM file_cache_entries ORDER BY lastUsedAt ASC, `key` ASC")
+    suspend fun evictionCandidates(): List<FileCacheEntryEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: FileCacheEntryEntity)

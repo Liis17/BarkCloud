@@ -52,6 +52,10 @@ abstract class BarkCloudDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_file_cache_entries_scopeServer_accountId_lastUsedAt` " +
                         "ON `file_cache_entries` (`scopeServer`, `accountId`, `lastUsedAt`)",
                 )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_file_cache_entries_lastUsedAt_key` " +
+                        "ON `file_cache_entries` (`lastUsedAt`, `key`)",
+                )
             }
         }
 
