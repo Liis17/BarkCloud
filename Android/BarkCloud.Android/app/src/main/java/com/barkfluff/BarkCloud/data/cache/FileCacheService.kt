@@ -42,6 +42,11 @@ class FileCacheService(
     private val legacyPreviewsDir = File(root, "previews")
 
     private val stateMutex = Mutex()
+    // Accessed under stateMutex; keep warm preview reads out of Room's query queue.
+    private val recentEntries = object : java.util.LinkedHashMap<String, FileCacheEntry>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, FileCacheEntry>?): Boolean =
+            size > 256
+    }
     private val loaderScope = CoroutineScope(SupervisorJob() + ioDispatcher)
     private val epochGuard = Any()
     private val epoch = AtomicLong(0L)
@@ -228,7 +233,7 @@ class FileCacheService(
                     fileName = target.name,
                 )
                 try {
-                    index.upsert(entry)
+                    upsertEntryLocked(entry)
                     ensureCurrent(activeKey, flight.epoch)
                     evictLocked()
                     synchronized(epochGuard) {
@@ -236,7 +241,7 @@ class FileCacheService(
                         flight.result.complete(target)
                     }
                 } catch (error: Throwable) {
-                    index.delete(activeKey.storageKey)
+                    deleteEntryLocked(activeKey.storageKey)
                     target.delete()
                     throw error
                 }
@@ -417,6 +422,7 @@ class FileCacheService(
             originalsDir.mkdirs()
             LocalShareFileCache.clear(root.parentFile ?: root)
             index.clear()
+            recentEntries.clear()
             initialized = true
             latestTimestamp = nowMillis()
         } finally {
@@ -460,9 +466,9 @@ class FileCacheService(
         withCacheState {
             ensureCurrent(key, operationEpoch)
             val activeKey = canonicalKey(key)
-            val entry = index.get(activeKey.storageKey) ?: return@withCacheState
+            val entry = getEntryLocked(activeKey.storageKey) ?: return@withCacheState
             resolveFile(entry)?.delete()
-            index.delete(activeKey.storageKey)
+            deleteEntryLocked(activeKey.storageKey)
         }
     }
 
@@ -493,6 +499,7 @@ class FileCacheService(
         withCacheState {
             if (epoch.get() != operationEpoch || currentScope() != newScope) return@withCacheState
             val oldEntries = index.entriesInScope(oldScope)
+            recentEntries.clear()
             index.rebindScope(oldScope, newScope)
             oldEntries.forEach { entry ->
                 movePinsLocked(entry.key.storageKey, entry.key.copy(scope = newScope).storageKey)
@@ -525,7 +532,7 @@ class FileCacheService(
                 val file = resolveFile(entry)
                 if (file == null || !file.isFile || file.length() <= 0L) {
                     if (file?.isFile == true && file.length() <= 0L) file.delete()
-                    index.delete(entry.key.storageKey)
+                    deleteEntryLocked(entry.key.storageKey)
                 } else {
                     presentNames += entry.key.category to entry.fileName
                 }
@@ -557,7 +564,7 @@ class FileCacheService(
                     val fileId = originalFileId(file.name) ?: return@forEach
                     val key = FileCacheKey.original(scope, fileId)
                     val adoptedAt = nextTimestampLocked()
-                    index.upsert(
+                    upsertEntryLocked(
                         FileCacheEntry(
                             key = key,
                             sizeBytes = file.length(),
@@ -567,22 +574,36 @@ class FileCacheService(
                     )
                 }
             if (scope.accountId != CacheScope.UNKNOWN_ACCOUNT) {
+                recentEntries.clear()
                 index.rebindScope(CacheScope(scope.serverKey, CacheScope.UNKNOWN_ACCOUNT), scope)
             }
             initialized = true
         }
     }
 
+    private suspend fun getEntryLocked(storageKey: String): FileCacheEntry? =
+        recentEntries[storageKey] ?: index.get(storageKey)?.also { recentEntries[storageKey] = it }
+
+    private suspend fun upsertEntryLocked(entry: FileCacheEntry) {
+        index.upsert(entry)
+        recentEntries[entry.key.storageKey] = entry
+    }
+
+    private suspend fun deleteEntryLocked(storageKey: String) {
+        index.delete(storageKey)
+        recentEntries.remove(storageKey)
+    }
+
     private suspend fun findFileLocked(key: FileCacheKey): File? {
         val activeKey = canonicalKey(key)
-        var entry = index.get(activeKey.storageKey)
+        var entry = getEntryLocked(activeKey.storageKey)
         if (entry == null && activeKey.scope.accountId == reboundAccounts[activeKey.scope.serverKey]) {
             val unknownKey = activeKey.copy(scope = activeKey.scope.copy(accountId = CacheScope.UNKNOWN_ACCOUNT))
-            val unknownEntry = index.get(unknownKey.storageKey)
+            val unknownEntry = getEntryLocked(unknownKey.storageKey)
             if (unknownEntry != null) {
                 entry = unknownEntry.copy(key = activeKey)
-                index.delete(unknownKey.storageKey)
-                index.upsert(entry)
+                deleteEntryLocked(unknownKey.storageKey)
+                upsertEntryLocked(entry)
                 movePinsLocked(unknownKey.storageKey, activeKey.storageKey)
             }
         }
@@ -590,14 +611,14 @@ class FileCacheService(
         val file = resolveFile(entry)
         if (file == null || !file.isFile || file.length() <= 0L) {
             file?.delete()
-            index.delete(activeKey.storageKey)
+            deleteEntryLocked(activeKey.storageKey)
             return null
         }
         val age = settings.staleMaxAgeMillis
         if (age != FileCacheSettings.NEVER && nowMillis() - entry.lastUsedAt > age) {
             if (pins[activeKey.storageKey].isNullOrEmpty()) {
                 file.delete()
-                index.delete(activeKey.storageKey)
+                deleteEntryLocked(activeKey.storageKey)
                 return null
             }
         }
@@ -608,7 +629,7 @@ class FileCacheService(
             entry.lastUsedAt
         }
         if (entry.sizeBytes != file.length() || touchedAt != entry.lastUsedAt) {
-            index.upsert(entry.copy(sizeBytes = file.length(), lastUsedAt = touchedAt))
+            upsertEntryLocked(entry.copy(sizeBytes = file.length(), lastUsedAt = touchedAt))
         }
         return file
     }
@@ -622,7 +643,7 @@ class FileCacheService(
             .filter { it.lastUsedAt < cutoff && pins[it.key.storageKey].isNullOrEmpty() }
             .forEach { entry ->
                 resolveFile(entry)?.delete()
-                index.delete(entry.key.storageKey)
+                deleteEntryLocked(entry.key.storageKey)
                 removed++
             }
         return removed
@@ -640,7 +661,7 @@ class FileCacheService(
             if (id == survivor || !pins[id].isNullOrEmpty() || flights.containsKey(id)) continue
             val file = resolveFile(entry)
             if (file != null && file.exists() && !file.delete()) continue
-            index.delete(id)
+            deleteEntryLocked(id)
             total -= entry.sizeBytes
         }
     }
