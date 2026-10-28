@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -112,6 +113,7 @@ fun CloudMediaViewer(
                     onDismiss = onDismiss,
                     onPlayVideo = onPlayVideo,
                     infoEnabled = infoEnabled,
+                    animatedVisibilityScope = this@AnimatedVisibility,
                 )
             }
         }
@@ -127,6 +129,7 @@ private fun CloudMediaViewerContent(
     onDismiss: () -> Unit,
     onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean,
+    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
@@ -220,10 +223,11 @@ private fun CloudMediaViewerContent(
             val asset = assets[page]
             val isCurrentPage = page == pagerState.currentPage
             val pageImageState = if (isCurrentPage) imageState else ViewerImageState.Preview
-            val previewModifier = Modifier.fillMaxSize().cloudMediaSharedElement(
+            val previewModifier = if (page == initialIndex) Modifier.fillMaxSize().cloudMediaSharedElement(
                 key = asset.id,
                 visible = viewerAssetId == asset.id && isCurrentPage,
-            )
+                animatedVisibilityScope = animatedVisibilityScope,
+            ) else Modifier.fillMaxSize()
 
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AsyncImage(

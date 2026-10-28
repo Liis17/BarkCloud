@@ -26,10 +26,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.upload.UploadJob
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
@@ -42,7 +44,7 @@ fun UploadQueueScreen(
     viewModel: UploadQueueViewModel = viewModel(factory = UploadQueueViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val visibleJobs = state.jobs.filter { it.createdAtMillis >= System.currentTimeMillis() - 60L * 60L * 1000L }
+    val visibleJobs = state.pendingJobs
     Scaffold(
         topBar = {
             TopAppBar(
@@ -59,6 +61,11 @@ fun UploadQueueScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (visibleJobs.isEmpty()) {
+                item {
+                    Text(stringResource(R.string.gallery_uploads_empty), modifier = Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             items(items = visibleJobs, key = { job -> job.id }) { job ->
                 UploadJobRow(job, onRetry = { viewModel.retry(job.id) }, onCancel = { viewModel.cancel(job.id) })
             }
@@ -68,8 +75,13 @@ fun UploadQueueScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun UploadJobRow(job: UploadJob, onRetry: () -> Unit, onCancel: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+fun UploadJobRow(
+    job: UploadJob,
+    onRetry: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null,
+    modifier: Modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+) {
+    Card(modifier) {
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -96,9 +108,9 @@ fun UploadJobRow(job: UploadJob, onRetry: () -> Unit, onCancel: () -> Unit) {
                 }
                 job.errorMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
-            if (job.phase == UploadPhase.FAILED || job.phase == UploadPhase.UPLOADED_NOT_ATTACHED) {
+            if (onRetry != null && (job.phase == UploadPhase.FAILED || job.phase == UploadPhase.UPLOADED_NOT_ATTACHED)) {
                 IconButton(onClick = onRetry) { Icon(Icons.Outlined.Refresh, contentDescription = "Повторить") }
-            } else if (job.phase != UploadPhase.COMPLETED) {
+            } else if (onCancel != null && job.phase != UploadPhase.COMPLETED) {
                 IconButton(onClick = onCancel) { Icon(Icons.Outlined.Cancel, contentDescription = "Отменить") }
             }
         }

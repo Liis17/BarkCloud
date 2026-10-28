@@ -88,6 +88,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
@@ -142,6 +143,7 @@ private enum class AccountMenuDestination {
     SETTINGS,
     TRASH,
     UPLOADS,
+    CLEANUP,
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -152,6 +154,7 @@ fun GalleryScreen(
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenUploads: () -> Unit,
+    onOpenCleanup: () -> Unit,
     viewModel: GalleryViewModel = viewModel(factory = GalleryViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -176,10 +179,8 @@ fun GalleryScreen(
     }
     var accountDialogOpen by remember { mutableStateOf(false) }
     var pendingNavigation by remember { mutableStateOf<AccountMenuDestination?>(null) }
-    var requestReclaimAfterDismiss by remember { mutableStateOf(false) }
     var profile by remember { mutableStateOf<User?>(null) }
-    var storageUsed by remember { mutableStateOf<Long?>(null) }
-    var storageLimit by remember { mutableStateOf<Long?>(null) }
+    var storageInfo by remember { mutableStateOf<FileTransferService.StorageInfo?>(null) }
     var storageLoading by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var refreshQueued by remember { mutableStateOf(false) }
@@ -302,11 +303,9 @@ fun GalleryScreen(
         if (accountDialogOpen) {
             viewModel.refreshAutoUploadPolicy()
             storageLoading = true
-            storageUsed = null
-            storageLimit = null
+            storageInfo = null
             runCatching { app.fileTransfer.storageInfo() }.onSuccess {
-                storageUsed = it.used
-                storageLimit = it.limit
+                storageInfo = it
             }
             storageLoading = false
         }
@@ -320,6 +319,7 @@ fun GalleryScreen(
                 AccountMenuDestination.SETTINGS -> onOpenSettings()
                 AccountMenuDestination.TRASH -> onOpenTrash()
                 AccountMenuDestination.UPLOADS -> onOpenUploads()
+                AccountMenuDestination.CLEANUP -> onOpenCleanup()
                 null -> Unit
             }
         }
@@ -396,23 +396,6 @@ fun GalleryScreen(
         viewModel.deleteCloudOnly(fileIds)
     }
 
-    LaunchedEffect(accountDialogOpen, requestReclaimAfterDismiss) {
-        if (!accountDialogOpen && requestReclaimAfterDismiss) {
-            requestReclaimAfterDismiss = false
-            viewModel.prepareDeviceCopyDeletion { uris, mediaKeys ->
-                launchSystemDelete(
-                    pending = PendingPhotoDelete(
-                        deviceMediaKeys = mediaKeys,
-                        cloudFileIds = emptyList(),
-                        totalCount = mediaKeys.size,
-                        accountReclaim = true,
-                    ),
-                    uris = uris,
-                )
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
         val permissionGranted = permissions.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
@@ -433,6 +416,8 @@ fun GalleryScreen(
         GalleryHeader(
             height = headerHeight,
             avatarUrl = avatarUrl,
+            uploadActive = uploadState.isActive,
+            uploadProgress = uploadState.progress,
             onAccount = { accountDialogOpen = true },
             selecting = state.selecting,
             selectedCount = state.selected.size,
@@ -620,15 +605,12 @@ fun GalleryScreen(
             displayName = profileName,
             username = profile?.username,
             avatarUrl = avatarUrl,
-            storageUsed = storageUsed,
-            storageLimit = storageLimit,
+            storageInfo = storageInfo,
             storageLoading = storageLoading,
-            autoUploadPolicy = state.autoUploadPolicy,
             uploadState = uploadState,
-            reclaimableCount = state.reclaimableCount,
-            onAutoUploadPolicyChange = viewModel::setAutoUploadPolicy,
+            reclaimableBytes = state.reclaimableBytes,
             onOpenUploads = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.UPLOADS },
-            onFreeDeviceSpace = { accountDialogOpen = false; requestReclaimAfterDismiss = true },
+            onFreeDeviceSpace = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.CLEANUP },
             onOpenProfile = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.PROFILE },
             onOpenSettings = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.SETTINGS },
             onOpenTrash = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.TRASH },
@@ -663,6 +645,8 @@ fun GalleryScreen(
 internal fun GalleryHeader(
     height: androidx.compose.ui.unit.Dp,
     avatarUrl: String?,
+    uploadActive: Boolean = false,
+    uploadProgress: Float = 0f,
     onAccount: () -> Unit,
     selecting: Boolean = false,
     selectedCount: Int = 0,
@@ -687,7 +671,17 @@ internal fun GalleryHeader(
                 IconButton(onClick = onClearSelection, enabled = enabled) {
                     Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.common_cancel))
                 }
-            } else Box(
+            } else Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                if (uploadActive) {
+                    CircularProgressIndicator(
+                        progress = { uploadProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxSize(),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                }
+                Box(
                 Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
                     .combinedClickable(onClick = onAccount),
                 contentAlignment = Alignment.Center,
@@ -702,6 +696,7 @@ internal fun GalleryHeader(
                 } else {
                     Icon(Icons.Outlined.Person, contentDescription = stringResource(R.string.gallery_account_menu))
                 }
+            }
             }
         }
     }

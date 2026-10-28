@@ -1,6 +1,7 @@
 package com.barkfluff.BarkCloud.ui.components
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,12 +32,19 @@ internal fun CloudMediaTransitionLayout(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-internal fun Modifier.cloudMediaSharedElement(key: String, visible: Boolean): Modifier {
+internal fun Modifier.cloudMediaSharedElement(
+    key: String,
+    visible: Boolean,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+): Modifier {
     val scope = LocalSharedTransitionScope.current ?: return this
     return with(scope) {
-        this@cloudMediaSharedElement.sharedElementWithCallerManagedVisibility(
-            rememberSharedContentState(key = "cloud-media:$key"),
-            visible = visible,
-        )
+        val state = rememberSharedContentState(key = "cloud-media:$key")
+        if (animatedVisibilityScope != null) {
+            // Keep the viewer alive until its shared-element exit has finished.
+            this@cloudMediaSharedElement.sharedElement(state, animatedVisibilityScope)
+        } else {
+            this@cloudMediaSharedElement.sharedElementWithCallerManagedVisibility(state, visible)
+        }
     }
 }

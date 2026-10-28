@@ -37,6 +37,47 @@ import kotlinx.coroutines.sync.withLock
 @OptIn(ExperimentalCoroutinesApi::class)
 class FileCacheServiceTest {
     @Test
+    fun repeatedPreviewReadsDoNotQueryTheIndexAgain() = runTest {
+        val root = Files.createTempDirectory("file-cache-warm-reads-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val cache = cache(root, RecordingLoader { _, file -> file.writeBytes(byteArrayOf(1)) }, scope, index = index)
+            val key = FileCacheKey.preview(scope, "photo", "preview", "https://cdn/preview")
+            val file = cache.load(key, "preview.jpg", sourceUrl = "https://cdn/preview")
+            val reads = index.getCalls
+
+            repeat(100) { assertEquals(file, cache.get(key)) }
+
+            assertEquals("Warm preview reads must not queue database queries", reads, index.getCalls)
+            file.delete()
+            assertNull(cache.get(key))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun recentMetadataIsBoundedAndReloadedFromThePersistentIndex() = runTest {
+        val root = Files.createTempDirectory("file-cache-metadata-limit-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val cache = cache(root, RecordingLoader { _, file -> file.writeBytes(byteArrayOf(1)) }, scope, index = index)
+            val keys = (0..256).map { FileCacheKey.preview(scope, "photo-$it", "preview-$it", null) }
+            keys.forEach { cache.load(it, "preview.jpg", sourceUrl = "https://cdn/preview") }
+            val reads = index.getCalls
+
+            assertNotNull(cache.get(keys.last()))
+            assertEquals(reads, index.getCalls)
+            assertNotNull(cache.get(keys.first()))
+            assertEquals(reads + 1, index.getCalls)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun defaultCacheLimitsRemainFiveGiBAndSevenDays() {
         assertEquals(5L * 1024L * 1024L * 1024L, FileCacheSettings.DEFAULT_MAX_BYTES)
         assertEquals(7L * FileCacheSettings.DAY_MILLIS, FileCacheSettings.DEFAULT_STALE_AGE_MILLIS)
@@ -940,6 +981,7 @@ class FileCacheServiceTest {
     private class DiskFileCacheIndex(private val file: File) : FileCacheIndex {
         private val mutex = Mutex()
         var upsertCalls = 0
+        var getCalls = 0
         var evictionQueries = 0
         var blockingGetStorageKey: String? = null
         val getBlocked = CompletableDeferred<Unit>()
@@ -949,6 +991,7 @@ class FileCacheServiceTest {
         val releaseClear = CompletableDeferred<Unit>()
 
         override suspend fun get(storageKey: String): FileCacheEntry? {
+            getCalls++
             if (storageKey == blockingGetStorageKey) {
                 getBlocked.complete(Unit)
                 releaseGet.await()
