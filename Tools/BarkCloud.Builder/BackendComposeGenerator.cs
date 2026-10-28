@@ -112,7 +112,11 @@ services:
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
       EXTERNAL_FILES_HOST: ${EXTERNAL_FILES_HOST}
       EXTERNAL_TORRENT_HOST: ${EXTERNAL_TORRENT_HOST}
-      # Порты торрент-сервиса нужны configuration для вычисления TorrentService:Host/RunSettings
+      # Порты сервисов нужны Configuration для вычисления внутренних адресов и RunSettings
+      IDENTITY_PORT: ${IDENTITY_PORT}
+      USERS_PORT: ${USERS_PORT}
+      FILES_PORT: ${FILES_PORT}
+      FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
       TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}{{configurationAgentSettings}}{{AppVolumeSection("CONFIGURATION")}}
