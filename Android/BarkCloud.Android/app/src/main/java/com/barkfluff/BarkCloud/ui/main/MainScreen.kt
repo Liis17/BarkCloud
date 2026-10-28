@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -36,6 +37,8 @@ import com.barkfluff.BarkCloud.ui.albums.AlbumDetailScreen
 import com.barkfluff.BarkCloud.ui.favorites.FavoritesScreen
 import com.barkfluff.BarkCloud.ui.files.CloudBrowserScreen
 import com.barkfluff.BarkCloud.ui.gallery.GalleryScreen
+import com.barkfluff.BarkCloud.ui.gallery.GalleryViewModel
+import com.barkfluff.BarkCloud.ui.gallery.DeviceCleanupScreen
 import com.barkfluff.BarkCloud.ui.media.MediaTabScreen
 import com.barkfluff.BarkCloud.ui.navigation.FadeThroughEnter
 import com.barkfluff.BarkCloud.ui.navigation.FadeThroughExit
@@ -133,6 +136,15 @@ fun MainScreen(
                         onOpenSettings = { navController.navigate("settings") },
                         onOpenTrash = { navController.navigate("trash") },
                         onOpenUploads = { navController.navigate("uploads/root") },
+                        onOpenCleanup = { navController.navigate("gallery/cleanup") },
+                    )
+                }
+                drillIn("gallery/cleanup") { entry ->
+                    val galleryEntry = remember(entry) { navController.getBackStackEntry("gallery/root") }
+                    val galleryViewModel: GalleryViewModel = viewModel(galleryEntry, factory = GalleryViewModel.factory())
+                    DeviceCleanupScreen(
+                        onNavigateUp = { navController.popBackStack() },
+                        viewModel = galleryViewModel,
                     )
                 }
             }

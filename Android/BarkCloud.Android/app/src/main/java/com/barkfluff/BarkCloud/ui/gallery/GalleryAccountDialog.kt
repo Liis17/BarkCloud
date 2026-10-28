@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -29,12 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import com.barkfluff.BarkCloud.net.FileTransferService
+import com.barkfluff.BarkCloud.files.ui.formatSize
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
 
@@ -47,7 +51,7 @@ internal fun GalleryAccountDialog(
     storageLoading: Boolean,
     autoUploadPolicy: AutoUploadNetworkPolicy,
     uploadState: UploadQueueUiState,
-    reclaimableCount: Int,
+    reclaimableBytes: Long,
     onAutoUploadPolicyChange: (AutoUploadNetworkPolicy) -> Unit,
     onOpenUploads: () -> Unit,
     onFreeDeviceSpace: () -> Unit,
@@ -181,8 +185,22 @@ internal fun GalleryAccountDialog(
                 }
 
                 HorizontalDivider()
-                TextButton(onClick = onFreeDeviceSpace, enabled = reclaimableCount > 0) {
-                    Text(stringResource(R.string.gallery_free_device_space, reclaimableCount))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = onFreeDeviceSpace,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(10.dp))
+                        Text(stringResource(R.string.gallery_free_device_space), modifier = Modifier.weight(1f))
+                        Text(formatSize(LocalContext.current, reclaimableBytes), style = MaterialTheme.typography.labelLarge)
+                    }
+                    Text(
+                        stringResource(R.string.gallery_cleanup_cloud_kept),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 HorizontalDivider()
