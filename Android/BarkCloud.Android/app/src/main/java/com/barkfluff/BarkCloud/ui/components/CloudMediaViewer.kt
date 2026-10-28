@@ -56,6 +56,7 @@ fun CloudMediaViewer(
     initialIndex: Int,
     onDismiss: () -> Unit,
     onPlayVideo: (MediaAsset) -> Unit,
+    infoEnabled: Boolean = true,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -90,7 +91,7 @@ fun CloudMediaViewer(
                         onDragEnd = {
                             when {
                                 dragY > dismissPx -> onDismiss()
-                                movedUp < -sheetOpenPx -> {
+                                infoEnabled && movedUp < -sheetOpenPx -> {
                                     sheetVisible = true
                                     scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
                                 }
@@ -128,12 +129,16 @@ fun CloudMediaViewer(
             }
         }
 
-        if (sheetVisible) {
+        if (infoEnabled && sheetVisible) {
             ModalBottomSheet(
                 onDismissRequest = { sheetVisible = false },
                 sheetState = sheetState,
             ) {
-                CloudMediaInfoContent(asset = currentAsset, state = infoState)
+                CloudMediaInfoContent(
+                    asset = currentAsset,
+                    state = infoState,
+                    onSave = infoViewModel::save,
+                )
             }
         }
     }

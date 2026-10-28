@@ -139,6 +139,7 @@ fun VaultScreen(
             initialIndex = vaultAssets.indexOf(asset).coerceAtLeast(0),
             onDismiss = { viewer = null },
             onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
+            infoEnabled = false,
         )
     }
 }
