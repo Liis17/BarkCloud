@@ -11,10 +11,15 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -29,17 +34,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import kotlinx.coroutines.launch
 
 private val DismissDistance = 120.dp
+private val SheetOpenDistance = 80.dp
 
 /**
- * Полноэкранный просмотр облачного медиа: листание свайпами влево и вправо, закрытие свайпом вниз.
- * Изображение показывается из превью (1024), видео открывается во внешнем плеере через [onPlayVideo].
+ * Полноэкранный просмотр облачного медиа. Листание свайпами влево и вправо, закрытие свайпом вниз,
+ * свайп вверх открывает панель свойств. Изображение показывается из превью (1024),
+ * видео открывается во внешнем плеере через [onPlayVideo].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CloudMediaViewer(
     assets: List<MediaAsset>,
@@ -54,28 +64,45 @@ fun CloudMediaViewer(
         val pagerState = rememberPagerState(initialPage = initialIndex) { assets.size }
         val scope = rememberCoroutineScope()
         val dismissPx = with(LocalDensity.current) { DismissDistance.toPx() }
+        val sheetOpenPx = with(LocalDensity.current) { SheetOpenDistance.toPx() }
         var dragY by remember { mutableFloatStateOf(0f) }
         val backdropAlpha = 1f - (dragY / dismissPx).coerceIn(0f, 1f) * 0.8f
+        var sheetVisible by remember { mutableStateOf(false) }
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
+        val currentAsset = assets[pagerState.currentPage]
+        val infoState by infoViewModel.state.collectAsStateWithLifecycle()
+
+        // Панель грузит данные только пока открыта, и перезагружает их при листании.
+        LaunchedEffect(sheetVisible, currentAsset.id) {
+            if (sheetVisible) infoViewModel.load(currentAsset.id)
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = backdropAlpha))
                 .graphicsLayer { translationY = dragY }
-                .pointerInput(dismissPx) {
+                .pointerInput(dismissPx, sheetOpenPx) {
+                    var movedUp = 0f
                     detectVerticalDragGestures(
+                        onDragStart = { movedUp = 0f },
                         onDragEnd = {
-                            if (dragY > dismissPx) {
-                                onDismiss()
-                            } else {
-                                scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
+                            when {
+                                dragY > dismissPx -> onDismiss()
+                                movedUp < -sheetOpenPx -> {
+                                    sheetVisible = true
+                                    scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
+                                }
+                                else -> scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
                             }
                         },
                         onDragCancel = {
                             scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
                         },
                     ) { _, amount ->
-                        // Тянем только вниз; движение вверх пока не двигает изображение.
+                        movedUp += amount
+                        // Тянем только вниз; движение вверх изображение не двигает, оно открывает панель.
                         dragY = (dragY + amount).coerceAtLeast(0f)
                     }
                 },
@@ -98,6 +125,15 @@ fun CloudMediaViewer(
                         )
                     }
                 }
+            }
+        }
+
+        if (sheetVisible) {
+            ModalBottomSheet(
+                onDismissRequest = { sheetVisible = false },
+                sheetState = sheetState,
+            ) {
+                CloudMediaInfoContent(asset = currentAsset, state = infoState)
             }
         }
     }
