@@ -1322,7 +1322,8 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   position: absolute; top: 10px; left: 10px;
   width: 30px; height: 30px; border-radius: var(--r-full);
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,.9); color: var(--md-on-surface);
+  /* Белая плашка поверх обложки: цвет фиксированный, иначе в тёмной теме иконка белая на белом. */
+  background: rgba(255,255,255,.9); color: #1d1b20;
 }
 .df-card .overlay {
   position: absolute; inset: 0;
@@ -1340,6 +1341,18 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   font-size: 12px;
 }
 .df-card.new-df:hover { border-color: var(--md-primary); color: var(--md-primary); transform: none; }
+.df-card.df-skeleton { cursor: default; position: relative; background: var(--md-surface-container-high); transition: none; }
+.df-card.df-skeleton:hover { transform: none; }
+.df-card.df-skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--md-on-surface) 8%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: df-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes df-skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .df-card.df-skeleton::after { animation: none; }
+}
 
 /* Конструктор правил умной папки (модалка) */
 .df-comb { display: flex; gap: 8px; margin: 8px 0 4px; }

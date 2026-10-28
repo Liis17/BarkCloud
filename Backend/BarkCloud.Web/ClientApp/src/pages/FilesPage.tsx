@@ -25,7 +25,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { pickDocumentIcon } from '../hooks/useDocumentHead';
 import { useUploadActions } from '../hooks/useUploadManager';
-import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
+import { DynamicFoldersSkeleton, DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
 import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
@@ -72,10 +72,11 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active 
     >
       <td className="selcell" />
       <td className="name">
-        <div className="file-icon folder">DIR</div>
-        <div className="file-name-col">
-          <div className="fn">{dir.name}</div>
-          <div className="meta">Папка</div>
+        <div className="name-cell">
+          <div className="file-icon folder"><Icon.folder size={22} /></div>
+          <div className="file-name-col">
+            <div className="fn">{dir.name}</div>
+          </div>
         </div>
       </td>
       <td className="size">—</td>
@@ -126,14 +127,16 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
         />
       </td>
       <td className="name">
-        {isMedia && hasPreview ? (
-          <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
-        ) : (
-          <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
-        )}
-        <div className="file-name-col">
-          <div className="fn">{entry.name}</div>
-          <div className="meta">{kindLabel(m?.kind)}</div>
+        <div className="name-cell">
+          {isMedia && hasPreview ? (
+            <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
+          ) : (
+            <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
+          )}
+          <div className="file-name-col">
+            <div className="fn">{entry.name}</div>
+            <div className="meta">{kindLabel(m?.kind)}</div>
+          </div>
         </div>
       </td>
       <td className="size">{m?.sizeLabel || '—'}</td>
@@ -268,6 +271,7 @@ export function FilesPage() {
   const [bulkMoving, setBulkMoving] = React.useState(false);
   const [archiving, setArchiving] = React.useState(false);
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
+  const [smartFoldersLoading, setSmartFoldersLoading] = React.useState(true);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
   const [directoryCursor, setDirectoryCursor] = React.useState<DirectoryCursor | null>(null);
@@ -353,7 +357,8 @@ export function FilesPage() {
   const loadSmartFolders = React.useCallback(() => {
     apiGet<{ folders: DynamicFolder[] }>('/api/dynamic-folders')
       .then((d) => setSmartFolders(d.folders || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSmartFoldersLoading(false));
   }, []);
   React.useEffect(() => {
     loadSmartFolders();
@@ -758,9 +763,11 @@ export function FilesPage() {
             )}
           </div>
 
-          {!openSmart && !searchQuery && !currentDir && smartFolders.length > 0 && (
+          {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading ? (
+            <DynamicFoldersSkeleton />
+          ) : smartFolders.length > 0 && (
             <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
-          )}
+          ))}
 
           {openSmart ? (
             <div className="files-list">
