@@ -143,6 +143,7 @@ private enum class AccountMenuDestination {
     SETTINGS,
     TRASH,
     UPLOADS,
+    CLEANUP,
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -153,6 +154,7 @@ fun GalleryScreen(
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenUploads: () -> Unit,
+    onOpenCleanup: () -> Unit,
     viewModel: GalleryViewModel = viewModel(factory = GalleryViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -177,7 +179,6 @@ fun GalleryScreen(
     }
     var accountDialogOpen by remember { mutableStateOf(false) }
     var pendingNavigation by remember { mutableStateOf<AccountMenuDestination?>(null) }
-    var requestReclaimAfterDismiss by remember { mutableStateOf(false) }
     var profile by remember { mutableStateOf<User?>(null) }
     var storageInfo by remember { mutableStateOf<FileTransferService.StorageInfo?>(null) }
     var storageLoading by remember { mutableStateOf(false) }
@@ -318,6 +319,7 @@ fun GalleryScreen(
                 AccountMenuDestination.SETTINGS -> onOpenSettings()
                 AccountMenuDestination.TRASH -> onOpenTrash()
                 AccountMenuDestination.UPLOADS -> onOpenUploads()
+                AccountMenuDestination.CLEANUP -> onOpenCleanup()
                 null -> Unit
             }
         }
@@ -392,23 +394,6 @@ fun GalleryScreen(
 
     fun deleteCloudOnly(fileIds: List<String>) {
         viewModel.deleteCloudOnly(fileIds)
-    }
-
-    LaunchedEffect(accountDialogOpen, requestReclaimAfterDismiss) {
-        if (!accountDialogOpen && requestReclaimAfterDismiss) {
-            requestReclaimAfterDismiss = false
-            viewModel.prepareDeviceCopyDeletion { uris, mediaKeys ->
-                launchSystemDelete(
-                    pending = PendingPhotoDelete(
-                        deviceMediaKeys = mediaKeys,
-                        cloudFileIds = emptyList(),
-                        totalCount = mediaKeys.size,
-                        accountReclaim = true,
-                    ),
-                    uris = uris,
-                )
-            }
-        }
     }
 
     LaunchedEffect(Unit) {
@@ -622,10 +607,10 @@ fun GalleryScreen(
             storageLoading = storageLoading,
             autoUploadPolicy = state.autoUploadPolicy,
             uploadState = uploadState,
-            reclaimableCount = state.reclaimableCount,
+            reclaimableBytes = state.reclaimableBytes,
             onAutoUploadPolicyChange = viewModel::setAutoUploadPolicy,
             onOpenUploads = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.UPLOADS },
-            onFreeDeviceSpace = { accountDialogOpen = false; requestReclaimAfterDismiss = true },
+            onFreeDeviceSpace = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.CLEANUP },
             onOpenProfile = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.PROFILE },
             onOpenSettings = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.SETTINGS },
             onOpenTrash = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.TRASH },

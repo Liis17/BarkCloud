@@ -19,6 +19,30 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class GalleryDeletionCoordinatorTest {
     @Test
+    fun approvedDeviceCleanupNeverDeletesCloudCopies() = runTest {
+        val cloudCalls = mutableListOf<String>()
+        val deviceCalls = mutableListOf<String>()
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val coordinator = GalleryDeletionCoordinator(
+            scope = scope,
+            deleteCloudFile = { cloudCalls += it },
+            onDeviceFilesDeleted = { deviceCalls += it },
+            onCloudFileDeleted = {},
+        )
+        val pending = PendingPhotoDelete(listOf("image:1"), emptyList(), 1, accountReclaim = true)
+
+        assertTrue(coordinator.beginSystemConfirmation(pending))
+        assertTrue(deviceCalls.isEmpty())
+        coordinator.completeSystemConfirmation(pending, approved = true)
+        advanceUntilIdle()
+
+        assertEquals(listOf("image:1"), deviceCalls)
+        assertTrue(cloudCalls.isEmpty())
+        assertTrue(coordinator.state.value.results.single().accountReclaim)
+        scope.cancel()
+    }
+
+    @Test
     fun cancellingSystemConfirmationPreventsAllCloudDeletes() = runTest {
         val cloudCalls = mutableListOf<String>()
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))

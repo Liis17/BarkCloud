@@ -155,7 +155,16 @@
     <string name="viewer_play_video">Воспроизвести видео</string>
     <string name="viewer_retry_original">Повторить</string>
     <string name="gallery_auto_upload">Автозагрузка</string>
-    <string name="gallery_free_device_space">Освободить место на устройстве (%1$d)</string>
+    <string name="gallery_free_device_space">Освободить место</string>
+    <string name="gallery_cleanup_cloud_kept">Файлы останутся в облаке</string>
+    <string name="gallery_cleanup_available">Можно освободить %1$s</string>
+    <string name="gallery_cleanup_description">Удалите с устройства фото и видео, копии которых уже есть в облаке. Перед удалением мы повторно проверим их наличие на сервере.</string>
+    <string name="gallery_cleanup_count">Локальных копий: %1$d</string>
+    <string name="gallery_cleanup_empty">Пока нет локальных копий, которые можно безопасно удалить.</string>
+    <string name="gallery_cleanup_action">Удалить локальные копии · %1$s</string>
+    <string name="gallery_cleanup_checking">Проверяем копии в облаке…</string>
+    <string name="gallery_cleanup_none_confirmed">Подходящих копий не найдено. Ничего не удалено.</string>
+    <string name="gallery_cleanup_back">Назад</string>
     <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
     <string name="gallery_selection_count">Выбрано: %1$d</string>
     <string name="gallery_account_menu">Меню аккаунта</string>
