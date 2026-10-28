@@ -7,6 +7,14 @@ private val jpegViewRequiredExtensions = setOf(
     "dng", "cr2", "cr3", "nef", "nrw", "arw", "orf", "rw2",
 )
 
+internal enum class ViewerCacheKind {
+    ORIGINAL,
+    JPEG_VIEW,
+}
+
+internal fun viewerCacheKindAfterDecodeFailure(useJpegView: Boolean): ViewerCacheKind =
+    if (useJpegView) ViewerCacheKind.JPEG_VIEW else ViewerCacheKind.ORIGINAL
+
 internal fun requiresJpegView(fileName: String, hasJpegView: Boolean): Boolean {
     if (!hasJpegView) return false
     val extension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)

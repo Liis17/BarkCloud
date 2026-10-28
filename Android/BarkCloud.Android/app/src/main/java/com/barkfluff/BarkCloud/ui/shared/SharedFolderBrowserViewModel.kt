@@ -73,7 +73,7 @@ class SharedFolderBrowserViewModel(
         }
     }
 
-    fun download(file: PublicFile, onDownloaded: (File) -> Unit) {
+    fun download(file: PublicFile, onDownloaded: suspend (File) -> Unit) {
         _state.update { it.copy(downloadingFileId = file.id) }
         viewModelScope.launch {
             try {

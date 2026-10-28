@@ -74,7 +74,8 @@ fun SharedWithMeScreen(
                     onDownload = {
                         viewModel.download(entry) { file ->
                             val mime = MimeIcon.mimeFor(entry.asset.fileName)
-                            context.startActivity(FileShareHelper.buildOpenIntent(context, file, mime))
+                            val shareFile = FileShareHelper.prepareLocalFile(context, file, entry.asset.fileName)
+                            context.startActivity(FileShareHelper.buildOpenIntent(context, shareFile, mime))
                         }
                     },
                 )

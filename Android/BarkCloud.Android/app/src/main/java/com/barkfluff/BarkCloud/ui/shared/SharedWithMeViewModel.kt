@@ -116,7 +116,7 @@ class SharedWithMeViewModel(
     }
 
     /** Скачивает файл во временный кэш и возвращает его для открытия/шеринга вызывающей стороной. */
-    fun download(entry: SharedWithMeEntry, onDownloaded: (File) -> Unit) {
+    fun download(entry: SharedWithMeEntry, onDownloaded: suspend (File) -> Unit) {
         _state.update { it.copy(downloadingFileId = entry.asset.id) }
         viewModelScope.launch {
             try {

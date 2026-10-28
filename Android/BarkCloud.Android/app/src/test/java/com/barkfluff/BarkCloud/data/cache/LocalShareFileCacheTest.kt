@@ -30,6 +30,22 @@ class LocalShareFileCacheTest {
     }
 
     @Test
+    fun namedShareCopyUsesTheDisplayedFileName() {
+        val root = Files.createTempDirectory("share-cache-named-").toFile()
+        try {
+            val source = File(root, "entry-ZmlsZQ.abc123.pdf").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val cacheRoot = File(root, "cache").apply { mkdirs() }
+
+            val shared = LocalShareFileCache.prepare(cacheRoot, source, displayName = "report.pdf")
+
+            assertEquals("report.pdf", shared.name)
+            assertArrayEquals(source.readBytes(), shared.readBytes())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun removesExpiredCopiesAndExplicitCacheClearRemovesShareDirectory() {
         val root = Files.createTempDirectory("share-cache-expiry-").toFile()
         try {

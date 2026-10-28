@@ -3,6 +3,9 @@ package com.barkfluff.BarkCloud.data.cache
 import com.barkfluff.BarkCloud.net.FileTransferService
 import java.io.File
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 class FileTransferCacheLoader(
@@ -26,7 +29,16 @@ class FileTransferCacheLoader(
                 }
                 val completedDownload = transfer.download(url, transferTempName)
                 downloaded = completedDownload
-                completedDownload.copyTo(destination, overwrite = true)
+                try {
+                    Files.move(
+                        completedDownload.toPath(),
+                        destination.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(completedDownload.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
             }
             if (destination.length() <= 0L) throw IOException("Загружен пустой файл")
         } finally {

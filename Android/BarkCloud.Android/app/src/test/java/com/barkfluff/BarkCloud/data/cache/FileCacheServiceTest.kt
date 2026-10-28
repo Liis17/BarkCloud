@@ -1,16 +1,20 @@
 package com.barkfluff.BarkCloud.data.cache
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -27,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class FileCacheServiceTest {
     @Test
     fun defaultCacheLimitsRemainFiveGiBAndSevenDays() {
@@ -135,6 +140,8 @@ class FileCacheServiceTest {
             val withPreviewId = FileCacheKey.preview(scope, "photo", "preview-1", "https://cdn/preview")
             val urlFallback = FileCacheKey.preview(scope, "photo", null, "https://cdn/preview")
             val jpegView = FileCacheKey.jpegView(scope, "photo")
+            val firstJpegView = FileCacheKey.jpegView(scope, "photo", "jpeg-view-1")
+            val regeneratedJpegView = FileCacheKey.jpegView(scope, "photo", "jpeg-view-2")
             val ownOriginal = FileCacheKey.original(scope, "shared-file")
             val sharedOriginal = FileCacheKey.sharedOriginal(scope, "shared-file")
 
@@ -142,6 +149,7 @@ class FileCacheServiceTest {
                 .map { it.storageKey }
                 .toSet()
                 .size)
+            assertFalse(firstJpegView.storageKey == regeneratedJpegView.storageKey)
             cache.load(withPreviewId, "preview.jpg", "https://cdn/preview")
             cache.load(urlFallback, "preview.jpg", "https://cdn/preview")
             cache.load(jpegView, "view.jpg", "https://cdn/view")
@@ -220,12 +228,14 @@ class FileCacheServiceTest {
                     destination.writeBytes(byteArrayOf(7, 8))
                 }
             }, scope)
-            val request = async { cache.load(FileCacheKey.original(scope, "in-flight"), "in-flight.bin") }
+            val request = async {
+                runCatching { cache.load(FileCacheKey.original(scope, "in-flight"), "in-flight.bin") }
+            }
             started.await()
 
             cache.clearAll()
             release.complete(Unit)
-            request.cancelAndJoin()
+            assertTrue(request.await().exceptionOrNull() is CacheInvalidatedException)
 
             assertEquals(0, cache.entryCount())
             assertTrue(managedFiles(root).isEmpty())
@@ -244,12 +254,14 @@ class FileCacheServiceTest {
                 started.complete(Unit)
                 awaitCancellation()
             }) { activeScope }
-            val request = async { cache.load(FileCacheKey.original(activeScope, "in-flight"), "in-flight.bin") }
+            val request = async {
+                runCatching { cache.load(FileCacheKey.original(activeScope, "in-flight"), "in-flight.bin") }
+            }
             started.await()
 
             activeScope = CacheScope("server-b", "user")
             cache.cancelInFlightLoads()
-            request.cancelAndJoin()
+            assertTrue(request.await().exceptionOrNull() is CacheInvalidatedException)
 
             assertEquals(0, cache.entryCount())
             assertTrue(managedFiles(root).isEmpty())
@@ -283,6 +295,39 @@ class FileCacheServiceTest {
             assertEquals(legacy, adopted)
             assertNotNull(diskIndex.get(FileCacheKey.original(scope, "legacy-id").storageKey))
             assertNull(diskIndex.get(missingKey.storageKey))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun startupDeletesOrphanEntryAndManagedFilesButAdoptsLegacyOriginalNames() = runTest {
+        val root = Files.createTempDirectory("file-cache-orphan-cleanup-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val originals = File(root, "BarkCloudFiles/originals")
+            val orphanEntry = File(originals, "entry-ZmlsZQ.0123456789abcdef.jpg").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(1, 2))
+            }
+            val legacy = File(originals, "legacy-name.pdf").apply { writeBytes(byteArrayOf(3, 4)) }
+            val orphanPreview = File(root, "BarkCloudFiles/managed/previews/unindexed.jpg").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(5))
+            }
+            val orphanJpegView = File(root, "BarkCloudFiles/managed/jpeg-views/unindexed.jpg").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(6))
+            }
+            val cache = cache(root, RecordingLoader { _, _ -> error("cached files expected") }, scope)
+
+            cache.statistics()
+
+            assertFalse(orphanEntry.exists())
+            assertFalse(orphanPreview.exists())
+            assertFalse(orphanJpegView.exists())
+            assertEquals(legacy, cache.get(FileCacheKey.original(scope, "legacy-name")))
+            assertEquals(1, cache.entryCount())
         } finally {
             root.deleteRecursively()
         }
@@ -356,13 +401,318 @@ class FileCacheServiceTest {
             val cache = cache(root, RecordingLoader { _, destination -> destination.writeBytes(ByteArray(3)) }, scope, policy)
             val pinnedKey = FileCacheKey.original(scope, "pinned")
             val pinned = cache.load(pinnedKey, "pinned.bin")
-            assertNotNull(cache.pin(pinnedKey))
+            val pin = cache.pin(pinnedKey)
+            assertNotNull(pin)
             cache.load(FileCacheKey.original(scope, "latest"), "latest.bin")
 
             assertTrue(pinned.exists())
-            cache.unpin(pinnedKey)
+            cache.unpin(requireNotNull(pin).pin)
             assertFalse(pinned.exists())
             assertEquals(1, cache.entryCount())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun cancelledOwnerCleansUpAfterStateMutexBecomesAvailable() = runTest {
+        val root = Files.createTempDirectory("file-cache-owner-cancel-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val started = CompletableDeferred<Unit>()
+            val attempts = AtomicInteger()
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination ->
+                    if (attempts.incrementAndGet() == 1) {
+                        started.complete(Unit)
+                        awaitCancellation()
+                    }
+                    destination.writeBytes(byteArrayOf(8, 9))
+                },
+                scope,
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                index = index,
+            )
+            cache.statistics()
+            val key = FileCacheKey.original(scope, "file")
+            val owner = launch(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "file.bin") }
+            started.await()
+
+            val blockingKey = FileCacheKey.original(scope, "mutex-holder")
+            index.blockingGetStorageKey = blockingKey.storageKey
+            val holder = async(start = CoroutineStart.UNDISPATCHED) { cache.get(blockingKey) }
+            index.getBlocked.await()
+            owner.cancel()
+            index.releaseGet.complete(Unit)
+            holder.await()
+            owner.join()
+
+            val recovered = withTimeout(5_000) { cache.load(key, "file.bin") }
+            assertEquals(byteArrayOf(8, 9).toList(), recovered.readBytes().toList())
+            assertEquals(2, attempts.get())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun activeWaiterCompletesSingleLoadWhenOwnerIsCancelled() = runTest {
+        val root = Files.createTempDirectory("file-cache-waiter-owner-cancel-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val loader = RecordingLoader { _, destination ->
+                started.complete(Unit)
+                release.await()
+                destination.writeBytes(byteArrayOf(3, 4, 5))
+            }
+            val cache = cache(root, loader, scope, ioDispatcher = UnconfinedTestDispatcher(testScheduler))
+            val key = FileCacheKey.original(scope, "shared")
+            val owner = launch(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "shared.bin") }
+            started.await()
+            val waiter = async(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "shared.bin") }
+
+            owner.cancelAndJoin()
+            release.complete(Unit)
+
+            assertEquals(byteArrayOf(3, 4, 5).toList(), waiter.await().readBytes().toList())
+            assertEquals(1, loader.calls.get())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun activeWaiterTakesOverAFlightWhoseResultWasCancelled() = runTest {
+        val root = Files.createTempDirectory("file-cache-waiter-retry-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val loaderCalls = AtomicInteger()
+            val loader = RecordingLoader { _, destination ->
+                if (loaderCalls.incrementAndGet() == 1) {
+                    started.complete(Unit)
+                    release.await()
+                    throw CancellationException("loader owner stopped")
+                }
+                destination.writeBytes(byteArrayOf(6, 7))
+            }
+            val cache = cache(root, loader, scope, ioDispatcher = UnconfinedTestDispatcher(testScheduler))
+            val key = FileCacheKey.original(scope, "retry")
+            val owner = async(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "retry.bin") }
+            started.await()
+            val waiter = async(start = CoroutineStart.UNDISPATCHED) { cache.load(key, "retry.bin") }
+            release.complete(Unit)
+
+            val first = owner.await()
+            assertEquals(first, waiter.await())
+            assertEquals(2, loaderCalls.get())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun cancellingClearAllAlwaysReleasesTheClearGate() = runTest {
+        val root = Files.createTempDirectory("file-cache-clear-cancel-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination -> destination.writeBytes(byteArrayOf(1, 2)) },
+                scope,
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                index = index,
+            )
+            cache.load(FileCacheKey.original(scope, "before-clear"), "before.bin")
+            index.blockClear = true
+            val clearing = launch { cache.clearAll() }
+            index.clearBlocked.await()
+
+            clearing.cancel()
+            clearing.join()
+            index.blockClear = false
+
+            val after = withTimeout(5_000) {
+                cache.load(FileCacheKey.original(scope, "after-clear"), "after.bin")
+            }
+            assertTrue(after.isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun cancelledPinnedActionReleasesItsPinAndLateUnpinCannotReleaseANewPin() = runTest {
+        val root = Files.createTempDirectory("file-cache-pin-cancel-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val policy = TestPolicy(maxCacheBytes = 3L)
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination -> destination.writeBytes(ByteArray(3)) },
+                scope,
+                policy,
+            )
+            val key = FileCacheKey.original(scope, "pinned")
+            val file = cache.load(key, "pinned.bin")
+            val entered = CompletableDeferred<Unit>()
+            val showing = launch {
+                cache.withPinnedEntry(key) {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+            entered.await()
+            cache.load(FileCacheKey.original(scope, "newest"), "newest.bin")
+            showing.cancelAndJoin()
+            assertFalse(file.exists())
+
+            cache.clearAll()
+            cache.load(key, "pinned.bin")
+            val oldPin = requireNotNull(cache.pin(key))
+            cache.clearAll()
+            cache.load(key, "pinned.bin")
+            val newPin = requireNotNull(cache.pin(key))
+            cache.unpin(oldPin.pin)
+            val latest = cache.load(FileCacheKey.original(scope, "latest"), "latest.bin")
+            assertTrue(newPin.file.exists())
+            assertTrue(latest.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun firstKnownAccountRebindsUnknownEntriesWithoutCancellingLoads() = runTest {
+        val root = Files.createTempDirectory("file-cache-account-rebind-").toFile()
+        try {
+            var activeScope = CacheScope("server", CacheScope.UNKNOWN_ACCOUNT)
+            val unknownScope = activeScope
+            val legacy = File(root, "BarkCloudFiles/originals/legacy-vault.pdf").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(7, 8))
+            }
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val cache = cache(
+                root,
+                RecordingLoader { request, destination ->
+                    if (request.key.fileId == "in-flight") {
+                        started.complete(Unit)
+                        release.await()
+                    }
+                    destination.writeBytes(byteArrayOf(4, 5, 6))
+                },
+                policy = TestPolicy(),
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                index = index,
+            ) { activeScope }
+            cache.statistics()
+            val request = async { cache.load(FileCacheKey.original(unknownScope, "in-flight"), "photo.bin") }
+            started.await()
+
+            activeScope = CacheScope("server", "42")
+            cache.accountIdentityChanged("server", null, "42")
+            cache.rebindUnknownAccount("server", "42")
+            release.complete(Unit)
+            val loaded = withTimeout(5_000) { request.await() }
+
+            val legacyKey = FileCacheKey.original(activeScope, "legacy-vault")
+            val loadedKey = FileCacheKey.original(activeScope, "in-flight")
+            assertTrue(loaded.isFile)
+            assertEquals(legacy, cache.get(legacyKey))
+            assertNotNull(index.get(legacyKey.storageKey))
+            assertNotNull(index.get(loadedKey.storageKey))
+            assertTrue(index.entriesInScope(unknownScope).isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun changingFromOneKnownAccountToAnotherInvalidatesLoadsAsIOException() = runTest {
+        val root = Files.createTempDirectory("file-cache-account-change-").toFile()
+        try {
+            var activeScope = CacheScope("server", "41")
+            val started = CompletableDeferred<Unit>()
+            val cache = cache(
+                root,
+                RecordingLoader { _, _ ->
+                    started.complete(Unit)
+                    awaitCancellation()
+                },
+                policy = TestPolicy(),
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+            ) { activeScope }
+            val request = async { runCatching { cache.load(FileCacheKey.original(activeScope, "file"), "file.bin") } }
+            started.await()
+
+            activeScope = CacheScope("server", "42")
+            cache.accountIdentityChanged("server", "41", "42")
+
+            assertTrue(withTimeout(5_000) { request.await().exceptionOrNull() } is CacheInvalidatedException)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun accessTimestampWritesAreThrottledWhileLruEvictionStaysOrdered() = runTest {
+        val root = Files.createTempDirectory("file-cache-touch-throttle-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            var now = 1_000L
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination -> destination.writeBytes(ByteArray(3)) },
+                scope,
+                TestPolicy(maxCacheBytes = 5L),
+                nowMillis = { now },
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                index = index,
+            )
+            val oldKey = FileCacheKey.original(scope, "old")
+            val old = cache.load(oldKey, "old.bin")
+            val initialWrites = index.upsertCalls
+            now += 1_000
+            cache.get(oldKey)
+            assertEquals(initialWrites, index.upsertCalls)
+            now += 30_000
+            cache.get(oldKey)
+            assertEquals(initialWrites + 1, index.upsertCalls)
+            now += 1
+            val newest = cache.load(FileCacheKey.original(scope, "newest"), "newest.bin")
+
+            assertFalse(old.exists())
+            assertTrue(newest.exists())
+            assertEquals(3L, cache.totalSize())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun invalidatingOriginalDeletesItsIndexRowAndFile() = runTest {
+        val root = Files.createTempDirectory("file-cache-invalidate-original-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val cache = cache(root, RecordingLoader { _, destination -> destination.writeBytes(byteArrayOf(1, 2, 3)) }, scope)
+            val key = FileCacheKey.original(scope, "broken")
+            val file = cache.load(key, "broken.jpg")
+
+            cache.invalidateOriginal("broken")
+
+            assertFalse(file.exists())
+            assertNull(cache.get(key))
+            assertEquals(0, cache.entryCount())
         } finally {
             root.deleteRecursively()
         }
@@ -375,7 +725,8 @@ class FileCacheServiceTest {
         policy: TestPolicy = TestPolicy(),
         nowMillis: () -> Long = { 100L },
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    ) = cache(root, loader, policy, nowMillis, ioDispatcher) { initialScope }
+        index: FileCacheIndex? = null,
+    ) = cache(root, loader, policy, nowMillis, ioDispatcher, index) { initialScope }
 
     private fun cache(
         root: File,
@@ -383,10 +734,11 @@ class FileCacheServiceTest {
         policy: TestPolicy = TestPolicy(),
         nowMillis: () -> Long = { 100L },
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        index: FileCacheIndex? = null,
         scope: () -> CacheScope,
     ) = FileCacheService(
         baseDirectory = root,
-        index = DiskFileCacheIndex(File(root, "index.json")),
+        index = index ?: DiskFileCacheIndex(File(root, "index.json")),
         loader = loader,
         settings = policy,
         currentScope = scope,
@@ -416,15 +768,27 @@ class FileCacheServiceTest {
 
     private class DiskFileCacheIndex(private val file: File) : FileCacheIndex {
         private val mutex = Mutex()
+        var upsertCalls = 0
+        var blockingGetStorageKey: String? = null
+        val getBlocked = CompletableDeferred<Unit>()
+        val releaseGet = CompletableDeferred<Unit>()
+        var blockClear = false
+        val clearBlocked = CompletableDeferred<Unit>()
+        val releaseClear = CompletableDeferred<Unit>()
 
-        override suspend fun get(storageKey: String): FileCacheEntry? = mutex.withLock {
-            readEntries()[storageKey]
+        override suspend fun get(storageKey: String): FileCacheEntry? {
+            if (storageKey == blockingGetStorageKey) {
+                getBlocked.complete(Unit)
+                releaseGet.await()
+            }
+            return mutex.withLock { readEntries()[storageKey] }
         }
 
         override suspend fun all(): List<FileCacheEntry> = mutex.withLock { readEntries().values.toList() }
 
         override suspend fun upsert(entry: FileCacheEntry) {
             mutex.withLock {
+                upsertCalls++
                 val entries = readEntries().toMutableMap().apply { put(entry.key.storageKey, entry) }
                 writeEntries(entries)
             }
@@ -438,6 +802,10 @@ class FileCacheServiceTest {
         }
 
         override suspend fun clear() {
+            if (blockClear) {
+                clearBlocked.complete(Unit)
+                releaseClear.await()
+            }
             mutex.withLock { writeEntries(emptyMap()) }
         }
 
