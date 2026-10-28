@@ -16,6 +16,7 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 | `Shared/BarkCloud.Proto/session_revocation_api.proto` | `SessionRevocationApi` | [[Backend/SessionRevocation]] |
 | `Shared/BarkCloud.Proto/users_api.proto` | `UsersApi`, `UsersServerApi` | [[Backend/Users]] |
 | `Shared/BarkCloud.Proto/files_api.proto` | `FilesApi`, `CloudApi`, `FilesServerApi`, `AlbumApi`, `MusicApi`, `SearchApi`, `DynamicFolderApi` | [[Backend/Files]] |
+| `Shared/BarkCloud.Proto/directory_sizes_api.proto` | `DirectorySizeApi` (размеры подпапок из кеша) | [[Backend/FilesCloud]] |
 | `Shared/BarkCloud.Proto/torrent_api.proto` | `TorrentApi` | [[Backend/Torrent]] |
 | `Shared/BarkCloud.Proto/shared.proto` | Общие protobuf-сообщения, включая `PageRequest` | — |
 
