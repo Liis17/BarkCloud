@@ -138,10 +138,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.device_folder_sync), style = MaterialTheme.typography.titleMedium)
-                            Text(stringResource(R.string.device_folder_sync_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        Text(stringResource(R.string.device_folder_sync), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                         val label = stringResource(R.string.device_folder_sync)
                         Switch(
                             checked = syncEnabled(selectedKey!!),

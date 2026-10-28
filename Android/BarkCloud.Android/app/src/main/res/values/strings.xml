@@ -1,6 +1,5 @@
 <resources>
-    <string name="device_folder_sync">Синхронизация папки</string>
-    <string name="device_folder_sync_hint">Фото и видео добавляются в очередь. Выключение не отменяет уже созданные задания.</string>
+    <string name="device_folder_sync">Загружать в облако</string>
     <string name="device_folder_sync_enabled">Синхронизация включена</string>
     <string name="app_name">BarkCloud</string>
 
