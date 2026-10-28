@@ -128,6 +128,7 @@ public class FilesContext : DbContext
             b.Property(x => x.HideFromSearch).HasDefaultValue(false);
             b.Property(x => x.EffectiveHideFromGallery).HasDefaultValue(false);
             b.Property(x => x.EffectiveHideFromSearch).HasDefaultValue(false);
+            b.Property(x => x.SizeVersion).HasDefaultValue(0L);
             // Уникальность имени папки в рамках одного владельца и одного родителя
             b.HasIndex(x => new { x.OwnerId, x.ParentId, x.Name }).IsUnique();
             // NULL в ParentId не участвует в прежней уникальности — корень защищаем отдельно.
@@ -346,5 +347,115 @@ public class FilesContext : DbContext
             b.HasIndex(x => new { x.OwnerId, x.NormalizedValue });
             b.HasOne<UploadFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Cascade);
         });
+    }
+
+    /// <summary>
+    /// Синхронное сохранение не поддерживается: инвалидация кеша размеров асинхронная, и пропустить её молча нельзя.
+    /// </summary>
+    public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
+        throw new NotSupportedException("Используйте SaveChangesAsync: он инвалидирует кеш размеров папок.");
+
+    /// <summary>
+    /// Сохраняет изменения и в той же транзакции инвалидирует кеш размера затронутых папок и всех их предков.
+    /// Затрагивают размер: появление, удаление и перенос живых записей, перенос и удаление папок, изменение
+    /// размера файла. Переименование и видимость размер не меняют.
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var touched = await CollectTouchedDirectoryIdsAsync(cancellationToken);
+        if (touched.Count == 0)
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+
+        await using var transaction = Database.CurrentTransaction is null
+            ? await Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        // Цепочку предков берём до и после сохранения: после переноса или удаления папки старая цепочка
+        // уже не находится в БД, а новая — до сохранения.
+        var affected = await CollectWithAncestorsAsync(touched, cancellationToken);
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        affected.UnionWith(await CollectWithAncestorsAsync(touched, cancellationToken));
+
+        await CloudDirectories
+            .Where(x => affected.Contains(x.Id))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.SubtreeSizeBytes, (long?)null)
+                .SetProperty(x => x.SizeVersion, x => x.SizeVersion + 1), cancellationToken);
+
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    private async Task<HashSet<Guid>> CollectTouchedDirectoryIdsAsync(CancellationToken cancellationToken)
+    {
+        var touched = new HashSet<Guid>();
+
+        foreach (var entry in ChangeTracker.Entries<CloudFileEntry>())
+        {
+            var affectsSize = entry.State is EntityState.Added or EntityState.Deleted
+                || entry.Property(x => x.IsDeleted).IsModified
+                || entry.Property(x => x.DirectoryId).IsModified;
+            if (!affectsSize)
+                continue;
+
+            if (entry.State != EntityState.Added && !entry.OriginalValues.GetValue<bool>(nameof(CloudFileEntry.IsDeleted)))
+                AddDirectory(touched, entry.OriginalValues.GetValue<Guid>(nameof(CloudFileEntry.DirectoryId)));
+            if (entry.State != EntityState.Deleted && !entry.Entity.IsDeleted)
+                AddDirectory(touched, entry.Entity.DirectoryId);
+        }
+
+        foreach (var entry in ChangeTracker.Entries<CloudDirectory>())
+        {
+            if (entry.State == EntityState.Deleted)
+            {
+                AddDirectory(touched, entry.OriginalValues.GetValue<Guid?>(nameof(CloudDirectory.ParentId)));
+            }
+            else if (entry.State == EntityState.Modified && entry.Property(x => x.ParentId).IsModified)
+            {
+                AddDirectory(touched, entry.OriginalValues.GetValue<Guid?>(nameof(CloudDirectory.ParentId)));
+                AddDirectory(touched, entry.Entity.ParentId);
+            }
+        }
+
+        // Изменённый размер файла (например, конвертация HEIC→JPEG) влияет на все папки, где лежат живые записи файла.
+        var resizedFileIds = ChangeTracker.Entries<UploadFile>()
+            .Where(entry => entry.State == EntityState.Modified && entry.Property(x => x.Size).IsModified)
+            .Select(entry => entry.Entity.Id)
+            .ToList();
+        if (resizedFileIds.Count > 0)
+        {
+            var directoryIds = await CloudFileEntries
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted && resizedFileIds.Contains(x.FileId))
+                .Select(x => x.DirectoryId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            foreach (var directoryId in directoryIds)
+                AddDirectory(touched, directoryId);
+        }
+
+        return touched;
+    }
+
+    private async Task<HashSet<Guid>> CollectWithAncestorsAsync(IEnumerable<Guid> start, CancellationToken cancellationToken)
+    {
+        var result = new HashSet<Guid>(start);
+        var frontier = result.ToList();
+        while (frontier.Count > 0)
+        {
+            var parents = await CloudDirectories
+                .AsNoTracking()
+                .Where(x => frontier.Contains(x.Id) && x.ParentId != null)
+                .Select(x => x.ParentId!.Value)
+                .ToListAsync(cancellationToken);
+            frontier = parents.Where(result.Add).ToList();
+        }
+        return result;
+    }
+
+    private static void AddDirectory(HashSet<Guid> touched, Guid? directoryId)
+    {
+        if (directoryId is Guid id && id != CloudHierarchyStorage.RootDirectoryId)
+            touched.Add(id);
     }
 }

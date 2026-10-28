@@ -15,6 +15,11 @@ public interface ICloudHierarchyStorage
     Task<List<CloudDirectory>> GetSubtree(long ownerId, Guid rootDirectoryId, CancellationToken cancellationToken = default);
     Task<(long FileCount, long TotalSizeBytes)> GetLiveFileStatsInDirectories(
         long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Размеры поддеревьев папок: из кеша, устаревшие пересчитываются. Версии кеша в папках — прочитанные до вызова.
+    /// </summary>
+    Task<Dictionary<Guid, long>> GetSubtreeSizes(
+        long ownerId, IReadOnlyCollection<CloudDirectory> directories, CancellationToken cancellationToken = default);
     void RemoveDirectories(IEnumerable<CloudDirectory> directories);
     Task<CloudFileEntry?> GetFileEntry(Guid id, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveFileEntriesByIds(long ownerId, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default);
