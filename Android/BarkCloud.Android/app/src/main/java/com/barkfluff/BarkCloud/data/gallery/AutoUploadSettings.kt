@@ -19,6 +19,19 @@ class AutoUploadSettings(context: Context) {
 
     val enabled: Boolean get() = policy != AutoUploadNetworkPolicy.OFF
 
+    // null preserves the existing all-folders backup until the user chooses folders.
+    var folderKeys: Set<String>?
+        get() = prefs.getStringSet("folder_keys", null)?.toSet()
+        set(value) = prefs.edit().putStringSet("folder_keys", value?.toSet()).apply()
+
+    fun includesFolder(key: String): Boolean = folderKeys?.contains(key) ?: true
+
+    fun setFolderEnabled(key: String, enabled: Boolean, knownFolders: Set<String>) {
+        val selected = folderKeys ?: if (this.enabled) knownFolders else emptySet()
+        folderKeys = if (enabled) selected + key else selected - key
+        if (enabled && !this.enabled) policy = AutoUploadNetworkPolicy.WIFI_ONLY
+    }
+
     var lastUploadedCount: Int
         get() = prefs.getInt(KEY_LAST_UPLOADED, 0)
         set(value) = prefs.edit().putInt(KEY_LAST_UPLOADED, value).apply()
