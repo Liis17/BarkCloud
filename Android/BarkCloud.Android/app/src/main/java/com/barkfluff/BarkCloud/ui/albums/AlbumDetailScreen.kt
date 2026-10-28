@@ -158,9 +158,10 @@ fun AlbumDetailScreen(
 
     viewer?.let { asset ->
         CloudMediaViewer(
-            asset = asset,
+            assets = state.items,
+            initialIndex = state.items.indexOf(asset).coerceAtLeast(0),
             onDismiss = { viewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { } },
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
         )
     }
 
