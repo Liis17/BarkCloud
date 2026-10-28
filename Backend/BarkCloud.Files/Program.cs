@@ -194,6 +194,8 @@ public class Program
         app.MapGrpcService<FilesApiService>();
         app.MapGrpcService<FilesServerApiService>();
         app.MapGrpcService<CloudApiService>();
+        app.MapGrpcService<DirectorySizeApiService>();
+        app.MapGrpcService<DirectorySizeApiService>();
         app.MapGrpcService<AlbumApiService>();
         app.MapGrpcService<MusicApiService>();
         app.MapGrpcService<DynamicFolderApiService>();
