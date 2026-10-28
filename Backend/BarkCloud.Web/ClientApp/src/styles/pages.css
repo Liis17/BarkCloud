@@ -718,9 +718,9 @@ tr.selected .row-actions { opacity: 1; }
 /* ─────────── Файлы — раскладка с инспектором ─────────── */
 .files-shell { display: grid; grid-template-columns: 1fr 360px; gap: 16px; height: 100%; padding: 4px 16px 16px; }
 /* Колонка скроллится целиком: блоки смартпапок и файлов — отдельные карточки. */
-.files-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow-y: auto; }
+.files-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow-y: auto; border-radius: var(--r-xl); }
 .smart-block { flex-shrink: 0; background: var(--md-surface-container-low); border-radius: var(--r-xl); }
-.files-block { background: var(--md-surface-container-low); border-radius: var(--r-xl); }
+.files-block { flex-shrink: 0; background: var(--md-surface-container-low); border-radius: var(--r-xl); overflow: clip; }
 .files-inspector { background: var(--md-surface-container-low); border-radius: var(--r-xl); overflow-y: auto; padding: 24px; }
 .files-bar { position: sticky; top: 0; z-index: 2; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 16px 24px; background: var(--md-surface-container-low); border-radius: var(--r-xl) var(--r-xl) 0 0; }
 .files-list { flex: 1; }
