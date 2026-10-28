@@ -1612,6 +1612,11 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
 }
 .album-pick-row:hover { background: var(--md-surface-container-high); }
 .album-pick-row .cnt { color: var(--md-on-surface-variant); font-size: 12px; }
+/* Список папок в модалке перемещения: скруглены только верх первой и низ последней строки */
+.move-folder-list .album-pick-row { border-radius: 0; }
+.move-folder-list li:first-child .album-pick-row { border-radius: var(--r-md) var(--r-md) 0 0; }
+.move-folder-list li:last-child .album-pick-row { border-radius: 0 0 var(--r-md) var(--r-md); }
+.move-folder-list li:only-child .album-pick-row { border-radius: var(--r-md); }
 
 /* ───────── Воспоминания «В этот день» ───────── */
 .memories { margin: 4px 0 8px; }

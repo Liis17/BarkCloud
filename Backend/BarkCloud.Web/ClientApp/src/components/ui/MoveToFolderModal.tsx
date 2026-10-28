@@ -25,6 +25,30 @@ export function MoveToFolderModal({
 
   const here = stack.length ? stack[stack.length - 1].id : '';
 
+  // Каждое открытие и каждый шаг вглубь — отдельная запись истории; «назад» снимает её и шагает вверх по дереву,
+  // на корне закрывает модалку. Иначе «назад» уходит к предыдущему списку файлов под модалкой.
+  const depthRef = React.useRef(0);
+  depthRef.current = stack.length;
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+  const pendingRef = React.useRef<(() => void) | null>(null);
+  React.useEffect(() => {
+    window.history.pushState({ ...window.history.state, moveFolderLayer: true }, '');
+    const onPop = () => {
+      const pending = pendingRef.current;
+      if (pending) {
+        pendingRef.current = null;
+        pending();
+      } else if (depthRef.current > 0) {
+        setStack((s) => s.slice(0, -1));
+      } else {
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   React.useEffect(() => {
     let alive = true;
     setDirs(null);
@@ -36,19 +60,36 @@ export function MoveToFolderModal({
     };
   }, [here]);
 
-  const gotoIndex = (i: number) => setStack((s) => s.slice(0, i + 1));
+  // Снимаем свои слои истории и только потом выполняем действие (закрытие или перенос).
+  const leave = (after: () => void) => {
+    if (pendingRef.current) return;
+    pendingRef.current = after;
+    window.history.go(-(depthRef.current + 1));
+  };
+  const enter = (dir: { id: string; name: string }) => {
+    window.history.pushState({ ...window.history.state, moveFolderLayer: true }, '');
+    setStack((s) => [...s, dir]);
+  };
+  const gotoIndex = (i: number) => {
+    const steps = stack.length - (i + 1);
+    if (steps > 0) {
+      pendingRef.current = () => {};
+      window.history.go(-steps);
+    }
+    setStack((s) => s.slice(0, i + 1));
+  };
   const isCurrent = here === currentDir;
 
   return (
     <Modal
       title={`Переместить (${count})`}
-      onClose={onClose}
+      onClose={() => leave(onClose)}
       actions={
         <>
-          <button className="btn text" onClick={onClose}>
+          <button className="btn text" onClick={() => leave(onClose)}>
             Отмена
           </button>
-          <button className="btn primary" disabled={isCurrent} onClick={() => onPick(here)}>
+          <button className="btn primary" disabled={isCurrent} onClick={() => leave(() => onPick(here))}>
             {isCurrent ? 'Файлы уже здесь' : 'Переместить сюда'}
           </button>
         </>
@@ -77,13 +118,13 @@ export function MoveToFolderModal({
       ) : dirs.length === 0 ? (
         <p style={{ color: 'var(--md-on-surface-variant)', fontSize: 13, margin: '8px 2px' }}>Вложенных папок нет.</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 320, overflowY: 'auto' }}>
+        <ul className="move-folder-list" style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 320, overflowY: 'auto' }}>
           {dirs.map((d) => (
             <li key={d.id}>
               <button
                 className="album-pick-row"
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10 }}
-                onClick={() => setStack((s) => [...s, { id: d.id, name: d.name }])}
+                onClick={() => enter({ id: d.id, name: d.name })}
               >
                 <Icon.folder size={18} />
                 <span style={{ flex: 1, textAlign: 'left' }}>{d.name}</span>
