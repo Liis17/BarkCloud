@@ -187,6 +187,7 @@ fun GalleryScreen(
             .sortedByDescending { it.dateMillis }
     }
     val dateSections = remember(timeline) { mediaDateSections(timeline) { it.dateMillis } }
+    val cloudAssets = remember(timeline) { timeline.mapNotNull { (it as? PhotoTimelineItem.Cloud)?.asset } }
     val selectedDeviceMediaKeys = state.selected
         .filter { it.startsWith(DEVICE_SELECTION_PREFIX) }
         .map { it.removePrefix(DEVICE_SELECTION_PREFIX) }
@@ -612,9 +613,10 @@ fun GalleryScreen(
 
     cloudViewer?.let { asset ->
         CloudMediaViewer(
-            asset = asset,
+            assets = cloudAssets,
+            initialIndex = cloudAssets.indexOf(asset).coerceAtLeast(0),
             onDismiss = { cloudViewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { message ->
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { message ->
                 android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
             } },
         )
