@@ -417,21 +417,35 @@ public class FilesContext : DbContext
             }
         }
 
-        // Изменённый размер файла (например, конвертация HEIC→JPEG) влияет на все папки, где лежат живые записи файла.
-        var resizedFileIds = ChangeTracker.Entries<UploadFile>()
+        // Размер файла (например, конвертация HEIC→JPEG) влияет на все папки с его живыми записями.
+        // Update() помечает Size изменённым всегда, поэтому сравниваем с сохранённым значением.
+        var sizeCandidates = ChangeTracker.Entries<UploadFile>()
             .Where(entry => entry.State == EntityState.Modified && entry.Property(x => x.Size).IsModified)
-            .Select(entry => entry.Entity.Id)
+            .Select(entry => (entry.Entity.Id, entry.Entity.Size))
             .ToList();
-        if (resizedFileIds.Count > 0)
+        if (sizeCandidates.Count > 0)
         {
-            var directoryIds = await CloudFileEntries
+            var candidateIds = sizeCandidates.Select(x => x.Id).ToList();
+            var storedSizes = await UploadedFiles
                 .AsNoTracking()
-                .Where(x => !x.IsDeleted && resizedFileIds.Contains(x.FileId))
-                .Select(x => x.DirectoryId)
-                .Distinct()
-                .ToListAsync(cancellationToken);
-            foreach (var directoryId in directoryIds)
-                AddDirectory(touched, directoryId);
+                .Where(x => candidateIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.Size })
+                .ToDictionaryAsync(x => x.Id, x => x.Size, cancellationToken);
+            var resizedFileIds = sizeCandidates
+                .Where(x => !storedSizes.TryGetValue(x.Id, out var stored) || stored != x.Size)
+                .Select(x => x.Id)
+                .ToList();
+            if (resizedFileIds.Count > 0)
+            {
+                var directoryIds = await CloudFileEntries
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted && resizedFileIds.Contains(x.FileId))
+                    .Select(x => x.DirectoryId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+                foreach (var directoryId in directoryIds)
+                    AddDirectory(touched, directoryId);
+            }
         }
 
         return touched;
