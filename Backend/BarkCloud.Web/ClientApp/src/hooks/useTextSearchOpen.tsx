@@ -4,7 +4,9 @@ import { openSearchHit, type SearchHit } from '../lib/search';
 import { textContentUrl } from '../lib/textFiles';
 import { apiPost, downloadFile } from '../lib/api';
 
-export function useTextSearchOpen() {
+/** Открытие результата поиска: текст/SVG — в общий вьювер, фото/видео/трек — в openMedia (например, Lightbox
+ *  и мини-плеер поверх поиска), остальное — переходы на вкладки. */
+export function useTextSearchOpen(openMedia?: (hit: SearchHit) => boolean) {
   const navigate = useNavigate();
   const { openTextFile, textViewer } = useTextFileViewer();
   function openSearchResult(hit: SearchHit) {
@@ -16,7 +18,7 @@ export function useTextSearchOpen() {
         if (!result.downloadUrl) throw new Error('Ссылка недоступна');
         window.location.href = result.downloadUrl;
       },
-    }));
+    }), openMedia);
   }
   return { openSearchResult, textViewer };
 }

@@ -1,5 +1,5 @@
 import type { NavigateFunction } from 'react-router-dom';
-import type { CardFile, FilePlaceholder, MediaItem, MediaKind } from './types';
+import type { CardFile, FilePlaceholder, MediaItem, MediaKind, MusicTrack } from './types';
 
 export type SearchSectionKey = 'photos' | 'videos' | 'files' | 'tracks' | 'albums' | 'playlists' | 'folders' | 'shared' | 'trash' | 'torrents';
 export type SearchHitKind = 'photo' | 'video' | 'file' | 'track' | 'album' | 'playlist' | 'folder' | 'dynamicFolder' | 'sharedFile' | 'sharedFolder' | 'sharedPlaylist' | 'trash' | 'torrent';
@@ -12,6 +12,8 @@ export interface SearchHit {
   title: string;
   subtitle: string;
   previewUrl: string;
+  /** Полноразмерный JPEG-вид для просмотра (HEIC и пр.); пусто — оригинал/превью. */
+  jpegViewUrl?: string;
   placeholder?: FilePlaceholder | null;
   mediaKind: string;
   favorite: boolean;
@@ -64,8 +66,9 @@ export function searchHitIconName(hit: SearchHit): string {
   }
 }
 
-export function openSearchHit(hit: SearchHit, navigate: NavigateFunction, openText?: (hit: SearchHit) => boolean): void {
+export function openSearchHit(hit: SearchHit, navigate: NavigateFunction, openText?: (hit: SearchHit) => boolean, openMedia?: (hit: SearchHit) => boolean): void {
   if ((hit.kind === 'file' || hit.kind === 'sharedFile' || hit.kind === 'photo') && openText?.(hit)) return;
+  if ((hit.kind === 'photo' || hit.kind === 'video' || hit.kind === 'track') && openMedia?.(hit)) return;
   switch (hit.kind) {
     case 'photo': navigate(`/photos?open=${encodeURIComponent(hit.fileId)}`); break;
     case 'video': navigate(`/videos?open=${encodeURIComponent(hit.fileId)}`); break;
@@ -95,9 +98,27 @@ export function searchHitToCardFile(hit: SearchHit): CardFile {
     width: 0,
     height: 0,
     previews: hit.previewUrl ? [{ w: 512, target: 512, url: hit.previewUrl }] : [],
+    jpegViewUrl: hit.jpegViewUrl || undefined,
     placeholder: hit.placeholder,
     createdAt: hit.createdAt,
     uploadedAt: hit.createdAt,
+  };
+}
+
+/** Трек для мини-плеера из хита поиска: плеер стримит по file.id, запрос метаданных не нужен.
+ *  Подпись хита — «Исполнитель · Альбом»; надёжно разобрать её можно только при обеих частях. */
+export function searchHitToTrack(hit: SearchHit): MusicTrack {
+  const parts = hit.subtitle.split(' · ');
+  const [artist, album] = parts.length === 2 ? parts : ['', ''];
+  return {
+    file: searchHitToCardFile(hit),
+    title: hit.title,
+    artist,
+    album,
+    duration: 0,
+    coverUrl: hit.previewUrl,
+    largeCoverUrl: hit.previewUrl,
+    url: '',
   };
 }
 

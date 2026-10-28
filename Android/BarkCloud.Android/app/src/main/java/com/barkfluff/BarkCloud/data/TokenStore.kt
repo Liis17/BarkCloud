@@ -33,6 +33,7 @@ class TokenStore(context: Context) {
                 accessTokenExpiresAt = it.optLong("accessTokenExpiresAt"),
                 refreshToken = it.optString("refreshToken"),
                 refreshTokenExpiresAt = it.optLong("refreshTokenExpiresAt"),
+                userId = it.optString("userId"),
             )
         }
     }.getOrElse {
@@ -47,6 +48,7 @@ class TokenStore(context: Context) {
             .put("accessTokenExpiresAt", bundle.accessTokenExpiresAt)
             .put("refreshToken", bundle.refreshToken)
             .put("refreshTokenExpiresAt", bundle.refreshTokenExpiresAt)
+            .put("userId", bundle.userId)
             .toString()
             .encodeToByteArray()
         val encrypted = encryption.doFinal(plain)
@@ -138,4 +140,5 @@ data class TokenBundle(
     val accessTokenExpiresAt: Long,
     val refreshToken: String,
     val refreshTokenExpiresAt: Long,
+    val userId: String = "",
 )

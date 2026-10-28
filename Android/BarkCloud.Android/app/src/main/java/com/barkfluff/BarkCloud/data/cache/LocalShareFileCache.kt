@@ -14,6 +14,7 @@ internal object LocalShareFileCache {
         cacheDir: File,
         source: File,
         nowMillis: Long = System.currentTimeMillis(),
+        displayName: String = source.name,
         copyFile: (File, File) -> Unit = { input, output -> input.copyTo(output, overwrite = true) },
     ): File {
         if (!source.isFile) throw IOException("Share source is no longer available")
@@ -25,12 +26,15 @@ internal object LocalShareFileCache {
 
         val sourceLength = source.length()
         val sourceLastModified = source.lastModified()
-        val key = fingerprint("${source.canonicalPath}\u0000$sourceLastModified\u0000$sourceLength")
+        val targetName = displayName.replace('\\', '/').substringAfterLast('/')
+            .takeIf { it.isNotBlank() && it != "." && it != ".." }
+            ?: source.name
+        val key = fingerprint("${source.canonicalPath}\u0000$sourceLastModified\u0000$sourceLength\u0000$targetName")
         val entry = File(directory, "share-$key")
         if (!entry.isDirectory && !entry.mkdirs() && !entry.isDirectory) {
             throw IOException("Could not create share cache entry")
         }
-        val target = File(entry, source.name)
+        val target = File(entry, targetName)
         if (target.isFile && target.length() == sourceLength) {
             entry.setLastModified(nowMillis)
             target.setLastModified(nowMillis)

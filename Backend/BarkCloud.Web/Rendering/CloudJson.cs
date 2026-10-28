@@ -80,13 +80,17 @@ public static class CloudJson
         return card;
     }
 
-    public static object Dir(DirectoryInfo d) => new
+    /// <summary>
+    /// sizeLabel — размер поддерева; null, если размер не запрашивали (например, при создании папки).
+    /// </summary>
+    public static object Dir(DirectoryInfo d, long? sizeBytes = null) => new
     {
         id = d.Id,
         parentId = d.ParentId,
         name = d.Name,
         createdAt = Iso(d.CreatedAt),
-        updatedAt = Iso(d.UpdatedAt)
+        updatedAt = Iso(d.UpdatedAt),
+        sizeLabel = sizeBytes is { } bytes ? Format.Size(bytes) : null
     };
 
     public static object DirProperties(DirectoryProperties p) => new

@@ -139,14 +139,51 @@ class FileTransferService(
     /** Скачать оригинал во временный файл (для предпросмотра / шеринга). */
     suspend fun download(urlString: String, suggestedName: String): File =
         withContext(Dispatchers.IO) {
-            http.newCall(Request.Builder().url(urlString).get().build()).execute().use { resp ->
-                if (!resp.isSuccessful) throw IOException("Download failed: HTTP ${resp.code}")
-                val name = suggestedName.ifEmpty { UUID.randomUUID().toString() }
-                val dest = File(appContext.cacheDir, name)
-                if (dest.exists()) dest.delete()
-                val source = resp.body ?: throw IOException("Download: empty body")
-                source.byteStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
-                dest
+            suspendCancellableCoroutine { continuation ->
+                val call = http.newCall(Request.Builder().url(urlString).get().build())
+                val destinationLock = Any()
+                var completedDestination: File? = null
+                var cancelled = false
+                continuation.invokeOnCancellation {
+                    call.cancel()
+                    synchronized(destinationLock) {
+                        cancelled = true
+                        completedDestination?.delete()
+                    }
+                }
+                call.enqueue(object : Callback {
+                    override fun onFailure(call: Call, error: IOException) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        var destination: File? = null
+                        try {
+                            response.use { resp ->
+                                if (!continuation.isActive) return
+                                if (!resp.isSuccessful) throw IOException("Download failed: HTTP ${resp.code}")
+                                val name = suggestedName.ifEmpty { UUID.randomUUID().toString() }
+                                destination = File(appContext.cacheDir, name).apply { delete() }
+                                val source = resp.body ?: throw IOException("Download: empty body")
+                                source.byteStream().use { input ->
+                                    destination!!.outputStream().use { input.copyTo(it) }
+                                }
+                            }
+                            val completed = requireNotNull(destination)
+                            synchronized(destinationLock) {
+                                if (cancelled || !continuation.isActive) {
+                                    completed.delete()
+                                } else {
+                                    completedDestination = completed
+                                    continuation.resume(completed)
+                                }
+                            }
+                        } catch (error: Throwable) {
+                            destination?.delete()
+                            if (continuation.isActive) continuation.resumeWithException(error)
+                        }
+                    }
+                })
             }
         }
 

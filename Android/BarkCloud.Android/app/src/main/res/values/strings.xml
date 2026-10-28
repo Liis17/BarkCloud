@@ -153,6 +153,7 @@
     <string name="gallery_upload_selected">Загрузить (%1$d)</string>
     <string name="gallery_selection_mode">Режим выбора</string>
     <string name="viewer_play_video">Воспроизвести видео</string>
+    <string name="viewer_retry_original">Повторить</string>
     <string name="gallery_auto_upload">Автозагрузка</string>
     <string name="gallery_free_device_space">Освободить место на устройстве (%1$d)</string>
     <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
@@ -237,9 +238,16 @@
     <string name="settings_account_processing">Выполняется…</string>
 
     <!-- Cache -->
-    <string name="cache_title">Кеш</string>
-    <string name="cache_size">Размер кеша</string>
+    <string name="cache_title">Хранилище и кеш</string>
+    <string name="cache_size">Общий размер</string>
     <string name="cache_size_summary">%1$s из %2$s · записей: %3$d</string>
+    <string name="cache_over_limit">Размер кеша превышает заданный лимит</string>
+    <string name="cache_contents">Состав кеша</string>
+    <string name="cache_preview">Превью</string>
+    <string name="cache_original">Оригиналы</string>
+    <string name="cache_legacy_preview">Старые превью Coil</string>
+    <string name="cache_category_summary">%1$s · записей: %2$d</string>
+    <string name="cache_size_only_summary">%1$s</string>
     <string name="cache_limit">Лимит кеша</string>
     <string name="cache_auto_clean">Автоочистка</string>
     <string name="cache_auto_clean_1d">1 день</string>

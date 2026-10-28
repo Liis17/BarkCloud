@@ -2,18 +2,18 @@ package com.barkfluff.BarkCloud.data.cache
 
 import android.content.Context
 
-class FileCacheSettings(context: Context) {
+class FileCacheSettings(context: Context) : FileCachePolicy {
     private val prefs = context.getSharedPreferences("barkcloud_cache", Context.MODE_PRIVATE)
 
-    var maxCacheBytes: Long
+    override var maxCacheBytes: Long
         get() = prefs.getLong(KEY_MAX_BYTES, DEFAULT_MAX_BYTES)
         set(value) = prefs.edit().putLong(KEY_MAX_BYTES, value).apply()
 
-    var staleMaxAgeMillis: Long
+    override var staleMaxAgeMillis: Long
         get() = prefs.getLong(KEY_STALE_AGE, DEFAULT_STALE_AGE_MILLIS)
         set(value) = prefs.edit().putLong(KEY_STALE_AGE, value).apply()
 
-    var lastSweepAtMillis: Long
+    override var lastSweepAtMillis: Long
         get() = prefs.getLong(KEY_LAST_SWEEP, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_SWEEP, value).apply()
 

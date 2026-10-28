@@ -89,6 +89,19 @@ public class CloudJsonTests
     }
 
     [Fact]
+    public void Dir_WithSize_AddsFormattedSizeLabel()
+    {
+        var directory = new DirectoryInfo { Id = "dir-1", Name = "Фильмы", CreatedAt = Timestamp.FromDateTime(DateTime.UtcNow), UpdatedAt = Timestamp.FromDateTime(DateTime.UtcNow) };
+
+        using var withSize = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(CloudJson.Dir(directory, 2048)));
+        using var withoutSize = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(CloudJson.Dir(directory)));
+
+        withSize.RootElement.GetProperty("sizeLabel").GetString().Should().Be("2 КБ");
+        withoutSize.RootElement.GetProperty("sizeLabel").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
+
+    [Fact]
     public void DirProperties_MapsDirectoryCountsAndVisibilityFields()
     {
         var createdAt = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);

@@ -119,7 +119,7 @@ private fun OutgoingFileGroupCard(
             leadingContent = {
                 if (group.file.previews.isNotEmpty()) {
                     MediaThumb(
-                        model = group.file.previewUrl(128),
+                        model = group.file.previewModel(128),
                         isVideo = group.file.isVideo,
                         contentDescription = group.file.fileName,
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),

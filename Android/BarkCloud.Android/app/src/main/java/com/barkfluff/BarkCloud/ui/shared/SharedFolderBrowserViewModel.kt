@@ -5,10 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.cloud.PublicDir
 import com.barkfluff.BarkCloud.data.cloud.PublicFile
 import com.barkfluff.BarkCloud.data.cloud.SharedRepository
-import com.barkfluff.BarkCloud.net.FileTransferService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +34,7 @@ data class SharedFolderUiState(
  */
 class SharedFolderBrowserViewModel(
     private val repo: SharedRepository,
-    private val transfer: FileTransferService,
+    private val fileCache: FileCacheService,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SharedFolderUiState())
@@ -73,11 +73,11 @@ class SharedFolderBrowserViewModel(
         }
     }
 
-    fun download(file: PublicFile, onDownloaded: (File) -> Unit) {
+    fun download(file: PublicFile, onDownloaded: suspend (File) -> Unit) {
         _state.update { it.copy(downloadingFileId = file.id) }
         viewModelScope.launch {
             try {
-                val downloaded = transfer.download(file.downloadUrl, file.name)
+                val downloaded = fileCache.loadSharedOriginal(file.id, file.name, file.downloadUrl)
                 _state.update { it.copy(downloadingFileId = null) }
                 onDownloaded(downloaded)
             } catch (e: Exception) {
@@ -94,7 +94,7 @@ class SharedFolderBrowserViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return SharedFolderBrowserViewModel(app.sharedRepository, app.fileTransfer) as T
+                return SharedFolderBrowserViewModel(app.sharedRepository, app.fileCache) as T
             }
         }
     }
