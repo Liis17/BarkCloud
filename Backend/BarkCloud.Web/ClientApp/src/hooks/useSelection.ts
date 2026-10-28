@@ -18,9 +18,9 @@ export function useSelection() {
 
   /** Выделить диапазон от якоря до id (включительно), добавляя к текущему выбору. */
   const selectRange = React.useCallback((orderedIds: string[], id: string) => {
+    const anchor = anchorRef.current;
     setIds((prev) => {
       const next = new Set(prev);
-      const anchor = anchorRef.current;
       const b = orderedIds.indexOf(id);
       const a = anchor ? orderedIds.indexOf(anchor) : -1;
       if (a === -1 || b === -1) {
