@@ -634,19 +634,14 @@ class FileCacheService(
         if (total <= max) return
         val candidates = index.evictionCandidates()
         val survivor = candidates.lastOrNull()?.key?.storageKey ?: return
-        val victims = mutableListOf<FileCacheEntry>()
         for (entry in candidates) {
             if (total <= max) break
             val id = entry.key.storageKey
             if (id == survivor || !pins[id].isNullOrEmpty() || flights.containsKey(id)) continue
-            victims += entry
-            total -= entry.sizeBytes
-        }
-        for (entry in victims) {
-            val id = entry.key.storageKey
             val file = resolveFile(entry)
             if (file != null && file.exists() && !file.delete()) continue
             index.delete(id)
+            total -= entry.sizeBytes
         }
     }
 

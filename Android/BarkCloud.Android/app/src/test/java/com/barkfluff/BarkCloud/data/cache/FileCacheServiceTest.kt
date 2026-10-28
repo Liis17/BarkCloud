@@ -829,6 +829,40 @@ class FileCacheServiceTest {
     }
 
     @Test
+    fun evictionContinuesAfterVictimDeletionFails() = runTest {
+        val root = Files.createTempDirectory("file-cache-delete-failure-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val policy = TestPolicy(maxCacheBytes = 100L)
+            val cache = cache(
+                root,
+                RecordingLoader { _, destination -> destination.writeBytes(ByteArray(2)) },
+                scope,
+                policy,
+                ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+            )
+            val oldest = cache.load(FileCacheKey.original(scope, "oldest"), "oldest.bin")
+            val next = cache.load(FileCacheKey.original(scope, "next"), "next.bin")
+            val newest = cache.load(FileCacheKey.original(scope, "newest"), "newest.bin")
+            assertTrue(oldest.delete())
+            assertTrue(oldest.mkdir())
+            File(oldest, "keep-delete-from-succeeding").writeBytes(byteArrayOf(1))
+            assertFalse(oldest.delete())
+            policy.maxCacheBytes = 4L
+
+            cache.enforceSizeLimit()
+
+            assertTrue(oldest.isDirectory)
+            assertFalse(next.exists())
+            assertTrue(newest.exists())
+            assertEquals(4L, cache.totalSize())
+            assertEquals(2, cache.entryCount())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun invalidatingOriginalDeletesItsIndexRowAndFile() = runTest {
         val root = Files.createTempDirectory("file-cache-invalidate-original-").toFile()
         try {
