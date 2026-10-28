@@ -117,43 +117,70 @@ public sealed class CloudDirectorySizeCacheTests
     }
 
     [Fact]
-    public async Task DeletingDirectory_InvalidatesParentChain()
+    public async Task DeletingEmptyDirectory_InvalidatesParentAndAncestors()
     {
         using var database = new SqliteFilesContext();
-        var root = Directory("root");
-        var child = Directory("child", root.Id);
-        var (file, blob) = Entry(child.Id, "a.txt", 10);
-        await AddAsync(database, new[] { root, child }, new[] { file }, new[] { blob });
+        var grandparent = Directory("grandparent");
+        var parent = Directory("parent", grandparent.Id);
+        var empty = Directory("empty", parent.Id);
+        await AddAsync(database, new[] { grandparent, parent, empty }, Array.Empty<CloudFileEntry>(), Array.Empty<UploadFile>());
         var storage = new CloudHierarchyStorage(database.Context);
-        await storage.GetSubtreeSizes(OwnerId, new[] { await ReadDirectory(database, root.Id) });
+        await storage.GetSubtreeSizes(OwnerId, new[] { await ReadDirectory(database, grandparent.Id), await ReadDirectory(database, parent.Id) });
+        (await ReadDirectory(database, parent.Id)).SubtreeSizeBytes.Should().Be(0);
 
-        var trackedFile = await database.Context.CloudFileEntries.SingleAsync(x => x.Id == file.Id);
-        trackedFile.IsDeleted = true;
-        var trackedChild = await database.Context.CloudDirectories.SingleAsync(x => x.Id == child.Id);
-        database.Context.CloudDirectories.Remove(trackedChild);
+        var tracked = await database.Context.CloudDirectories.SingleAsync(x => x.Id == empty.Id);
+        database.Context.CloudDirectories.Remove(tracked);
         await database.Context.SaveChangesAsync();
 
-        (await ReadDirectory(database, root.Id)).SubtreeSizeBytes.Should().BeNull();
+        (await ReadDirectory(database, parent.Id)).SubtreeSizeBytes.Should().BeNull();
+        (await ReadDirectory(database, grandparent.Id)).SubtreeSizeBytes.Should().BeNull();
     }
 
     [Fact]
-    public async Task MovingDirectory_InvalidatesOldAndNewParents()
+    public async Task MovingDirectory_InvalidatesOldAndNewParentsIncludingAncestors()
     {
         using var database = new SqliteFilesContext();
-        var oldParent = Directory("old");
+        var grandparent = Directory("grandparent");
+        var oldParent = Directory("old", grandparent.Id);
         var newParent = Directory("new");
         var moved = Directory("moved", oldParent.Id);
         var (file, blob) = Entry(moved.Id, "a.txt", 10);
-        await AddAsync(database, new[] { oldParent, newParent, moved }, new[] { file }, new[] { blob });
+        await AddAsync(database, new[] { grandparent, oldParent, newParent, moved }, new[] { file }, new[] { blob });
         var storage = new CloudHierarchyStorage(database.Context);
-        await storage.GetSubtreeSizes(OwnerId, new[] { await ReadDirectory(database, oldParent.Id), await ReadDirectory(database, newParent.Id) });
+        await storage.GetSubtreeSizes(OwnerId, new[]
+        {
+            await ReadDirectory(database, grandparent.Id), await ReadDirectory(database, oldParent.Id), await ReadDirectory(database, newParent.Id)
+        });
 
         var tracked = await database.Context.CloudDirectories.SingleAsync(x => x.Id == moved.Id);
         tracked.ParentId = newParent.Id;
         await database.Context.SaveChangesAsync();
 
+        (await ReadDirectory(database, grandparent.Id)).SubtreeSizeBytes.Should().BeNull();
         (await ReadDirectory(database, oldParent.Id)).SubtreeSizeBytes.Should().BeNull();
         (await ReadDirectory(database, newParent.Id)).SubtreeSizeBytes.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResavingUnchangedFile_DoesNotInvalidate()
+    {
+        using var database = new SqliteFilesContext();
+        var root = Directory("root");
+        var (file, blob) = Entry(root.Id, "a.txt", 10);
+        await AddAsync(database, new[] { root }, new[] { file }, new[] { blob });
+        var storage = new CloudHierarchyStorage(database.Context);
+        await storage.GetSubtreeSizes(OwnerId, new[] { await ReadDirectory(database, root.Id) });
+        var before = await ReadDirectory(database, root.Id);
+
+        // Как LegacyPreviewBackfillService: объект без отслеживания, сохраняется через Update().
+        database.Context.ChangeTracker.Clear();
+        var detached = await database.Context.UploadedFiles.AsNoTracking().SingleAsync(x => x.Id == blob.Id);
+        database.Context.UploadedFiles.Update(detached);
+        await database.Context.SaveChangesAsync();
+
+        var after = await ReadDirectory(database, root.Id);
+        after.SubtreeSizeBytes.Should().Be(before.SubtreeSizeBytes);
+        after.SizeVersion.Should().Be(before.SizeVersion);
     }
 
     [Fact]
