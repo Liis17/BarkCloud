@@ -32,11 +32,11 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
 
         var result = await Find(SearchSection.Photos, Query);
 
+        // c.Typo is rank 1 and is omitted because this section has strict matches.
         result.Hits.Select(x => x.Id).Should().Equal(Ids(
             c.TagExact.EntryId, c.Exact.EntryId,
             c.PrefixNew.EntryId, c.NoEntry.FileId, c.PrefixOld.EntryId,
-            c.AliasSub.EntryId, c.Sub.EntryId,
-            c.Typo.EntryId));
+            c.AliasSub.EntryId, c.Sub.EntryId));
         result.HasMore.Should().BeFalse();
         result.NextCursor.Should().BeEmpty();
         var byId = result.Hits.ToDictionary(x => x.Id);
@@ -44,7 +44,7 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
         byId[c.TagExact.EntryId.ToString()].MatchValue.Should().Be("report");
         byId[c.AliasSub.EntryId.ToString()].MatchField.Should().Be("alias");
         byId[c.Exact.EntryId.ToString()].MatchField.Should().Be("name");
-        byId[c.Typo.EntryId.ToString()].MatchField.Should().Be("name");
+        byId.Keys.Should().NotContain(c.Typo.EntryId.ToString());
     }
 
     [PostgresFact]
@@ -301,11 +301,12 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
         first.Hits.Should().HaveCount(3);
         first.HasMore.Should().BeTrue();
         first.NextCursor.Should().NotBeEmpty();
-        rest.Hits.Should().HaveCount(5);
+        rest.Hits.Should().HaveCount(4, "rank-1 typo is suppressed while strict matches exist");
         rest.HasMore.Should().BeFalse();
         rest.NextCursor.Should().BeEmpty();
-        var exactlyAll = await Find(service, SearchSection.Photos, Query, limit: 8);
+        var exactlyAll = await Find(service, SearchSection.Photos, Query, limit: 7);
         exactlyAll.HasMore.Should().BeFalse("ровно limit результатов — следующей страницы нет");
+        exactlyAll.NextCursor.Should().BeEmpty();
     }
 
     [PostgresFact]
