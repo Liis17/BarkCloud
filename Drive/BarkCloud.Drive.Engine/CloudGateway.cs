@@ -50,6 +50,13 @@ internal sealed partial class CloudGateway : IDisposable
         DirectoryListingDetailed Listing,
         DirectoryListingIndex Index);
 
+    private sealed record FileMoveListingSnapshot(
+        CachedDirectoryListing? Source,
+        CachedDirectoryListing? Destination,
+        int SourceGeneration,
+        int DestinationGeneration,
+        long AccountEpoch);
+
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
@@ -116,6 +123,7 @@ internal sealed partial class CloudGateway : IDisposable
     public Action<string>? SyncError { get; set; }
 
     internal Action? ListingLoadWaiterJoinedForTesting { get; set; }
+    internal Action<long, long>? ListingMoveSnapshotCopiedForTesting { get; set; }
     internal Action<string>? CacheEntryBeforeOpenForTesting { get; set; }
     internal Action<string>? CacheFileOpenedForTesting { get; set; }
     internal Action<string>? CacheFileBeforeDeleteForTesting { get; set; }
@@ -544,10 +552,7 @@ internal sealed partial class CloudGateway : IDisposable
     public void InvalidateListing(string dirId)
     {
         lock (_listLock)
-        {
-            _listCache.TryRemove(dirId, out _);
-            _listGen.AddOrUpdate(dirId, 1, (_, g) => g + 1); // бампаем поколение — текущие in-flight листинги этой папки не закэшируются
-        }
+            InvalidateListingLocked(dirId); // бампаем поколение — текущие in-flight листинги этой папки не закэшируются
     }
 
     public ResolvedNode? Resolve(string path)
@@ -1445,6 +1450,209 @@ internal sealed partial class CloudGateway : IDisposable
 
     public void MoveFileEntry(string entryId, string newDirectoryId)
         => _cloud.MoveFileEntry(new MoveFileEntryRequest { EntryId = entryId, NewDirectoryId = newDirectoryId });
+
+    public void MoveFileEntryAndUpdateListings(string entryId, string sourceDirectoryId,
+        string destinationDirectoryId)
+    {
+        var snapshot = CaptureFileMoveListingSnapshot(sourceDirectoryId, destinationDirectoryId);
+        _cloud.MoveFileEntry(new MoveFileEntryRequest
+        {
+            EntryId = entryId,
+            NewDirectoryId = destinationDirectoryId,
+        });
+
+        if (snapshot.Source is null || snapshot.Destination is null)
+        {
+            InvalidateListingPair(sourceDirectoryId, destinationDirectoryId);
+            return;
+        }
+
+        var sourceFile = snapshot.Source.Listing.Files.FirstOrDefault(file =>
+            string.Equals(file.Entry.Id, entryId, StringComparison.Ordinal));
+        if (sourceFile is null
+            || snapshot.Destination.Index.FilesByName.ContainsKey(sourceFile.Entry.Name))
+        {
+            InvalidateListingPair(sourceDirectoryId, destinationDirectoryId);
+            return;
+        }
+
+        var measureCopy = ListingMoveSnapshotCopiedForTesting;
+        var allocatedBefore = measureCopy is null ? 0 : GC.GetAllocatedBytesForCurrentThread();
+        var startedAt = measureCopy is null ? 0 : Stopwatch.GetTimestamp();
+        var movedFile = sourceFile.Clone();
+        movedFile.Entry.DirectoryId = destinationDirectoryId;
+        var sourceListing = CopyDirectoryListingWithoutFile(snapshot.Source.Listing, entryId);
+        var destinationListing = CopyDirectoryListingWithFile(snapshot.Destination.Listing, movedFile);
+        var sourceIndex = CopyDirectoryListingIndex(snapshot.Source.Index);
+        var destinationIndex = CopyDirectoryListingIndex(snapshot.Destination.Index);
+        RemoveFileFromIndex(sourceIndex, sourceListing, sourceFile);
+        AddFileToIndex(destinationIndex, movedFile);
+        measureCopy?.Invoke(Stopwatch.GetTimestamp() - startedAt,
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
+
+        // Публикация и проверка снимков используют тот же порядок блокировок, что и смена аккаунта.
+        lock (_cacheEpochLock)
+        lock (_listLock)
+        {
+            if (IsCurrentFileMoveListingLocked(sourceDirectoryId, snapshot.SourceGeneration,
+                    snapshot.AccountEpoch, snapshot.Source)
+                && IsCurrentFileMoveListingLocked(destinationDirectoryId, snapshot.DestinationGeneration,
+                    snapshot.AccountEpoch, snapshot.Destination))
+            {
+                var sourceGeneration = BumpListingGenerationLocked(sourceDirectoryId);
+                var destinationGeneration = BumpListingGenerationLocked(destinationDirectoryId);
+                _listCache[sourceDirectoryId] = snapshot.Source with
+                {
+                    Generation = sourceGeneration,
+                    Listing = sourceListing,
+                    Index = sourceIndex,
+                };
+                _listCache[destinationDirectoryId] = snapshot.Destination with
+                {
+                    Generation = destinationGeneration,
+                    Listing = destinationListing,
+                    Index = destinationIndex,
+                };
+            }
+            else
+            {
+                InvalidateListingLocked(sourceDirectoryId);
+                InvalidateListingLocked(destinationDirectoryId);
+            }
+        }
+    }
+
+    private FileMoveListingSnapshot CaptureFileMoveListingSnapshot(
+        string sourceDirectoryId, string destinationDirectoryId)
+    {
+        lock (_cacheEpochLock)
+        lock (_listLock)
+        {
+            _listGen.TryGetValue(sourceDirectoryId, out var sourceGeneration);
+            _listGen.TryGetValue(destinationDirectoryId, out var destinationGeneration);
+            var accountEpoch = Volatile.Read(ref _accountEpoch);
+            _listCache.TryGetValue(sourceDirectoryId, out var source);
+            _listCache.TryGetValue(destinationDirectoryId, out var destination);
+
+            if (source is not null
+                && (source.Generation != sourceGeneration || source.AccountEpoch != accountEpoch))
+                source = null;
+            if (destination is not null
+                && (destination.Generation != destinationGeneration || destination.AccountEpoch != accountEpoch))
+                destination = null;
+
+            return new FileMoveListingSnapshot(source, destination, sourceGeneration,
+                destinationGeneration, accountEpoch);
+        }
+    }
+
+    private bool IsCurrentFileMoveListingLocked(string directoryId, int generation, long accountEpoch,
+        CachedDirectoryListing snapshot)
+    {
+        _listGen.TryGetValue(directoryId, out var currentGeneration);
+        return currentGeneration == generation
+               && accountEpoch == Volatile.Read(ref _accountEpoch)
+               && _listCache.TryGetValue(directoryId, out var current)
+               && ReferenceEquals(current, snapshot);
+    }
+
+    private void InvalidateListingPair(string sourceDirectoryId, string destinationDirectoryId)
+    {
+        lock (_listLock)
+        {
+            InvalidateListingLocked(sourceDirectoryId);
+            InvalidateListingLocked(destinationDirectoryId);
+        }
+    }
+
+    private void InvalidateListingLocked(string directoryId)
+    {
+        _listCache.TryRemove(directoryId, out _);
+        BumpListingGenerationLocked(directoryId);
+    }
+
+    private int BumpListingGenerationLocked(string directoryId)
+        => _listGen.AddOrUpdate(directoryId, 1, (_, generation) => generation + 1);
+
+    private static DirectoryListingDetailed CopyDirectoryListingWithoutFile(
+        DirectoryListingDetailed listing, string entryId)
+    {
+        var copy = CopyDirectoryListing(listing);
+        for (var i = 0; i < copy.Files.Count; i++)
+        {
+            if (!string.Equals(copy.Files[i].Entry.Id, entryId, StringComparison.Ordinal))
+                continue;
+            copy.Files.RemoveAt(i);
+            break;
+        }
+
+        return copy;
+    }
+
+    private static DirectoryListingDetailed CopyDirectoryListingWithFile(
+        DirectoryListingDetailed listing, FileEntryDetailed file)
+    {
+        var copy = CopyDirectoryListing(listing);
+        var index = 0;
+        while (index < copy.Files.Count
+               && CompareFileEntries(copy.Files[index], file) <= 0)
+            index++;
+        copy.Files.Insert(index, file);
+        return copy;
+    }
+
+    private static DirectoryListingDetailed CopyDirectoryListing(DirectoryListingDetailed listing)
+    {
+        var copy = new DirectoryListingDetailed
+        {
+            NextCursorName = listing.NextCursorName,
+            NextCursorEntryId = listing.NextCursorEntryId,
+        };
+        copy.Subdirs.AddRange(listing.Subdirs);
+        copy.Files.AddRange(listing.Files);
+        return copy;
+    }
+
+    private static int CompareFileEntries(FileEntryDetailed left, FileEntryDetailed right)
+    {
+        var nameOrder = string.Compare(left.Entry.Name, right.Entry.Name, StringComparison.Ordinal);
+        return nameOrder != 0
+            ? nameOrder
+            : string.Compare(left.Entry.Id, right.Entry.Id, StringComparison.Ordinal);
+    }
+
+    private static DirectoryListingIndex CopyDirectoryListingIndex(DirectoryListingIndex index)
+        => new(
+            new Dictionary<string, BarkCloud.Proto.Files.DirectoryInfo>(
+                index.SubdirectoriesByName, index.SubdirectoriesByName.Comparer),
+            new Dictionary<string, BarkCloud.Proto.Files.DirectoryInfo>(
+                index.SubdirectoriesByExactName, index.SubdirectoriesByExactName.Comparer),
+            new Dictionary<string, FileEntryDetailed>(index.FilesByName, index.FilesByName.Comparer),
+            new Dictionary<string, FileEntryDetailed>(index.FilesByExactName, index.FilesByExactName.Comparer));
+
+    private static void RemoveFileFromIndex(DirectoryListingIndex index,
+        DirectoryListingDetailed listing, FileEntryDetailed file)
+    {
+        if (index.FilesByExactName.TryGetValue(file.Entry.Name, out var exact)
+            && string.Equals(exact.Entry.Id, file.Entry.Id, StringComparison.Ordinal))
+            index.FilesByExactName.Remove(file.Entry.Name);
+
+        if (!index.FilesByName.TryGetValue(file.Entry.Name, out var insensitive)
+            || !string.Equals(insensitive.Entry.Id, file.Entry.Id, StringComparison.Ordinal))
+            return;
+
+        index.FilesByName.Remove(file.Entry.Name);
+        var replacement = listing.Files.FirstOrDefault(candidate =>
+            string.Equals(candidate.Entry.Name, file.Entry.Name, StringComparison.OrdinalIgnoreCase));
+        if (replacement is not null)
+            index.FilesByName.TryAdd(replacement.Entry.Name, replacement);
+    }
+
+    private static void AddFileToIndex(DirectoryListingIndex index, FileEntryDetailed file)
+    {
+        index.FilesByName.TryAdd(file.Entry.Name, file);
+        index.FilesByExactName.TryAdd(file.Entry.Name, file);
+    }
 
     public void DeleteFileEntry(string entryId, CancellationToken cancellationToken = default)
         => _cloud.DeleteFileEntry(new DeleteFileEntryRequest { EntryId = entryId },

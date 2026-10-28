@@ -1006,6 +1006,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         LocalFile? targetFile = null;
         var targetSyncHeld = false;
+        var listingCacheHandledByMove = false;
         try
         {
             var sourceNode = ResolveSource();
@@ -1108,8 +1109,15 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     }
                 }
 
-                MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName, to.Value.DirectoryId, to.Value.Name,
-                    parentChanged, nameChanged, rollback);
+                var updateListingCache = sourceFile is null
+                    && targetFile is null
+                    && !isDirectory
+                    && !targetExists
+                    && parentChanged
+                    && !nameChanged;
+                listingCacheHandledByMove = MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName,
+                    to.Value.DirectoryId, to.Value.Name, parentChanged, nameChanged,
+                    updateListingCache, rollback);
 
                 if (sourceFile is not null)
                 {
@@ -1133,6 +1141,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             }
             catch (Exception ex)
             {
+                // После отката серверного перемещения кеш нужно инвалидировать в finally.
+                listingCacheHandledByMove = false;
                 var rollbackErrors = RollbackMove(rollback, oldName);
                 if (targetDeleted)
                 {
@@ -1163,8 +1173,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (targetSyncHeld)
                 Monitor.Exit(targetFile!.Sync);
-            _gateway.InvalidateListing(from.Value.DirectoryId);
-            _gateway.InvalidateListing(to.Value.DirectoryId);
+            if (!listingCacheHandledByMove)
+            {
+                _gateway.InvalidateListing(from.Value.DirectoryId);
+                _gateway.InvalidateListing(to.Value.DirectoryId);
+            }
         }
     }
 
@@ -1308,10 +1321,12 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
     }
 
-    private void MoveCloudNode(ResolvedNode node, string sourceDirectoryId, string sourceName,
+    private bool MoveCloudNode(ResolvedNode node, string sourceDirectoryId, string sourceName,
         string destinationDirectoryId, string destinationName, bool parentChanged, bool nameChanged,
-        Stack<Action> rollback)
+        bool updateListingCache, Stack<Action> rollback)
     {
+        var listingCacheHandled = false;
+
         void Rename(string name)
         {
             if (node.IsDirectory)
@@ -1324,6 +1339,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (node.IsDirectory)
                 _gateway.MoveDirectory(node.DirectoryId, directoryId);
+            else if (updateListingCache && directoryId == destinationDirectoryId)
+            {
+                _gateway.MoveFileEntryAndUpdateListings(node.EntryId, sourceDirectoryId, destinationDirectoryId);
+                listingCacheHandled = true;
+            }
             else
                 _gateway.MoveFileEntry(node.EntryId, directoryId);
         }
@@ -1376,6 +1396,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             Apply(() => Rename(destinationName), () => Rename(sourceName),
                 node.IsDirectory ? null : destinationName);
         }
+
+        return listingCacheHandled;
     }
 
     private List<Exception> RollbackMove(Stack<Action> rollback, string oldName)
