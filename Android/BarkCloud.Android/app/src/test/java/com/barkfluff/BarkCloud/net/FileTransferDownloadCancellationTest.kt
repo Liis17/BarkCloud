@@ -67,13 +67,17 @@ class FileTransferDownloadCancellationTest {
         val context = mockk<Context>()
         every { context.cacheDir } returns cacheDir
         val callEnded = CountDownLatch(1)
+        val allowCallbackToFinish = CountDownLatch(1)
+        val callbackFinished = CountDownLatch(1)
         lateinit var request: Job
         val client = OkHttpClient.Builder().eventListener(object : EventListener() {
             override fun callEnd(call: Call) {
                 request.cancel()
                 callEnded.countDown()
+                allowCallbackToFinish.await(5, TimeUnit.SECONDS)
             }
         }).build()
+        client.dispatcher.idleCallback = Runnable { callbackFinished.countDown() }
         val service = FileTransferService(context, mockk<GrpcManager>(relaxed = true), client)
         server.enqueue(MockResponse().setBody("completed body"))
         server.start()
@@ -87,8 +91,12 @@ class FileTransferDownloadCancellationTest {
 
             assertTrue("response body did not finish", callEnded.await(5, TimeUnit.SECONDS))
             assertTrue(request.isCancelled)
+            // Joining the cancelled coroutine does not join the OkHttp callback.
+            allowCallbackToFinish.countDown()
+            assertTrue("download callback did not finish", callbackFinished.await(5, TimeUnit.SECONDS))
             assertTrue("completed file was left behind", !File(cacheDir, "orphan.tmp").exists())
         } finally {
+            allowCallbackToFinish.countDown()
             server.shutdown()
             cacheDir.deleteRecursively()
         }
