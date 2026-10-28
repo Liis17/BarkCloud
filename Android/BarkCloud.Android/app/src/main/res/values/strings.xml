@@ -372,4 +372,20 @@
     <string name="avatar_crop_zoom">Масштаб</string>
     <string name="avatar_crop_area">Область обрезки аватара</string>
     <string name="avatar_crop_error">Не удалось обработать изображение</string>
+    <string name="viewer_info_size">Размер</string>
+    <string name="viewer_info_date">Дата</string>
+    <string name="viewer_info_loading">Загрузка…</string>
+    <string name="viewer_info_metadata_error">Метаданные недоступны: %1$s</string>
+    <string name="viewer_info_map_title">Место съёмки</string>
+    <string name="viewer_info_map_open">Открыть карту</string>
+    <string name="viewer_info_search_title">Имя для поиска</string>
+    <string name="viewer_info_search_help">Помогает найти файл, сохраняя его настоящее имя.</string>
+    <string name="viewer_info_tags_title">Теги</string>
+    <string name="viewer_info_tag_add">Добавить тег</string>
+    <string name="viewer_info_tags_empty">Нет доступных тегов</string>
+    <string name="viewer_info_tags_limit">Максимум 20 тегов на файл.</string>
+    <string name="viewer_info_search_error">Поиск недоступен: %1$s</string>
+    <string name="viewer_info_save">Сохранить</string>
+    <string name="viewer_info_saving">Сохраняем…</string>
+    <string name="viewer_info_save_error">Не удалось сохранить: %1$s</string>
 </resources>

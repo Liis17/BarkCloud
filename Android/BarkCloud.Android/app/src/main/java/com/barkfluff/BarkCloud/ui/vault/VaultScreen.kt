@@ -133,10 +133,13 @@ fun VaultScreen(
     }
 
     viewer?.let { asset ->
+        val vaultAssets = state.items.map { it.toMediaAsset() }
         CloudMediaViewer(
-            asset = asset,
+            assets = vaultAssets,
+            initialIndex = vaultAssets.indexOf(asset).coerceAtLeast(0),
             onDismiss = { viewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { } },
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
+            infoEnabled = false,
         )
     }
 }

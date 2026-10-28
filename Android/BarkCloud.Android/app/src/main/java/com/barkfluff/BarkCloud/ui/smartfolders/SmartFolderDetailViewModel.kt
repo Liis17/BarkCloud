@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.data.cloud.DynamicFolderRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,7 @@ class SmartFolderDetailViewModel(
     private var started = false
     private var cursorCreatedAt: Long? = null
     private var cursorFileId = ""
+    private var reloadJob: Job? = null
 
     fun start(folderId: String) {
         if (started) return
@@ -46,7 +48,7 @@ class SmartFolderDetailViewModel(
     fun reload() {
         cursorCreatedAt = null
         cursorFileId = ""
-        viewModelScope.launch {
+        reloadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = it.items.isEmpty(), isRefreshing = it.items.isNotEmpty()) }
             runCatching { repository.listItems(folderId) }
                 .onSuccess { page ->
@@ -67,6 +69,11 @@ class SmartFolderDetailViewModel(
                     }
                 }
         }
+    }
+
+    suspend fun reloadAndWait() {
+        if (reloadJob?.isActive != true) reload()
+        reloadJob?.join()
     }
 
     fun loadMore() {

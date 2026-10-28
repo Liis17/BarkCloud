@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.ui.shared
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -32,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -43,6 +46,7 @@ import com.barkfluff.BarkCloud.data.cloud.PublicFile
 import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.data.MimeIcon
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -65,34 +69,41 @@ fun SharedFolderBrowserScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(state.name.ifEmpty { title }, maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
-        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(state.subdirs, key = { "d-${it.id}" }) { dir ->
-                    SharedDirRow(dir, onOpen = { onOpenFolder(dir.id, dir.name) })
-                }
-                items(state.files, key = { "f-${it.id}" }) { file ->
-                    SharedFileRow(
-                        file = file,
-                        isDownloading = state.downloadingFileId == file.id,
-                        onDownload = {
-                            viewModel.download(file) { downloaded ->
-                                val mime = MimeIcon.mimeFor(file.name)
-                                context.startActivity(FileShareHelper.buildOpenIntent(context, downloaded, mime))
+            RefreshableContentSurface(
+                onRefresh = viewModel::reloadAndWait,
+                header = {
+                    TopAppBar(
+                        title = { Text(state.name.ifEmpty { title }, maxLines = 1) },
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        navigationIcon = {
+                            IconButton(onClick = onNavigateUp) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
                             }
                         },
                     )
+                },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(state.subdirs, key = { "d-${it.id}" }) { dir ->
+                        SharedDirRow(dir, onOpen = { onOpenFolder(dir.id, dir.name) })
+                    }
+                    items(state.files, key = { "f-${it.id}" }) { file ->
+                        SharedFileRow(
+                            file = file,
+                            isDownloading = state.downloadingFileId == file.id,
+                            onDownload = {
+                                viewModel.download(file) { downloaded ->
+                                    val mime = MimeIcon.mimeFor(file.name)
+                                    context.startActivity(FileShareHelper.buildOpenIntent(context, downloaded, mime))
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
@@ -114,6 +125,7 @@ private fun SharedDirRow(dir: PublicDir, onOpen: () -> Unit) {
     ListItem(
         headlineContent = { Text(dir.name, maxLines = 1) },
         leadingContent = { Icon(Icons.Outlined.Folder, contentDescription = null) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.clickable(onClick = onOpen),
     )
 }
@@ -126,6 +138,7 @@ private fun SharedFileRow(
 ) {
     ListItem(
         headlineContent = { Text(file.name, maxLines = 1) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = {
             if (file.previewUrl != null) {
                 MediaThumb(

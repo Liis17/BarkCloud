@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -65,6 +66,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.DynamicFolderCard
 import com.barkfluff.BarkCloud.files.data.StoragePermission
 import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderFormDialog
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,89 +114,95 @@ fun FilesRootScreen(
     }
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.files_root_title)) },
-                actions = { menu() },
-            )
-        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            item {
-                SectionHeader(stringResource(R.string.files_section_on_device))
-            }
-            item {
-                OnDeviceCard(
-                    granted = state.storageGranted,
-                    onOpen = { onOpenLocal(viewModel.externalRootPath) },
-                    onRequestPermission = {
-                        try {
-                            context.startActivity(StoragePermission.requestIntent(context.packageName))
-                        } catch (_: ActivityNotFoundException) {
-                            context.startActivity(StoragePermission.fallbackIntent())
-                        }
-                    },
+        RefreshableContentSurface(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            onRefresh = { viewModel.reloadAndWait(context) },
+            header = {
+                CenterAlignedTopAppBar(
+                    title = { Text(stringResource(R.string.files_root_title)) },
+                    actions = { menu() },
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                 )
-            }
-            if (state.storageGranted) {
-                items(state.removableStorage, key = { it.path }) { volume ->
-                    Spacer(Modifier.height(8.dp))
-                    NavCard(
-                        icon = Icons.Outlined.Storage,
-                        title = volume.name,
-                        subtitle = volume.path,
-                        onClick = { onOpenLocal(volume.path) },
+            },
+        ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                item {
+                    SectionHeader(stringResource(R.string.files_section_on_device))
+                }
+                item {
+                    OnDeviceCard(
+                        granted = state.storageGranted,
+                        onOpen = { onOpenLocal(viewModel.externalRootPath) },
+                        onRequestPermission = {
+                            try {
+                                context.startActivity(StoragePermission.requestIntent(context.packageName))
+                            } catch (_: ActivityNotFoundException) {
+                                context.startActivity(StoragePermission.fallbackIntent())
+                            }
+                        },
                     )
                 }
-            }
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-            item {
-                SectionHeader(stringResource(R.string.files_section_cloud))
-            }
-            item {
-                NavCard(
-                    icon = Icons.Outlined.Cloud,
-                    title = stringResource(R.string.cloud_storage_title),
-                    subtitle = stringResource(R.string.cloud_storage_subtitle),
-                    onClick = onOpenCloud,
-                )
-            }
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-            item {
-                NavCard(
-                    icon = Icons.Outlined.Group,
-                    title = stringResource(R.string.files_shared_title),
-                    subtitle = null,
-                    onClick = onOpenShared,
-                )
-            }
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SectionHeader(stringResource(R.string.smart_folders_section), Modifier.weight(1f))
-                    TextButton(onClick = { showCreateSmartFolder = true }) {
-                        Icon(Icons.Outlined.Add, contentDescription = null)
-                        Text(stringResource(R.string.smart_folder_new), modifier = Modifier.padding(start = 6.dp))
+                if (state.storageGranted) {
+                    items(state.removableStorage, key = { it.path }) { volume ->
+                        Spacer(Modifier.height(8.dp))
+                        NavCard(
+                            icon = Icons.Outlined.Storage,
+                            title = volume.name,
+                            subtitle = volume.path,
+                            onClick = { onOpenLocal(volume.path) },
+                        )
                     }
                 }
-            }
-            items(state.smartFolders, key = { it.id }) { folder ->
-                SmartFolderCard(
-                    folder = folder,
-                    onOpen = { onOpenSmartFolder(folder.id, folder.name) },
-                    onEdit = { editingFolder = folder },
-                    onDelete = { viewModel.deleteSmartFolder(folder) },
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+                item {
+                    SectionHeader(stringResource(R.string.files_section_cloud))
+                }
+                item {
+                    NavCard(
+                        icon = Icons.Outlined.Cloud,
+                        title = stringResource(R.string.cloud_storage_title),
+                        subtitle = stringResource(R.string.cloud_storage_subtitle),
+                        onClick = onOpenCloud,
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+                item {
+                    NavCard(
+                        icon = Icons.Outlined.Group,
+                        title = stringResource(R.string.files_shared_title),
+                        subtitle = null,
+                        onClick = onOpenShared,
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SectionHeader(stringResource(R.string.smart_folders_section), Modifier.weight(1f))
+                        TextButton(onClick = { showCreateSmartFolder = true }) {
+                            Icon(Icons.Outlined.Add, contentDescription = null)
+                            Text(stringResource(R.string.smart_folder_new), modifier = Modifier.padding(start = 6.dp))
+                        }
+                    }
+                }
+                items(state.smartFolders, key = { it.id }) { folder ->
+                    SmartFolderCard(
+                        folder = folder,
+                        onOpen = { onOpenSmartFolder(folder.id, folder.name) },
+                        onEdit = { editingFolder = folder },
+                        onDelete = { viewModel.deleteSmartFolder(folder) },
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
     }

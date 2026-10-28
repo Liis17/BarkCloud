@@ -1,59 +1,143 @@
 package com.barkfluff.BarkCloud.ui.components
 
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import androidx.compose.ui.res.stringResource
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import kotlinx.coroutines.launch
+
+private val DismissDistance = 120.dp
+private val SheetOpenDistance = 80.dp
 
 /**
- * Полноэкранный просмотр облачного медиа: изображение показывается из превью (1024),
- * видео открывается во внешнем плеере через [onPlayVideo] (скачивание оригинала).
+ * Полноэкранный просмотр облачного медиа. Листание свайпами влево и вправо, закрытие свайпом вниз,
+ * свайп вверх открывает панель свойств. Изображение показывается из превью (1024),
+ * видео открывается во внешнем плеере через [onPlayVideo].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CloudMediaViewer(
-    asset: MediaAsset,
+    assets: List<MediaAsset>,
+    initialIndex: Int,
     onDismiss: () -> Unit,
-    onPlayVideo: () -> Unit,
+    onPlayVideo: (MediaAsset) -> Unit,
+    infoEnabled: Boolean = true,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        val pagerState = rememberPagerState(initialPage = initialIndex) { assets.size }
+        val scope = rememberCoroutineScope()
+        val dismissPx = with(LocalDensity.current) { DismissDistance.toPx() }
+        val sheetOpenPx = with(LocalDensity.current) { SheetOpenDistance.toPx() }
+        var dragY by remember { mutableFloatStateOf(0f) }
+        val backdropAlpha = 1f - (dragY / dismissPx).coerceIn(0f, 1f) * 0.8f
+        var sheetVisible by remember { mutableStateOf(false) }
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
+        val currentAsset = assets[pagerState.currentPage]
+        val infoState by infoViewModel.state.collectAsStateWithLifecycle()
+
+        // Панель грузит данные только пока открыта, и перезагружает их при листании.
+        LaunchedEffect(sheetVisible, currentAsset.id) {
+            if (sheetVisible) infoViewModel.load(currentAsset.id)
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center,
+                .background(Color.Black.copy(alpha = backdropAlpha))
+                .graphicsLayer { translationY = dragY }
+                .pointerInput(dismissPx, sheetOpenPx) {
+                    var movedUp = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { movedUp = 0f },
+                        onDragEnd = {
+                            when {
+                                dragY > dismissPx -> onDismiss()
+                                infoEnabled && movedUp < -sheetOpenPx -> {
+                                    sheetVisible = true
+                                    scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
+                                }
+                                else -> scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch { animate(dragY, 0f) { value, _ -> dragY = value } }
+                        },
+                    ) { _, amount ->
+                        movedUp += amount
+                        // Тянем только вниз; движение вверх изображение не двигает, оно открывает панель.
+                        dragY = (dragY + amount).coerceAtLeast(0f)
+                    }
+                },
         ) {
-            AsyncImage(
-                model = asset.previewUrl(1024),
-                contentDescription = asset.fileName,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-            )
-            if (asset.isVideo) {
-                Icon(
-                    imageVector = Icons.Filled.PlayCircle,
-                    contentDescription = stringResource(R.string.viewer_play_video),
-                    tint = Color.White,
-                    modifier = Modifier.size(72.dp).clickable(onClick = onPlayVideo),
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                val asset = assets[page]
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AsyncImage(
+                        model = asset.previewUrl(1024),
+                        contentDescription = asset.fileName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                    if (asset.isVideo) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayCircle,
+                            contentDescription = stringResource(R.string.viewer_play_video),
+                            tint = Color.White,
+                            modifier = Modifier.size(72.dp).clickable { onPlayVideo(asset) },
+                        )
+                    }
+                }
+            }
+        }
+
+        if (infoEnabled && sheetVisible) {
+            ModalBottomSheet(
+                onDismissRequest = { sheetVisible = false },
+                sheetState = sheetState,
+            ) {
+                CloudMediaInfoContent(
+                    asset = currentAsset,
+                    state = infoState,
+                    onSave = infoViewModel::save,
                 )
             }
         }
