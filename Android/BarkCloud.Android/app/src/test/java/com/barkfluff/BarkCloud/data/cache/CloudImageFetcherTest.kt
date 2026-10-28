@@ -47,7 +47,7 @@ class CloudImageFetcherTest {
     }
 
     @Test
-    fun legacyDiskCacheEntryIsCopiedIntoManagedCacheAndIndexed() = runTest {
+    fun legacyDiskCacheEntryIsCopiedIntoManagedCacheIndexedAndRemovedFromLegacyCache() = runTest {
         val root = Files.createTempDirectory("cloud-image-legacy-").toFile()
         try {
             val scope = CacheScope("server", "user")
@@ -68,10 +68,39 @@ class CloudImageFetcherTest {
 
             assertEquals(listOf(url), diskCache.openedKeys)
             assertTrue(diskCache.editedKeys.isEmpty())
+            assertEquals(listOf(url), diskCache.removedKeys)
             assertEquals(0, loader.networkRequests.size)
             assertEquals(1, cache.entryCount())
             assertEquals(DataSource.DISK, result.dataSource)
             assertArrayEquals(byteArrayOf(4, 5, 6), requireNotNull(indexed).readBytes())
+            assertTrue(requireNotNull(diskCache.snapshot).closed)
+            result.source.close()
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedLegacyTransferKeepsEntryAndFallsBackToNetwork() = runTest {
+        val root = Files.createTempDirectory("cloud-image-legacy-failure-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val loader = RecordingLoader(byteArrayOf(7, 8, 9), failSourceFile = true)
+            val cache = cache(root, scope, loader)
+            val url = "https://cdn/legacy-preview"
+            val model = CloudImageModel(url, "file-legacy-failure", "preview-legacy-failure")
+            val legacyFile = File(root, "legacy.jpg").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+            val diskCache = FakeDiskCache(root).apply {
+                snapshotKey = url
+                snapshot = FakeSnapshot(legacyFile.toOkioPath())
+            }
+
+            val result = fetcher(model, cache, scope, diskCache).fetch() as SourceFetchResult
+
+            assertEquals(listOf(url), diskCache.openedKeys)
+            assertTrue(diskCache.removedKeys.isEmpty())
+            assertEquals(listOf(url), loader.networkRequests)
+            assertEquals(DataSource.NETWORK, result.dataSource)
             assertTrue(requireNotNull(diskCache.snapshot).closed)
             result.source.close()
         } finally {
@@ -120,12 +149,16 @@ class CloudImageFetcherTest {
         ioDispatcher = Dispatchers.IO,
     )
 
-    private class RecordingLoader(private val response: ByteArray) : FileCacheLoader {
+    private class RecordingLoader(
+        private val response: ByteArray,
+        private val failSourceFile: Boolean = false,
+    ) : FileCacheLoader {
         val networkRequests = mutableListOf<String>()
 
         override suspend fun load(request: FileCacheLoadRequest, destination: File) {
             val source = request.sourceFile
             if (source != null) {
+                if (failSourceFile) throw IOException("legacy copy failed")
                 source.copyTo(destination, overwrite = true)
             } else {
                 networkRequests += requireNotNull(request.sourceUrl)
@@ -165,6 +198,7 @@ class CloudImageFetcherTest {
         var snapshot: FakeSnapshot? = null
         val openedKeys = mutableListOf<String>()
         val editedKeys = mutableListOf<String>()
+        val removedKeys = mutableListOf<String>()
 
         override fun openSnapshot(key: String): DiskCache.Snapshot? {
             openedKeys += key
@@ -176,7 +210,10 @@ class CloudImageFetcherTest {
             return null
         }
 
-        override fun remove(key: String): Boolean = false
+        override fun remove(key: String): Boolean {
+            removedKeys += key
+            return true
+        }
         override fun clear() = Unit
         override fun shutdown() = Unit
     }

@@ -176,6 +176,9 @@ class FileCacheService(
     suspend fun loadOriginal(fileId: String, fileName: String): File =
         load(FileCacheKey.original(currentScope(), fileId), fileName)
 
+    suspend fun getOriginal(fileId: String): File? =
+        get(FileCacheKey.original(currentScope(), fileId))
+
     /** Загрузка файла из общей папки с ключом, отдельным от собственного оригинала. */
     suspend fun loadSharedOriginal(fileId: String, fileName: String, sourceUrl: String): File =
         load(FileCacheKey.sharedOriginal(currentScope(), fileId), fileName, sourceUrl)
@@ -183,6 +186,15 @@ class FileCacheService(
     /** Удерживает оригинал в кеше, пока внешний просмотрщик запускается. */
     suspend fun <T> withPinnedOriginal(fileId: String, action: suspend (File) -> T): T =
         withPinnedEntry(FileCacheKey.original(currentScope(), fileId), action)
+
+    suspend fun getJpegView(fileId: String): File? =
+        get(FileCacheKey.jpegView(currentScope(), fileId))
+
+    suspend fun loadJpegView(fileId: String, sourceUrl: String): File =
+        load(FileCacheKey.jpegView(currentScope(), fileId), "jpeg-view.jpg", sourceUrl)
+
+    suspend fun <T> withPinnedJpegView(fileId: String, action: suspend (File) -> T): T =
+        withPinnedEntry(FileCacheKey.jpegView(currentScope(), fileId), action)
 
     /** Пин удерживает запись от LRU-вытеснения до соответствующего unpin. */
     suspend fun pin(key: FileCacheKey): File? = withContext(ioDispatcher) {
@@ -219,7 +231,7 @@ class FileCacheService(
             val matching = entries.filter { it.key.category == category }
             CacheCategoryStats(matching.sumOf { it.sizeBytes }, matching.size)
         }
-        val legacyFiles = filesIn(legacyPreviewsDir)
+        val legacyFiles = legacyPreviewFiles()
         val total = entries.sumOf { it.sizeBytes }
         FileCacheStats(
             categories = categories,
@@ -237,11 +249,11 @@ class FileCacheService(
 
     /** Размер и количество превью в отдельном legacy disk cache Coil. */
     suspend fun previewSize(): Long = withContext(ioDispatcher) {
-        filesIn(legacyPreviewsDir).sumOf { it.length() }
+        legacyPreviewFiles().sumOf { it.length() }
     }
 
     suspend fun previewEntryCount(): Int = withContext(ioDispatcher) {
-        filesIn(legacyPreviewsDir).size
+        legacyPreviewFiles().size
     }
 
     suspend fun clearAll() = withContext(ioDispatcher) {
@@ -489,4 +501,8 @@ class FileCacheService(
 
     private fun filesIn(directory: File): List<File> =
         directory.walkTopDown().filter { it.isFile }.toList()
+
+    // Coil's two-value DiskCache stores image data as .0 and metadata as .1 beside its journal.
+    private fun legacyPreviewFiles(): List<File> =
+        filesIn(legacyPreviewsDir).filter { it.name.endsWith(".0") }
 }

@@ -69,19 +69,23 @@ internal class CloudImageFetcher(
     private suspend fun loadFile(key: FileCacheKey): Pair<File, DataSource> {
         val snapshot = legacyDiskCache?.openSnapshot(model.url)
         if (snapshot != null) {
+            var migratedFile: File? = null
             try {
                 try {
-                    val file = fileCache.load(
+                    migratedFile = fileCache.load(
                         key = key,
                         fileName = model.cacheFileName,
                         sourceFile = File(snapshot.data.toString()),
                     )
-                    return file to DataSource.DISK
                 } catch (_: IOException) {
                     // A stale legacy entry must not prevent downloading a usable preview.
                 }
             } finally {
                 snapshot.close()
+            }
+            migratedFile?.let {
+                legacyDiskCache?.remove(model.url)
+                return it to DataSource.DISK
             }
         }
         return fileCache.load(key, model.cacheFileName, sourceUrl = model.url) to DataSource.NETWORK

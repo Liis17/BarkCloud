@@ -51,10 +51,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
+import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,72 +97,71 @@ fun AlbumDetailScreen(
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            RefreshableContentSurface(
-                onRefresh = viewModel::reloadAndWait,
-                header = {
-                    TopAppBar(
-                        title = { Text(state.name, maxLines = 1) },
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                        navigationIcon = {
-                            IconButton(onClick = onNavigateUp) {
-                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Outlined.MoreVert, contentDescription = null)
-                            }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.albums_rename)) },
-                                    onClick = { menuOpen = false; showRename = true },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.common_delete)) },
-                                    onClick = { menuOpen = false; showDelete = true },
-                                )
-                            }
-                        },
-                    )
-                },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 120.dp),
-                    state = gridState,
+    CloudMediaTransitionLayout(viewer?.id) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                RefreshableContentSurface(
+                    onRefresh = viewModel::reloadAndWait,
+                    header = {
+                        TopAppBar(
+                            title = { Text(state.name, maxLines = 1) },
+                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            navigationIcon = {
+                                IconButton(onClick = onNavigateUp) {
+                                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
+                                }
+                            },
+                            actions = {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Outlined.MoreVert, contentDescription = null)
+                                }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.albums_rename)) },
+                                        onClick = { menuOpen = false; showRename = true },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.common_delete)) },
+                                        onClick = { menuOpen = false; showDelete = true },
+                                    )
+                                }
+                            },
+                        )
+                    },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.items, key = { it.id }) { asset ->
-                        AlbumItemCell(
-                            asset = asset,
-                            onTap = { viewer = asset },
-                            onSetCover = { viewModel.setCover(asset.id) },
-                            onRemove = { viewModel.removeItem(asset.id) },
-                        )
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 120.dp),
+                        state = gridState,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        items(state.items, key = { it.id }) { asset ->
+                            AlbumItemCell(
+                                asset = asset,
+                                onTap = { viewer = asset },
+                                onSetCover = { viewModel.setCover(asset.id) },
+                                onRemove = { viewModel.removeItem(asset.id) },
+                            )
+                        }
                     }
                 }
-            }
 
-            FloatingActionButton(
-                onClick = {
-                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = null)
+                FloatingActionButton(
+                    onClick = {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                    },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                }
             }
         }
-    }
-
-    viewer?.let { asset ->
         CloudMediaViewer(
             assets = state.items,
-            initialIndex = state.items.indexOf(asset).coerceAtLeast(0),
+            selectedAsset = viewer,
             onDismiss = { viewer = null },
             onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
         )
@@ -212,7 +214,10 @@ private fun AlbumItemCell(
             model = asset.previewModel(512),
             isVideo = asset.isVideo,
             contentDescription = asset.fileName,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().cloudMediaSharedElement(
+                key = asset.id,
+                visible = LocalCloudMediaViewerAssetId.current != asset.id,
+            ),
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(

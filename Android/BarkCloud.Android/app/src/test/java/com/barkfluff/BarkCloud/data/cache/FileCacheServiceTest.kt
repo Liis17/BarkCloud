@@ -293,10 +293,12 @@ class FileCacheServiceTest {
         val root = Files.createTempDirectory("file-cache-coil-").toFile()
         try {
             val scope = CacheScope("server", "user")
-            val coilPreview = File(root, "BarkCloudFiles/previews/coil-entry").apply {
+            val coilPreview = File(root, "BarkCloudFiles/previews/coil-entry.0").apply {
                 parentFile?.mkdirs()
                 writeBytes(byteArrayOf(1, 2, 3, 4))
             }
+            File(root, "BarkCloudFiles/previews/coil-entry.1").writeBytes(ByteArray(30))
+            File(root, "BarkCloudFiles/previews/journal").writeBytes(ByteArray(100))
             val cache = cache(root, RecordingLoader { _, _ -> error("no download expected") }, scope)
 
             val stats = cache.statistics()
