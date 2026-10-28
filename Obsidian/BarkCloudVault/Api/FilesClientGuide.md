@@ -71,6 +71,8 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 
 При нескольких совпавших полях сначала учитываются ранг и сходство, затем приоритет поля, после него — `COLLATE "C"` PostgreSQL. Для `ResolveHit` без поискового запроса `match_field` и `match_value` пусты.
 
+`SearchHit.jpeg_view_url` (поле 16, обратно совместимое) содержит ссылку на полноразмерный JPEG-вид для просмотра — заполняется для хитов файлов владельца из `UploadFile.JpegViewFileId` и пустая у альбомов, папок, shared-объектов и legacy-файлов без JPEG-вида; выбор `preview_url` при этом не меняется. Веб-прокси `/api/search` и `/api/search/hit` отдаёт её как `jpegViewUrl`.
+
 ## Ограничения и важные детали
 
 - `CheckFileHash` и `CheckFileHashes` — read-only проверки SHA-256 для UX дубликатов; ответ включает `exists` и `existing_locations`. Совпадающее содержимое не объединяет блобы, и отдельная загрузка создаст отдельный файл.

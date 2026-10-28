@@ -320,6 +320,7 @@ public static class SearchEndpoints
         title = hit.Title,
         subtitle = hit.Subtitle,
         previewUrl = hit.PreviewUrl,
+        jpegViewUrl = hit.JpegViewUrl,
         placeholder = CloudJson.Placeholder(hit.Placeholder),
         mediaKind = hit.MediaKind.ToString().Replace("MediaKind", "", StringComparison.Ordinal).ToLowerInvariant(),
         favorite = hit.Favorite,
