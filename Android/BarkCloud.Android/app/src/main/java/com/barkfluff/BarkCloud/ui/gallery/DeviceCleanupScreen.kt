@@ -11,15 +11,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +41,9 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.files.ui.formatSize
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
+import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
+import androidx.compose.foundation.layout.Box
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,8 +54,13 @@ internal fun DeviceCleanupScreen(onNavigateUp: () -> Unit, viewModel: GalleryVie
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var checking by remember { mutableStateOf(false) }
+    var departing by remember { mutableStateOf<List<DeviceMedia>>(emptyList()) }
     var pending by rememberSaveable(stateSaver = pendingPhotoDeleteSaver) { mutableStateOf<PendingPhotoDelete?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val keys = pending?.deviceMediaKeys.orEmpty().toSet()
+            departing = state.items.filter { it.mediaKey in keys }.take(12)
+        }
         pending?.let { viewModel.completeSystemDelete(it, result.resultCode == Activity.RESULT_OK) }
         pending = null
     }
@@ -82,7 +86,9 @@ internal fun DeviceCleanupScreen(onNavigateUp: () -> Unit, viewModel: GalleryVie
     ) { padding ->
         DeviceCleanupContent(
             state = state,
-            busy = checking || deletion.isBusy,
+            busy = checking || deletion.isBusy || departing.isNotEmpty(),
+            departing = departing,
+            onAnimationFinished = { departing = emptyList() },
             modifier = Modifier.padding(padding),
             onClean = {
                 checking = true
@@ -117,25 +123,27 @@ internal fun DeviceCleanupScreen(onNavigateUp: () -> Unit, viewModel: GalleryVie
 }
 
 @Composable
-internal fun DeviceCleanupContent(state: GalleryUiState, busy: Boolean, modifier: Modifier = Modifier, onClean: () -> Unit) {
+internal fun DeviceCleanupContent(
+    state: GalleryUiState,
+    busy: Boolean,
+    modifier: Modifier = Modifier,
+    departing: List<DeviceMedia> = emptyList(),
+    onAnimationFinished: () -> Unit = {},
+    onClean: () -> Unit,
+) {
     val size = formatSize(LocalContext.current, state.reclaimableBytes)
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        ) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.gallery_cleanup_available, size), style = MaterialTheme.typography.headlineSmall)
-                Text(stringResource(R.string.gallery_cleanup_count, state.reclaimableCount), style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(R.string.gallery_cleanup_cloud_kept), style = MaterialTheme.typography.labelLarge)
-            }
-        }
-        Text(stringResource(R.string.gallery_cleanup_description), style = MaterialTheme.typography.bodyLarge)
-        if (state.reclaimableCount == 0) {
-            Text(stringResource(R.string.gallery_cleanup_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            CleanupPreviewGrid(
+                items = if (departing.isNotEmpty()) departing else state.items.filter {
+                    state.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD
+                }.take(12),
+                dissolving = departing.isNotEmpty(),
+                onFinished = onAnimationFinished,
+            )
         }
         if (busy) {
             CircularProgressIndicator()
