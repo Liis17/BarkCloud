@@ -26,6 +26,27 @@ public static class CloudApiEndpoints
     // x-error-code из трейлеров gRPC (см. CloudAccessDeniedException в Shared.Exceptions)
     private const string ErrCloudAccessDenied = "D4F1E2A8-9C5B-4A77-83BB-5E6F7A8B9C01";
 
+    /// <summary>
+    /// Размеры подпапок — вспомогательные данные листинга: при сбое Files-сервиса папки показываются без размеров.
+    /// Unauthenticated не глотаем, его обрабатывает Guarded (обновление токена).
+    /// </summary>
+    private static async Task<Dictionary<string, long>> FetchSubdirectorySizesAsync(
+        DirectorySizeApi.DirectorySizeApiClient client, ILoggerFactory loggerFactory, string? parentId, Metadata headers, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await client.GetSubdirectorySizesAsync(
+                new GetSubdirectorySizesRequest { ParentId = parentId ?? string.Empty },
+                new CallOptions(headers: headers, deadline: DateTime.UtcNow.AddSeconds(15), cancellationToken: cancellationToken)).ResponseAsync;
+            return response.Sizes.ToDictionary(s => s.DirectoryId, s => s.SizeBytes);
+        }
+        catch (RpcException ex) when (ex.StatusCode != StatusCode.Unauthenticated)
+        {
+            loggerFactory.CreateLogger(nameof(CloudApiEndpoints)).LogWarning(ex, "Не удалось получить размеры подпапок папки {ParentId}", parentId);
+            return new Dictionary<string, long>();
+        }
+    }
+
     internal static SearchFilesRequest BuildSearchFilesRequest(
         string query,
         string? kind,
@@ -114,7 +135,8 @@ public static class CloudApiEndpoints
         // ───────────────────────── Каталоги ─────────────────────────
 
         api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            DirectorySizeApi.DirectorySizeApiClient directorySizes, string? dir, int? limit, string? cursorName, string? cursorId) =>
+            DirectorySizeApi.DirectorySizeApiClient directorySizes, ILoggerFactory loggerFactory,
+            string? dir, int? limit, string? cursorName, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
                 var req = new ListDirectoryRequest
@@ -127,11 +149,10 @@ public static class CloudApiEndpoints
 
                 // Листинг и размеры подпапок — параллельно; размеры берутся из кеша Files-сервиса.
                 var listingTask = cloud.ListDirectoryDetailedAsync(req, token).ResponseAsync;
-                var sizesTask = directorySizes.GetSubdirectorySizesAsync(
-                    new GetSubdirectorySizesRequest { ParentId = dir ?? string.Empty }, token).ResponseAsync;
+                var sizesTask = FetchSubdirectorySizesAsync(directorySizes, loggerFactory, dir, token, http.RequestAborted);
                 await Task.WhenAll(listingTask, sizesTask);
                 var listing = listingTask.Result;
-                var sizeById = sizesTask.Result.Sizes.ToDictionary(s => s.DirectoryId, s => s.SizeBytes);
+                var sizeById = sizesTask.Result;
 
                 return Results.Json(new
                 {
@@ -180,7 +201,8 @@ public static class CloudApiEndpoints
             {
                 var info = await cloud.CreateDirectoryAsync(
                     new CreateDirectoryRequest { ParentId = body.ParentId ?? "", Name = body.Name }, token);
-                return Results.Json(CloudJson.Dir(info), Json);
+                // Только что созданная папка пуста.
+                return Results.Json(CloudJson.Dir(info, 0), Json);
             }));
 
         api.MapPost("/cloud/dir/visibility", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, VisibilityReq body) =>
