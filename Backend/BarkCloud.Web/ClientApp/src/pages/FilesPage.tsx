@@ -733,144 +733,149 @@ export function FilesPage() {
       <div className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
         {over && <FileDropOverlay detail={`Файлы будут загружены в папку «${dropDirectoryName}»`} />}
         <div className="files-main">
-          <div className="files-bar">
-            {searchQuery ? (
-              <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Icon.search size={18} />
-                <span className="cur">Результаты поиска: «{searchQuery}»</span>
-                <a onClick={() => navigate('/files')} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <Icon.x size={14} /> Очистить
-                </a>
-              </div>
-            ) : (
-              <div className="breadcrumb">
-                <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
-                  <Icon.folder size={18} />
-                </a>
-                {stack.map((s, i) => (
-                  <React.Fragment key={s.id}>
-                    <span className="sep">/</span>
-                    {i === stack.length - 1 ? (
-                      <span className="cur">{s.name}</span>
-                    ) : (
-                      <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
-                        {s.name}
-                      </a>
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading ? (
-            <DynamicFoldersSkeleton />
-          ) : smartFolders.length > 0 && (
-            <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
-          ))}
-
-          {openSmart ? (
-            <div className="files-list">
-              <DynamicFolderDetail
-                folder={openSmart}
-                onBack={() => setOpenSmart(null)}
-                onChanged={loadSmartFolders}
-                toast={toast}
-                albums={albums}
-                reloadAlbums={loadAlbums}
-              />
-            </div>
-          ) : (
-          <div className="files-list">
-            {listing === null ? (
-              <Loading />
-            ) : isEmpty ? (
-              searchQuery ? (
-                <EmptyState
-                  icon="search"
-                  title="Ничего не найдено"
-                  hint={`По запросу «${searchQuery}» файлов не нашлось.`}
-                />
+          {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading || smartFolders.length > 0) && (
+            <div className="smart-block">
+              {smartFoldersLoading ? (
+                <DynamicFoldersSkeleton />
               ) : (
-                <EmptyState
-                  icon="folder"
-                  title="Папка пуста"
-                  hint="Загрузите файлы или создайте подпапку."
-                  action={
-                    <button className="btn primary" onClick={() => doUpload()}>
-                      <Icon.upload size={16} /> Загрузить
-                    </button>
-                  }
+                <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
+              )}
+            </div>
+          )}
+          <div className="files-block">
+            <div className="files-bar">
+              {searchQuery ? (
+                <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Icon.search size={18} />
+                  <span className="cur">Результаты поиска: «{searchQuery}»</span>
+                  <a onClick={() => navigate('/files')} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Icon.x size={14} /> Очистить
+                  </a>
+                </div>
+              ) : (
+                <div className="breadcrumb">
+                  <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
+                    <Icon.folder size={18} />
+                  </a>
+                  {stack.map((s, i) => (
+                    <React.Fragment key={s.id}>
+                      <span className="sep">/</span>
+                      {i === stack.length - 1 ? (
+                        <span className="cur">{s.name}</span>
+                      ) : (
+                        <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
+                          {s.name}
+                        </a>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {openSmart ? (
+              <div className="files-list">
+                <DynamicFolderDetail
+                  folder={openSmart}
+                  onBack={() => setOpenSmart(null)}
+                  onChanged={loadSmartFolders}
+                  toast={toast}
+                  albums={albums}
+                  reloadAlbums={loadAlbums}
                 />
-              )
+              </div>
             ) : (
-              <table className="ftable">
-                <thead>
-                  <tr>
-                    <th style={{ width: 40 }} className="selcell">
-                      <input
-                        type="checkbox"
-                        checked={allChecked}
-                        disabled={!files.length}
-                        onChange={(e) => fsel.setAll(files.map((f) => f.entryId), e.target.checked)}
+            <div className="files-list">
+              {listing === null ? (
+                <Loading />
+              ) : isEmpty ? (
+                searchQuery ? (
+                  <EmptyState
+                    icon="search"
+                    title="Ничего не найдено"
+                    hint={`По запросу «${searchQuery}» файлов не нашлось.`}
+                  />
+                ) : (
+                  <EmptyState
+                    icon="folder"
+                    title="Папка пуста"
+                    hint="Загрузите файлы или создайте подпапку."
+                    action={
+                      <button className="btn primary" onClick={() => doUpload()}>
+                        <Icon.upload size={16} /> Загрузить
+                      </button>
+                    }
+                  />
+                )
+              ) : (
+                <table className="ftable">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 40 }} className="selcell">
+                        <input
+                          type="checkbox"
+                          checked={allChecked}
+                          disabled={!files.length}
+                          onChange={(e) => fsel.setAll(files.map((f) => f.entryId), e.target.checked)}
+                        />
+                      </th>
+                      <th>Имя</th>
+                      <th style={{ width: 120 }}>Размер</th>
+                      <th style={{ width: 140 }}>Изменён</th>
+                      <th style={{ width: 120 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dirs.map((d) => (
+                      <DirRow
+                        key={d.id}
+                        dir={d}
+                        active={dropTarget?.id === d.id}
+                        dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                        onOpen={openDir}
+                        onRename={(t) => startRename(t, true)}
+                        onDelete={(t) => requestDelete(t, true)}
+                        onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                       />
-                    </th>
-                    <th>Имя</th>
-                    <th style={{ width: 120 }}>Размер</th>
-                    <th style={{ width: 140 }}>Изменён</th>
-                    <th style={{ width: 120 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dirs.map((d) => (
-                    <DirRow
-                      key={d.id}
-                      dir={d}
-                      active={dropTarget?.id === d.id}
-                      dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
-                      onOpen={openDir}
-                      onRename={(t) => startRename(t, true)}
-                      onDelete={(t) => requestDelete(t, true)}
-                      onMenu={(ev, t) => openAt(ev, dirMenu(t))}
-                    />
-                  ))}
-                  {files.map((e) => (
-                    <FileRow
-                      key={e.entryId}
-                      entry={e}
-                      selected={!!sel && sel.entryId === e.entryId}
-                      bulkChecked={fsel.has(e.entryId)}
-                      onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
-                      onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
-                      onOpen={openEntry}
-                      onDownload={download}
-                      onRename={(t) => startRename(t, false)}
-                      onDelete={(t) => requestDelete(t, false)}
-                      onMenu={(ev, t) => openAt(ev, fileMenu(t, ev.currentTarget))}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {searchQuery && searchCursor && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
-                <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
-                  {searchMore ? 'Загрузка…' : 'Показать ещё'}
-                </button>
-              </div>
-            )}
-            {!searchQuery && directoryCursor && (
-              <div
-                ref={directorySentinelRef}
-                role={directoryMore ? 'status' : undefined}
-                aria-label={directoryMore ? 'Загрузка файлов' : undefined}
-                style={{ display: 'flex', justifyContent: 'center', minHeight: 24, padding: '14px 0' }}
-              >
-                {directoryMore && <span>Загрузка…</span>}
-              </div>
+                    ))}
+                    {files.map((e) => (
+                      <FileRow
+                        key={e.entryId}
+                        entry={e}
+                        selected={!!sel && sel.entryId === e.entryId}
+                        bulkChecked={fsel.has(e.entryId)}
+                        onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
+                        onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
+                        onOpen={openEntry}
+                        onDownload={download}
+                        onRename={(t) => startRename(t, false)}
+                        onDelete={(t) => requestDelete(t, false)}
+                        onMenu={(ev, t) => openAt(ev, fileMenu(t, ev.currentTarget))}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {searchQuery && searchCursor && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                  <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
+                    {searchMore ? 'Загрузка…' : 'Показать ещё'}
+                  </button>
+                </div>
+              )}
+              {!searchQuery && directoryCursor && (
+                <div
+                  ref={directorySentinelRef}
+                  role={directoryMore ? 'status' : undefined}
+                  aria-label={directoryMore ? 'Загрузка файлов' : undefined}
+                  style={{ display: 'flex', justifyContent: 'center', minHeight: 24, padding: '14px 0' }}
+                >
+                  {directoryMore && <span>Загрузка…</span>}
+                </div>
+              )}
+            </div>
             )}
           </div>
-          )}
         </div>
 
         <aside className="files-inspector">
