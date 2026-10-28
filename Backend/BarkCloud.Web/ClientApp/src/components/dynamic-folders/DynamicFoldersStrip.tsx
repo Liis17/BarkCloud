@@ -22,3 +22,14 @@ export function DynamicFoldersStrip({ folders, onOpen, onCreate }: Props) {
     </div>
   );
 }
+
+/** Заглушка ленты на время загрузки: та же сетка, что у ленты, чтобы список файлов не прыгал. */
+export function DynamicFoldersSkeleton() {
+  return (
+    <div className="dynamic-folders" aria-busy="true">
+      {Array.from({ length: 14 }, (_, i) => (
+        <div key={i} className="df-card df-skeleton" />
+      ))}
+    </div>
+  );
+}
