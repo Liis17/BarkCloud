@@ -44,6 +44,17 @@ public class CloudDirectory
     /// <summary>Итоговый признак скрытия папки из поиска с учётом наследования.</summary>
     public bool EffectiveHideFromSearch { get; set; }
 
+    /// <summary>
+    /// Кеш суммарного размера живых файлов во всём поддереве. null — не посчитан или устарел.
+    /// Пишется только пересчётом с проверкой <see cref="SizeVersion"/>; сбрасывается при изменении содержимого.
+    /// </summary>
+    public long? SubtreeSizeBytes { get; set; }
+
+    /// <summary>
+    /// Версия кеша размера. Растёт при каждой инвалидации и защищает пересчёт от записи устаревшего значения.
+    /// </summary>
+    public long SizeVersion { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

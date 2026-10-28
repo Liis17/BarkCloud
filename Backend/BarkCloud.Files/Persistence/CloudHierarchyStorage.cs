@@ -17,6 +17,9 @@ namespace BarkCloud.Files.Persistence;
 /// </summary>
 public class CloudHierarchyStorage : ICloudHierarchyStorage
 {
+    // Ограничение числа параметров в одном запросе IN (...) при обходе и суммировании поддеревьев.
+    private const int MaxIdsPerQuery = 500;
+
     /// <summary>
     /// Синтетический идентификатор корневой директории владельца.
     /// Используется только для CloudFileEntry.DirectoryId, чтобы поддерживать
@@ -286,6 +289,104 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
             .SingleOrDefaultAsync(cancellationToken);
 
         return (aggregate?.FileCount ?? 0, aggregate?.TotalSizeBytes ?? 0);
+    }
+
+    /// <summary>
+    /// Размеры поддеревьев папок из кеша. Устаревшие пересчитываются и сохраняются в кеш, если за время пересчёта
+    /// папка не менялась. Версии в переданных папках должны быть прочитаны до этого вызова: тогда параллельная
+    /// инвалидация приводит к отказу записи, а не к устаревшему значению в кеше.
+    /// </summary>
+    public async Task<Dictionary<Guid, long>> GetSubtreeSizes(
+        long ownerId, IReadOnlyCollection<CloudDirectory> directories, CancellationToken cancellationToken = default)
+    {
+        var sizes = new Dictionary<Guid, long>();
+        var stale = new List<CloudDirectory>();
+        foreach (var directory in directories)
+        {
+            if (directory.SubtreeSizeBytes is { } cached)
+                sizes[directory.Id] = cached;
+            else
+                stale.Add(directory);
+        }
+
+        if (stale.Count == 0)
+            return sizes;
+
+        // Один обход в ширину от всех устаревших папок. Запоминаем родителя каждой найденной папки:
+        // живой размер папки прибавляем ко всем устаревшим предкам, включая вложенные друг в друга.
+        var staleIds = stale.Select(x => x.Id).ToHashSet();
+        var visited = new HashSet<Guid>(staleIds);
+        var parentOf = new Dictionary<Guid, Guid>();
+        var frontier = staleIds.ToList();
+        while (frontier.Count > 0)
+        {
+            var children = new List<(Guid Id, Guid ParentId)>();
+            foreach (var batch in frontier.Chunk(MaxIdsPerQuery))
+            {
+                var rows = await _context.CloudDirectories
+                    .AsNoTracking()
+                    .Where(x => x.OwnerId == ownerId && x.ParentId != null && batch.Contains(x.ParentId!.Value))
+                    .Select(x => new { x.Id, ParentId = x.ParentId!.Value })
+                    .ToListAsync(cancellationToken);
+                children.AddRange(rows.Select(x => (x.Id, x.ParentId)));
+            }
+
+            frontier = [];
+            foreach (var (id, parentId) in children)
+            {
+                parentOf[id] = parentId;
+                if (visited.Add(id))
+                    frontier.Add(id);
+            }
+        }
+
+        var liveSizes = await GetLiveSizesByDirectory(ownerId, visited.ToList(), cancellationToken);
+        var totals = stale.ToDictionary(x => x.Id, _ => 0L);
+        foreach (var (directoryId, size) in liveSizes)
+        {
+            // Идём вверх по родителям; ограничение по числу посещённых папок защищает от цикла в повреждённых данных.
+            var current = directoryId;
+            for (var steps = 0; steps <= visited.Count; steps++)
+            {
+                if (staleIds.Contains(current))
+                    totals[current] += size;
+                if (!parentOf.TryGetValue(current, out var parent))
+                    break;
+                current = parent;
+            }
+        }
+
+        foreach (var directory in stale)
+        {
+            var total = totals[directory.Id];
+            sizes[directory.Id] = total;
+            await _context.CloudDirectories
+                .Where(x => x.Id == directory.Id && x.SizeVersion == directory.SizeVersion)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.SubtreeSizeBytes, (long?)total), cancellationToken);
+        }
+
+        return sizes;
+    }
+
+    private async Task<Dictionary<Guid, long>> GetLiveSizesByDirectory(
+        long ownerId, IReadOnlyCollection<Guid> directoryIds, CancellationToken cancellationToken)
+    {
+        var sizes = new Dictionary<Guid, long>();
+        foreach (var batch in directoryIds.Chunk(MaxIdsPerQuery))
+        {
+            var rows = await _context.CloudFileEntries
+                .AsNoTracking()
+                .Where(entry => entry.OwnerId == ownerId && !entry.IsDeleted && batch.Contains(entry.DirectoryId))
+                .Join(_context.UploadedFiles.AsNoTracking(), entry => entry.FileId, file => file.Id,
+                    (entry, file) => new { entry.DirectoryId, file.Size })
+                .GroupBy(x => x.DirectoryId)
+                .Select(group => new { DirectoryId = group.Key, TotalSizeBytes = group.Sum(x => x.Size) })
+                .ToListAsync(cancellationToken);
+            foreach (var row in rows)
+                sizes[row.DirectoryId] = row.TotalSizeBytes;
+        }
+
+        return sizes;
     }
 
     public void RemoveDirectories(IEnumerable<CloudDirectory> directories)

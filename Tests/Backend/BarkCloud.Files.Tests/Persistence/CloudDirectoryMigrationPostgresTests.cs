@@ -44,7 +44,6 @@ public sealed class CloudDirectoryMigrationPostgresTests
         await InsertLegacyDirectory(context, photos);
         await InsertLegacyDirectory(context, child);
         CloudFileEntryFixtures.AddOriginals(context, [entry]);
-        context.CloudFileEntries.Add(entry);
         context.FolderShareLinks.Add(new FolderShareLink
         {
             Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = photos.Id, Token = "roundtrip-folder-share",
@@ -55,6 +54,7 @@ public sealed class CloudDirectoryMigrationPostgresTests
             Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = photos.Id, RecipientId = 77, CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
+        await InsertLegacyEntry(context, entry);
         var legacyDirectories = await LegacyDirectoryRows(context);
         var entries = await context.CloudFileEntries.AsNoTracking().ToListAsync();
         var shares = await context.FolderShareLinks.AsNoTracking().ToListAsync();
@@ -128,10 +128,10 @@ public sealed class CloudDirectoryMigrationPostgresTests
         await InsertLegacyDirectory(context, second);
         await InsertLegacyDirectory(context, child);
         CloudFileEntryFixtures.AddOriginals(context, [entry]);
-        context.CloudFileEntries.Add(entry);
         context.FolderShareLinks.Add(share);
         context.DirectoryGrants.Add(grant);
         await context.SaveChangesAsync();
+        await InsertLegacyEntry(context, entry);
         var before = await LegacyDirectoryRows(context);
 
         var migrate = () => context.Database.MigrateAsync();
@@ -175,6 +175,14 @@ public sealed class CloudDirectoryMigrationPostgresTests
             INSERT INTO "CloudDirectories" ("Id", "OwnerId", "ParentId", "Name", "SystemKind", "CreatedAt", "UpdatedAt")
             VALUES ({directory.Id}, {directory.OwnerId}, {directory.ParentId}, {directory.Name}, {(int)directory.SystemKind},
                 {directory.CreatedAt}, {directory.UpdatedAt})
+            """);
+
+    // Записи пишем сырым SQL: EF-вставка трогает инвалидацию размеров папок, а колонок кеша в легаси-схеме нет.
+    private static Task<int> InsertLegacyEntry(FilesContext context, CloudFileEntry entry) =>
+        context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "CloudFileEntries" ("Id", "OwnerId", "DirectoryId", "FileId", "Name", "CreatedAt", "IsDeleted", "DeletedAt", "PurgeAt")
+            VALUES ({entry.Id}, {entry.OwnerId}, {entry.DirectoryId}, {entry.FileId}, {entry.Name}, {entry.CreatedAt},
+                {entry.IsDeleted}, {entry.DeletedAt}, {entry.PurgeAt})
             """);
 
     private static Task<List<string>> LegacyDirectoryRows(FilesContext context) =>
