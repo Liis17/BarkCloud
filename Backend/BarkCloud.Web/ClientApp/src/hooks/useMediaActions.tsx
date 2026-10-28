@@ -23,6 +23,8 @@ interface UseMediaActionsArgs {
   onRemoved?: (media: MediaItem) => void;
   onItemPatched?: (id: string, patch: Partial<MediaItem>) => void;
   reloadAlbums?: () => void;
+  /** Открывает медиа на просмотр (например, Lightbox). Не задан — пункт «Открыть» не показывается. */
+  onOpen?: (media: MediaItem) => void;
   /** Удалять конкретную запись каталога (entryIds[0]), а не все записи файла: для списков, где элемент — одна запись (поиск). */
   deleteByEntry?: boolean;
 }
@@ -50,7 +52,7 @@ function bustPreviews(m: MediaItem): Partial<MediaItem> {
 }
 
 /** Полный набор действий контекстного меню для медиа галереи (Фото/Видео). */
-export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPatched, reloadAlbums, deleteByEntry }: UseMediaActionsArgs) {
+export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPatched, reloadAlbums, onOpen, deleteByEntry }: UseMediaActionsArgs) {
   const navigate = useNavigate();
   const [menu, setMenu] = React.useState<{ x: number; y: number; media: MediaItem } | null>(null);
   const [rename, setRename] = React.useState<MediaItem | null>(null);
@@ -171,14 +173,16 @@ export function useMediaActions({ albums, toast, onRenamed, onRemoved, onItemPat
     const inAlbums = membership.of(m.id);
     const available = (albums || []).filter((a) => !inAlbums.has(a.id));
     const present = (albums || []).filter((a) => inAlbums.has(a.id));
-    const out: ContextItem[] = [
+    const out: ContextItem[] = [];
+    if (onOpen) out.push({ label: 'Открыть', icon: 'eye', onClick: () => onOpen(m) });
+    out.push(
       { label: 'Скачать', icon: 'download', onClick: () => download(m) },
       { label: 'Копировать ссылку', icon: 'link', onClick: () => copyLink(m) },
       { label: 'Создать публичную ссылку', icon: 'share', onClick: () => createShare(m.id, m.name, toast) },
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareWith(m) },
       { label: 'Переименовать', icon: 'pencil', disabled: !hasEntry, onClick: () => setRename(m) },
       { label: 'Показать в папке', icon: 'folder', disabled: !hasEntry, onClick: () => revealInFolder(m) },
-    ];
+    );
     if (m.kind === 'video') {
       out.push({ label: 'Заменить превью', icon: 'photo', onClick: () => replaceThumb(m) });
     }
