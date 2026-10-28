@@ -90,7 +90,7 @@ class UserRepositoryAvatarTest {
             SetProfilePictureResponse.getDefaultInstance()
         }
 
-        UserRepository(grpc, transfer) { 0L }.setAvatar(uri)
+        UserRepository(grpc, transfer, monotonicNowMillis = { 0L }).setAvatar(uri)
 
         assertEquals(listOf("ready-upload", "token", "fixed-stub", "deadline", "profile-rpc"), order)
         assertEquals("ready-file-id", request.captured.fileId)
@@ -112,7 +112,7 @@ class UserRepositoryAvatarTest {
         }
         every { grpc.usersStub("access-token") } returns users
 
-        val update = async { UserRepository(grpc, transfer) { 0L }.setAvatar(uri) }
+        val update = async { UserRepository(grpc, transfer, monotonicNowMillis = { 0L }).setAvatar(uri) }
         runCurrent()
         val error = runCatching { update.await() }.exceptionOrNull()
 
@@ -132,7 +132,7 @@ class UserRepositoryAvatarTest {
         coEvery { transfer.uploadAvatar(uri) } returns "ready-file-id"
         coEvery { grpc.validAccessToken() } coAnswers { awaitCancellation() }
 
-        val error = runCatching { UserRepository(grpc, transfer) { 0L }.setAvatar(uri) }.exceptionOrNull()
+        val error = runCatching { UserRepository(grpc, transfer, monotonicNowMillis = { 0L }).setAvatar(uri) }.exceptionOrNull()
 
         assertTrue(error is IOException)
         assertEquals(15_000L, testScheduler.currentTime)
