@@ -143,6 +143,7 @@ fun VaultScreen(
             onDismiss = { viewer = null },
             onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             infoEnabled = false,
+            onDelete = { item -> viewModel.deleteFile(item.id) },
         )
     }
 }

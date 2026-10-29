@@ -105,6 +105,11 @@ class FavoritesViewModel(
         }
     }
 
+    suspend fun deleteFile(fileId: String) {
+        cloudRepository.deleteUserMedia(fileId)
+        _state.update { it.copy(items = it.items.filterNot { asset -> asset.id == fileId }) }
+    }
+
     fun snackbarShown() = _state.update { it.copy(snackbar = null) }
 
     companion object {

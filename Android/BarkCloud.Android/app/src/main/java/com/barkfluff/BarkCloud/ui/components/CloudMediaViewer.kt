@@ -103,10 +103,16 @@ fun CloudMediaViewer(
 ) {
     val visibility = remember { MutableTransitionState(false) }
     var retainedAsset by remember { mutableStateOf<MediaAsset?>(null) }
+    var listWasEmptyAtOpen by remember(selectedAsset?.id) {
+        mutableStateOf(selectedAsset != null && assets.isEmpty())
+    }
 
     LaunchedEffect(selectedAsset) {
         if (selectedAsset != null) retainedAsset = selectedAsset
         visibility.targetState = selectedAsset != null
+    }
+    LaunchedEffect(assets.isNotEmpty()) {
+        if (assets.isNotEmpty()) listWasEmptyAtOpen = false
     }
     LaunchedEffect(visibility.isIdle, visibility.currentState) {
         if (visibility.isIdle && !visibility.currentState) retainedAsset = null
@@ -120,19 +126,23 @@ fun CloudMediaViewer(
     ) {
         val asset = retainedAsset ?: selectedAsset
         if (asset != null) {
-            val viewerAssets = if (assets.isEmpty()) listOf(asset) else assets
-            val initialIndex = viewerAssets.indexOfFirst { it.id == asset.id }.coerceAtLeast(0)
-            key(asset.id) {
-                CloudMediaViewerContent(
-                    assets = viewerAssets,
-                    initialIndex = initialIndex,
-                    isOpen = selectedAsset?.id == asset.id,
-                    onDismiss = onDismiss,
-                    onPlayVideo = onPlayVideo,
-                    infoEnabled = infoEnabled,
-                    onDelete = onDelete,
-                    animatedVisibilityScope = this@AnimatedVisibility,
-                )
+            if (assets.isEmpty() && !listWasEmptyAtOpen) {
+                LaunchedEffect(asset.id) { onDismiss() }
+            } else {
+                val viewerAssets = if (assets.isEmpty()) listOf(asset) else assets
+                val initialIndex = viewerAssets.indexOfFirst { it.id == asset.id }.coerceAtLeast(0)
+                key(asset.id) {
+                    CloudMediaViewerContent(
+                        assets = viewerAssets,
+                        initialIndex = initialIndex,
+                        isOpen = selectedAsset?.id == asset.id,
+                        onDismiss = onDismiss,
+                        onPlayVideo = onPlayVideo,
+                        infoEnabled = infoEnabled,
+                        onDelete = onDelete,
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                    )
+                }
             }
         }
     }
@@ -153,6 +163,7 @@ private fun CloudMediaViewerContent(
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
     val pagerState = rememberPagerState(initialPage = initialIndex) { assets.size }
+    val assetIds = remember(assets) { assets.map { it.id } }
     val scope = rememberCoroutineScope()
     val dismissPx = with(LocalDensity.current) { DismissDistance.toPx() }
     val sheetOpenPx = with(LocalDensity.current) { SheetOpenDistance.toPx() }
@@ -175,9 +186,8 @@ private fun CloudMediaViewerContent(
             (activeZoomState.value?.zoomableState?.contentTransformation?.scaleMetadata?.userZoom ?: 1f) > 1.01f
         }
     }
-    var previousSettledAssetId by remember {
-        mutableStateOf(assets.getOrNull(initialIndex)?.id)
-    }
+    var previousAssetIds by remember { mutableStateOf(assetIds) }
+    var previousSettledAssetId by remember { mutableStateOf(assetIds.getOrNull(initialIndex)) }
     val infoState by infoViewModel.state.collectAsStateWithLifecycle()
     val viewerAssetId = LocalCloudMediaViewerAssetId.current
     val jpegViewModel = currentAsset.jpegViewModel()
@@ -188,7 +198,26 @@ private fun CloudMediaViewerContent(
     var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
     var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
 
-    LaunchedEffect(pagerState.settledPage) {
+    LaunchedEffect(assetIds) {
+        val targetIndex = viewerIndexAfterAssetListChange(
+            previousIds = previousAssetIds,
+            currentId = previousSettledAssetId,
+            currentIds = assetIds,
+        ) ?: run {
+            onDismiss()
+            return@LaunchedEffect
+        }
+        val targetAssetId = assetIds.getOrNull(targetIndex)
+        val previousAssetId = previousSettledAssetId
+        if (previousAssetId != null && previousAssetId != targetAssetId) {
+            zoomStates.remove(previousAssetId)?.zoomableState?.resetZoom()
+        }
+        if (pagerState.currentPage != targetIndex) pagerState.scrollToPage(targetIndex)
+        previousAssetIds = assetIds
+        previousSettledAssetId = targetAssetId
+    }
+
+    LaunchedEffect(pagerState.settledPage, assetIds) {
         val settledAsset = assets.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
         val previousAssetId = previousSettledAssetId
         if (previousAssetId != null && previousAssetId != settledAsset.id) {

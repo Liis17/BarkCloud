@@ -132,6 +132,24 @@ class GalleryDeletionCoordinatorTest {
         viewModelScope.cancel()
     }
 
+    @Test
+    fun cloudOnlyCompletionReportsSuccessfulItemCount() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val coordinator = coordinator(scope) { if (it == "cloud-fail") error("rejected") }
+        var deletedCount = -1
+
+        assertTrue(
+            coordinator.deleteCloudOnly(
+                PendingPhotoDelete(emptyList(), listOf("cloud-ok", "cloud-fail"), 2),
+            ) { deletedCount = it },
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, deletedCount)
+        assertFalse(coordinator.state.value.isBusy)
+        scope.cancel()
+    }
+
     private fun mixedDelete() = PendingPhotoDelete(
         deviceMediaKeys = listOf("device-1"),
         cloudFileIds = listOf("cloud-ok", "cloud-fail"),

@@ -63,10 +63,16 @@ internal class GalleryDeletionCoordinator(
         execute(pending)
     }
 
-    fun deleteCloudOnly(pending: PendingPhotoDelete): Boolean {
+    fun deleteCloudOnly(
+        pending: PendingPhotoDelete,
+        onFinished: ((Int) -> Unit)? = null,
+    ): Boolean {
         if (pending.cloudFileIds.isEmpty() || _state.value.isBusy) return false
         _state.update { it.copy(isBusy = true, pendingConfirmation = null) }
-        execute(pending.copy(deviceMediaKeys = emptyList(), cloudFileIds = pending.cloudFileIds.distinct()))
+        execute(
+            pending.copy(deviceMediaKeys = emptyList(), cloudFileIds = pending.cloudFileIds.distinct()),
+            onFinished,
+        )
         return true
     }
 
@@ -79,7 +85,7 @@ internal class GalleryDeletionCoordinator(
         _state.update { it.copy(results = it.results.filterNot { result -> result.id == id }) }
     }
 
-    private fun execute(pending: PendingPhotoDelete) {
+    private fun execute(pending: PendingPhotoDelete, onFinished: ((Int) -> Unit)? = null) {
         scope.launch {
             var deletedCount = 0
             try {
@@ -117,6 +123,7 @@ internal class GalleryDeletionCoordinator(
                     results = it.results + result,
                 )
             }
+            onFinished?.invoke(deletedCount)
         }
     }
 }

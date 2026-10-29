@@ -164,6 +164,7 @@ fun AlbumDetailScreen(
             selectedAsset = viewer,
             onDismiss = { viewer = null },
             onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
+            onDelete = { item -> viewModel.deleteFile(item.id) },
         )
     }
 
