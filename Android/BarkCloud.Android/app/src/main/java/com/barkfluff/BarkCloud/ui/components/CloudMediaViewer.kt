@@ -30,6 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -52,6 +54,10 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import me.saket.telephoto.zoomable.ZoomableImageState
+import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
+import me.saket.telephoto.zoomable.rememberZoomableImageState
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.CacheInvalidatedException
@@ -142,7 +148,17 @@ private fun CloudMediaViewerContent(
     var sheetVisible by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
-    val currentAsset = assets[pagerState.currentPage]
+    val currentAsset = assets.getOrNull(pagerState.currentPage) ?: return
+    val zoomStates = remember { mutableMapOf<String, ZoomableImageState>() }
+    val activeZoomState = remember { mutableStateOf<ZoomableImageState?>(null) }
+    val isZoomed by remember {
+        derivedStateOf {
+            (activeZoomState.value?.zoomableState?.contentTransformation?.scaleMetadata?.userZoom ?: 1f) > 1.01f
+        }
+    }
+    var previousSettledAssetId by remember {
+        mutableStateOf(assets.getOrNull(initialIndex)?.id)
+    }
     val infoState by infoViewModel.state.collectAsStateWithLifecycle()
     val viewerAssetId = LocalCloudMediaViewerAssetId.current
     val jpegViewModel = currentAsset.jpegViewModel()
@@ -152,6 +168,15 @@ private fun CloudMediaViewerContent(
     var retryCount by remember(currentAsset.id) { mutableIntStateOf(0) }
     var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
     var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
+
+    LaunchedEffect(pagerState.settledPage) {
+        val settledAsset = assets.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
+        val previousAssetId = previousSettledAssetId
+        if (previousAssetId != null && previousAssetId != settledAsset.id) {
+            zoomStates.remove(previousAssetId)?.zoomableState?.resetZoom()
+        }
+        previousSettledAssetId = settledAsset.id
+    }
 
     BackHandler(enabled = isOpen, onBack = onDismiss)
 
@@ -196,7 +221,8 @@ private fun CloudMediaViewerContent(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = backdropAlpha))
             .graphicsLayer { translationY = dragY }
-            .pointerInput(dismissPx, sheetOpenPx) {
+            .pointerInput(dismissPx, sheetOpenPx, isZoomed) {
+                if (isZoomed) return@pointerInput
                 var movedUp = 0f
                 detectVerticalDragGestures(
                     onDragStart = { movedUp = 0f },
@@ -219,9 +245,18 @@ private fun CloudMediaViewerContent(
                 }
             },
     ) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        HorizontalPager(
+            state = pagerState,
+            key = { page -> assets[page].id },
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
             val asset = assets[page]
             val isCurrentPage = page == pagerState.currentPage
+            val zoomableImageState = rememberZoomableImageState()
+            SideEffect {
+                zoomStates[asset.id] = zoomableImageState
+                if (isCurrentPage) activeZoomState.value = zoomableImageState
+            }
             val pageImageState = if (isCurrentPage) imageState else ViewerImageState.Preview
             val previewModifier = if (page == initialIndex) Modifier.fillMaxSize().cloudMediaSharedElement(
                 key = asset.id,
@@ -245,35 +280,53 @@ private fun CloudMediaViewerContent(
                         label = "cloud-original",
                     ) { image ->
                         when (image) {
-                            is ViewerImageState.Original -> AsyncImage(
-                                model = image.file,
-                                contentDescription = asset.fileName,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit,
-                                onError = {
-                                    if (!useJpegView && jpegViewModel != null) {
-                                        failedDecodeCache = null
-                                        scope.launch {
-                                            invalidateViewerCacheSafely { app.fileCache.invalidateOriginal(asset.id) }
-                                        }
-                                        imageState = ViewerImageState.Loading
-                                        useJpegView = true
-                                    } else {
-                                        failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView)
-                                        imageState = ViewerImageState.Error
-                                    }
-                                },
-                            )
-                            is ViewerImageState.JpegView -> AsyncImage(
-                                model = image.model,
-                                contentDescription = asset.fileName,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit,
-                                onError = {
-                                    failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView = true)
-                                    imageState = ViewerImageState.Error
-                                },
-                            )
+                            is ViewerImageState.Original -> {
+                                val request = remember(image.file, asset.id, useJpegView) {
+                                    ImageRequest.Builder(context)
+                                        .data(image.file)
+                                        .listener(onError = { _, _ ->
+                                            if (!useJpegView && jpegViewModel != null) {
+                                                failedDecodeCache = null
+                                                scope.launch {
+                                                    invalidateViewerCacheSafely {
+                                                        app.fileCache.invalidateOriginal(asset.id)
+                                                    }
+                                                }
+                                                imageState = ViewerImageState.Loading
+                                                useJpegView = true
+                                            } else {
+                                                failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView)
+                                                imageState = ViewerImageState.Error
+                                            }
+                                        })
+                                        .build()
+                                }
+                                ZoomableAsyncImage(
+                                    model = request,
+                                    contentDescription = asset.fileName,
+                                    modifier = Modifier.fillMaxSize(),
+                                    state = zoomableImageState,
+                                    contentScale = ContentScale.Fit,
+                                )
+                            }
+                            is ViewerImageState.JpegView -> {
+                                val request = remember(image.model, asset.id) {
+                                    ImageRequest.Builder(context)
+                                        .data(image.model)
+                                        .listener(onError = { _, _ ->
+                                            failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView = true)
+                                            imageState = ViewerImageState.Error
+                                        })
+                                        .build()
+                                }
+                                ZoomableAsyncImage(
+                                    model = request,
+                                    contentDescription = asset.fileName,
+                                    modifier = Modifier.fillMaxSize(),
+                                    state = zoomableImageState,
+                                    contentScale = ContentScale.Fit,
+                                )
+                            }
                             else -> Unit
                         }
                     }
