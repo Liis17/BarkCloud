@@ -13,6 +13,44 @@ internal enum class ViewerCacheKind {
     JPEG_VIEW,
 }
 
+internal data class CloudMediaActionVisibility(
+    val share: Boolean,
+    val copy: Boolean,
+    val download: Boolean,
+    val info: Boolean,
+    val delete: Boolean,
+)
+
+internal fun cloudMediaActionVisibility(
+    isVideo: Boolean,
+    infoEnabled: Boolean,
+    canDelete: Boolean,
+): CloudMediaActionVisibility = CloudMediaActionVisibility(
+    share = true,
+    copy = !isVideo,
+    download = true,
+    info = infoEnabled,
+    delete = canDelete,
+)
+
+internal enum class CloudMediaStoreCollection {
+    IMAGES,
+    VIDEOS,
+}
+
+internal data class CloudMediaStoreTarget(
+    val collection: CloudMediaStoreCollection,
+    val mimeType: String,
+    val relativePath: String,
+)
+
+internal fun cloudMediaStoreTarget(isVideo: Boolean, mimeType: String): CloudMediaStoreTarget =
+    CloudMediaStoreTarget(
+        collection = if (isVideo) CloudMediaStoreCollection.VIDEOS else CloudMediaStoreCollection.IMAGES,
+        mimeType = mimeType,
+        relativePath = if (isVideo) "Movies/BarkCloud" else "Pictures/BarkCloud",
+    )
+
 internal fun viewerCacheKindAfterDecodeFailure(useJpegView: Boolean): ViewerCacheKind =
     if (useJpegView) ViewerCacheKind.JPEG_VIEW else ViewerCacheKind.ORIGINAL
 
