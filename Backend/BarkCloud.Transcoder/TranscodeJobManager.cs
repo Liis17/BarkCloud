@@ -7,6 +7,11 @@ public sealed class TranscodeJobManager(TranscodePaths paths, ITranscoderProcess
 
     public TranscodeStartResult Start(StartTranscodeRequest request)
     {
+        if (request.Generation < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.Generation), "Поколение задания должно быть положительным.");
+        }
+
         if (!FfmpegCommand.SupportedHeights.Contains(request.Height))
         {
             throw new ArgumentOutOfRangeException(nameof(request.Height), "Высота не входит в поддерживаемую лестницу.");
@@ -22,7 +27,7 @@ public sealed class TranscodeJobManager(TranscodePaths paths, ITranscoderProcess
             _current?.Cancellation.Dispose();
             var inputPath = paths.ResolveInput(request.Input);
             var outputPath = paths.ResolveOutput(request.Output);
-            var job = new Job(Guid.NewGuid().ToString("N"), inputPath, outputPath, request.Height);
+            var job = new Job(Guid.NewGuid().ToString("N"), inputPath, outputPath, request.Height, request.Generation);
             _current = job;
             job.Execution = Task.Run(() => ExecuteAsync(job));
             return new TranscodeStartResult(false, Snapshot(job));
@@ -119,14 +124,15 @@ public sealed class TranscodeJobManager(TranscodePaths paths, ITranscoderProcess
     }
 
     private static TranscodeJobResponse Snapshot(Job job) =>
-        new(job.Id, job.Status, job.Progress, job.Error);
+        new(job.Id, job.Generation, job.Status, job.Progress, job.Error);
 
-    private sealed class Job(string id, string inputPath, string outputPath, int height)
+    private sealed class Job(string id, string inputPath, string outputPath, int height, long generation)
     {
         public string Id { get; } = id;
         public string InputPath { get; } = inputPath;
         public string OutputPath { get; } = outputPath;
         public int Height { get; } = height;
+        public long Generation { get; } = generation;
         public CancellationTokenSource Cancellation { get; } = new();
         public string Status { get; set; } = "running";
         public int Progress { get; set; }
@@ -135,8 +141,8 @@ public sealed class TranscodeJobManager(TranscodePaths paths, ITranscoderProcess
     }
 }
 
-public sealed record StartTranscodeRequest(string Input, string Output, int Height);
+public sealed record StartTranscodeRequest(string Input, string Output, int Height, long Generation);
 
-public sealed record TranscodeJobResponse(string Id, string Status, int Progress, string? Error);
+public sealed record TranscodeJobResponse(string Id, long Generation, string Status, int Progress, string? Error);
 
 public sealed record TranscodeStartResult(bool Conflict, TranscodeJobResponse? Job);

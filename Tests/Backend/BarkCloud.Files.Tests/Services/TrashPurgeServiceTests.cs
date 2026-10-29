@@ -230,6 +230,30 @@ public class TrashPurgeServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task PurgeOrphanWithPendingVariantIntent_DefersDeletionForRecovery()
+    {
+        var original = Blob(Guid.NewGuid());
+        original.MediaKind = MediaKind.Video;
+        var variantId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(original);
+        _db.Context.VideoTranscodeStates.Add(new VideoTranscodeState
+        {
+            FileId = original.Id,
+            PendingVariantFileId = variantId,
+            PendingProfileId = "video-variants-v1",
+            UpdatedAt = DateTime.UtcNow
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var deleted = await CreateSut().PurgeOrphanBlobsAsync([original.Id], default);
+
+        deleted.Should().Be(0);
+        (await _db.Context.UploadedFiles.FindAsync(original.Id)).Should().NotBeNull();
+        (await _db.Context.VideoTranscodeStates.FindAsync(original.Id))!.PendingVariantFileId.Should().Be(variantId);
+        _deletedKeys.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task PurgeExpiredEntries_ExpiredEntry_IsPurgedWithDependenciesAndBlob()
     {
         var now = DateTime.UtcNow;
