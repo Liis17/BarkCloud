@@ -1,4 +1,5 @@
 using BarkCloud.Files.Consumers;
+using BarkCloud.Files.Configurations;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Host;
 using BarkCloud.Files.Infrastructure;
@@ -118,6 +119,10 @@ public class Program
         builder.Services.AddSingleton<IMultipartUploadStore, S3MultipartUploadStore>();
         builder.Services.AddSingleton<StorageMigrationGate>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.Configure<VideoVariantOptions>(builder.Configuration.GetSection("VideoVariants"));
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<VideoTranscodeLeaseManager>();
+        builder.Services.AddHostedService<VideoVariantWorker>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddSingleton<IS3StorageStatsProvider, S3StorageStatsProvider>();

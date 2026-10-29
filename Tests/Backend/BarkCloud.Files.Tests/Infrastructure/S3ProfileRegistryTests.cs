@@ -67,6 +67,7 @@ public sealed class S3ProfileRegistryTests
     [InlineData(UploadFileType.UserAvatar, MediaKind.Photo, true, "previews-v1")]
     [InlineData(UploadFileType.CloudFile, MediaKind.Photo, false, "images-v1")]
     [InlineData(UploadFileType.CloudFile, MediaKind.Video, false, "videos-v1")]
+    [InlineData(UploadFileType.VideoVariant, MediaKind.Video, false, "video-variants-v1")]
     [InlineData(UploadFileType.CloudFile, MediaKind.Audio, false, "audio-v1")]
     [InlineData(UploadFileType.CloudFile, MediaKind.Document, false, "documents-v1")]
     [InlineData(UploadFileType.CloudFile, MediaKind.Other, false, "other-v1")]
@@ -80,6 +81,7 @@ public sealed class S3ProfileRegistryTests
         using var registry = new S3BucketRegistry(Configuration(
             Profile("universal-v1", "universal", "https://local.example", "universal", true),
             Profile("avatars-v1", "avatars", "https://local.example", "avatars", true),
+            Profile("video-variants-v1", "video-variants", "https://local.example", "video-variants", true),
             Profile("images-v1", "images", "https://local.example", "images", true),
             Profile("videos-v1", "videos", "https://local.example", "videos", true),
             Profile("audio-v1", "audio", "https://local.example", "audio", true),
@@ -89,6 +91,16 @@ public sealed class S3ProfileRegistryTests
 
         registry.ResolveWriteProfileId(fileType, mediaKind, isPreview)
             .Should().Be(expectedProfileId);
+    }
+
+    [Fact]
+    public void ResolveWriteProfile_VideoVariantFallsBackToUniversal()
+    {
+        using var registry = new S3BucketRegistry(Configuration(
+            Profile("universal-v1", "universal", "https://local.example", "universal", true)));
+
+        registry.ResolveWriteProfileId(UploadFileType.VideoVariant, MediaKind.Video, isPreview: false)
+            .Should().Be("universal-v1");
     }
 
     private static IConfiguration Configuration(params Dictionary<string, string?>[] profiles)

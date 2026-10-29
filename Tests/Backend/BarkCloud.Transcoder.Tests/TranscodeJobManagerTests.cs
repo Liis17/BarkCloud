@@ -14,8 +14,8 @@ public sealed class TranscodeJobManagerTests : IDisposable
         var runner = new BlockingRunner();
         var manager = new TranscodeJobManager(new TranscodePaths(_root), runner);
 
-        var first = manager.Start(new StartTranscodeRequest("source", "first.webm", 360));
-        var second = manager.Start(new StartTranscodeRequest("source", "second.webm", 720));
+        var first = manager.Start(new StartTranscodeRequest("source", "first.webm", 360, 1));
+        var second = manager.Start(new StartTranscodeRequest("source", "second.webm", 720, 1));
 
         Assert.False(first.Conflict);
         Assert.True(second.Conflict);
@@ -33,7 +33,7 @@ public sealed class TranscodeJobManagerTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "source"), "source");
         var runner = new BlockingRunner();
         var manager = new TranscodeJobManager(new TranscodePaths(_root), runner);
-        var start = manager.Start(new StartTranscodeRequest("source", "output.webm", 360));
+        var start = manager.Start(new StartTranscodeRequest("source", "output.webm", 360, 1));
 
         await runner.Started;
         var cancelled = await manager.CancelAsync(start.Job!.Id);

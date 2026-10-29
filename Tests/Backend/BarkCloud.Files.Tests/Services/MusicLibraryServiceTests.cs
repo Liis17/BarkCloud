@@ -109,6 +109,7 @@ public class MusicLibraryServiceTests : IDisposable
         {
             Id = fileId,
             Uploaders = new List<long> { OwnerId },
+            Type = UploadFileType.CloudFile,
             MediaKind = MediaKind.Audio
         });
         var tempFiles = new Mock<ITempFilesStorage>();
@@ -142,8 +143,8 @@ public class MusicLibraryServiceTests : IDisposable
         });
         await _db.Context.SaveChangesAsync();
 
-        var audio = new UploadFile { Id = audioId, Uploaders = [OwnerId], MediaKind = MediaKind.Audio };
-        var photo = new UploadFile { Id = photoId, Uploaders = [OwnerId], MediaKind = MediaKind.Photo };
+        var audio = new UploadFile { Id = audioId, Uploaders = [OwnerId], Type = UploadFileType.CloudFile, MediaKind = MediaKind.Audio };
+        var photo = new UploadFile { Id = photoId, Uploaders = [OwnerId], Type = UploadFileType.CloudFile, MediaKind = MediaKind.Photo };
         var files = new Mock<IUploadedFilesStorage>();
         files.Setup(x => x.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync([audio, photo]);
         var service = new MusicLibraryService(

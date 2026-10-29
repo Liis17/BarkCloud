@@ -217,6 +217,27 @@ public class TrashPurgeService : ITrashPurgeService
         // Без CommitAsync (блоб оказался не сирота или S3 не удалил объект) Dispose откатывает занятие строки.
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
+        UploadFile? current;
+        if (_context.Database.IsNpgsql())
+        {
+            var locked = await _context.UploadedFiles
+                .FromSqlInterpolated($"SELECT * FROM \"UploadedFiles\" WHERE \"Id\" = {orphan.Id} FOR UPDATE")
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+            current = locked.SingleOrDefault();
+        }
+        else
+        {
+            current = await _context.UploadedFiles.AsNoTracking()
+                .SingleOrDefaultAsync(file => file.Id == orphan.Id, cancellationToken);
+        }
+        if (current is null || current.Uploaders.Count > 0)
+            return false;
+
+        if (current.Type == UploadFileType.CloudFile && await _context.VideoTranscodeStates
+                .AnyAsync(state => state.FileId == current.Id && state.PendingVariantFileId != null, cancellationToken))
+            return false;
+
         var claimed = await _context.UploadedFiles
             .Where(f => f.Id == orphan.Id && f.Uploaders.Count == 0
                 && !_context.CloudFileEntries.Any(e => e.FileId == f.Id))
