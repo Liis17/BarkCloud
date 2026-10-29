@@ -54,6 +54,9 @@ public sealed class ConfigurationDefaultsPopulatorTests : IDisposable
         second.Single(item => item.ServiceId == ServiceId.Notification
                               && item.Section == "Email"
                               && item.Key == "AllowInsecure").Value.Should().Be("true");
+        second.Single(item => item.ServiceId == ServiceId.Files
+                              && item.Section == "VideoVariants"
+                              && item.Key == "Enabled").Value.Should().Be("false");
 
         var universal = await _context.StorageProfiles.SingleAsync();
         universal.ProfileId.Should().Be("universal-v1");

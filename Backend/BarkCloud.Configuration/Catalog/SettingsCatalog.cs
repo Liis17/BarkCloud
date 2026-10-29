@@ -132,7 +132,10 @@ public static class SettingsCatalog
             ("UsersService", "Host", SettingValueKind.Url, false, false),
             ("ExternalEndpoint", "Host", SettingValueKind.Url, false, false),
             ("TempFiles", "ExpiresAt", SettingValueKind.Integer, false, false),
-            ("Uploads", "TempDirectory", SettingValueKind.String, false, false));
+            ("Uploads", "TempDirectory", SettingValueKind.String, false, false),
+            ("VideoVariants", "Enabled", SettingValueKind.Boolean, false, false),
+            ("VideoVariants", "MaxSourceSizeMb", SettingValueKind.Integer, false, false),
+            ("VideoVariants", "MaxDurationMinutes", SettingValueKind.Integer, false, false));
 
         AddService(entries, ServiceId.Torrent,
             ("IdentityService", "Host", SettingValueKind.Url, false, false),
