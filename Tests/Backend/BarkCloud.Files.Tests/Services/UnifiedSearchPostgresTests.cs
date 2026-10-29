@@ -87,6 +87,40 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
     }
 
     [PostgresFact]
+    public async Task Search_VideoVariantsAreExcluded()
+    {
+        await using var database = await PostgresFilesDatabase.CreateAsync();
+        var originalId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        await using (var seed = database.CreateContext())
+        {
+            seed.UploadedFiles.AddRange(
+                new UploadFile
+                {
+                    Id = originalId, Uploaders = [Catalog.Owner], Type = UploadFileType.CloudFile,
+                    MediaKind = MediaKind.Video, Filename = "variant-marker.mp4", StorageProfileId = "test-profile",
+                    Size = 8, CreatedAt = DateTime.UtcNow, UploadedAt = DateTime.UtcNow, Etag = "original-etag"
+                },
+                new UploadFile
+                {
+                    Id = variantId, Uploaders = [Catalog.Owner], Type = UploadFileType.VideoVariant,
+                    MediaKind = MediaKind.Video, Filename = "variant-marker-360p.webm", StorageProfileId = "test-profile",
+                    Size = 4, CreatedAt = DateTime.UtcNow, UploadedAt = DateTime.UtcNow, Etag = "variant-etag"
+                });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = database.CreateContext();
+        var service = new UnifiedSearchService(context, UserContextFactory.Create(Catalog.Owner),
+            new RunSettings { Host = "http://localhost", Http1Port = 7026 }, TestConfiguration.Empty());
+        var result = await Find(service, SearchSection.Videos, "variant-marker");
+
+        result.Hits.Should().ContainSingle();
+        result.Hits[0].FileId.Should().Be(originalId.ToString());
+        result.Hits.Select(x => x.FileId).Should().NotContain(variantId.ToString());
+    }
+
+    [PostgresFact]
     public async Task Search_Tracks_UsesAudioMetadataOnly()
     {
         var c = fixture.Catalog;

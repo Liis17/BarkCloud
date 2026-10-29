@@ -73,12 +73,27 @@ public class AttachFileCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_VideoVariantCannotBeAttachedById()
+    {
+        var fileId = Guid.NewGuid();
+        var variant = ReadyFile(fileId);
+        variant.Type = UploadFileType.VideoVariant;
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(variant);
+
+        var act = () => CreateSut().Handle(new AttachFileCommand { FileId = fileId, Name = "f" }, default);
+
+        await act.Should().ThrowAsync<FileNotFoundException>();
+        _storage.Verify(s => s.AddFileEntry(It.IsAny<CloudFileEntry>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_FileStillProcessing_ThrowsFileNotReady()
     {
         var fileId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
             Id = fileId,
+            Type = UploadFileType.CloudFile,
             Uploaders = [OwnerId],
             Etag = "etag",
             UploadedAt = null
@@ -239,6 +254,7 @@ public class AttachFileCommandHandlerTests
         MediaKind mediaKind = MediaKind.Other) => new()
     {
         Id = id,
+        Type = UploadFileType.CloudFile,
         Uploaders = [ownerId],
         MediaKind = mediaKind,
         UploadedAt = DateTime.UtcNow,

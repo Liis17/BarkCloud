@@ -95,7 +95,7 @@ public class CreateArchiveCommandHandler : IRequestHandler<CreateArchiveCommand,
             var blobs = await _files.GetFiles(request.FileIds);
             foreach (var f in blobs)
             {
-                if (!f.Uploaders.Contains(ownerId))
+                if (f.Type != UploadFileType.CloudFile || !f.Uploaders.Contains(ownerId))
                     continue; // чужой блоб — не отдаём по знанию id
                 Add(f.Id, SafeLeafName(f.Filename, f.Id));
             }
@@ -181,7 +181,8 @@ public class CreateArchiveCommandHandler : IRequestHandler<CreateArchiveCommand,
                     Stream src;
                     try
                     {
-                        if (!sourceFiles.TryGetValue(fileId, out var sourceFile))
+                    if (!sourceFiles.TryGetValue(fileId, out var sourceFile)
+                        || sourceFile.Type != UploadFileType.CloudFile)
                             continue;
                         var sourceProfileId = _buckets.ResolveReadProfileId(sourceFile);
                         src = await _s3.DownloadAsync(sourceProfileId, fileId.ToString());

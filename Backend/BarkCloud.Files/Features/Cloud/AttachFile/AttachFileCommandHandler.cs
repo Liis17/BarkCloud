@@ -12,6 +12,7 @@ using MediatR;
 using DirectoryNotFoundException = BarkCloud.Shared.Exceptions.Files.DirectoryNotFoundException;
 using FileNotFoundException = BarkCloud.Shared.Exceptions.Files.FileNotFoundException;
 using MediaKind = BarkCloud.Files.Domain.MediaKind;
+using DomainUploadFileType = BarkCloud.Files.Domain.UploadFileType;
 
 namespace BarkCloud.Files.Features.Cloud.AttachFile;
 
@@ -67,6 +68,8 @@ public class AttachFileCommandHandler : IRequestHandler<AttachFileCommand, Cloud
         // Проверяем существование UploadFile
         var file = await _filesStorage.GetFile(request.FileId);
         if (file is null)
+            throw new FileNotFoundException();
+        if (file.Type != DomainUploadFileType.CloudFile)
             throw new FileNotFoundException();
 
         // Разрешаем привязку только если пользователь уже в Uploaders (то есть он загружал файл).

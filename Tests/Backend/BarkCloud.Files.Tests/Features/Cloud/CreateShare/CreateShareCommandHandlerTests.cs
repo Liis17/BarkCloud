@@ -1,4 +1,5 @@
 using BarkCloud.Files.Features.Cloud.CreateShare;
+using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Tests._Helpers;
 using BarkCloud.Shared.Exceptions.Files;
@@ -45,12 +46,28 @@ public class CreateShareCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_VideoVariantCannotBeSharedById()
+    {
+        var fileId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId, Type = UploadFileType.VideoVariant, Uploaders = [OwnerId], Etag = "etag", UploadedAt = DateTime.UtcNow
+        });
+
+        var act = () => CreateSut().Handle(new CreateShareCommand { FileId = fileId }, default);
+
+        await act.Should().ThrowAsync<CloudAccessDeniedException>();
+        _storage.Verify(s => s.Add(It.IsAny<DomainShareLink>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_FileNotReady_ThrowsFileNotReady()
     {
         var fileId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
             Id = fileId,
+            Type = UploadFileType.CloudFile,
             Uploaders = new() { OwnerId }
         });
 
@@ -67,6 +84,7 @@ public class CreateShareCommandHandlerTests
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
             Id = fileId,
+            Type = UploadFileType.CloudFile,
             Uploaders = new() { OwnerId },
             Etag = "etag",
             UploadedAt = DateTime.UtcNow

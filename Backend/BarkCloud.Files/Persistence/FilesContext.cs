@@ -34,6 +34,12 @@ public class FilesContext : DbContext
 
     public DbSet<FilePreview> FilePreviews { get; set; }
 
+    public DbSet<VideoVariant> VideoVariants { get; set; }
+
+    public DbSet<VideoTranscodeState> VideoTranscodeStates { get; set; }
+
+    public DbSet<VideoTranscodeLease> VideoTranscodeLeases { get; set; }
+
     public DbSet<FilePlaceholder> FilePlaceholders { get; set; }
 
     public DbSet<Album> Albums { get; set; }
@@ -171,6 +177,29 @@ public class FilesContext : DbContext
             // Обратный поиск «к какому оригиналу относится это превью» —
             // нужен при подчистке Uploaders/дедупликации.
             b.HasIndex(x => x.PreviewFileId);
+        });
+
+        modelBuilder.Entity<VideoVariant>(b =>
+        {
+            b.HasIndex(x => new { x.OriginalFileId, x.Height }).IsUnique();
+            b.HasIndex(x => x.VariantFileId);
+        });
+
+        modelBuilder.Entity<VideoTranscodeState>(b =>
+        {
+            b.HasKey(x => x.FileId);
+            b.Property(x => x.LastError).HasMaxLength(2048);
+            b.Property(x => x.PendingProfileId).HasMaxLength(128);
+            b.HasIndex(x => new { x.Status, x.UpdatedAt });
+        });
+
+        modelBuilder.Entity<VideoTranscodeLease>(b =>
+        {
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.OwnerInstanceId).HasMaxLength(128);
+            b.ToTable("VideoTranscodeLeases", table => table.HasCheckConstraint(
+                "CK_VideoTranscodeLeases_SingletonId", "\"Id\" = 1"));
         });
 
         modelBuilder.Entity<FilePlaceholder>(b =>

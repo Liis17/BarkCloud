@@ -157,6 +157,7 @@ public class UploadedFilesStorage : IUploadedFilesStorage
             .AsNoTracking()
             .WhereReady()
             .Where(x => x.Uploaders.Contains(userId))
+            .Where(x => x.Type != UploadFileType.VideoVariant)
             .GroupBy(x => x.Type)
             .Select(g => new { Type = g.Key, Size = g.Sum(x => x.Size) })
             .ToDictionaryAsync(x => x.Type, x => x.Size);
