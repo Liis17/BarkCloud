@@ -9,6 +9,7 @@ using DomainShareLink = BarkCloud.Files.Domain.ShareLink;
 using TempFileEntity = BarkCloud.Files.Domain.TempFile;
 using UploadFileEntity = BarkCloud.Files.Domain.UploadFile;
 using DomainMediaKind = BarkCloud.Files.Domain.MediaKind;
+using DomainUploadFileType = BarkCloud.Files.Domain.UploadFileType;
 using FilePreviewEntity = BarkCloud.Files.Domain.FilePreview;
 using ProtoMediaKind = BarkCloud.Proto.Files.MediaKind;
 
@@ -69,22 +70,35 @@ public class ResolveShareCommandHandlerTests
     public async Task Handle_HappyPath_IncrementsClicksAndReturnsUrlWithPreview()
     {
         var fileId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
         var tempId = Guid.NewGuid();
+        var variantTempId = Guid.NewGuid();
         var previewLarge = Guid.NewGuid();
         var share = new DomainShareLink { Id = Guid.NewGuid(), FileId = fileId, Token = "t", Name = "Pic" };
         _storage.Setup(s => s.GetByToken("t", It.IsAny<CancellationToken>())).ReturnsAsync(share);
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
             Id = fileId,
-            MediaKind = DomainMediaKind.Photo,
+            Type = DomainUploadFileType.CloudFile,
+            MediaKind = DomainMediaKind.Video,
             ImageWidth = 800,
             ImageHeight = 600,
             Size = 12345,
             Etag = "etag",
             UploadedAt = DateTime.UtcNow
         });
+        _files.Setup(s => s.GetVideoVariantsForFiles(
+                It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, List<VideoVariantDownloadInfo>>
+            {
+                [fileId] = [new(variantId, 360, 640, 360, 300)]
+            });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TempFileEntity> { new() { Id = tempId, OriginalFileId = fileId } });
+            .ReturnsAsync(new List<TempFileEntity>
+            {
+                new() { Id = tempId, OriginalFileId = fileId },
+                new() { Id = variantTempId, OriginalFileId = variantId }
+            });
         _files.Setup(s => s.GetPreviewsForFile(fileId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<FilePreviewEntity>
             {
@@ -98,10 +112,14 @@ public class ResolveShareCommandHandlerTests
         response.FileId.Should().Be(fileId.ToString());
         response.Name.Should().Be("Pic");
         response.DownloadUrl.Should().Contain(tempId.ToString());
-        response.MediaKind.Should().Be(ProtoMediaKind.Photo);
+        response.MediaKind.Should().Be(ProtoMediaKind.Video);
         response.PreviewUrl.Should().Contain(previewLarge.ToString()); // берётся самое крупное превью
         response.ImageWidth.Should().Be(800);
         response.FileSize.Should().Be(12345);
+        response.VideoQualities.Should().HaveCount(2);
+        response.VideoQualities[0].IsOriginal.Should().BeTrue();
+        response.VideoQualities[1].IsOriginal.Should().BeFalse();
+        response.VideoQualities[1].Url.Should().Contain(variantTempId.ToString());
         _storage.Verify(s => s.IncrementClicks(share.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

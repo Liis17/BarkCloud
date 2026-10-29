@@ -1,6 +1,7 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
@@ -77,25 +78,23 @@ public class GetTempDownloadUrlCommandHandler : IRequestHandler<GetTempDownloadU
 
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
-        // Один INSERT на все TempFile вместо N round-trip'ов к БД
-        var tempFiles = await _tempFilesStorage.CreateTempFilesBatchAsync(
-            files.Select(f => f.Id), cancellationToken);
+        var downloadLinks = await VideoQualityLinkBuilder.CreateAsync(
+            _uploadedFilesStorage, _tempFilesStorage, files, baseUrl, cancellationToken);
 
-        foreach (var tempFile in tempFiles)
+        foreach (var file in files)
         {
-            var url = FileUrlHelper.GenerateDownloadUrl(baseUrl, tempFile.Id);
+            if (!downloadLinks.TryGetValue(file.Id, out var links) || string.IsNullOrEmpty(links.OriginalUrl))
+                continue;
 
-            _logger.LogDebug(
-                "Создана временная ссылка для файла {FileId}: {TempFileId}",
-                tempFile.OriginalFileId,
-                tempFile.Id
-            );
+            _logger.LogDebug("Создана временная ссылка для файла {FileId}", file.Id);
 
-            response.FileUrls.Add(new GetTempDownloadUrlResponse.Types.DownloadFileData()
+            var fileData = new GetTempDownloadUrlResponse.Types.DownloadFileData
             {
-                FileId = tempFile.OriginalFileId.ToString(),
-                Url = url
-            });
+                FileId = file.Id.ToString(),
+                Url = links.OriginalUrl
+            };
+            fileData.VideoQualities.AddRange(links.VideoQualities);
+            response.FileUrls.Add(fileData);
         }
 
         _logger.LogInformation(

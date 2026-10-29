@@ -95,6 +95,36 @@ public sealed class UploadedFilesStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task GetVideoVariantsForFiles_ReturnsOnlyReadyVariantsInOneBatch()
+    {
+        var original = ReadyFile(42, MediaKind.Video, 100);
+        var variant = ReadyFile(42, MediaKind.Video, 30);
+        variant.Type = UploadFileType.VideoVariant;
+        var pending = ReadyFile(42, MediaKind.Video, 20);
+        pending.Type = UploadFileType.VideoVariant;
+        pending.Etag = null;
+        _database.Context.UploadedFiles.AddRange(original, variant, pending);
+        _database.Context.VideoVariants.AddRange(
+            new VideoVariant
+            {
+                Id = Guid.NewGuid(), OriginalFileId = original.Id, VariantFileId = variant.Id,
+                Height = 360, Width = 640, ActualHeight = 360, CreatedAt = DateTime.UtcNow
+            },
+            new VideoVariant
+            {
+                Id = Guid.NewGuid(), OriginalFileId = original.Id, VariantFileId = pending.Id,
+                Height = 720, Width = 1280, ActualHeight = 720, CreatedAt = DateTime.UtcNow
+            });
+        await _database.Context.SaveChangesAsync();
+
+        var result = await new UploadedFilesStorage(_database.Context)
+            .GetVideoVariantsForFiles([original.Id]);
+
+        result[original.Id].Should().ContainSingle();
+        result[original.Id][0].Should().Be(new VideoVariantDownloadInfo(variant.Id, 360, 640, 360, 30));
+    }
+
+    [Fact]
     public async Task GetUserMediaStats_MatchesGalleryFiltersForKindReadyStatePreviewsAndTrash()
     {
         const long ownerId = 42;

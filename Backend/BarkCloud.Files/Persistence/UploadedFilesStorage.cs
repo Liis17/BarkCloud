@@ -130,6 +130,44 @@ public class UploadedFilesStorage : IUploadedFilesStorage
                 g => g.OrderBy(p => p.TargetWidth).ToList());
     }
 
+    public async Task<Dictionary<Guid, List<VideoVariantDownloadInfo>>> GetVideoVariantsForFiles(
+        IEnumerable<Guid> originalFileIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = originalFileIds.Distinct().ToArray();
+        if (ids.Length == 0)
+            return [];
+
+        var variants = await (
+            from variant in _context.VideoVariants.AsNoTracking()
+            join file in _context.UploadedFiles.AsNoTracking().WhereReady()
+                on variant.VariantFileId equals file.Id
+            where ids.Contains(variant.OriginalFileId) && file.Type == UploadFileType.VideoVariant
+            select new
+            {
+                variant.OriginalFileId,
+                FileId = variant.VariantFileId,
+                variant.Height,
+                variant.Width,
+                variant.ActualHeight,
+                file.Size
+            }).ToListAsync(cancellationToken);
+
+        return variants
+            .GroupBy(variant => variant.OriginalFileId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(variant => variant.Height)
+                    .Select(variant => new VideoVariantDownloadInfo(
+                        variant.FileId,
+                        variant.Height,
+                        variant.Width,
+                        variant.ActualHeight,
+                        variant.Size))
+                    .ToList());
+    }
+
     /// <summary>
     /// Снимает <paramref name="userId"/> из Uploaders файла (для декремента квоты).
     /// </summary>
