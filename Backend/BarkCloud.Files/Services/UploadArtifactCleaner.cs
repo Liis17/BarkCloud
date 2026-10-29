@@ -12,19 +12,11 @@ public sealed class UploadArtifactCleaner(
 {
     public async Task CleanupAsync(UploadSession session, CancellationToken cancellationToken)
     {
-        // Владелец снимается с оригинала и (если он ему больше не нужен) с превью в одной транзакции:
-        // общее превью проверяется и освобождается под блокировкой строки (см. FileOwnership).
+        // Владелец снимается с оригинала и неиспользуемых производных блобов в одной транзакции.
         await using (var transaction = await context.Database.BeginTransactionAsync(cancellationToken))
         {
             await context.RemoveUploaderAsync(session.FileId, session.OwnerId, cancellationToken);
-
-            var previewFileIds = await context.FilePreviews
-                .AsNoTracking()
-                .Where(x => x.OriginalFileId == session.FileId)
-                .Select(x => x.PreviewFileId)
-                .Distinct()
-                .ToListAsync(cancellationToken);
-            await context.ReleasePreviewOwnerAsync(previewFileIds, session.OwnerId, [session.FileId], cancellationToken);
+            await context.ReleaseDerivedBlobOwnerAsync([session.FileId], session.OwnerId, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
         }

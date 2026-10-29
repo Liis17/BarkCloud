@@ -147,31 +147,10 @@ public class TrashPurgeService : ITrashPurgeService
                 released.Add(pair);
             }
 
-            // Снимаем владельца с превью-блобов. Превью дедуплицируются по SHA256, поэтому один
-            // блоб-превью может быть привязан сразу к нескольким оригиналам. Убираем владельца с
-            // превью ТОЛЬКО если у него не осталось другого (не удаляемого сейчас) оригинала,
-            // ссылающегося на тот же превью-блоб, — иначе оставшийся файл лишился бы превью.
-            // Строки превью блокируются до коммита (параллельная привязка нового оригинала или такой же
-            // purge ждёт и видит результат), сразу все и по порядку Id — чтобы два purge с пересекающимися
-            // превью разных владельцев не ждали друг друга.
-            var previewsByOwner = new List<(long OwnerId, List<Guid> ReleasedFileIds, List<Guid> PreviewFileIds)>();
+            // Производные блобы снимаются только если на них больше не ссылается другой оригинал владельца.
             foreach (var ownerGroup in released.GroupBy(r => r.OwnerId))
-            {
-                var releasedFileIds = ownerGroup.Select(r => r.FileId).ToList();
-                var previewFileIds = await _context.FilePreviews
-                    .AsNoTracking()
-                    .Where(p => releasedFileIds.Contains(p.OriginalFileId))
-                    .Select(p => p.PreviewFileId)
-                    .Distinct()
-                    .ToListAsync(cancellationToken);
-                if (previewFileIds.Count > 0)
-                    previewsByOwner.Add((ownerGroup.Key, releasedFileIds, previewFileIds));
-            }
-
-            await _context.LockLiveFilesAsync(
-                previewsByOwner.SelectMany(x => x.PreviewFileIds).Distinct().ToList(), cancellationToken);
-            foreach (var (ownerId, releasedFileIds, previewFileIds) in previewsByOwner)
-                await _context.ReleasePreviewOwnerAsync(previewFileIds, ownerId, releasedFileIds, cancellationToken);
+                await _context.ReleaseDerivedBlobOwnerAsync(
+                    ownerGroup.Select(r => r.FileId).Distinct().ToList(), ownerGroup.Key, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
         }
@@ -202,14 +181,19 @@ public class TrashPurgeService : ITrashPurgeService
         if (candidateFileIds.Count == 0)
             return 0;
 
-        // Расширяем кандидатов их превью-блобами — они осиротевают вместе с оригиналом.
+        // Расширяем кандидатов превью и видео-вариантами — они осиротевают вместе с оригиналом.
         var previewFileIds = await _context.FilePreviews
             .AsNoTracking()
             .Where(p => candidateFileIds.Contains(p.OriginalFileId))
             .Select(p => p.PreviewFileId)
             .ToListAsync(cancellationToken);
+        var variantFileIds = await _context.VideoVariants
+            .AsNoTracking()
+            .Where(v => candidateFileIds.Contains(v.OriginalFileId))
+            .Select(v => v.VariantFileId)
+            .ToListAsync(cancellationToken);
 
-        var allIds = candidateFileIds.Concat(previewFileIds).Distinct().ToList();
+        var allIds = candidateFileIds.Concat(previewFileIds).Concat(variantFileIds).Distinct().ToList();
 
         var orphans = await _context.UploadedFiles
             .AsNoTracking()
@@ -258,6 +242,12 @@ public class TrashPurgeService : ITrashPurgeService
         // Снимаем связки превью, ссылающиеся на удалённый блоб (как на оригинал, так и на превью).
         await _context.FilePreviews
             .Where(p => p.OriginalFileId == orphan.Id || p.PreviewFileId == orphan.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+        await _context.VideoVariants
+            .Where(v => v.OriginalFileId == orphan.Id || v.VariantFileId == orphan.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+        await _context.VideoTranscodeStates
+            .Where(x => x.FileId == orphan.Id || x.PendingVariantFileId == orphan.Id)
             .ExecuteDeleteAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);

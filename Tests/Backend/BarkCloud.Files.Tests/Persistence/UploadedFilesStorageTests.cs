@@ -74,6 +74,27 @@ public sealed class UploadedFilesStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task VideoVariantCountsTowardQuotaButIsNotListedAsUserMediaOrTypeBreakdown()
+    {
+        const long ownerId = 42;
+        var original = ReadyFile(ownerId, MediaKind.Video, 80);
+        var variant = ReadyFile(ownerId, MediaKind.Video, 20);
+        variant.Type = UploadFileType.VideoVariant;
+        _database.Context.UploadedFiles.AddRange(original, variant);
+        await _database.Context.SaveChangesAsync();
+
+        var storage = new UploadedFilesStorage(_database.Context);
+        var media = await storage.ListUserMediaPage(ownerId, MediaKind.Video, null, null, 50);
+        var usedBytes = await storage.GetUserStorageUsed(ownerId);
+        var byType = await storage.GetUserStorageByType(ownerId);
+
+        media.Should().ContainSingle().Which.Id.Should().Be(original.Id);
+        usedBytes.Should().Be(100);
+        byType.Should().ContainKey(UploadFileType.CloudFile).WhoseValue.Should().Be(80);
+        byType.Should().NotContainKey(UploadFileType.VideoVariant);
+    }
+
+    [Fact]
     public async Task GetUserMediaStats_MatchesGalleryFiltersForKindReadyStatePreviewsAndTrash()
     {
         const long ownerId = 42;

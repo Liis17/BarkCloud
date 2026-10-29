@@ -16,8 +16,15 @@ internal static class FileOwnership
     public static async Task AddUploaderAsync(
         this FilesContext context, Guid fileId, long userId, CancellationToken cancellationToken = default)
     {
+        await using var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
         if (context.IsNpgsql())
         {
+            var isCloudFile = await context.UploadedFiles
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == fileId && x.Type == Domain.UploadFileType.CloudFile, cancellationToken);
             await context.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                  UPDATE "UploadedFiles"
@@ -25,15 +32,49 @@ internal static class FileOwnership
                  WHERE "Id" = {fileId} AND NOT ("Uploaders" @> ARRAY[{userId}]::bigint[])
                  """,
                 cancellationToken);
+
+            if (isCloudFile)
+            {
+                await context.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                     UPDATE "UploadedFiles" AS variant
+                     SET "Uploaders" = array_append(variant."Uploaders", {userId})
+                     WHERE variant."Id" IN (
+                         SELECT "VariantFileId" FROM "VideoVariants" WHERE "OriginalFileId" = {fileId}
+                     ) AND NOT (variant."Uploaders" @> ARRAY[{userId}]::bigint[])
+                    """,
+                    cancellationToken);
+            }
+
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
             return;
         }
 
         var file = await context.UploadedFiles.FirstOrDefaultAsync(x => x.Id == fileId, cancellationToken);
-        if (file is null || file.Uploaders.Contains(userId))
+        if (file is null)
             return;
 
-        file.Uploaders.Add(userId);
+        if (!file.Uploaders.Contains(userId))
+            file.Uploaders.Add(userId);
+
+        if (file.Type == Domain.UploadFileType.CloudFile)
+        {
+            var variantIds = await context.VideoVariants
+                .Where(x => x.OriginalFileId == fileId)
+                .Select(x => x.VariantFileId)
+                .ToListAsync(cancellationToken);
+            var variants = await context.UploadedFiles
+                .Where(x => variantIds.Contains(x.Id))
+                .ToListAsync(cancellationToken);
+            foreach (var variant in variants)
+                if (!variant.Uploaders.Contains(userId))
+                    variant.Uploaders.Add(userId);
+        }
+
         await context.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>Снимает владельца с файла. Неизвестный файл или отсутствующий владелец — не ошибка.</summary>
@@ -145,6 +186,57 @@ internal static class FileOwnership
             if (!stillNeeded)
                 await context.RemoveUploaderAsync(previewFileId, ownerId, cancellationToken);
         }
+    }
+
+    /// <summary>Снимает владельца с превью и вариантов, на которые не ссылаются другие его оригиналы.</summary>
+    public static async Task ReleaseDerivedBlobOwnerAsync(
+        this FilesContext context,
+        IReadOnlyCollection<Guid> originalFileIds,
+        long ownerId,
+        CancellationToken cancellationToken = default)
+    {
+        var originals = originalFileIds.Distinct().ToArray();
+        if (originals.Length == 0)
+            return;
+
+        var previewIds = await context.FilePreviews
+            .AsNoTracking()
+            .Where(x => originals.Contains(x.OriginalFileId))
+            .Select(x => x.PreviewFileId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var variantIds = await context.VideoVariants
+            .AsNoTracking()
+            .Where(x => originals.Contains(x.OriginalFileId))
+            .Select(x => x.VariantFileId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var derivedIds = previewIds.Concat(variantIds).Distinct().ToList();
+        if (derivedIds.Count == 0)
+            return;
+
+        var liveIds = await context.LockLiveFilesAsync(derivedIds, cancellationToken);
+        var retainedPreviewIds = await context.FilePreviews
+            .AsNoTracking()
+            .Where(p => derivedIds.Contains(p.PreviewFileId)
+                && !originals.Contains(p.OriginalFileId)
+                && context.UploadedFiles.Any(o => o.Id == p.OriginalFileId && o.Uploaders.Contains(ownerId)))
+            .Select(p => p.PreviewFileId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var retainedVariantIds = await context.VideoVariants
+            .AsNoTracking()
+            .Where(v => derivedIds.Contains(v.VariantFileId)
+                && !originals.Contains(v.OriginalFileId)
+                && context.UploadedFiles.Any(o => o.Id == v.OriginalFileId && o.Uploaders.Contains(ownerId)))
+            .Select(v => v.VariantFileId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var retainedIds = retainedPreviewIds.Concat(retainedVariantIds).ToHashSet();
+
+        foreach (var fileId in liveIds)
+            if (!retainedIds.Contains(fileId))
+                await context.RemoveUploaderAsync(fileId, ownerId, cancellationToken);
     }
 
     private static bool IsNpgsql(this FilesContext context) =>
