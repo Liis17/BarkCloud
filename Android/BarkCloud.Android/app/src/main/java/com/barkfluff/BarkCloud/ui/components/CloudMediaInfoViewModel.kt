@@ -71,14 +71,19 @@ class CloudMediaInfoViewModel(
     fun save(alias: String, tags: List<String>) {
         val target = fileId
         viewModelScope.launch {
+            if (fileId != target) return@launch
             _state.update { it.copy(saving = true, saveError = null) }
             try {
                 val saved = repository.replaceFileSearchMetadata(target, alias.trim(), tags)
-                _state.update { it.copy(saving = false, alias = saved.alias, tags = saved.tagsList) }
+                if (fileId == target) {
+                    _state.update { it.copy(saving = false, alias = saved.alias, tags = saved.tagsList) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, saveError = e.message) }
+                if (fileId == target) {
+                    _state.update { it.copy(saving = false, saveError = e.message) }
+                }
             }
         }
     }
