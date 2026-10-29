@@ -39,6 +39,15 @@ public sealed class StorageProfileStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_VideoVariantsRole_IsSupported()
+    {
+        var profile = await _storage.SaveAsync(Input(StorageProfileRoles.VideoVariants,
+            "https://video-variants.example", "video-variants"), "admin", "web");
+
+        profile.Role.Should().Be(StorageProfileRoles.VideoVariants);
+    }
+
+    [Fact]
     public async Task Save_CredentialRotation_UpdatesEveryVersionAtTheSamePhysicalLocation()
     {
         await _storage.SaveAsync(Input("images", "https://s3.example", "shared"), "admin", "web");
