@@ -1,5 +1,6 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Proto.Files;
 
@@ -90,28 +91,22 @@ public class ResolveFolderShareCommandHandler : IRequestHandler<ResolveFolderSha
             var fileIds = entries.Select(e => e.FileId).Distinct().ToList();
             var files = (await _filesStorage.GetFiles(fileIds)).ToDictionary(f => f.Id);
             var previewsByFile = await _filesStorage.GetPreviewsForFiles(files.Keys, cancellationToken);
-
-            // Прямой /download/{fileId} для CloudFile запрещён — выдаём временные ссылки на оригиналы.
-            var tempByOriginal = files.Count == 0
-                ? new Dictionary<Guid, Guid>()
-                : (await _tempFilesStorage.CreateTempFilesBatchAsync(files.Keys, cancellationToken))
-                    .GroupBy(t => t.OriginalFileId)
-                    .ToDictionary(g => g.Key, g => g.First().Id);
+            var downloadLinks = await VideoQualityLinkBuilder.CreateAsync(
+                _filesStorage, _tempFilesStorage, files.Values, baseUrl, cancellationToken);
 
             foreach (var e in entries)
             {
                 if (!files.TryGetValue(e.FileId, out var file))
                     continue;
 
-                var downloadUrl = tempByOriginal.TryGetValue(e.FileId, out var tempId)
-                    ? FileUrlHelper.GenerateDownloadUrl(baseUrl, tempId)
-                    : string.Empty;
+                downloadLinks.TryGetValue(e.FileId, out var links);
+                var downloadUrl = links?.OriginalUrl ?? string.Empty;
 
                 var previewUrl = string.Empty;
                 if (previewsByFile.TryGetValue(e.FileId, out var previews) && previews.Count > 0)
                     previewUrl = FileUrlHelper.GenerateDownloadUrl(baseUrl, previews.OrderByDescending(p => p.TargetWidth).First().PreviewFileId);
 
-                response.Files.Add(new PublicFileEntry
+                var fileEntry = new PublicFileEntry
                 {
                     FileId = e.FileId.ToString(),
                     Name = e.Name,
@@ -121,7 +116,10 @@ public class ResolveFolderShareCommandHandler : IRequestHandler<ResolveFolderSha
                     FileSize = file.Size,
                     ImageWidth = file.ImageWidth ?? 0,
                     ImageHeight = file.ImageHeight ?? 0
-                });
+                };
+                if (links is not null)
+                    fileEntry.VideoQualities.AddRange(links.VideoQualities);
+                response.Files.Add(fileEntry);
             }
         }
 

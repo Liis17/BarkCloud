@@ -230,10 +230,19 @@ message GetTempDownloadUrlResponse {
     string file_id = 1; // идентификатор файла
     string url = 2; // ссылка на загрузку
     string preview_url = 3; // ссылка на превью файла
+    repeated VideoQualityInfo video_qualities = 4; // оригинал и сжатые варианты видео
   }
 
   repeated DownloadFileData file_urls = 1; // ссылки на файлы
 
+}
+
+message VideoQualityInfo {
+  int32 height = 1;
+  int32 width = 2;
+  int64 file_size = 3;
+  bool is_original = 4;
+  string url = 5;
 }
 
 message GetFileDataRequest {
@@ -1351,6 +1360,7 @@ message ResolveShareResponse {
   int32 image_width = 7;      // размеры оригинала (если известны)
   int32 image_height = 8;
   int64 file_size = 9;        // размер оригинала, байт
+  repeated VideoQualityInfo video_qualities = 10; // оригинал и сжатые варианты видео
 }
 
 // ============ Шаринг между пользователями (приватные гранты) ============
@@ -1422,6 +1432,7 @@ message GetSharedFileDownloadUrlRequest {
 
 message GetSharedFileDownloadUrlResponse {
   string download_url = 1;
+  repeated VideoQualityInfo video_qualities = 2; // оригинал и сжатые варианты видео
 }
 
 // ============ Публичные папки (динамическая страница) ============
@@ -1475,6 +1486,7 @@ message PublicFileEntry {
   int64 file_size = 6;
   int32 image_width = 7;
   int32 image_height = 8;
+  repeated VideoQualityInfo video_qualities = 9; // оригинал и сжатые варианты видео
 }
 
 message ResolveFolderShareResponse {
