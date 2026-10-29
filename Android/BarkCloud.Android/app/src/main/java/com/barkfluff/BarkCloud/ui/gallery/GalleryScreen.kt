@@ -625,6 +625,9 @@ fun GalleryScreen(
         onPlayVideo = { item -> openRemote(item.id, item.fileName) { message ->
                 android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
         } },
+        onDelete = { item ->
+            if (!viewModel.deleteCloudFromViewer(item.id)) throw IllegalStateException()
+        },
     )
     }
     viewer?.let { media ->

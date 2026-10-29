@@ -4,6 +4,7 @@ import com.barkfluff.BarkCloud.data.cache.CacheInvalidatedException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -68,6 +69,25 @@ class CloudMediaViewerLogicTest {
             ),
             cloudMediaStoreTarget(isVideo = true, mimeType = "video/mp4"),
         )
+    }
+
+    @Test
+    fun listChangeKeepsTheCurrentAssetWhenItStillExists() {
+        assertEquals(
+            1,
+            viewerIndexAfterAssetListChange(
+                previousIds = listOf("a", "b", "c"),
+                currentId = "b",
+                currentIds = listOf("x", "b", "c"),
+            ),
+        )
+    }
+
+    @Test
+    fun removalKeepsTheSamePositionOrUsesThePreviousLastItem() {
+        assertEquals(0, viewerIndexAfterAssetListChange(listOf("a", "b", "c"), "a", listOf("b", "c")))
+        assertEquals(1, viewerIndexAfterAssetListChange(listOf("a", "b", "c"), "c", listOf("a", "b")))
+        assertNull(viewerIndexAfterAssetListChange(listOf("a"), "a", emptyList()))
     }
 
     @Test

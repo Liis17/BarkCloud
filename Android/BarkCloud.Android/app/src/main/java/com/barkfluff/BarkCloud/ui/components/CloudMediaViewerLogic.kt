@@ -51,6 +51,17 @@ internal fun cloudMediaStoreTarget(isVideo: Boolean, mimeType: String): CloudMed
         relativePath = if (isVideo) "Movies/BarkCloud" else "Pictures/BarkCloud",
     )
 
+internal fun viewerIndexAfterAssetListChange(
+    previousIds: List<String>,
+    currentId: String?,
+    currentIds: List<String>,
+): Int? {
+    if (currentIds.isEmpty()) return null
+    currentId?.let { id -> currentIds.indexOf(id).takeIf { it >= 0 }?.let { return it } }
+    val previousIndex = currentId?.let(previousIds::indexOf)?.takeIf { it >= 0 } ?: 0
+    return previousIndex.coerceAtMost(currentIds.lastIndex)
+}
+
 internal fun viewerCacheKindAfterDecodeFailure(useJpegView: Boolean): ViewerCacheKind =
     if (useJpegView) ViewerCacheKind.JPEG_VIEW else ViewerCacheKind.ORIGINAL
 

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.DynamicFolderRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import kotlinx.coroutines.Job
@@ -27,6 +28,7 @@ data class SmartFolderDetailUiState(
 
 class SmartFolderDetailViewModel(
     private val repository: DynamicFolderRepository,
+    private val cloudRepository: CloudRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SmartFolderDetailUiState())
@@ -76,6 +78,11 @@ class SmartFolderDetailViewModel(
         reloadJob?.join()
     }
 
+    suspend fun deleteFile(fileId: String) {
+        cloudRepository.deleteUserMedia(fileId)
+        _state.update { it.copy(items = it.items.filterNot { asset -> asset.id == fileId }) }
+    }
+
     fun loadMore() {
         val s = _state.value
         if (!s.canLoadMore || s.isLoading || s.isLoadingMore) return
@@ -113,7 +120,7 @@ class SmartFolderDetailViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return SmartFolderDetailViewModel(app.dynamicFolderRepository) as T
+                return SmartFolderDetailViewModel(app.dynamicFolderRepository, app.cloudRepository) as T
             }
         }
     }
