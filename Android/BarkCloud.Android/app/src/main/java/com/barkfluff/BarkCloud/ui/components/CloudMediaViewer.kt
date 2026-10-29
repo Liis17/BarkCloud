@@ -6,6 +6,8 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -14,16 +16,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -42,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -69,6 +77,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
+import java.text.DateFormat
+import java.util.Date
 
 private val DismissDistance = 120.dp
 private val SheetOpenDistance = 80.dp
@@ -89,6 +99,7 @@ fun CloudMediaViewer(
     onDismiss: () -> Unit,
     onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean = true,
+    onDelete: (suspend (MediaAsset) -> Unit)? = null,
 ) {
     val visibility = remember { MutableTransitionState(false) }
     var retainedAsset by remember { mutableStateOf<MediaAsset?>(null) }
@@ -119,6 +130,7 @@ fun CloudMediaViewer(
                     onDismiss = onDismiss,
                     onPlayVideo = onPlayVideo,
                     infoEnabled = infoEnabled,
+                    onDelete = onDelete,
                     animatedVisibilityScope = this@AnimatedVisibility,
                 )
             }
@@ -135,6 +147,7 @@ private fun CloudMediaViewerContent(
     onDismiss: () -> Unit,
     onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean,
+    onDelete: (suspend (MediaAsset) -> Unit)?,
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     val context = LocalContext.current
@@ -149,6 +162,12 @@ private fun CloudMediaViewerContent(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
     val currentAsset = assets.getOrNull(pagerState.currentPage) ?: return
+    val dateTimeText = remember(currentAsset.createdAtMillis) {
+        currentAsset.createdAtMillis.takeIf { it > 0L }?.let {
+            DateFormat.getDateTimeInstance().format(Date(it))
+        }.orEmpty()
+    }
+    var overlayVisible by remember { mutableStateOf(true) }
     val zoomStates = remember { mutableMapOf<String, ZoomableImageState>() }
     val activeZoomState = remember { mutableStateOf<ZoomableImageState?>(null) }
     val isZoomed by remember {
@@ -268,7 +287,7 @@ private fun CloudMediaViewerContent(
                 AsyncImage(
                     model = asset.previewModel(1024),
                     contentDescription = asset.fileName,
-                    modifier = previewModifier,
+                    modifier = previewModifier.clickable { overlayVisible = !overlayVisible },
                     contentScale = ContentScale.Fit,
                 )
                 if (isCurrentPage && asset.kind == CloudMediaKind.PHOTO) {
@@ -307,6 +326,7 @@ private fun CloudMediaViewerContent(
                                     modifier = Modifier.fillMaxSize(),
                                     state = zoomableImageState,
                                     contentScale = ContentScale.Fit,
+                                    onClick = { overlayVisible = !overlayVisible },
                                 )
                             }
                             is ViewerImageState.JpegView -> {
@@ -325,6 +345,7 @@ private fun CloudMediaViewerContent(
                                     modifier = Modifier.fillMaxSize(),
                                     state = zoomableImageState,
                                     contentScale = ContentScale.Fit,
+                                    onClick = { overlayVisible = !overlayVisible },
                                 )
                             }
                             else -> Unit
@@ -368,6 +389,52 @@ private fun CloudMediaViewerContent(
                     )
                 }
             }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        AnimatedVisibility(
+            visible = overlayVisible,
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().zIndex(1f),
+            enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 3 },
+            exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { -it / 3 },
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(112.dp)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.78f), Color.Transparent)),
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = 4.dp, top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.viewer_back),
+                            tint = Color.White,
+                        )
+                    }
+                    Text(text = dateTimeText, color = Color.White)
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = overlayVisible,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp).zIndex(1f),
+            enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 },
+            exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { it / 2 },
+        ) {
+            CloudMediaActions(
+                asset = currentAsset,
+                infoEnabled = infoEnabled,
+                onInfo = { sheetVisible = true },
+                onDelete = onDelete,
+                scope = scope,
+            )
         }
     }
 
