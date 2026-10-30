@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
+import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.net.queryFileName
@@ -35,6 +36,7 @@ data class AlbumDetailUiState(
 class AlbumDetailViewModel(
     private val appContext: Context,
     private val albumRepository: AlbumRepository,
+    private val cloudRepository: CloudRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AlbumDetailUiState())
@@ -146,6 +148,11 @@ class AlbumDetailViewModel(
         }
     }
 
+    suspend fun deleteFile(fileId: String) {
+        cloudRepository.deleteUserMedia(fileId)
+        _state.update { it.copy(items = it.items.filterNot { asset -> asset.id == fileId }) }
+    }
+
     fun rename(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch {
@@ -177,7 +184,7 @@ class AlbumDetailViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return AlbumDetailViewModel(app, app.albumRepository) as T
+                return AlbumDetailViewModel(app, app.albumRepository, app.cloudRepository) as T
             }
         }
     }

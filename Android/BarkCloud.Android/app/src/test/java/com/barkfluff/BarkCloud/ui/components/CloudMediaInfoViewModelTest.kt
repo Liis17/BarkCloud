@@ -6,6 +6,7 @@ import com.barkfluff.BarkCloud.support.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -68,6 +69,68 @@ class CloudMediaInfoViewModelTest {
 
         assertEquals("старое", vm.state.value.alias)
         assertEquals("сеть", vm.state.value.saveError)
+        assertFalse(vm.state.value.saving)
+    }
+
+    @Test fun `delayed successful save for previous file does not replace current file state`() = runTest {
+        val pendingSave = CompletableDeferred<FileSearchMetadata>()
+        val currentFileMetadata = FileSearchMetadata.newBuilder()
+            .setAlias("Альбом B")
+            .addTags("тег B")
+            .build()
+        coEvery { repository.fileMetadata(any()) } returns null
+        coEvery { repository.fileSearchMetadata(any()) } returns FileSearchMetadata.getDefaultInstance()
+        coEvery { repository.fileSearchMetadata("B") } returns currentFileMetadata
+        coEvery { repository.listUserTags() } returns emptyList()
+        coEvery { repository.replaceFileSearchMetadata("A", "Альбом A новый", listOf("тег A")) } coAnswers {
+            pendingSave.await()
+        }
+        val vm = CloudMediaInfoViewModel(repository)
+
+        vm.load("A")
+        runCurrent()
+        vm.save("Альбом A новый", listOf("тег A"))
+        runCurrent()
+        vm.load("B")
+        runCurrent()
+        pendingSave.complete(
+            FileSearchMetadata.newBuilder().setAlias("Альбом A новый").addTags("тег A").build(),
+        )
+        runCurrent()
+
+        assertEquals("Альбом B", vm.state.value.alias)
+        assertEquals(listOf("тег B"), vm.state.value.tags)
+        assertNull(vm.state.value.saveError)
+        assertFalse(vm.state.value.saving)
+    }
+
+    @Test fun `delayed failed save for previous file does not report error on current file`() = runTest {
+        val pendingSave = CompletableDeferred<FileSearchMetadata>()
+        val currentFileMetadata = FileSearchMetadata.newBuilder()
+            .setAlias("Альбом B")
+            .addTags("тег B")
+            .build()
+        coEvery { repository.fileMetadata(any()) } returns null
+        coEvery { repository.fileSearchMetadata(any()) } returns FileSearchMetadata.getDefaultInstance()
+        coEvery { repository.fileSearchMetadata("B") } returns currentFileMetadata
+        coEvery { repository.listUserTags() } returns emptyList()
+        coEvery { repository.replaceFileSearchMetadata("A", "Альбом A новый", listOf("тег A")) } coAnswers {
+            pendingSave.await()
+        }
+        val vm = CloudMediaInfoViewModel(repository)
+
+        vm.load("A")
+        runCurrent()
+        vm.save("Альбом A новый", listOf("тег A"))
+        runCurrent()
+        vm.load("B")
+        runCurrent()
+        pendingSave.completeExceptionally(IllegalStateException("сеть"))
+        runCurrent()
+
+        assertEquals("Альбом B", vm.state.value.alias)
+        assertEquals(listOf("тег B"), vm.state.value.tags)
+        assertNull(vm.state.value.saveError)
         assertFalse(vm.state.value.saving)
     }
 }

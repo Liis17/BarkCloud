@@ -22,6 +22,7 @@ import com.barkfluff.BarkCloud.data.upload.UploadDestination
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -299,6 +300,20 @@ class GalleryViewModel(
                 totalCount = totalCount,
             ),
         )
+    }
+
+    internal suspend fun deleteCloudFromViewer(fileId: String): Boolean {
+        if (_state.value.isQueueing || deletionState.value.isBusy) return false
+        val result = CompletableDeferred<Boolean>()
+        val started = deletionCoordinator.deleteCloudOnly(
+            PendingPhotoDelete(
+                deviceMediaKeys = emptyList(),
+                cloudFileIds = listOf(fileId),
+                totalCount = 1,
+            ),
+        ) { deletedCount -> result.complete(deletedCount == 1) }
+        if (!started) return false
+        return result.await()
     }
 
     internal fun acknowledgeDeletedCloudIds(ids: Set<String>) = deletionCoordinator.acknowledgeDeletedCloudIds(ids)
