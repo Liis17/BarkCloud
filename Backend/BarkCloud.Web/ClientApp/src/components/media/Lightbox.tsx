@@ -5,6 +5,7 @@ import { useOptionalAudioPlayer } from '../../hooks/useAudioPlayer';
 import { apiGet, fetchClipboardImage, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { VideoPlayer } from './MediaPlayer';
+import type { VideoQuality } from './MediaPlayer';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
 import { isSvgFileName, selectPhotoViewSource } from '../../lib/imagePreviewSource';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
@@ -12,6 +13,7 @@ import type { CardFile, MediaItem } from '../../lib/types';
 
 interface DownloadResponse {
   urls: Record<string, string | null>;
+  videoQualities: Record<string, VideoQuality[]>;
 }
 
 interface LightboxProps {
@@ -30,6 +32,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const list: CardFile[] = Array.isArray(items) ? items : media ? [media] : [];
   const [i, setI] = React.useState(index);
   const [urls, setUrls] = React.useState<Record<string, string | null>>({});
+  const [videoQualities, setVideoQualities] = React.useState<Record<string, VideoQuality[]>>({});
   const [err, setErr] = React.useState<string | null>(null);
   const [scale, setScale] = React.useState(1);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
@@ -73,7 +76,10 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     if (!fileId || urls[fileId]) return;
     apiGet<DownloadResponse>('/api/files/download?ids=' + encodeURIComponent(fileId))
       .then((d) => {
-        if (alive) setUrls((u) => ({ ...u, [fileId]: (d.urls && d.urls[fileId]) || null }));
+        if (alive) {
+          setUrls((u) => ({ ...u, [fileId]: (d.urls && d.urls[fileId]) || null }));
+          setVideoQualities((current) => ({ ...current, [fileId]: d.videoQualities?.[fileId] || [] }));
+        }
       })
       .catch((e) => {
         if (alive) setErr(e.message);
@@ -237,6 +243,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
               persistVolumeRef(el);
             }}
             src={url!}
+            qualities={videoQualities[fileId!]}
             autoPlay
           />
         )}

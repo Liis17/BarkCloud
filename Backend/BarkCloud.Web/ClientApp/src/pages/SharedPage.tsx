@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { SharedFolderModal } from '../components/ui/SharedFolderModal';
+import { Modal } from '../components/ui/Modal';
+import { VideoPlayer, type VideoQuality } from '../components/media/MediaPlayer';
 import { useToast } from '../hooks/useToast';
 import { useTextFileViewer } from '../hooks/useTextFileViewer';
 import { getTextFileKind, textContentUrl } from '../lib/textFiles';
@@ -27,6 +29,7 @@ interface SharedOwner {
 interface SharedFile {
   id: string;
   name: string;
+  kind?: string;
   size?: number;
   previews?: { url: string }[];
 }
@@ -166,7 +169,7 @@ function SharedCard({ item, onDownload, onOpen, opened }: { item: SharedItem; on
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        {getTextFileKind(item.file.name) && <button className="btn text" onClick={() => onOpen(item)}><Icon.eye size={16} /> Открыть</button>}
+        {(item.file.kind === 'video' || getTextFileKind(item.file.name)) && <button className="btn text" onClick={() => onOpen(item)}><Icon.eye size={16} /> Открыть</button>}
         <button className="btn text" onClick={() => onDownload(item)}>
           <Icon.download size={16} /> Скачать
         </button>
@@ -303,6 +306,7 @@ export function SharedPage() {
   const [shared, setShared] = React.useState<SharedItem[] | null>(null);
   const [sharedFolders, setSharedFolders] = React.useState<SharedFolderItem[] | null>(null);
   const [openFolder, setOpenFolder] = React.useState<{ id: string; name: string } | null>(null);
+  const [sharedVideo, setSharedVideo] = React.useState<{ name: string; downloadUrl: string; videoQualities: VideoQuality[] } | null>(null);
   // Курсоры пагинации: «Мои публичные» — несколько источников, у грантов курсор только у файлов.
   const [pubCursors, setPubCursors] = React.useState<{ file: Cursor; folder: Cursor; album: Cursor; musicPlaylist: Cursor }>({
     file: null,
@@ -511,7 +515,19 @@ export function SharedPage() {
       toast((e as Error).message, 'err');
     }
   }
+  async function openSharedVideo(item: SharedItem) {
+    try {
+      const response = await apiPost<{ downloadUrl: string; videoQualities: VideoQuality[] }>('/api/shared/download', { fileId: item.file.id });
+      setSharedVideo({ name: item.file.name, downloadUrl: response.downloadUrl, videoQualities: response.videoQualities || [] });
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
+  }
   function openSharedText(item: SharedItem) {
+    if (item.file.kind === 'video') {
+      void openSharedVideo(item);
+      return;
+    }
     openTextFile({ name: item.file.name, size: item.file.size, contentUrl: textContentUrl({ kind: 'shared', fileId: item.file.id }), onDownload: () => download(item) });
   }
 
@@ -692,6 +708,14 @@ export function SharedPage() {
         ))}
 
       {openFolder && <SharedFolderModal rootDirId={openFolder.id} rootName={openFolder.name} onClose={() => setOpenFolder(null)} />}
+      {sharedVideo && (
+        <Modal title={sharedVideo.name} wide onClose={() => setSharedVideo(null)}>
+          <div style={{ display: 'grid', justifyItems: 'center', gap: 12 }}>
+            <VideoPlayer className="shared-folder-video" src={sharedVideo.downloadUrl} qualities={sharedVideo.videoQualities} autoPlay />
+            <a className="btn primary" href={sharedVideo.downloadUrl} target="_blank" rel="noreferrer"><Icon.download size={16} /> Скачать оригинал</a>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

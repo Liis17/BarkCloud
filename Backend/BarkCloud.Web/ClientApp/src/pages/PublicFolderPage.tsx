@@ -8,6 +8,7 @@ import { PublicFileTile } from '../components/public/PublicTile';
 import { PublicViewer } from '../components/public/PublicViewer';
 import { countLabel, isPublicMedia } from '../components/public/publicFile';
 import { useDocumentHead } from '../hooks/useDocumentHead';
+import type { VideoQuality } from '../components/media/MediaPlayer';
 
 interface PubDir {
   id: string;
@@ -22,6 +23,7 @@ interface PubFile {
   fileSize: number;
   imageWidth: number;
   imageHeight: number;
+  videoQualities: VideoQuality[];
 }
 interface Listing {
   found: boolean;

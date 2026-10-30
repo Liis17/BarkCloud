@@ -5,6 +5,7 @@ import { Modal } from './Modal';
 import { Icon } from '../Icon';
 import { Loading } from './EmptyState';
 import { VideoPlayer } from '../media/MediaPlayer';
+import type { VideoQuality } from '../media/MediaPlayer';
 import { apiGet } from '../../lib/api';
 
 interface PubDir {
@@ -18,6 +19,7 @@ interface PubFile {
   downloadUrl: string;
   previewUrl: string;
   fileSize: number;
+  videoQualities: VideoQuality[];
 }
 interface Listing {
   found: boolean;
@@ -122,7 +124,7 @@ export function SharedFolderModal({ rootDirId, rootName, onClose }: { rootDirId:
         <div onClick={() => setViewer(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 60 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '92vw', maxHeight: '92vh', textAlign: 'center' }}>
             {viewer.mediaKind === 'video' ? (
-              <VideoPlayer className="shared-folder-video" src={viewer.downloadUrl} autoPlay />
+              <VideoPlayer className="shared-folder-video" src={viewer.downloadUrl} qualities={viewer.videoQualities} autoPlay />
             ) : (
               <img src={viewer.downloadUrl} alt={viewer.name} style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 8, objectFit: 'contain' }} />
             )}

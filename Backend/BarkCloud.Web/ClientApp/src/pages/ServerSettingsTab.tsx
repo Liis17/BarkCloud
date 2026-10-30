@@ -59,7 +59,7 @@ const SERVICE_NAMES: Record<number, string> = {
 };
 const STORAGE_ROLES: Record<string, string> = {
   universal: 'Универсальное', avatars: 'Аватары', images: 'Изображения', videos: 'Видео',
-  audio: 'Аудио', documents: 'Документы', other: 'Прочие файлы', previews: 'Превью',
+  audio: 'Аудио', documents: 'Документы', other: 'Прочие файлы', previews: 'Превью', 'video-variants': 'Варианты видео',
 };
 const STORAGE_FIELD_NAMES = ['Endpoint', 'Bucket', 'Access key Credentials', 'Secret key Credentials', 'Регион Region', 'Адресация ForcePathStyle', 'Cloudflare R2', 'Применить миграцию'];
 const STORAGE_FIELDS = 'S3 ' + STORAGE_FIELD_NAMES.join(' ');

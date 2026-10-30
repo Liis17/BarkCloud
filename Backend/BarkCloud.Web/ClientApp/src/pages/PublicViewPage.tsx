@@ -9,6 +9,7 @@ import { usePublicShareActions } from '../components/public/usePublicShareAction
 import { useDocumentHead } from '../hooks/useDocumentHead';
 import { persistVolumeRef } from '../lib/volume';
 import { VideoPlayer } from '../components/media/MediaPlayer';
+import type { VideoQuality } from '../components/media/MediaPlayer';
 import { isSvgFileName } from '../lib/imagePreviewSource';
 
 interface ShareInfo {
@@ -20,6 +21,7 @@ interface ShareInfo {
   imageWidth: number;
   imageHeight: number;
   fileSize: number;
+  videoQualities: VideoQuality[];
   downloadPath: string;
 }
 
@@ -120,6 +122,7 @@ export function PublicViewPage() {
               <VideoPlayer
                 onMediaRef={persistVolumeRef}
                 src={info.downloadUrl}
+                qualities={info.videoQualities}
                 poster={info.previewUrl || undefined}
                 bigPlay
               />
