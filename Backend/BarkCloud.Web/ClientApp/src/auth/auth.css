@@ -277,65 +277,21 @@ a {
   font-weight: 570;
 }
 
-.auth-field > input,
-.auth-password-wrap > input {
-  width: 100%;
-  min-width: 0;
-  min-height: 52px;
-  padding: 12px 14px;
-  border: 1px solid var(--auth-outline);
-  border-radius: 12px;
-  outline: none;
-  background: var(--auth-surface-container);
-  color: var(--auth-on-surface);
-  font-size: 16px;
-  line-height: 1.4;
-  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
-}
-
-.auth-field > input:hover,
-.auth-password-wrap > input:hover {
-  background: var(--auth-surface-high);
-}
-
-.auth-field > input:focus-visible,
-.auth-password-wrap > input:focus-visible {
-  border-color: var(--auth-focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-focus) 23%, transparent);
-}
-
-.auth-field > input[aria-invalid='true'],
-.auth-password-wrap > input[aria-invalid='true'] {
-  border-color: var(--auth-error);
-}
-
 .auth-field input:disabled {
   cursor: wait;
   opacity: 0.72;
 }
 
-.auth-password-wrap {
-  position: relative;
-  min-width: 0;
-}
-
-.auth-password-wrap > input {
-  padding-right: 92px;
-}
-
 .auth-password-toggle {
-  position: absolute;
-  top: 50%;
-  right: 8px;
   min-width: 72px;
-  min-height: 48px;
+  min-height: 40px;
   padding: 6px 8px;
-  transform: translateY(-50%);
   border: 0;
   border-radius: 9px;
   background: transparent;
   color: var(--auth-primary);
   cursor: pointer;
+  font: inherit;
   font-size: 13px;
   font-weight: 620;
 }
@@ -344,6 +300,8 @@ a {
   cursor: wait;
   opacity: 0.6;
 }
+
+.auth-page .md-text-field:has(.auth-password-toggle) .md-text-field__control { padding-right: 96px; }
 
 .auth-password-toggle:focus-visible,
 .auth-primary-button:focus-visible,
@@ -462,12 +420,6 @@ a {
   gap: 12px;
 }
 
-.auth-name-fields .auth-field > label {
-  min-height: 2.4em;
-  line-height: 1.2;
-}
-
-.auth-helper,
 .auth-inline-note {
   margin: 0;
   color: var(--auth-on-surface-variant);
@@ -633,7 +585,7 @@ a {
   box-sizing: border-box;
 }
 
-:focus-visible {
+:focus-visible:not(.md-text-field__control):not(.md-search-field__control) {
   outline: 2px solid var(--auth-focus);
   outline-offset: 3px;
 }
@@ -718,10 +670,6 @@ a {
   .auth-name-fields {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-  }
-
-  .auth-name-fields .auth-field > label {
-    min-height: 0;
   }
 
   .auth-otp-cells {

@@ -13,26 +13,25 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
 namespace BarkCloud.Web.Tests.Auth;
 
-public class AuthGatewayTests
+public class AuthGatewayTests : IDisposable
 {
-    private const string Secret = "test-secret-key-at-least-32-bytes-long!!";
+    private readonly RsaJwtTestKeys _keys = new();
 
     private readonly Mock<IdentityApi.IdentityApiClient> _identity = new();
     private readonly TokenRevocationCache _revocations = new();
 
-    private AuthGateway CreateSut(string secret = Secret)
+    private AuthGateway CreateSut(RsaJwtTestKeys? keys = null)
     {
+        keys ??= _keys;
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["JwtSettings:SecretKey"] = secret,
+                [RsaJwtKeys.PublicKeyConfigKey] = keys.PublicKeyFile,
                 ["JwtSettings:Issuer"] = "bark",
                 ["JwtSettings:Audience"] = "bark"
             })
@@ -41,8 +40,8 @@ public class AuthGatewayTests
         return new AuthGateway(_identity.Object, _revocations, config, NullLogger<AuthGateway>.Instance);
     }
 
-    // User-JWT как у Identity (HS256, те же клеймы), но с управляемым iat.
-    private static string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null, string secret = Secret,
+    // User-JWT как у Identity (RS256, те же клеймы), но с управляемым iat.
+    private static string Jwt(RsaJwtTestKeys keys, long userId = 42, string deviceId = "d1", DateTime? issuedAt = null,
         long? sessionId = null)
     {
         var now = DateTime.UtcNow;
@@ -65,13 +64,15 @@ public class AuthGatewayTests
             Expires = now.AddMinutes(50),
             Issuer = "bark",
             Audience = "bark",
-            SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)), SecurityAlgorithms.HmacSha256)
+            SigningCredentials = keys.CreateSigningCredentials()
         };
 
         var handler = new JwtSecurityTokenHandler();
         return handler.WriteToken(handler.CreateToken(descriptor));
     }
+
+    private string Jwt(long userId = 42, string deviceId = "d1", DateTime? issuedAt = null, long? sessionId = null)
+        => Jwt(_keys, userId, deviceId, issuedAt, sessionId);
 
     private static HttpContext HttpWithCookies(string access, string? refresh = null)
     {
@@ -240,18 +241,16 @@ public class AuthGatewayTests
         VerifyRefreshNotCalled();
     }
 
-    // F23: токен Identity подписан по UTF-8 байтам секрета; Web раньше проверял по ASCII.
+    // Токен, подписанный чужим ключом, отбрасывается: Web знает только публичный ключ Identity.
     [Fact]
-    public async Task AuthenticateAsync_UnicodeSecret_ReturnsUserForTokenSignedLikeIdentity()
+    public async Task AuthenticateAsync_TokenSignedWithOtherKey_ReturnsNull()
     {
-        const string unicodeSecret = "СекретныйКлючДляПодписиТокеновЮникод";
-        var http = HttpWithCookies(Jwt(secret: unicodeSecret));
+        using var otherKeys = new RsaJwtTestKeys();
+        var http = HttpWithCookies(Jwt(otherKeys));
 
-        var user = await CreateSut(unicodeSecret).AuthenticateAsync(http);
+        var user = await CreateSut().AuthenticateAsync(http);
 
-        user.Should().NotBeNull();
-        user!.UserId.Should().Be(42);
-        VerifyRefreshNotCalled();
+        user.Should().BeNull();
     }
 
     [Fact]
@@ -339,4 +338,6 @@ public class AuthGatewayTests
         user.Should().NotBeNull();
         user!.SessionId.Should().Be(6);
     }
+
+    public void Dispose() => _keys.Dispose();
 }

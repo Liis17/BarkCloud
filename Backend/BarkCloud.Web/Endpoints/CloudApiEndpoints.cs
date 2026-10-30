@@ -26,6 +26,27 @@ public static class CloudApiEndpoints
     // x-error-code из трейлеров gRPC (см. CloudAccessDeniedException в Shared.Exceptions)
     private const string ErrCloudAccessDenied = "D4F1E2A8-9C5B-4A77-83BB-5E6F7A8B9C01";
 
+    /// <summary>
+    /// Размеры подпапок — вспомогательные данные листинга: при сбое Files-сервиса папки показываются без размеров.
+    /// Unauthenticated не глотаем, его обрабатывает Guarded (обновление токена).
+    /// </summary>
+    private static async Task<Dictionary<string, long>> FetchSubdirectorySizesAsync(
+        DirectorySizeApi.DirectorySizeApiClient client, ILoggerFactory loggerFactory, string? parentId, Metadata headers, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await client.GetSubdirectorySizesAsync(
+                new GetSubdirectorySizesRequest { ParentId = parentId ?? string.Empty },
+                new CallOptions(headers: headers, deadline: DateTime.UtcNow.AddSeconds(15), cancellationToken: cancellationToken)).ResponseAsync;
+            return response.Sizes.ToDictionary(s => s.DirectoryId, s => s.SizeBytes);
+        }
+        catch (RpcException ex) when (ex.StatusCode != StatusCode.Unauthenticated)
+        {
+            loggerFactory.CreateLogger(nameof(CloudApiEndpoints)).LogWarning(ex, "Не удалось получить размеры подпапок папки {ParentId}", parentId);
+            return new Dictionary<string, long>();
+        }
+    }
+
     internal static SearchFilesRequest BuildSearchFilesRequest(
         string query,
         string? kind,
@@ -114,6 +135,7 @@ public static class CloudApiEndpoints
         // ───────────────────────── Каталоги ─────────────────────────
 
         api.MapGet("/cloud/list", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
+            DirectorySizeApi.DirectorySizeApiClient directorySizes, ILoggerFactory loggerFactory,
             string? dir, int? limit, string? cursorName, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
@@ -125,10 +147,18 @@ public static class CloudApiEndpoints
                 if (!string.IsNullOrWhiteSpace(cursorName)) req.CursorName = cursorName;
                 if (!string.IsNullOrWhiteSpace(cursorId)) req.CursorEntryId = cursorId;
 
-                var listing = await cloud.ListDirectoryDetailedAsync(req, token);
+                // Листинг и размеры подпапок — параллельно; размеры берутся из кеша Files-сервиса.
+                var listingTask = cloud.ListDirectoryDetailedAsync(req, token).ResponseAsync;
+                var sizesTask = FetchSubdirectorySizesAsync(directorySizes, loggerFactory, dir, token, http.RequestAborted);
+                await Task.WhenAll(listingTask, sizesTask);
+                var listing = listingTask.Result;
+                var sizeById = sizesTask.Result;
+
                 return Results.Json(new
                 {
-                    dirs = listing.Subdirs.Select(CloudJson.Dir).ToArray(),
+                    dirs = listing.Subdirs
+                        .Select(d => CloudJson.Dir(d, sizeById.TryGetValue(d.Id, out var size) ? size : (long?)null))
+                        .ToArray(),
                     files = listing.Files.Select(CloudJson.Entry).ToArray(),
                     nextCursorName = listing.NextCursorName,
                     nextCursorId = listing.NextCursorEntryId
@@ -171,7 +201,8 @@ public static class CloudApiEndpoints
             {
                 var info = await cloud.CreateDirectoryAsync(
                     new CreateDirectoryRequest { ParentId = body.ParentId ?? "", Name = body.Name }, token);
-                return Results.Json(CloudJson.Dir(info), Json);
+                // Только что созданная папка пуста.
+                return Results.Json(CloudJson.Dir(info, 0), Json);
             }));
 
         api.MapPost("/cloud/dir/visibility", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, VisibilityReq body) =>
@@ -963,7 +994,18 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 var resp = await cloud.GetSharedFileDownloadUrlAsync(new GetSharedFileDownloadUrlRequest { FileId = body.FileId }, token);
-                return Results.Json(new { downloadUrl = resp.DownloadUrl }, Json);
+                return Results.Json(new
+                {
+                    downloadUrl = resp.DownloadUrl,
+                    videoQualities = resp.VideoQualities.Select(q => new
+                    {
+                        height = q.Height,
+                        width = q.Width,
+                        fileSize = q.FileSize,
+                        isOriginal = q.IsOriginal,
+                        url = q.Url
+                    }).ToArray()
+                }, Json);
             }));
 
         // ───────────────────────── Шаринг папок между пользователями ─────────────────────────
@@ -1048,7 +1090,15 @@ public static class CloudApiEndpoints
                         previewUrl = f.PreviewUrl,
                         fileSize = f.FileSize,
                         imageWidth = f.ImageWidth,
-                        imageHeight = f.ImageHeight
+                        imageHeight = f.ImageHeight,
+                        videoQualities = f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray()
                     }).ToArray()
                 }, Json);
             }));
@@ -1325,43 +1375,21 @@ public static class CloudApiEndpoints
                 var resp = await files.GetTempDownloadUrlAsync(req, token);
                 return Results.Json(new
                 {
-                    urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url)
+                    urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url),
+                    videoQualities = resp.FileUrls
+                        .Where(f => f.VideoQualities.Count > 0)
+                        .ToDictionary(f => f.FileId, f => f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray())
                 }, Json);
             }));
 
-        // Inline-просмотр оригинала same-origin (для текста/кода — открыть в браузере, не скачивать).
-        // Скачивание Files всегда идёт с Content-Disposition: attachment, а CORS на files нет —
-        // поэтому web проксирует содержимое через внутренний HTTP1-эндпоинт (как upload-прокси).
-        api.MapGet("/files/view", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files,
-            IHttpClientFactory httpFactory, IConfiguration config, string id) =>
-            await Guarded(http, auth, async token =>
-            {
-                var req = new GetTempDownloadUrlRequest();
-                req.FileIds.Add(id);
-                var resp = await files.GetTempDownloadUrlAsync(req, token);
-                var url = resp.FileUrls.FirstOrDefault()?.Url;
-                if (string.IsNullOrEmpty(url))
-                    return Results.NotFound();
-
-                // Качаем с внутреннего HTTP1-эндпоинта Files (минуя nginx/TLS), как upload-прокси.
-                var http1Base = config["FilesService:Http1Base"];
-                var fetchUrl = url;
-                if (!string.IsNullOrEmpty(http1Base))
-                {
-                    var tempId = new Uri(url).Segments[^1];
-                    fetchUrl = $"{http1Base}/download/{tempId}";
-                }
-
-                var client = httpFactory.CreateClient("files-upload");
-                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead);
-                if (!upstream.IsSuccessStatusCode)
-                    return Results.StatusCode((int)upstream.StatusCode);
-
-                // Без Content-Disposition: attachment — браузер отрендерит текст/код в новой вкладке.
-                http.Response.ContentType = upstream.Content.Headers.ContentType?.ToString() ?? "text/plain; charset=utf-8";
-                await upstream.Content.CopyToAsync(http.Response.Body);
-                return Results.Empty;
-            }));
+        app.MapFileViewEndpoint();
 
         api.MapGet("/files/activity", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
             string? id, int? limit, string? cursorAt, string? cursorId) =>
@@ -1765,6 +1793,43 @@ public static class CloudApiEndpoints
         if (m.HasDocumentPageCount) dict["documentPageCount"] = m.DocumentPageCount;
 
         return dict;
+    }
+
+    // Same-origin просмотр оригинала: принудительно скачиваем, чтобы браузер не отображал активное содержимое.
+    internal static void MapFileViewEndpoint(this WebApplication app)
+    {
+        app.MapGet("/api/files/view", async (HttpContext http, AuthGateway auth, FilesApi.FilesApiClient files,
+            IHttpClientFactory httpFactory, IConfiguration config, string id) =>
+        {
+            http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return await Guarded(http, auth, async token =>
+            {
+                var req = new GetTempDownloadUrlRequest();
+                req.FileIds.Add(id);
+                var resp = await files.GetTempDownloadUrlAsync(req, token);
+                var url = resp.FileUrls.FirstOrDefault()?.Url;
+                if (string.IsNullOrEmpty(url))
+                    return Results.NotFound();
+
+                var http1Base = config["FilesService:Http1Base"];
+                var fetchUrl = url;
+                if (!string.IsNullOrEmpty(http1Base))
+                {
+                    var tempId = new Uri(url).Segments[^1];
+                    fetchUrl = $"{http1Base}/download/{tempId}";
+                }
+
+                var client = httpFactory.CreateClient("files-upload");
+                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead);
+                if (!upstream.IsSuccessStatusCode)
+                    return Results.StatusCode((int)upstream.StatusCode);
+
+                http.Response.ContentType = "application/octet-stream";
+                http.Response.Headers.ContentDisposition = "attachment";
+                await upstream.Content.CopyToAsync(http.Response.Body);
+                return Results.Empty;
+            });
+        });
     }
 
     /// <summary>Авторизация по cookie + единая обработка gRPC-ошибок.</summary>

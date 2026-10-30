@@ -1,4 +1,6 @@
 <resources>
+    <string name="device_folder_sync">Загружать в облако</string>
+    <string name="device_folder_sync_enabled">Синхронизация включена</string>
     <string name="app_name">BarkCloud</string>
 
     <!-- Login -->
@@ -21,9 +23,9 @@
     <string name="login_server_files_port_label">Порт Files</string>
 
     <!-- Bottom navigation (5 табов, как в iOS) -->
-    <string name="tab_gallery">Галерея</string>
+    <string name="tab_gallery">Фото</string>
     <string name="tab_files">Файлы</string>
-    <string name="tab_albums">Альбомы</string>
+    <string name="tab_albums">Подборки</string>
     <string name="tab_trash">Корзина</string>
     <string name="tab_settings">Настройки</string>
 
@@ -153,9 +155,54 @@
     <string name="gallery_upload_selected">Загрузить (%1$d)</string>
     <string name="gallery_selection_mode">Режим выбора</string>
     <string name="viewer_play_video">Воспроизвести видео</string>
+    <string name="viewer_retry_original">Повторить</string>
+    <string name="viewer_back">Назад</string>
+    <string name="viewer_action_share">Поделиться</string>
+    <string name="viewer_action_copy">Копировать</string>
+    <string name="viewer_action_download">Скачать</string>
+    <string name="viewer_action_info">Свойства</string>
+    <string name="viewer_action_delete">Удалить</string>
+    <string name="viewer_action_share_title">Поделиться файлом</string>
+    <string name="viewer_action_copied">Скопировано</string>
+    <string name="viewer_action_download_complete">Сохранено в галерею</string>
+    <string name="viewer_action_failed">Не удалось выполнить действие</string>
+    <string name="viewer_action_delete_title">Переместить файл в корзину?</string>
+    <string name="viewer_action_delete_message">Файл «%1$s» будет перемещён в корзину.</string>
+    <string name="viewer_action_cancel">Отмена</string>
     <string name="gallery_auto_upload">Автозагрузка</string>
-    <string name="gallery_free_device_space">Удалить копии с устройства (%1$d)</string>
+    <string name="gallery_free_device_space">Освободить место</string>
+    <string name="gallery_cleanup_cloud_kept">Файлы останутся в облаке</string>
+    <string name="gallery_cleanup_available">Можно освободить %1$s</string>
+    <string name="gallery_cleanup_description">Удалите с устройства фото и видео, копии которых уже есть в облаке. Перед удалением мы повторно проверим их наличие на сервере.</string>
+    <string name="gallery_cleanup_count">Локальных копий: %1$d</string>
+    <string name="gallery_cleanup_empty">Пока нет локальных копий, которые можно безопасно удалить.</string>
+    <string name="gallery_cleanup_action">Удалить локальные копии · %1$s</string>
+    <string name="gallery_cleanup_checking">Проверяем копии в облаке…</string>
+    <string name="gallery_cleanup_none_confirmed">Подходящих копий не найдено. Ничего не удалено.</string>
+    <string name="gallery_cleanup_back">Назад</string>
     <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
+    <string name="gallery_selection_count">Выбрано: %1$d</string>
+    <string name="gallery_account_menu">Меню аккаунта</string>
+    <string name="gallery_account_profile_unavailable">Профиль недоступен</string>
+    <string name="gallery_account_storage_unavailable">Не удалось получить данные хранилища</string>
+    <string name="gallery_self_hosted" translatable="false">self-hosted</string>
+    <string name="gallery_storage_unlimited">%1$s · Без лимита</string>
+    <string name="gallery_storage_avatars">Аватары</string>
+    <string name="gallery_storage_other">Прочее</string>
+    <string name="photos_auto_upload_off">Выключена</string>
+    <string name="photos_auto_upload_wifi">Только Wi-Fi</string>
+    <string name="photos_auto_upload_any">Любая сеть</string>
+    <string name="gallery_uploads_title">Загрузки</string>
+    <string name="gallery_uploads_empty">Нет ожидающих загрузок</string>
+    <string name="gallery_open_uploads">Открыть очередь загрузок</string>
+    <string name="gallery_favorite_selected">В избранное (%1$d)</string>
+    <string name="gallery_delete_selected">Удалить (%1$d)</string>
+    <string name="gallery_delete_selected_title">Удалить выбранные элементы?</string>
+    <string name="gallery_delete_device_count">С устройства (%1$d)</string>
+    <string name="gallery_delete_cloud_count">Из облака (%1$d)</string>
+    <string name="gallery_delete_both_count">Из обоих источников (%1$d)</string>
+    <string name="gallery_delete_result">Удалено %1$d из %2$d</string>
+    <string name="gallery_favorite_result">Добавлено в избранное %1$d из %2$d</string>
     <string name="gallery_permission_message">Чтобы показать вашу медиатеку, разрешите доступ к фото и видео.</string>
     <string name="gallery_permission_grant">Разрешить доступ</string>
 
@@ -199,7 +246,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
-    <string name="settings_edit_profile">Редактировать профиль</string>
+    <string name="settings_edit_profile">Профиль</string>
     <string name="settings_privacy">Приватность</string>
     <string name="settings_devices">Устройства</string>
     <string name="settings_storage_title">Хранилище</string>
@@ -210,13 +257,25 @@
     <string name="settings_sign_out_title">Выйти из аккаунта?</string>
     <string name="settings_sign_out_message">Потребуется снова войти.</string>
     <string name="settings_delete_account">Удалить аккаунт</string>
-    <string name="settings_delete_account_title">Удалить аккаунт?</string>
-    <string name="settings_delete_account_message">Все данные будут удалены безвозвратно.</string>
+    <string name="settings_delete_account_message">Удаление аккаунта начнётся сразу после последнего подтверждения, без периода ожидания. Отменить удаление будет нельзя.</string>
+    <string name="settings_delete_account_title">Удаление аккаунта</string>
+    <string name="settings_delete_account_data_warning">Профиль, фотографии, файлы, альбомы и другие данные аккаунта будут удалены безвозвратно. Восстановить их будет невозможно. Сохраните нужные данные перед продолжением.</string>
+    <string name="settings_delete_account_final_warning">Это последнее предупреждение. Нажав «Удалить безвозвратно», вы немедленно запустите удаление аккаунта и его данных. Отсрочки и возможности восстановления нет.</string>
+    <string name="settings_delete_account_continue">Продолжить</string>
+    <string name="settings_delete_account_now">Удалить безвозвратно</string>
+    <string name="settings_account_processing">Выполняется…</string>
 
     <!-- Cache -->
-    <string name="cache_title">Кеш</string>
-    <string name="cache_size">Размер кеша</string>
+    <string name="cache_title">Хранилище и кеш</string>
+    <string name="cache_size">Общий размер</string>
     <string name="cache_size_summary">%1$s из %2$s · записей: %3$d</string>
+    <string name="cache_over_limit">Размер кеша превышает заданный лимит</string>
+    <string name="cache_contents">Состав кеша</string>
+    <string name="cache_preview">Превью</string>
+    <string name="cache_original">Оригиналы</string>
+    <string name="cache_legacy_preview">Старые превью Coil</string>
+    <string name="cache_category_summary">%1$s · записей: %2$d</string>
+    <string name="cache_size_only_summary">%1$s</string>
     <string name="cache_limit">Лимит кеша</string>
     <string name="cache_auto_clean">Автоочистка</string>
     <string name="cache_auto_clean_1d">1 день</string>
@@ -331,4 +390,45 @@
     <string name="files_sort_size_desc">Размер ↓</string>
     <string name="files_sort_date_asc">Дата ↑</string>
     <string name="files_sort_date_desc">Дата ↓</string>
+    <string name="tab_search">Поиск</string>
+    <string name="main_menu">Меню</string>
+    <string name="common_load_more">Показать ещё</string>
+    <string name="common_refresh">Обновить</string>
+    <string name="search_hint">Имена файлов, теги, описания</string>
+    <string name="search_prompt">Поиск по облаку: фото, видео, файлы, папки и альбомы. Введите хотя бы два символа.</string>
+    <string name="search_empty">Ничего не найдено</string>
+    <string name="search_folders">Папки</string>
+    <string name="search_albums">Альбомы</string>
+    <string name="photos_upload">Загрузить фото и видео</string>
+    <string name="photos_empty">Пока нет фото</string>
+    <string name="photos_permission">Разрешите доступ, чтобы добавить фото с устройства</string>
+    <string name="avatar_crop_title">Обрезать аватар</string>
+    <string name="avatar_crop_apply">Применить</string>
+    <string name="avatar_crop_hint">Перемещайте снимок и меняйте масштаб. Круг показывает будущий аватар.</string>
+    <string name="avatar_crop_zoom">Масштаб</string>
+    <string name="avatar_crop_area">Область обрезки аватара</string>
+    <string name="avatar_crop_error">Не удалось обработать изображение</string>
+    <string name="viewer_info_size">Размер</string>
+    <string name="viewer_info_date">Дата</string>
+    <string name="viewer_info_loading">Загрузка…</string>
+    <string name="viewer_info_metadata_error">Метаданные недоступны: %1$s</string>
+    <string name="viewer_info_map_title">Место съёмки</string>
+    <string name="viewer_info_map_open">Открыть карту</string>
+    <string name="viewer_info_search_title">Имя для поиска</string>
+    <string name="viewer_info_search_help">Помогает найти файл, сохраняя его настоящее имя.</string>
+    <string name="viewer_info_tags_title">Теги</string>
+    <string name="viewer_info_tag_add">Добавить тег</string>
+    <string name="viewer_info_tags_empty">Нет доступных тегов</string>
+    <string name="viewer_info_tags_limit">Максимум 20 тегов на файл.</string>
+    <string name="viewer_info_search_error">Поиск недоступен: %1$s</string>
+    <string name="viewer_info_save">Сохранить</string>
+    <string name="viewer_info_saving">Сохраняем…</string>
+    <string name="viewer_info_save_error">Не удалось сохранить: %1$s</string>
+    <string name="collections_people">Люди</string>
+    <string name="collections_device">Устройство</string>
+    <string name="collections_cloud_albums">Альбомы в облаке</string>
+    <string name="device_folders_empty">Нет папок с фото или видео</string>
+    <string name="device_media_permission">Разрешите доступ к фото и видео, чтобы увидеть папки устройства</string>
+    <string name="device_media_allow">Разрешить доступ</string>
+    <string name="device_media_error">Не удалось прочитать медиатеку</string>
 </resources>

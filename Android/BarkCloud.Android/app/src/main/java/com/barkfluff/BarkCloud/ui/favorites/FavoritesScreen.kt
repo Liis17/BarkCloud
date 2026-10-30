@@ -3,6 +3,7 @@ package com.barkfluff.BarkCloud.ui.favorites
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -24,7 +25,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -41,8 +41,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
+import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,54 +75,56 @@ fun FavoritesScreen(
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.tab_favorites)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::reload,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 120.dp),
-                    state = gridState,
+    CloudMediaTransitionLayout(viewer?.id) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                RefreshableContentSurface(
+                    onRefresh = viewModel::reloadAndWait,
+                    header = {
+                        TopAppBar(
+                            title = { Text(stringResource(R.string.tab_favorites)) },
+                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            navigationIcon = {
+                                IconButton(onClick = onNavigateUp) {
+                                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
+                                }
+                            },
+                        )
+                    },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.items, key = { it.id }) { asset ->
-                        FavoriteCell(
-                            asset = asset,
-                            onTap = { viewer = asset },
-                            onRemove = { viewModel.removeFavorite(asset.id) },
-                        )
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 120.dp),
+                        state = gridState,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        items(state.items, key = { it.id }) { asset ->
+                            FavoriteCell(
+                                asset = asset,
+                                onTap = { viewer = asset },
+                                onRemove = { viewModel.removeFavorite(asset.id) },
+                            )
+                        }
                     }
                 }
-            }
-            if (state.isEmpty) {
-                Text(
-                    text = stringResource(R.string.favorites_empty),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                if (state.isEmpty) {
+                    Text(
+                        text = stringResource(R.string.favorites_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
             }
         }
-    }
-
-    viewer?.let { asset ->
         CloudMediaViewer(
-            asset = asset,
+            assets = state.items,
+            selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { } },
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
+            onDelete = { item -> viewModel.deleteFile(item.id) },
         )
     }
 }
@@ -139,10 +145,13 @@ private fun FavoriteCell(
             .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true }),
     ) {
         MediaThumb(
-            model = asset.previewUrl(512),
+            model = asset.previewModel(512),
             isVideo = asset.isVideo,
             contentDescription = asset.fileName,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().cloudMediaSharedElement(
+                key = asset.id,
+                visible = LocalCloudMediaViewerAssetId.current != asset.id,
+            ),
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(

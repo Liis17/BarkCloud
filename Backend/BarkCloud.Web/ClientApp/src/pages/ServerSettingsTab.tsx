@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loading } from '../components/ui/EmptyState';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { SearchField, TextField } from '../components/ui/TextField';
 import { Icon } from '../components/Icon';
 import { Select } from '../components/ui/Select';
 import { useApiResource } from '../hooks/useApiResource';
@@ -58,7 +59,7 @@ const SERVICE_NAMES: Record<number, string> = {
 };
 const STORAGE_ROLES: Record<string, string> = {
   universal: 'Универсальное', avatars: 'Аватары', images: 'Изображения', videos: 'Видео',
-  audio: 'Аудио', documents: 'Документы', other: 'Прочие файлы', previews: 'Превью',
+  audio: 'Аудио', documents: 'Документы', other: 'Прочие файлы', previews: 'Превью', 'video-variants': 'Варианты видео',
 };
 const STORAGE_FIELD_NAMES = ['Endpoint', 'Bucket', 'Access key Credentials', 'Secret key Credentials', 'Регион Region', 'Адресация ForcePathStyle', 'Cloudflare R2', 'Применить миграцию'];
 const STORAGE_FIELDS = 'S3 ' + STORAGE_FIELD_NAMES.join(' ');
@@ -166,7 +167,7 @@ function SettingEditor({ setting, query, onSaved, onDirty, onExpired }: {
     </div>
     <div className="server-setting-control">
       {setting.valueKind === 'boolean' ? <Select aria-label={settingName(setting)} value={value} disabled={setting.isReadOnly || busy} onChange={setValue}
-        options={[{ value: 'true', label: 'Включено' }, { value: 'false', label: 'Выключено' }]} /> : <input aria-label={settingName(setting)} type={type} value={value} disabled={setting.isReadOnly || busy}
+        options={[{ value: 'true', label: 'Включено' }, { value: 'false', label: 'Выключено' }]} /> : <TextField containerClassName="server-setting-field" label={settingName(setting)} aria-label={settingName(setting)} type={type} value={value} disabled={setting.isReadOnly || busy}
         placeholder={!setting.isReadOnly && setting.isSensitive && setting.hasValue ? 'Задано — новое значение для замены' : ''}
         onChange={(event) => setValue(event.target.value)} />}
       {!setting.isReadOnly && <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Сохраняем…' : 'Сохранить'}</button>}
@@ -244,7 +245,6 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
     setConfirmation({ title: selected ? 'Сохранить S3-профиль?' : 'Создать S3-профиль?', lines,
       run: () => mutate('/api/settings/server/storage/profile', body) });
   }
-  function fieldError(key: string) { return errors[key] ? <small className="field-error" role="alert">{errors[key]}</small> : null; }
   return <article className="storage-profile-card">
     <div className="storage-profile-head"><div className="storage-profile-identity"><h3>{STORAGE_ROLES[role] || role}</h3>
       <small>{selected?.profileId || 'Новый профиль роли ' + role}</small></div>
@@ -252,18 +252,14 @@ function StorageEditor({ role, selected, profiles, revisions, draft, setDraft, o
     </div>
     {!selected && role !== 'universal' && <p className="sys-note">До создания профиля новые файлы этой роли используют universal.</p>}
     <fieldset disabled={busy} className="storage-profile-grid"><legend>Подключение</legend>
-      <label><span><Highlight value="Endpoint" query={query} /></span><input aria-label="Endpoint" type="url" value={draft.serviceUrl} aria-invalid={!!errors.serviceUrl} onChange={(event) => edit('serviceUrl', event.target.value)} placeholder="https://s3.example.com" />{fieldError('serviceUrl')}</label>
-      <label><span><Highlight value="Bucket" query={query} /></span><input aria-label="Bucket" value={draft.bucketName} aria-invalid={!!errors.bucketName} onChange={(event) => edit('bucketName', event.target.value)} />{fieldError('bucketName')}</label>
-      <label><span><Highlight value="Access key" query={query} />{selected?.hasAccessKey && <small className="credential-set"> · задан</small>}</span>
-        <div className="credential-input"><input aria-label="Access key" type={showAccess ? 'text' : 'password'} value={draft.accessKey} placeholder={selected?.hasAccessKey ? 'Задан' : ''} aria-invalid={!!errors.accessKey} onChange={(event) => edit('accessKey', event.target.value)} autoComplete="off" />
-          <button type="button" className="icon-btn" aria-label={showAccess ? 'Скрыть введённый access key' : 'Показать введённый access key'} disabled={!draft.accessKey} onClick={() => setShowAccess(!showAccess)}><Icon.eye size={18} /></button></div>{fieldError('accessKey')}
-      </label>
-      <label><span><Highlight value="Secret key" query={query} />{selected?.hasSecretKey && <small className="credential-set"> · задан</small>}</span>
-        <div className="credential-input"><input aria-label="Secret key" type={showSecret ? 'text' : 'password'} value={draft.secretKey} placeholder={selected?.hasSecretKey ? 'Оставьте пустым, чтобы не менять' : ''} aria-invalid={!!errors.secretKey} onChange={(event) => edit('secretKey', event.target.value)} autoComplete="new-password" />
-          <button type="button" className="icon-btn" aria-label={showSecret ? 'Скрыть введённый secret key' : 'Показать введённый secret key'} disabled={!draft.secretKey} onClick={() => setShowSecret(!showSecret)}><Icon.eye size={18} /></button></div>{fieldError('secretKey')}
-      </label>
+      <TextField label={<Highlight value="Endpoint" query={query} />} aria-label="Endpoint" type="url" value={draft.serviceUrl} error={errors.serviceUrl} errorRole="alert" onChange={(event) => edit('serviceUrl', event.target.value)} placeholder="https://s3.example.com" />
+      <TextField label={<Highlight value="Bucket" query={query} />} aria-label="Bucket" value={draft.bucketName} error={errors.bucketName} errorRole="alert" onChange={(event) => edit('bucketName', event.target.value)} />
+      <TextField label={<>{<Highlight value="Access key" query={query} />}{selected?.hasAccessKey && <small className="credential-set"> · задан</small>}</>} aria-label="Access key" type={showAccess ? 'text' : 'password'} value={draft.accessKey} placeholder={selected?.hasAccessKey ? 'Задан' : ''} error={errors.accessKey} errorRole="alert" onChange={(event) => edit('accessKey', event.target.value)} autoComplete="off"
+        trailing={<button type="button" className="icon-btn" aria-label={showAccess ? 'Скрыть введённый access key' : 'Показать введённый access key'} disabled={!draft.accessKey} onClick={() => setShowAccess(!showAccess)}><Icon.eye size={18} /></button>} />
+      <TextField label={<>{<Highlight value="Secret key" query={query} />}{selected?.hasSecretKey && <small className="credential-set"> · задан</small>}</>} aria-label="Secret key" type={showSecret ? 'text' : 'password'} value={draft.secretKey} placeholder={selected?.hasSecretKey ? 'Оставьте пустым, чтобы не менять' : ''} error={errors.secretKey} errorRole="alert" onChange={(event) => edit('secretKey', event.target.value)} autoComplete="new-password"
+        trailing={<button type="button" className="icon-btn" aria-label={showSecret ? 'Скрыть введённый secret key' : 'Показать введённый secret key'} disabled={!draft.secretKey} onClick={() => setShowSecret(!showSecret)}><Icon.eye size={18} /></button>} />
       <p className="storage-credentials-help"><Highlight value="Оставьте поля ключей пустыми, чтобы сохранить текущие credentials." query={query} /></p>
-      <label><span><Highlight value="Регион" query={query} /></span><input aria-label="Регион S3" value={draft.region} onChange={(event) => edit('region', event.target.value)} placeholder={draft.isR2 ? 'auto' : 'Автоматически'} /></label>
+      <TextField label={<Highlight value="Регион" query={query} />} aria-label="Регион S3" value={draft.region} onChange={(event) => edit('region', event.target.value)} placeholder={draft.isR2 ? 'auto' : 'Автоматически'} />
       <label><span><Highlight value="Адресация бакета" query={query} /></span><Select aria-label="Адресация бакета S3" value={draft.forcePathStyle ? 'path' : 'virtual'} disabled={busy}
         options={[{ value: 'path', label: 'Path style · endpoint/bucket' }, { value: 'virtual', label: 'Virtual host · bucket.endpoint' }]} onChange={(value) => edit('forcePathStyle', value === 'path')} /></label>
       <label className="server-check"><input type="checkbox" checked={draft.isR2} onChange={(event) => edit('isR2', event.target.checked)} /><span><Highlight value="Cloudflare R2" query={query} /></span></label>
@@ -470,18 +466,13 @@ function StorageGroupsSection({ groups, buckets, query, onChanged, onExpired, op
       </div>
       {(selected || creating) && <article className="server-s3-group-editor">
         <div className="storage-group-fields">
-          <label><span><Highlight value="Название группы" query={query} /></span>
-            <input aria-label="Название группы S3" value={draft.name} disabled={busy} aria-invalid={!!errors.name}
-              onChange={(event) => edit({ name: event.target.value })} />
-            {errors.name && <small className="field-error" role="alert">{errors.name}</small>}
-          </label>
-          <label><span><Highlight value="Квота группы" query={query} /></span><div className="storage-group-quota-control">
-            <input aria-label="Квота группы S3" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue} disabled={busy}
-              aria-invalid={!!errors.quotaValue} onChange={(event) => edit({ quotaValue: event.target.value })} />
+          <TextField label={<Highlight value="Название группы" query={query} />} aria-label="Название группы S3" value={draft.name} disabled={busy} error={errors.name} errorRole="alert"
+            onChange={(event) => edit({ name: event.target.value })} />
+          <div className="storage-group-quota-field"><div className="storage-group-quota-control">
+            <TextField label={<Highlight value="Квота группы" query={query} />} containerClassName="storage-group-quota-value" aria-label="Квота группы S3" type="number" min="0" step="1" inputMode="numeric" value={draft.quotaValue} disabled={busy}
+              error={errors.quotaValue} errorRole="alert" onChange={(event) => edit({ quotaValue: event.target.value })} />
             <Select<QuotaUnit> aria-label="Единица квоты группы" value={draft.quotaUnit} disabled={busy} onChange={(value) => edit({ quotaUnit: value })} options={quotaSelectOptions} />
-          </div><small>0 = безлимит</small>
-            {errors.quotaValue && <small className="field-error" role="alert">{errors.quotaValue}</small>}
-          </label>
+          </div><small>0 = безлимит</small></div>
         </div>
         <div className="storage-group-members">
           <strong>Бакеты группы</strong>
@@ -570,7 +561,7 @@ export default function ServerSettingsTab({ active = true, onAccessExpired = () 
       <button className="btn text" disabled={resource.loading} onClick={() => void resource.reload()}><Icon.refresh size={16} /> Обновить</button></header>
     <section className="server-settings-toolbar">
       <div className="server-section-head"><div><div className="ttl">Параметры сервисов</div><div className="sub">Изменения применяются после перезапуска соответствующих сервисов</div></div><span className="server-section-count">{count} параметров{query && hasS3 ? ' · ' + s3MatchesLabel : ''}{Object.values(dirty).filter(Boolean).length > 0 ? ' · ' + Object.values(dirty).filter(Boolean).length + ' изменено' : ''}</span></div>
-      <label className="server-search-field"><span>Поиск по параметрам конфигурации</span><input type="search" value={search} placeholder="JwtSettings:Issuer или Endpoint" onChange={(event) => setSearch(event.target.value)} /></label>
+      <div className="server-search-field"><label htmlFor="server-settings-search">Поиск по параметрам конфигурации</label><SearchField id="server-settings-search" label="Поиск по параметрам конфигурации" value={search} placeholder="JwtSettings:Issuer или Endpoint" onChange={(event) => setSearch(event.target.value)} /></div>
       <div className="server-collapse-actions"><button className="btn text" onClick={() => setExpanded(new Set(allKeys))}>Развернуть всё</button><button className="btn text" onClick={() => setExpanded(new Set())}>Свернуть всё</button>
         {search && <button className="btn text" onClick={() => setSearch('')}>Очистить поиск конфигураций</button>}</div>
       {query && count === 0 && !hasS3 && !hasReserved && <div className="server-empty" role="status">По этому запросу параметры не найдены.</div>}
@@ -597,7 +588,7 @@ export default function ServerSettingsTab({ active = true, onAccessExpired = () 
       <summary className="set-card-head server-group-summary"><strong className="ttl">Зарезервированные имена</strong><span className="server-section-count">{data.reservedNames.length} имён</span></summary>
       <div className="set-card-body server-reserved-body">
         <form className="reserved-add" onSubmit={(event) => { event.preventDefault(); if (newReserved.trim()) void reservedAction(renaming ? 'update' : 'add', renaming ? { oldName: renaming, newName: newReserved } : { name: newReserved }); }}>
-          <label><span>{renaming ? 'Переименовать ' + renaming : 'Добавить имя'}</span><input aria-label="Новое зарезервированное имя" value={newReserved} onChange={(event) => setNewReserved(event.target.value)} /></label><button className="btn primary" disabled={reservedBusy || !newReserved.trim()}>{renaming ? 'Сохранить' : 'Добавить'}</button>
+          <TextField label={renaming ? 'Переименовать ' + renaming : 'Добавить имя'} aria-label="Новое зарезервированное имя" value={newReserved} onChange={(event) => setNewReserved(event.target.value)} /><button className="btn primary" disabled={reservedBusy || !newReserved.trim()}>{renaming ? 'Сохранить' : 'Добавить'}</button>
           {renaming && <button type="button" className="btn text" onClick={() => { setRenaming(null); setNewReserved(''); }}>Отмена</button>}
         </form>
         <div className="reserved-list">{data.reservedNames.map((name) => <span key={name}><b>{name}</b><button type="button" aria-label={'Переименовать ' + name} onClick={() => { setRenaming(name); setNewReserved(name); }}><Icon.pencil size={14} /></button>

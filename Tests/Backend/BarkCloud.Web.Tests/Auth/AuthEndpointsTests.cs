@@ -9,6 +9,7 @@ using BarkCloud.Proto.Identity;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
 using BarkCloud.TestKit;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
@@ -628,6 +629,101 @@ public sealed class AuthEndpointsTests
             It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
+    [Fact]
+    public async Task ResetWithAuthenticatorRequiredShowsTotpFieldAndCompletesWithBothCodes()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Identity.Setup(x => x.ResetPasswordAsync(It.IsAny<ResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ResetPasswordResponse { ResetId = "reset-with-2fa" }));
+        fixture.Identity.SetupSequence(x => x.ConfirmResetPasswordAsync(It.IsAny<ConfirmResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Throws(OtpRequired(string.Empty, 0, method: "authenticator"))
+            .Throws(RpcFailure(new NotValidOtpCodeException().ErrorCode))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ConfirmResetPasswordResponse
+            {
+                AccessToken = new Token { Value = "private-access-token" },
+                RefreshToken = new Token
+                {
+                    Value = "private-refresh-token",
+                    ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddDays(30))
+                }
+            }));
+
+        using var initial = await fixture.GetStateAsync("/forgot");
+        var csrf = initial.RootElement.GetProperty("csrfToken").GetString()!;
+        using var begin = await fixture.PostStateAsync("/forgot", csrf,
+            Fields(("login", "known@example.test")));
+        var flowId = begin.Json.RootElement.GetProperty("flowId").GetString()!;
+
+        using var needsTotp = await fixture.PostStateAsync("/forgot/confirm",
+            begin.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("password", "new-secret-password")));
+        var state = needsTotp.Json.RootElement;
+        state.GetProperty("screen").GetString().Should().Be("reset");
+        state.GetProperty("authenticatorRequired").GetBoolean().Should().BeTrue();
+        state.GetProperty("formError").GetString().Should().Be("Введите код из приложения-аутентификатора, чтобы завершить восстановление.");
+        state.GetProperty("fieldErrors").GetProperty("authenticator").GetString().Should().NotBeNullOrEmpty();
+        state.TryGetProperty("clearOtp", out _).Should().BeFalse("email-код уже проверен и не очищается");
+        state.TryGetProperty("fieldErrors", out var errors).Should().BeTrue();
+        errors.TryGetProperty("otp", out _).Should().BeFalse();
+
+        // Неверный TOTP: состояние сохраняется, email-код не сбрасывается, cooldown не запускается.
+        using var wrongTotp = await fixture.PostStateAsync("/forgot/confirm",
+            needsTotp.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("authenticator_code", "000000"),
+                ("password", "new-secret-password")));
+        var invalidState = wrongTotp.Json.RootElement;
+        invalidState.GetProperty("screen").GetString().Should().Be("reset");
+        invalidState.GetProperty("authenticatorRequired").GetBoolean().Should().BeTrue();
+        invalidState.TryGetProperty("clearOtp", out _).Should().BeFalse();
+        invalidState.GetProperty("fieldErrors").TryGetProperty("otp", out _).Should().BeFalse();
+        invalidState.GetProperty("fieldErrors").GetProperty("authenticator").GetString().Should().NotBeNullOrEmpty();
+
+        using var done = await fixture.PostStateAsync("/forgot/confirm",
+            wrongTotp.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("authenticator_code", "654321"),
+                ("password", "new-secret-password")));
+        done.Json.RootElement.GetProperty("redirectTo").GetString().Should().Be("/photos");
+
+        fixture.Identity.Verify(x => x.ConfirmResetPasswordAsync(
+            It.Is<ConfirmResetPasswordRequest>(request =>
+                request.OtpCode == "123456" && request.AuthenticatorCode == "654321"
+                && request.ResetId == "reset-with-2fa"),
+            It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetResendClearsAuthenticatorRequirement()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Identity.SetupSequence(x => x.ResetPasswordAsync(It.IsAny<ResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ResetPasswordResponse { ResetId = "reset-a" }))
+            .Returns(GrpcCallHelpers.AsyncUnary(new ResetPasswordResponse { ResetId = "reset-b" }));
+        fixture.Identity.Setup(x => x.ConfirmResetPasswordAsync(It.IsAny<ConfirmResetPasswordRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Throws(OtpRequired(string.Empty, 0, method: "authenticator"));
+
+        using var initial = await fixture.GetStateAsync("/forgot");
+        using var begin = await fixture.PostStateAsync("/forgot",
+            initial.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("login", "known@example.test")));
+        var flowId = begin.Json.RootElement.GetProperty("flowId").GetString()!;
+
+        using var needsTotp = await fixture.PostStateAsync("/forgot/confirm",
+            begin.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId), ("otp", "123456"), ("password", "new-secret-password")));
+        needsTotp.Json.RootElement.GetProperty("authenticatorRequired").GetBoolean().Should().BeTrue();
+
+        using var resend = await fixture.PostStateAsync("/forgot/resend",
+            needsTotp.Json.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("flow_id", flowId)));
+        var resent = resend.Json.RootElement;
+        resent.GetProperty("screen").GetString().Should().Be("reset");
+        resent.TryGetProperty("authenticatorRequired", out _).Should().BeFalse("новый код начинает email-этап заново");
+    }
+
     private static AuthResponse SuccessAuthResponse() => new()
     {
         AccessToken = new Token { Value = "private-access-token", ExpirationDate = Timestamp.FromDateTime(DateTime.UtcNow.AddHours(1)) },
@@ -670,7 +766,6 @@ public sealed class AuthEndpointsTests
 
     private sealed class Fixture : IAsyncDisposable
     {
-        private static readonly string JwtSecret = "auth-endpoint-fixture-signing-secret-at-least-32-bytes";
         private const string TestAssetManifest = """
             {
               "src/auth/main.tsx": {
@@ -695,10 +790,11 @@ public sealed class AuthEndpointsTests
         private readonly CookieContainer _cookies;
         private readonly Uri _baseAddress;
         private readonly string _temporaryWebRoot;
+        private readonly RsaJwtTestKeys _keys;
 
         private Fixture(WebApplication app, HttpClient client, CookieContainer cookies, Uri baseAddress,
             Mock<IdentityApi.IdentityApiClient> identity, Mock<ConfigurationApi.ConfigurationApiClient> configuration,
-            string serverName, bool registrationEnabled, string temporaryWebRoot)
+            string serverName, bool registrationEnabled, string temporaryWebRoot, RsaJwtTestKeys keys)
         {
             App = app;
             Client = client;
@@ -709,6 +805,7 @@ public sealed class AuthEndpointsTests
             ServerName = serverName;
             RegistrationEnabled = registrationEnabled;
             _temporaryWebRoot = temporaryWebRoot;
+            _keys = keys;
         }
 
         public WebApplication App { get; }
@@ -747,6 +844,7 @@ public sealed class AuthEndpointsTests
             var temporaryWebRoot = Path.Combine(Path.GetTempPath(), $"BarkCloud.Web.Tests.Auth.{Guid.NewGuid():N}");
             WebApplication? app = null;
             HttpClient? client = null;
+            var keys = new RsaJwtTestKeys();
             try
             {
                 Directory.CreateDirectory(temporaryWebRoot);
@@ -765,7 +863,7 @@ public sealed class AuthEndpointsTests
                 builder.Logging.ClearProviders();
                 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["JwtSettings:SecretKey"] = JwtSecret,
+                    [RsaJwtKeys.PublicKeyConfigKey] = keys.PublicKeyFile,
                     ["JwtSettings:Issuer"] = "bark",
                     ["JwtSettings:Audience"] = "bark",
                     ["App:PublicHost"] = serverName,
@@ -777,7 +875,7 @@ public sealed class AuthEndpointsTests
                 var identity = new Mock<IdentityApi.IdentityApiClient>(MockBehavior.Strict);
                 var configuration = new Mock<ConfigurationApi.ConfigurationApiClient>(MockBehavior.Strict);
                 var fixture = new Fixture(null!, null!, cookies, null!, identity, configuration,
-                    serverName, registrationEnabled, temporaryWebRoot);
+                    serverName, registrationEnabled, temporaryWebRoot, keys);
                 configuration.Setup(x => x.GetConfigurationAsync(It.IsAny<GetConfigurationRequest>(),
                         It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
                     .Returns(() => GrpcCallHelpers.AsyncUnary(new GetConfigurationResponse
@@ -824,10 +922,11 @@ public sealed class AuthEndpointsTests
                 var handler = new HttpClientHandler { CookieContainer = cookies, UseCookies = true };
                 client = new HttpClient(handler) { BaseAddress = baseAddress };
                 return new Fixture(app, client, cookies, baseAddress, identity, configuration,
-                    serverName, registrationEnabled, temporaryWebRoot);
+                    serverName, registrationEnabled, temporaryWebRoot, keys);
             }
             catch
             {
+                keys.Dispose();
                 client?.Dispose();
                 try
                 {
@@ -918,6 +1017,7 @@ public sealed class AuthEndpointsTests
             }
             finally
             {
+                _keys.Dispose();
                 if (Directory.Exists(_temporaryWebRoot))
                     Directory.Delete(_temporaryWebRoot, recursive: true);
             }

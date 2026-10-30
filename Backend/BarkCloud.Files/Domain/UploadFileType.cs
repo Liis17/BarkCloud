@@ -7,4 +7,6 @@ public enum UploadFileType
     UserAvatar = 1,
 
     CloudFile = 2,
+
+    VideoVariant = 3,
 }

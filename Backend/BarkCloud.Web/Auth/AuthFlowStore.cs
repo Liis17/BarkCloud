@@ -47,8 +47,11 @@ public sealed class AuthFlow
     public DateTimeOffset? RefreshTokenExpiresAt { get; internal set; }
     public bool Remember { get; internal set; } = true;
     public bool RevokeOtherSessions { get; internal set; } = true;
+    public bool ResetPasskeys { get; internal set; } = true;
     public string? OtpMethod { get; internal set; }
     public string? OtpMailStatus { get; internal set; }
+    // Email-сброс требует второй фактор: на форме нового пароля показывается поле TOTP.
+    public bool AuthenticatorRequired { get; internal set; }
     public DateTimeOffset? CodeExpiresAt { get; internal set; }
     public DateTimeOffset? RetryAt { get; internal set; }
     public string? FormError { get; internal set; }
@@ -73,6 +76,7 @@ public sealed class AuthFlow
         RefreshTokenExpiresAt = null;
         OtpMethod = null;
         OtpMailStatus = null;
+        AuthenticatorRequired = false;
         CodeExpiresAt = null;
         RetryAt = null;
         FormError = null;

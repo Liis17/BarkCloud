@@ -32,11 +32,11 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
 
         var result = await Find(SearchSection.Photos, Query);
 
+        // c.Typo is rank 1 and is omitted because this section has strict matches.
         result.Hits.Select(x => x.Id).Should().Equal(Ids(
             c.TagExact.EntryId, c.Exact.EntryId,
             c.PrefixNew.EntryId, c.NoEntry.FileId, c.PrefixOld.EntryId,
-            c.AliasSub.EntryId, c.Sub.EntryId,
-            c.Typo.EntryId));
+            c.AliasSub.EntryId, c.Sub.EntryId));
         result.HasMore.Should().BeFalse();
         result.NextCursor.Should().BeEmpty();
         var byId = result.Hits.ToDictionary(x => x.Id);
@@ -44,7 +44,7 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
         byId[c.TagExact.EntryId.ToString()].MatchValue.Should().Be("report");
         byId[c.AliasSub.EntryId.ToString()].MatchField.Should().Be("alias");
         byId[c.Exact.EntryId.ToString()].MatchField.Should().Be("name");
-        byId[c.Typo.EntryId.ToString()].MatchField.Should().Be("name");
+        byId.Keys.Should().NotContain(c.Typo.EntryId.ToString());
     }
 
     [PostgresFact]
@@ -84,6 +84,40 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
 
         result.Hits.Select(x => x.Id).Should().Equal(Ids(c.VideoExact.EntryId, c.VideoSub.EntryId));
         result.Hits.Should().OnlyContain(x => x.Kind == SearchHitKind.Video);
+    }
+
+    [PostgresFact]
+    public async Task Search_VideoVariantsAreExcluded()
+    {
+        await using var database = await PostgresFilesDatabase.CreateAsync();
+        var originalId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        await using (var seed = database.CreateContext())
+        {
+            seed.UploadedFiles.AddRange(
+                new UploadFile
+                {
+                    Id = originalId, Uploaders = [Catalog.Owner], Type = UploadFileType.CloudFile,
+                    MediaKind = MediaKind.Video, Filename = "variant-marker.mp4", StorageProfileId = "test-profile",
+                    Size = 8, CreatedAt = DateTime.UtcNow, UploadedAt = DateTime.UtcNow, Etag = "original-etag"
+                },
+                new UploadFile
+                {
+                    Id = variantId, Uploaders = [Catalog.Owner], Type = UploadFileType.VideoVariant,
+                    MediaKind = MediaKind.Video, Filename = "variant-marker-360p.webm", StorageProfileId = "test-profile",
+                    Size = 4, CreatedAt = DateTime.UtcNow, UploadedAt = DateTime.UtcNow, Etag = "variant-etag"
+                });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = database.CreateContext();
+        var service = new UnifiedSearchService(context, UserContextFactory.Create(Catalog.Owner),
+            new RunSettings { Host = "http://localhost", Http1Port = 7026 }, TestConfiguration.Empty());
+        var result = await Find(service, SearchSection.Videos, "variant-marker");
+
+        result.Hits.Should().ContainSingle();
+        result.Hits[0].FileId.Should().Be(originalId.ToString());
+        result.Hits.Select(x => x.FileId).Should().NotContain(variantId.ToString());
     }
 
     [PostgresFact]
@@ -301,11 +335,12 @@ public sealed class UnifiedSearchPostgresTests(SearchCatalogFixture fixture) : I
         first.Hits.Should().HaveCount(3);
         first.HasMore.Should().BeTrue();
         first.NextCursor.Should().NotBeEmpty();
-        rest.Hits.Should().HaveCount(5);
+        rest.Hits.Should().HaveCount(4, "rank-1 typo is suppressed while strict matches exist");
         rest.HasMore.Should().BeFalse();
         rest.NextCursor.Should().BeEmpty();
-        var exactlyAll = await Find(service, SearchSection.Photos, Query, limit: 8);
+        var exactlyAll = await Find(service, SearchSection.Photos, Query, limit: 7);
         exactlyAll.HasMore.Should().BeFalse("ровно limit результатов — следующей страницы нет");
+        exactlyAll.NextCursor.Should().BeEmpty();
     }
 
     [PostgresFact]

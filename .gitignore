@@ -12,6 +12,8 @@
 *.env
 # Пример-файл переменных окружения — трекаем (реальный .env остаётся игнорируемым)
 !Backend/sample.env
+/Backend/.env.bak.*
+/Backend/secrets/jwt/jwt-private.pem
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -438,4 +440,9 @@ FodyWeavers.xsd
 /Mac/BarkCloudKit/.build
 /Mac/BarkCloudDrive/build
 .claude/scheduled_tasks.lock
+
+# Машинозависимые файлы Android Studio; остальные файлы .idea проекта шарятся
+Android/BarkCloud.Android/.idea/.name
+Android/BarkCloud.Android/.idea/deploymentTargetSelector.xml
+Android/BarkCloud.Android/.idea/studiobot.xml
 *.profraw

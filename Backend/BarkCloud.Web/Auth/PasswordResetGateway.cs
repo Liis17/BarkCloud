@@ -12,6 +12,7 @@ public sealed class PasswordResetGateway
 {
     private const int MinPasswordLength = 6;
     private const string ErrOtpInvalid = "803B632C-4457-4B05-9435-9C3DD0F41E00";
+    private const string ErrOtpAuthenticatorRequired = "C1576884-12D8-4722-A7EE-9F9789AD1265";
     private const string ErrResetExpired = "9F3D1B82-8E55-4C71-BD2A-3D7FAC2E6AE1";
     private const string ErrResetNotFound = "5B9A8269-617E-4D4C-9696-A554C59E3A86";
     private const string ErrResetApproved = "BE708516-BF40-44F9-A6D1-A7F30AB02BED";
@@ -71,8 +72,8 @@ public sealed class PasswordResetGateway
     }
 
     public async Task<PasswordResetResult> ConfirmAsync(
-        HttpContext http, string resetId, string code, string newPassword, bool revokeOtherSessions,
-        CancellationToken cancellationToken = default)
+        HttpContext http, string resetId, string code, string newPassword, bool revokeOtherSessions, bool resetPasskeys,
+        string? authenticatorCode = null, CancellationToken cancellationToken = default)
     {
         if (!IsSixDigitCode(code))
             return new PasswordResetResult(PasswordResetOutcome.CodeInvalid,
@@ -90,7 +91,9 @@ public sealed class PasswordResetGateway
                 ResetId = resetId,
                 OtpCode = code,
                 NewPassword = newPassword,
-                RevokeOtherSessions = revokeOtherSessions
+                RevokeOtherSessions = revokeOtherSessions,
+                ResetPasskeys = resetPasskeys,
+                AuthenticatorCode = authenticatorCode ?? string.Empty
             }, device.ToMetadata(), cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -105,6 +108,12 @@ public sealed class PasswordResetGateway
                 return new PasswordResetResult(PasswordResetOutcome.TooManyAttempts,
                     "Слишком много попыток. Попробуйте позже.", ResetId: resetId,
                     RetryAfterSeconds: ReadRetryAfter(ex));
+
+            // Email-код уже проверен сервером; для завершения нужен код из приложения-аутентификатора.
+            if (codeValue == ErrOtpAuthenticatorRequired)
+                return new PasswordResetResult(PasswordResetOutcome.AuthenticatorRequired,
+                    "Введите код из приложения-аутентификатора, чтобы завершить восстановление.",
+                    ResetId: resetId);
 
             if (codeValue is ErrOtpInvalid or ErrResetExpired or ErrResetNotFound or ErrResetApproved)
                 return new PasswordResetResult(PasswordResetOutcome.CodeInvalid,

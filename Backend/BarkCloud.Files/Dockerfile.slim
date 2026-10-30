@@ -32,7 +32,9 @@ WORKDIR /app
 COPY --from=lognara-agent /download/lognara-agent /usr/local/bin/lognara-agent
 COPY --chown=1654:1654 --from=lognara-agent /spool /var/lib/lognara-agent/spool
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 librsvg2-bin fonts-dejavu-core util-linux \
+    && librsvg_version="$(dpkg-query -W -f='${Version}' librsvg2-2)" \
+    && dpkg --compare-versions "${librsvg_version}" ge "2.58.0+dfsg-1ubuntu0.1" \
     && rm -rf /var/lib/apt/lists/*
 # Статические бинари ffmpeg/ffprobe для генерации превью видео и аудио-обложек.
 COPY --from=mwader/static-ffmpeg:latest /ffmpeg /usr/local/bin/ffmpeg

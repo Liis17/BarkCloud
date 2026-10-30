@@ -4,7 +4,8 @@
 x-common-variables: &common-variables
   CONFIGURATION_SERVICE_URL: "${CONFIGURATION_SERVICE_URL}"
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
-  CONFIGURATION_ACCESS_KEY: "${CONFIGURATION_ACCESS_KEY}"
+  # Публичный JWT-ключ: валидация RS256 (подписывает только Identity приватным ключом)
+  JwtSettings__PublicKeyFile: /keys/jwt/jwt-public.pem
 
 services:
   # === Основные микросервисы (prod-образы) ===
@@ -13,22 +14,33 @@ services:
     image: docker.barkfluff.com/barkcloud-configuration:latest
     container_name: ${CONFIGURATION_CONTAINER_NAME}
     restart: always
-    env_file:
-      - .env
     environment:
       <<: *common-variables
-      CONFIGURATION_HOST:  cloud-postgres:5432
+      # Реестр bootstrap-ключей сервисов: доступ к своему разделу, админ-операции — только Web
+      CONFIGURATION_ACCESS_KEYS: "${CONFIGURATION_ACCESS_KEYS}"
+      CONFIGURATION_HOST: ${POSTGRES_HOST}
       CONFIGURATION_DATABASE: configuration
-      CONFIGURATION_USERNAME: ${POSTGRES_USER}
-      CONFIGURATION_PASSWORD: ${POSTGRES_PASSWORD}
+      CONFIGURATION_USERNAME: barkcloud_configuration
+      CONFIGURATION_PASSWORD: "${CONFIGURATION_DB_PASSWORD}"
       CONFIGURATION_PORT: ${CONFIGURATION_PORT}
-      CONFIGURATION_DBPORT: "5432"
+      CONFIGURATION_DBPORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      IDENTITY_DB_PASSWORD: "${IDENTITY_DB_PASSWORD}"
+      USERS_DB_PASSWORD: "${USERS_DB_PASSWORD}"
+      FILES_DB_PASSWORD: "${FILES_DB_PASSWORD}"
+      TORRENT_DB_PASSWORD: "${TORRENT_DB_PASSWORD}"
       MINIO_HOST: cloud-minio
       MINIO_PORT: "9000"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VIRTUAL_HOST}
+      RABBITMQ_IDENTITY_PASSWORD: "${RABBITMQ_IDENTITY_PASSWORD}"
+      RABBITMQ_USERS_PASSWORD: "${RABBITMQ_USERS_PASSWORD}"
+      RABBITMQ_FILES_PASSWORD: "${RABBITMQ_FILES_PASSWORD}"
+      RABBITMQ_TORRENT_PASSWORD: "${RABBITMQ_TORRENT_PASSWORD}"
+      RABBITMQ_NOTIFICATION_PASSWORD: "${RABBITMQ_NOTIFICATION_PASSWORD}"
       # SMTP для подтверждений по email (опционально; пусто — режим без почты)
       EMAIL_HOST: ${EMAIL_HOST}
       EMAIL_PORT: ${EMAIL_PORT}
@@ -39,7 +51,11 @@ services:
       EXTERNAL_USERS_HOST: ${EXTERNAL_USERS_HOST}
       EXTERNAL_FILES_HOST: ${EXTERNAL_FILES_HOST}
       EXTERNAL_TORRENT_HOST: ${EXTERNAL_TORRENT_HOST}
-      # Порты торрент-сервиса нужны configuration для вычисления TorrentService:Host/RunSettings
+      # Порты сервисов нужны Configuration для вычисления внутренних адресов и RunSettings
+      IDENTITY_PORT: ${IDENTITY_PORT}
+      USERS_PORT: ${USERS_PORT}
+      FILES_PORT: ${FILES_PORT}
+      FILES_HTTP1PORT: ${FILES_HTTP1PORT}
       TORRENT_PORT: ${TORRENT_PORT}
       TORRENT_HTTP1PORT: ${TORRENT_HTTP1PORT}
       TORRENT_PEER_PORT: ${TORRENT_PEER_PORT}
@@ -55,11 +71,18 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${IDENTITY_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIALS: "${SERVICE_CREDENTIALS}"
+      SERVICE_CREDENTIAL: ${IDENTITY_SERVICE_CREDENTIAL}
+      JwtSettings__PrivateKeyFile: /keys/jwt/jwt-private.pem
       SERVICE_PORT: ${IDENTITY_PORT}
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       ConsoleOutput: ${IDENTITY_CONSOLE_OUTPUT}
       SeqEnable: ${IDENTITY_SEQ_ENABLE}
       LognaraEnable: ${IDENTITY_LOGNARA_ENABLE}
+    volumes:
+      - ./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -71,10 +94,14 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${USERS_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${USERS_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${USERS_PORT}
       ConsoleOutput: ${USERS_CONSOLE_OUTPUT}
       SeqEnable: ${USERS_SEQ_ENABLE}
       LognaraEnable: ${USERS_LOGNARA_ENABLE}
+    volumes:
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -87,21 +114,42 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${FILES_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${FILES_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"
+      VideoVariants__WorkDirectory: "/mnt/transcode"
+      VideoVariants__TranscoderUrl: "http://cloud-transcoder:8080"
+      TRANSCODER_TOKEN: "${TRANSCODER_TOKEN}"
       ConsoleOutput: ${FILES_CONSOLE_OUTPUT}
       SeqEnable: ${FILES_SEQ_ENABLE}
       LognaraEnable: ${FILES_LOGNARA_ENABLE}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
       - cloud-configuration
       - cloud-identity
+      - cloud-transcoder
+
+  cloud-transcoder:
+    image: docker.barkfluff.com/barkcloud-transcoder:latest
+    restart: always
+    environment:
+      TRANSCODER_TOKEN: "${TRANSCODER_TOKEN}"
+      TRANSCODER_THREADS: "${TRANSCODER_THREADS}"
+    cpus: "${TRANSCODER_CPUS}"
+    mem_limit: "${TRANSCODER_MEMORY}"
+    volumes:
+      - ${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode
+    networks:
+      - barkcloud-network
 
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   cloud-notification:
@@ -110,6 +158,7 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${NOTIFICATION_CONFIG_ACCESS_KEY}
       ConsoleOutput: ${NOTIFICATION_CONSOLE_OUTPUT}
       SeqEnable: ${NOTIFICATION_SEQ_ENABLE}
       LognaraEnable: ${NOTIFICATION_LOGNARA_ENABLE}
@@ -125,6 +174,8 @@ services:
     restart: always
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${TORRENT_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${TORRENT_SERVICE_CREDENTIAL}
       SERVICE_PORT: ${TORRENT_PORT}
       SERVICE_HTTP1PORT: ${TORRENT_HTTP1PORT}
       FILES_HTTP1PORT: ${FILES_HTTP1PORT}
@@ -135,6 +186,7 @@ services:
       LognaraEnable: ${TORRENT_LOGNARA_ENABLE}
     volumes:
       - ${TORRENT_DOWNLOAD_PATH:-torrent_data}:/mnt/torrents
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
@@ -151,10 +203,14 @@ services:
       - .env
     environment:
       <<: *common-variables
+      CONFIGURATION_ACCESS_KEY: ${WEB_CONFIG_ACCESS_KEY}
+      SERVICE_CREDENTIAL: ${WEB_SERVICE_CREDENTIAL}
       ASPNETCORE_URLS: "http://+:8080"
       App__CookieSecure: "${WEB_COOKIE_SECURE}"
       App__PublicHost: "${WEB_PUBLIC_HOST}"
+      App__TrustedProxyNetworks: "${WEB_TRUSTED_PROXY_NETWORKS:-}"
       App__AdminPassword: "${WEB_ADMIN_PASSWORD}"
+      App__AdminCookieKey: "${WEB_ADMIN_COOKIE_KEY}"
       BarkCloud__AndroidCertificateSha256Fingerprint: "${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}"
       Docker__ContainerNames__Configuration: "${CONFIGURATION_CONTAINER_NAME}"
       Docker__ContainerNames__Identity: "${IDENTITY_CONTAINER_NAME}"
@@ -170,6 +226,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml:rw
       - ./.env:/.env:ro
+      - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
       - cloud-web-maintenance:/app/maintenance
     networks:
       - barkcloud-network

@@ -8,6 +8,8 @@ Parent: [[Web/WebApp]] · See also: [[Backend/Configuration]] · [[Backend/Ident
 
 ## Источники
 
+Раздел `/settings#tags` управляет личными поисковыми тегами через Files (`Backend/BarkCloud.Web/ClientApp/src/pages/TagsTab.tsx`): список с цветами и поиском, создание, изменение названия/цвета и удаление с подтверждением. Выбор цвета выполняет `TagColorPicker` (`Backend/BarkCloud.Web/ClientApp/src/components/ui/TagColorPicker.tsx`) внутри формы: 12 пресетов, HSV-область, доступные с клавиатуры ползунки и HEX `#RRGGBB`; незавершённый или неверный HEX не отправляется. Сохранение продолжает использовать те же маршруты и поля API. AdminGate не требуется. Переименование и удаление распространяются на назначения тега всем файлам владельца.
+
 | Файл | Символ | Роль |
 |---|---|---|
 | `Backend/BarkCloud.Web/SettingsEndpoints.cs` | `MapSettingsEndpoints` | HTTP API страницы настроек |
@@ -20,10 +22,12 @@ Parent: [[Web/WebApp]] · See also: [[Backend/Configuration]] · [[Backend/Ident
 | Метод и путь | Поведение |
 |---|---|
 | `GET /api/settings/full` | Полный набор данных страницы |
+| `GET /api/settings/tags`, `POST /api/settings/tags/save`, `POST /api/settings/tags/delete` | Личный каталог Files: `{items:[{id,name,color}]}`; сохранение `{id?,name,color}` (пустой id создаёт), удаление `{id}`. Цвет — `#RRGGBB`, имя — до 50 символов; нормализованные дубликаты запрещены |
 | `GET /api/settings/context`, `GET /api/settings/profile`, `GET /api/settings/storage`, `GET /api/settings/system` | Раздельные данные для контекста доступа и соответствующих разделов |
 | `POST /api/settings/profile/name`, `POST /api/settings/profile/bio`, `POST /api/settings/profile/username`; `GET /api/settings/profile/username-available?u=` | Изменение имени, биографии и username; проверка доступности username |
 | `GET/POST /api/settings/privacy` | Чтение и изменение видимости профиля, email, last seen и поиска по username |
 | `/api/settings/security/*`, `GET /api/settings/sessions`, `POST /api/settings/sessions/revoke*` | Пароль, 2FA, WebAuthn, список сессий и отзыв сессий |
+| `POST /api/settings/security/reauth/begin`, `POST /api/settings/security/reauth/complete` | Свежая повторная аутентификация для управления passkey и отдельных операций с факторами |
 | `POST /api/settings/system/registration` | Включить или отключить регистрацию; требуется AdminGate |
 | `/api/settings/server/*` | Чтение и изменение серверной конфигурации, версий настроек, storage-профилей и зарезервированных имён |
 | `POST /api/settings/server/storage/groups/save` | Создать или изменить группу: `{id?, name, quotaValue, quotaUnit, buckets[{serviceUrl, bucketName}]}` |
@@ -35,9 +39,10 @@ API миграции S3 принадлежит [[Web/S3Migration]]. API обсл
 ## Зависимости и взаимодействия
 
 - Профиль, приватность, устройства, удаление аккаунта и аватар используют Users; пароль, 2FA, WebAuthn и сессии используют Identity; конфигурационные значения, S3-профили и группы квот — Configuration.
+- Добавление и удаление passkey сначала получают одноразовое разрешение на пять минут, связанное с пользователем, активной сессией, действием и удаляемым ключом. Подтверждение возможно паролем вместе с требуемым активным фактором аккаунта либо существующим passkey; email-2FA использует отдельный код. Identity атомарно проверяет разрешение и активность сессии вместе с изменением ключей.
 - `/api/settings/server/*` требует обычную сессию и открытую AdminGate-сессию. Сама AdminGate управляет отдельной cookie и не заменяет пользовательскую аутентификацию.
 - Данные для страницы собирает `PageDataBuilder`; файловая статистика и сведения о сервере доступны отдельными запросами.
-- `GET /api/settings/server` возвращает `storageGroups` с квотой в байтах и членами, а также `storageBuckets` — уникальные нормализованные endpoint/bucket с ролями и статусами. Credentials не возвращаются. В «Группах S3» квота задаётся в ГБ, ТБ или ПБ; новые бакеты выбираются из доступных профилей, а сохранение и удаление группы требуют перезапуска Files.
+- `GET /api/settings/server` возвращает `storageGroups` с квотой в байтах и членами, а также `storageBuckets` — уникальные нормализованные endpoint/bucket с ролями и статусами. Credentials не возвращаются. Роль `video-variants` показана в списке как «Варианты видео». В «Группах S3» квота задаётся в ГБ, ТБ или ПБ; новые бакеты выбираются из доступных профилей, а сохранение и удаление группы требуют перезапуска Files.
 
 ## Ограничения и важные детали
 

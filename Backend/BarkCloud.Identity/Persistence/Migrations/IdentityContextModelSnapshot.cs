@@ -59,8 +59,14 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<int?>("EmailAuthCodePurpose")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("EmailAuthCodeRequestId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("EmailOtpEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<long?>("LastAcceptedTotpStep")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("LastEmailAuthCode")
                         .HasColumnType("text");
@@ -71,11 +77,17 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<string>("OtpSecret")
                         .HasColumnType("text");
 
+                    b.Property<long>("OtpSecretGeneration")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("PendingOtpSecret")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("PendingOtpSecretExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("PendingOtpSecurityStateVersion")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("ReauthPasswordAttempts")
                         .HasColumnType("integer");
@@ -170,6 +182,52 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.HasIndex("NextAttemptAt");
 
                     b.ToTable("PendingNotifications");
+                });
+
+            modelBuilder.Entity("BarkCloud.Identity.Domain.ReauthPermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CredentialId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("PermissionTokenHash")
+                        .HasColumnType("bytea");
+
+                    b.Property<long>("SecurityStateVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SessionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("WebAuthnChallengeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("PermissionTokenHash")
+                        .IsUnique();
+
+                    b.ToTable("ReauthPermissions");
                 });
 
             modelBuilder.Entity("BarkCloud.Identity.Domain.RefreshToken", b =>
@@ -284,6 +342,9 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
+                    b.Property<long>("SecurityStateVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
 
@@ -304,6 +365,15 @@ namespace BarkCloud.Identity.Persistence.Migrations
                     b.Property<string>("OptionsJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("ReauthPermissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("SecurityStateVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SessionId")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer");

@@ -18,7 +18,9 @@ public sealed record AuthPageState(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FormError,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FormMessage,
     AuthPageFeatures Features,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ClearOtp);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ClearOtp,
+    // Для экрана reset: сервер подтвердил email-код и ждёт код Authenticator.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool AuthenticatorRequired = false);
 
 public sealed record AuthPageValues(
     [property: JsonPropertyName("login"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Login = null,
@@ -27,6 +29,7 @@ public sealed record AuthPageValues(
     [property: JsonPropertyName("first_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FirstName = null,
     [property: JsonPropertyName("last_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LastName = null,
     [property: JsonPropertyName("remember"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Remember = null,
-    [property: JsonPropertyName("revoke_sessions"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? RevokeSessions = null);
+    [property: JsonPropertyName("revoke_sessions"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? RevokeSessions = null,
+    [property: JsonPropertyName("reset_passkeys"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ResetPasskeys = null);
 
 public sealed record AuthPageFeatures(bool RegistrationEnabled, bool EmailEnabled);

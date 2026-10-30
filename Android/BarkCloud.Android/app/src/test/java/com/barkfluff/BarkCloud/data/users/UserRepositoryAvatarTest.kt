@@ -12,10 +12,9 @@ import barkcloud.users.UsersApiGrpcKt
 import barkcloud.users.UsersApiOuterClass.SetProfilePictureRequest
 import barkcloud.users.UsersApiOuterClass.SetProfilePictureResponse
 import barkcloud.users.UsersApiOuterClass.User
-import com.barkfluff.BarkCloud.data.SessionManager
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
-import com.barkfluff.BarkCloud.ui.settings.ProfileViewModel
+import com.barkfluff.BarkCloud.ui.settings.EditProfileViewModel
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -91,7 +90,7 @@ class UserRepositoryAvatarTest {
             SetProfilePictureResponse.getDefaultInstance()
         }
 
-        UserRepository(grpc, transfer) { 0L }.setAvatar(uri)
+        UserRepository(grpc, transfer, monotonicNowMillis = { 0L }).setAvatar(uri)
 
         assertEquals(listOf("ready-upload", "token", "fixed-stub", "deadline", "profile-rpc"), order)
         assertEquals("ready-file-id", request.captured.fileId)
@@ -113,7 +112,7 @@ class UserRepositoryAvatarTest {
         }
         every { grpc.usersStub("access-token") } returns users
 
-        val update = async { UserRepository(grpc, transfer) { 0L }.setAvatar(uri) }
+        val update = async { UserRepository(grpc, transfer, monotonicNowMillis = { 0L }).setAvatar(uri) }
         runCurrent()
         val error = runCatching { update.await() }.exceptionOrNull()
 
@@ -133,7 +132,7 @@ class UserRepositoryAvatarTest {
         coEvery { transfer.uploadAvatar(uri) } returns "ready-file-id"
         coEvery { grpc.validAccessToken() } coAnswers { awaitCancellation() }
 
-        val error = runCatching { UserRepository(grpc, transfer) { 0L }.setAvatar(uri) }.exceptionOrNull()
+        val error = runCatching { UserRepository(grpc, transfer, monotonicNowMillis = { 0L }).setAvatar(uri) }.exceptionOrNull()
 
         assertTrue(error is IOException)
         assertEquals(15_000L, testScheduler.currentTime)
@@ -179,14 +178,11 @@ class UserRepositoryAvatarTest {
         Dispatchers.setMain(kotlinx.coroutines.test.StandardTestDispatcher(testScheduler))
         try {
             val uri = mockk<Uri>()
-            val context = mockk<Context>(relaxed = true)
             val users = mockk<UserRepository>()
-            val transfer = mockk<FileTransferService>()
             val oldUser = User.newBuilder().setProfilePicture("old-avatar-url").build()
             coEvery { users.getUser() } returns oldUser
-            coEvery { transfer.storageInfo() } throws IOException("storage offline")
             coEvery { users.setAvatar(uri) } throws IOException("profile RPC failed")
-            val viewModel = ProfileViewModel(context, users, transfer, mockk<SessionManager>(relaxed = true))
+            val viewModel = EditProfileViewModel(users, mockk())
 
             viewModel.load()
             runCurrent()
@@ -210,10 +206,7 @@ class UserRepositoryAvatarTest {
             val users = mockk<UserRepository>(relaxed = true)
             val entered = CompletableDeferred<Unit>()
             coEvery { users.setAvatar(uri) } coAnswers { entered.complete(Unit); awaitCancellation() }
-            val viewModel = ProfileViewModel(
-                mockk<Context>(relaxed = true), users,
-                mockk<FileTransferService>(relaxed = true), mockk<SessionManager>(relaxed = true),
-            )
+            val viewModel = EditProfileViewModel(users, mockk())
 
             viewModel.setAvatar(uri)
             runCurrent()
@@ -232,4 +225,30 @@ class UserRepositoryAvatarTest {
             Dispatchers.resetMain()
         }
     }
+    @Test
+    fun `avatar refresh preserves unsaved profile fields and releases prepared file`() = runTest {
+        Dispatchers.setMain(kotlinx.coroutines.test.StandardTestDispatcher(testScheduler))
+        try {
+            val uri = mockk<Uri>()
+            val users = mockk<UserRepository>(relaxed = true)
+            coEvery { users.getUser() } returns User.newBuilder().setFirstName("Original").setProfilePicture("old").build()
+            val vm = EditProfileViewModel(users, mockk())
+            vm.load()
+            runCurrent()
+            vm.onFirstNameChange("Unsaved")
+            vm.onBioChange("Unsaved bio")
+            coEvery { users.getUser() } returns User.newBuilder().setFirstName("Original").setProfilePicture("new").build()
+            var released = 0
+            vm.setAvatar(uri) { released++ }
+            runCurrent()
+            assertEquals("Unsaved", vm.state.value.firstName)
+            assertEquals("Unsaved bio", vm.state.value.bio)
+            assertEquals("new", vm.state.value.avatarUrl)
+            assertEquals(1, released)
+            assertFalse(vm.state.value.isUpdatingAvatar)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
 }

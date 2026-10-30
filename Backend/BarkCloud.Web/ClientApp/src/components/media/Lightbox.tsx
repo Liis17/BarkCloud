@@ -2,15 +2,18 @@ import React from 'react';
 import { Icon } from '../Icon';
 import { useContextMenu } from '../ui/ContextMenu';
 import { useOptionalAudioPlayer } from '../../hooks/useAudioPlayer';
-import { apiGet, proxiedImageUrl } from '../../lib/api';
+import { apiGet, fetchClipboardImage, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { VideoPlayer } from './MediaPlayer';
+import type { VideoQuality } from './MediaPlayer';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
+import { isSvgFileName, selectPhotoViewSource } from '../../lib/imagePreviewSource';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
 import type { CardFile, MediaItem } from '../../lib/types';
 
 interface DownloadResponse {
   urls: Record<string, string | null>;
+  videoQualities: Record<string, VideoQuality[]>;
 }
 
 interface LightboxProps {
@@ -29,6 +32,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const list: CardFile[] = Array.isArray(items) ? items : media ? [media] : [];
   const [i, setI] = React.useState(index);
   const [urls, setUrls] = React.useState<Record<string, string | null>>({});
+  const [videoQualities, setVideoQualities] = React.useState<Record<string, VideoQuality[]>>({});
   const [err, setErr] = React.useState<string | null>(null);
   const [scale, setScale] = React.useState(1);
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
@@ -42,6 +46,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const cur = list[i] || null;
   const fileId = cur && cur.id;
   const isVideo = !!cur && cur.kind === 'video';
+  const isSvg = !!cur && (isSvgFileName(cur.name) || isSvgFileName(cur.ext));
 
   React.useEffect(() => {
     if (!isVideo || !musicPlayer) return;
@@ -71,7 +76,10 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     if (!fileId || urls[fileId]) return;
     apiGet<DownloadResponse>('/api/files/download?ids=' + encodeURIComponent(fileId))
       .then((d) => {
-        if (alive) setUrls((u) => ({ ...u, [fileId]: (d.urls && d.urls[fileId]) || null }));
+        if (alive) {
+          setUrls((u) => ({ ...u, [fileId]: (d.urls && d.urls[fileId]) || null }));
+          setVideoQualities((current) => ({ ...current, [fileId]: d.videoQualities?.[fileId] || [] }));
+        }
       })
       .catch((e) => {
         if (alive) setErr(e.message);
@@ -140,8 +148,8 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   // Оригинал (временная ссылка) — для скачивания, видео и фолбэка фото.
   const url = fileId ? urls[fileId] : null;
   // Для фото показываем JpegView (HEIC и пр. браузеро-недружелюбные форматы), если он есть.
-  const photoSrc = isVideo ? null : (cur.jpegViewUrl && cur.jpegViewUrl.length > 0 ? cur.jpegViewUrl : url);
-  const ready = isVideo ? !!url : !!photoSrc;
+  const photoSrc = isVideo ? null : selectPhotoViewSource(cur.name, cur.jpegViewUrl, cur.previews, url);
+  const ready = isVideo ? !!url : isSvg ? !!photoSrc || !!url : !!photoSrc;
   // Для действий панели: элементы галерей — MediaItem, у прочих entryIds может не быть.
   const curM = cur as MediaItem;
   const hasEntry = !!(curM.entryIds && curM.entryIds.length > 0);
@@ -187,7 +195,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     try {
       if (!photoSrc) throw new Error('Изображение ещё не загружено');
       // Через same-origin прокси — иначе чужой origin Files даёт CORS/tainted-canvas.
-      const blob = await (await fetch(proxiedImageUrl(photoSrc))).blob();
+      const blob = await fetchClipboardImage(proxiedImageUrl(photoSrc));
       // Clipboard API принимает только PNG — перегоняем через canvas.
       const bitmap = await createImageBitmap(blob);
       const canvas = document.createElement('canvas');
@@ -199,8 +207,8 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
       actions.toast('Изображение скопировано');
-    } catch {
-      actions.toast('Не удалось скопировать изображение', 'err');
+    } catch (e) {
+      actions.toast(e instanceof Error ? e.message : 'Не удалось скопировать изображение', 'err');
     }
   }
 
@@ -235,22 +243,27 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
               persistVolumeRef(el);
             }}
             src={url!}
+            qualities={videoQualities[fileId!]}
             autoPlay
           />
         )}
         {ready && !isVideo && (
-          <img
-            src={photoSrc!}
-            alt={cur.name || ''}
-            draggable={false}
-            className={scale > 1 ? 'zoomed' : ''}
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
-            onMouseDown={onMouseDown}
-            onDoubleClick={() => {
-              setScale((s) => (s > 1 ? 1 : 2));
-              setPan({ x: 0, y: 0 });
-            }}
-          />
+          photoSrc ? (
+            <img
+              src={photoSrc}
+              alt={cur.name || ''}
+              draggable={false}
+              className={scale > 1 ? 'zoomed' : ''}
+              style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
+              onMouseDown={onMouseDown}
+              onDoubleClick={() => {
+                setScale((s) => (s > 1 ? 1 : 2));
+                setPan({ x: 0, y: 0 });
+              }}
+            />
+          ) : (
+            <div className="lb-msg">Безопасное превью недоступно</div>
+          )
         )}
       </div>
 
@@ -278,7 +291,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
               <Icon.download size={20} />
             </a>
           )}
-          {!isVideo && (
+          {!isVideo && photoSrc && (
             <button className="icon-btn" title="Скопировать в буфер обмена" onClick={copyImage}>
               <Icon.copy size={20} />
             </button>

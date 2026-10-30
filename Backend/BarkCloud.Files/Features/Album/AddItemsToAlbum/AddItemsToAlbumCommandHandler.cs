@@ -9,6 +9,7 @@ using MediatR;
 
 using DomainAlbumItem = BarkCloud.Files.Domain.AlbumItem;
 using MediaKind = BarkCloud.Files.Domain.MediaKind;
+using DomainUploadFileType = BarkCloud.Files.Domain.UploadFileType;
 
 namespace BarkCloud.Files.Features.Album.AddItemsToAlbum;
 
@@ -52,7 +53,8 @@ public class AddItemsToAlbumCommandHandler : IRequestHandler<AddItemsToAlbumComm
 
         // Принимаем только фото/видео, принадлежащие пользователю.
         var eligible = files
-            .Where(f => f.Uploaders.Contains(ownerId)
+            .Where(f => f.Type == DomainUploadFileType.CloudFile
+                        && f.Uploaders.Contains(ownerId)
                         && (f.MediaKind == MediaKind.Photo || f.MediaKind == MediaKind.Video))
             .Select(f => f.Id)
             .ToList();

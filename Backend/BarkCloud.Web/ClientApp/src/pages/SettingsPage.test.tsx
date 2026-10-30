@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage';
 import { jsonResponse, profile, serverSettings, system } from '../test/settingsFixtures';
 
+vi.mock('../lib/webauthn', () => ({
+  webauthnAuthenticate: vi.fn(),
+  webauthnRegister: vi.fn(),
+  webauthnSupported: () => true,
+}));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -44,6 +50,119 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
     await waitFor(() => expect(document.querySelector('.avatar-big img')?.getAttribute('src')).toBe(profile.avatarUrl));
     expect(fetchMock.mock.calls.map(([path]) => path).sort()).toEqual(['/api/settings/context', '/api/settings/profile']);
+  });
+
+  it('запрашивает reauth перед добавлением passkey и показывает обязательный второй фактор', async () => {
+    const fetchMock = mockSettings();
+    fetchMock.mockImplementation((path) => {
+      if (path === '/api/settings/security/reauth/begin')
+        return Promise.resolve(jsonResponse({ message: 'Введите код приложения-аутентификатора', otpMethod: 'authenticator' }, 400));
+      const data: Record<string, unknown> = {
+        '/api/settings/context': { admin: { enabled: false, unlocked: false } },
+        '/api/settings/profile': profile,
+        '/api/settings/security/2fa': { authenticator: true, email: false },
+        '/api/settings/security/webauthn': { keys: [{ id: 'key-1', name: 'Ключ', createdAt: null, lastUsedAt: null }] },
+      };
+      return Promise.resolve(jsonResponse(data[path] ?? {}));
+    });
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Безопасность' }));
+    await screen.findByText('Ключи безопасности');
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить ключ' }));
+    fireEvent.change(await screen.findByPlaceholderText('Пароль'), { target: { value: 'current-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить паролем' }));
+
+    const otpCode = await screen.findByLabelText('Код из приложения-аутентификатора') as HTMLInputElement;
+    expect(otpCode.getAttribute('inputmode')).toBe('numeric');
+    expect(otpCode.getAttribute('autocomplete')).toBe('one-time-code');
+    const beginCall = fetchMock.mock.calls.find(([path]) => path === '/api/settings/security/reauth/begin');
+    expect(JSON.parse(beginCall?.[1]?.body as string)).toMatchObject({ action: 1, password: 'current-password' });
+    expect(fetchMock.mock.calls.some(([path]) => path === '/api/settings/security/webauthn/register/begin')).toBe(false);
+  });
+
+  it('сохраняет email-код reauth как одноразовый числовой ввод', async () => {
+    const fetchMock = mockSettings();
+    let beginCount = 0;
+    fetchMock.mockImplementation((path) => {
+      if (path === '/api/settings/security/reauth/begin') {
+        beginCount++;
+        return Promise.resolve(beginCount === 1
+          ? jsonResponse({ message: 'Введите код из письма', otpMethod: 'email' }, 400)
+          : jsonResponse({ challengeId: 'email-challenge' }));
+      }
+      const data: Record<string, unknown> = {
+        '/api/settings/context': { admin: { enabled: false, unlocked: false } },
+        '/api/settings/profile': profile,
+        '/api/settings/security/2fa': { authenticator: false, email: false },
+        '/api/settings/security/webauthn': { keys: [{ id: 'key-1', name: 'Ключ', createdAt: null, lastUsedAt: null }] },
+      };
+      return Promise.resolve(jsonResponse(data[path] ?? {}));
+    });
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Безопасность' }));
+    await screen.findByText('Ключи безопасности');
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить ключ' }));
+    fireEvent.change(await screen.findByLabelText('Пароль'), { target: { value: 'current-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить паролем' }));
+    await waitFor(() => expect(beginCount).toBe(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить паролем' }));
+
+    const emailCode = await screen.findByLabelText('Код из письма') as HTMLInputElement;
+    expect(emailCode.getAttribute('inputmode')).toBe('numeric');
+    expect(emailCode.getAttribute('autocomplete')).toBe('one-time-code');
+  });
+
+  it('сохраняет autofocus и Enter для кода включения 2FA', async () => {
+    const fetchMock = mockSettings();
+    fetchMock.mockImplementation((path) => {
+      if (path === '/api/settings/security/2fa') return Promise.resolve(jsonResponse({ authenticator: false, email: false }));
+      if (path === '/api/settings/security/2fa/enable') return Promise.resolve(jsonResponse({ qr: '', code: '' }));
+      if (path === '/api/settings/security/2fa/confirm') return Promise.resolve(jsonResponse({ message: 'Код неверен' }, 400));
+      const data: Record<string, unknown> = {
+        '/api/settings/context': { admin: { enabled: false, unlocked: false } },
+        '/api/settings/profile': profile,
+        '/api/settings/security/webauthn': { keys: [] },
+      };
+      return Promise.resolve(jsonResponse(data[path] ?? {}));
+    });
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Безопасность' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Приложение-аутентификатор' }));
+    fireEvent.change(await screen.findByLabelText('Пароль'), { target: { value: 'current-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Продолжить' }));
+
+    const code = await screen.findByLabelText('Код подтверждения') as HTMLInputElement;
+    await waitFor(() => expect(document.activeElement).toBe(code));
+    fireEvent.change(code, { target: { value: '123456' } });
+    fireEvent.keyDown(code, { key: 'Enter' });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path === '/api/settings/security/2fa/confirm')).toBe(true));
+    const confirmCall = fetchMock.mock.calls.find(([path]) => path === '/api/settings/security/2fa/confirm');
+    expect(JSON.parse(confirmCall?.[1]?.body as string)).toEqual({ otpCode: '123456' });
+  });
+
+  it('сохраняет autofocus и Enter для кода отключения 2FA', async () => {
+    const fetchMock = mockSettings();
+    fetchMock.mockImplementation((path) => {
+      if (path === '/api/settings/security/2fa') return Promise.resolve(jsonResponse({ authenticator: true, email: false }));
+      if (path === '/api/settings/security/2fa/disable') return Promise.resolve(jsonResponse({ message: 'Код неверен' }, 400));
+      const data: Record<string, unknown> = {
+        '/api/settings/context': { admin: { enabled: false, unlocked: false } },
+        '/api/settings/profile': profile,
+        '/api/settings/security/webauthn': { keys: [] },
+      };
+      return Promise.resolve(jsonResponse(data[path] ?? {}));
+    });
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Безопасность' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Приложение-аутентификатор' }));
+
+    const code = await screen.findByLabelText('Код') as HTMLInputElement;
+    await waitFor(() => expect(document.activeElement).toBe(code));
+    fireEvent.change(code, { target: { value: '654321' } });
+    fireEvent.keyDown(code, { key: 'Enter' });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path === '/api/settings/security/2fa/disable')).toBe(true));
+    const disableCall = fetchMock.mock.calls.find(([path]) => path === '/api/settings/security/2fa/disable');
+    expect(JSON.parse(disableCall?.[1]?.body as string)).toEqual({ otpType: 1, otpCode: '654321' });
   });
 
   it('общий поиск открывает пункт и переводит к нему фокус', async () => {

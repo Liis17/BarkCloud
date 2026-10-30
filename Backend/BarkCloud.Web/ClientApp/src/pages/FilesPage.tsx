@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
 import { Lightbox } from '../components/media/Lightbox';
 import { Modal } from '../components/ui/Modal';
+import { TextField } from '../components/ui/TextField';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { FolderPropertiesModal } from '../components/ui/FolderPropertiesModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
@@ -24,7 +25,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { pickDocumentIcon } from '../hooks/useDocumentHead';
 import { useUploadActions } from '../hooks/useUploadManager';
-import { DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
+import { DynamicFoldersSkeleton, DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
 import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
@@ -53,11 +54,9 @@ function directoryCursorOf(listing: Listing): DirectoryCursor | null {
 
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 
-function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active }: {
+function DirRow({ dir, onOpen, onMenu, dropHandlers, active }: {
   dir: DirInfo;
   onOpen: (d: DirInfo) => void;
-  onRename: (d: DirInfo) => void;
-  onDelete: (d: DirInfo) => void;
   onMenu: (e: React.MouseEvent, d: DirInfo) => void;
   dropHandlers: FileDropHandlers;
   active: boolean;
@@ -71,24 +70,16 @@ function DirRow({ dir, onOpen, onRename, onDelete, onMenu, dropHandlers, active 
     >
       <td className="selcell" />
       <td className="name">
-        <div className="file-icon folder">DIR</div>
-        <div className="file-name-col">
-          <div className="fn">{dir.name}</div>
-          <div className="meta">Папка</div>
+        <div className="name-cell">
+          <div className="file-icon folder"><Icon.folder size={22} /></div>
+          <div className="file-name-col">
+            <div className="fn">{dir.name}</div>
+          </div>
         </div>
       </td>
-      <td className="size">—</td>
+      <td className="size">{dir.sizeLabel || '—'}</td>
       <td className="modified">{fmtDate(dir.updatedAt)}</td>
-      <td>
-        <span className="row-actions">
-          <button title="Переименовать" onClick={(e) => { e.stopPropagation(); onRename(dir); }}>
-            <Icon.pencil size={18} />
-          </button>
-          <button title="Удалить" onClick={(e) => { e.stopPropagation(); onDelete(dir); }}>
-            <Icon.trash size={18} />
-          </button>
-        </span>
-      </td>
+      <td />
     </tr>
   );
 }
@@ -125,14 +116,16 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
         />
       </td>
       <td className="name">
-        {isMedia && hasPreview ? (
-          <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
-        ) : (
-          <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
-        )}
-        <div className="file-name-col">
-          <div className="fn">{entry.name}</div>
-          <div className="meta">{kindLabel(m?.kind)}</div>
+        <div className="name-cell">
+          {isMedia && hasPreview ? (
+            <MediaThumb media={m} className="thumb file-thumb" sizes="40px" />
+          ) : (
+            <div className={'file-icon ' + (m?.iconKind || 'doc')}>{m?.ext || 'FILE'}</div>
+          )}
+          <div className="file-name-col">
+            <div className="fn">{entry.name}</div>
+            <div className="meta">{kindLabel(m?.kind)}</div>
+          </div>
         </div>
       </td>
       <td className="size">{m?.sizeLabel || '—'}</td>
@@ -247,7 +240,7 @@ export function FilesPage() {
   const searchQuery = (new URLSearchParams(location.search).get('q') || '').trim();
   const directDirectoryId = new URLSearchParams(location.search).get('dir') || '';
   const smartFolderId = new URLSearchParams(location.search).get('smart') || '';
-  const [stack, setStack] = React.useState<{ id: string; name: string }[]>(directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : (navState.stack || []));
+  const stack = directDirectoryId ? [{ id: directDirectoryId, name: 'Папка' }] : (navState.stack ?? []);
   const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
@@ -265,8 +258,10 @@ export function FilesPage() {
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [bulkMoving, setBulkMoving] = React.useState(false);
+  const [moveProgress, setMoveProgress] = React.useState<{ done: number; total: number } | null>(null);
   const [archiving, setArchiving] = React.useState(false);
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
+  const [smartFoldersLoading, setSmartFoldersLoading] = React.useState(true);
   const [openSmart, setOpenSmart] = React.useState<DynamicFolder | null>(null);
   const [creatingSmart, setCreatingSmart] = React.useState(false);
   const [directoryCursor, setDirectoryCursor] = React.useState<DirectoryCursor | null>(null);
@@ -336,14 +331,6 @@ export function FilesPage() {
       });
   }, [currentDir, searchQuery, toast, fsel.clear]);
   React.useEffect(load, [load]);
-  React.useEffect(() => {
-    if (directDirectoryId) setStack([{ id: directDirectoryId, name: 'Папка' }]);
-    else if (navState.stack) setStack(navState.stack);
-    else setStack([]);
-    // location.key меняется при навигации, но не при переходах по локальным хлебным крошкам.
-    // Поэтому стек синхронизируется с URL/state и не сбрасывается при обычном открытии подпапки.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.key, directDirectoryId, navState.stack]);
   const loadRef = React.useRef(load);
   loadRef.current = load;
   React.useEffect(() => { loadRef.current(); }, [attachVersion]);
@@ -360,7 +347,8 @@ export function FilesPage() {
   const loadSmartFolders = React.useCallback(() => {
     apiGet<{ folders: DynamicFolder[] }>('/api/dynamic-folders')
       .then((d) => setSmartFolders(d.folders || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSmartFoldersLoading(false));
   }, []);
   React.useEffect(() => {
     loadSmartFolders();
@@ -425,8 +413,11 @@ export function FilesPage() {
     return () => observer.disconnect();
   }, [directoryCursor, searchQuery]);
 
-  const openDir = (dir: DirInfo) => setStack((s) => [...s, { id: dir.id, name: dir.name }]);
-  const gotoIndex = (i: number) => setStack((s) => s.slice(0, i + 1));
+  const openDir = (dir: DirInfo) => navigate('/files', { state: { stack: [...stack, { id: dir.id, name: dir.name }] } });
+  const gotoIndex = (i: number) => {
+    if (i < 0 && !stack.length) return;
+    navigate('/files', { state: { stack: stack.slice(0, i + 1) } });
+  };
 
   const startRename = (target: DirInfo | Entry, isDir: boolean) => {
     setName(target.name);
@@ -625,21 +616,35 @@ export function FilesPage() {
   }
 
   async function bulkMove(targetDir: string) {
+    if (moveProgress) return;
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
     let ok = 0;
-    for (const e of chosen) {
-      try {
-        await apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir });
-        ok++;
-      } catch (err) {
-        toast(`«${e.name}»: ${(err as Error).message}`, 'err');
+    let failed = 0;
+    let firstError: { name: string; message: string } | null = null;
+    setMoveProgress({ done: 0, total: chosen.length });
+    try {
+      for (const e of chosen) {
+        try {
+          await apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir });
+          ok++;
+        } catch (err) {
+          failed++;
+          if (!firstError) firstError = { name: e.name, message: (err as Error).message };
+        }
+        setMoveProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
       }
+    } finally {
+      setMoveProgress(null);
+      setBulkMoving(false);
+      fsel.clear();
     }
-    setBulkMoving(false);
-    fsel.clear();
     if (ok) {
-      toast(`Перемещено: ${ok}`);
+      toast(failed ? `Перемещено: ${ok}, не удалось: ${failed}` : `Перемещено: ${ok}`);
       load();
+    } else if (failed === 1 && firstError) {
+      toast(`«${firstError.name}»: ${firstError.message}`, 'err');
+    } else if (failed) {
+      toast(`Не удалось переместить выбранные файлы (${failed})`, 'err');
     }
   }
   async function bulkCopyLinks() {
@@ -732,142 +737,147 @@ export function FilesPage() {
       <div className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
         {over && <FileDropOverlay detail={`Файлы будут загружены в папку «${dropDirectoryName}»`} />}
         <div className="files-main">
-          <div className="files-bar">
-            {searchQuery ? (
-              <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Icon.search size={18} />
-                <span className="cur">Результаты поиска: «{searchQuery}»</span>
-                <a onClick={() => navigate('/files')} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <Icon.x size={14} /> Очистить
-                </a>
-              </div>
-            ) : (
-              <div className="breadcrumb">
-                <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
-                  <Icon.folder size={18} />
-                </a>
-                {stack.map((s, i) => (
-                  <React.Fragment key={s.id}>
-                    <span className="sep">/</span>
-                    {i === stack.length - 1 ? (
-                      <span className="cur">{s.name}</span>
-                    ) : (
-                      <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
-                        {s.name}
-                      </a>
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {!openSmart && !searchQuery && !currentDir && smartFolders.length > 0 && (
-            <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
-          )}
-
-          {openSmart ? (
-            <div className="files-list">
-              <DynamicFolderDetail
-                folder={openSmart}
-                onBack={() => setOpenSmart(null)}
-                onChanged={loadSmartFolders}
-                toast={toast}
-                albums={albums}
-                reloadAlbums={loadAlbums}
-              />
-            </div>
-          ) : (
-          <div className="files-list">
-            {listing === null ? (
-              <Loading />
-            ) : isEmpty ? (
-              searchQuery ? (
-                <EmptyState
-                  icon="search"
-                  title="Ничего не найдено"
-                  hint={`По запросу «${searchQuery}» файлов не нашлось.`}
-                />
+          {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading || smartFolders.length > 0) && (
+            <div className="smart-block">
+              {smartFoldersLoading ? (
+                <DynamicFoldersSkeleton />
               ) : (
-                <EmptyState
-                  icon="folder"
-                  title="Папка пуста"
-                  hint="Загрузите файлы или создайте подпапку."
-                  action={
-                    <button className="btn primary" onClick={() => doUpload()}>
-                      <Icon.upload size={16} /> Загрузить
-                    </button>
-                  }
+                <DynamicFoldersStrip folders={smartFolders} onOpen={setOpenSmart} onCreate={() => setCreatingSmart(true)} />
+              )}
+            </div>
+          )}
+          <div className="files-block">
+            <div className="files-bar">
+              {searchQuery ? (
+                <div className="breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Icon.search size={18} />
+                  <span className="cur">Результаты поиска: «{searchQuery}»</span>
+                  <a onClick={() => navigate('/files')} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Icon.x size={14} /> Очистить
+                  </a>
+                </div>
+              ) : (
+                <div className="breadcrumb">
+                  <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
+                    <Icon.folder size={18} />
+                  </a>
+                  {stack.map((s, i) => (
+                    <React.Fragment key={s.id}>
+                      <span className="sep">/</span>
+                      {i === stack.length - 1 ? (
+                        <span className="cur">{s.name}</span>
+                      ) : (
+                        <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
+                          {s.name}
+                        </a>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {openSmart ? (
+              <div className="files-list">
+                <DynamicFolderDetail
+                  folder={openSmart}
+                  onBack={() => setOpenSmart(null)}
+                  onChanged={loadSmartFolders}
+                  toast={toast}
+                  albums={albums}
+                  reloadAlbums={loadAlbums}
                 />
-              )
+              </div>
             ) : (
-              <table className="ftable">
-                <thead>
-                  <tr>
-                    <th style={{ width: 40 }} className="selcell">
-                      <input
-                        type="checkbox"
-                        checked={allChecked}
-                        disabled={!files.length}
-                        onChange={(e) => fsel.setAll(files.map((f) => f.entryId), e.target.checked)}
+            <div className="files-list">
+              {listing === null ? (
+                <Loading />
+              ) : isEmpty ? (
+                searchQuery ? (
+                  <EmptyState
+                    icon="search"
+                    title="Ничего не найдено"
+                    hint={`По запросу «${searchQuery}» файлов не нашлось.`}
+                  />
+                ) : (
+                  <EmptyState
+                    icon="folder"
+                    title="Папка пуста"
+                    hint="Загрузите файлы или создайте подпапку."
+                    action={
+                      <button className="btn primary" onClick={() => doUpload()}>
+                        <Icon.upload size={16} /> Загрузить
+                      </button>
+                    }
+                  />
+                )
+              ) : (
+                <table className="ftable">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 40 }} className="selcell">
+                        <input
+                          type="checkbox"
+                          checked={allChecked}
+                          disabled={!files.length}
+                          onChange={(e) => fsel.setAll(files.map((f) => f.entryId), e.target.checked)}
+                        />
+                      </th>
+                      <th>Имя</th>
+                      <th style={{ width: 120 }}>Размер</th>
+                      <th style={{ width: 140 }}>Изменён</th>
+                      <th style={{ width: 120 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dirs.map((d) => (
+                      <DirRow
+                        key={d.id}
+                        dir={d}
+                        active={dropTarget?.id === d.id}
+                        dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                        onOpen={openDir}
+                        onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                       />
-                    </th>
-                    <th>Имя</th>
-                    <th style={{ width: 120 }}>Размер</th>
-                    <th style={{ width: 140 }}>Изменён</th>
-                    <th style={{ width: 120 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dirs.map((d) => (
-                    <DirRow
-                      key={d.id}
-                      dir={d}
-                      active={dropTarget?.id === d.id}
-                      dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
-                      onOpen={openDir}
-                      onRename={(t) => startRename(t, true)}
-                      onDelete={(t) => requestDelete(t, true)}
-                      onMenu={(ev, t) => openAt(ev, dirMenu(t))}
-                    />
-                  ))}
-                  {files.map((e) => (
-                    <FileRow
-                      key={e.entryId}
-                      entry={e}
-                      selected={!!sel && sel.entryId === e.entryId}
-                      bulkChecked={fsel.has(e.entryId)}
-                      onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
-                      onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
-                      onOpen={openEntry}
-                      onDownload={download}
-                      onRename={(t) => startRename(t, false)}
-                      onDelete={(t) => requestDelete(t, false)}
-                      onMenu={(ev, t) => openAt(ev, fileMenu(t, ev.currentTarget))}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {searchQuery && searchCursor && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
-                <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
-                  {searchMore ? 'Загрузка…' : 'Показать ещё'}
-                </button>
-              </div>
-            )}
-            {!searchQuery && directoryCursor && (
-              <div
-                ref={directorySentinelRef}
-                role={directoryMore ? 'status' : undefined}
-                aria-label={directoryMore ? 'Загрузка файлов' : undefined}
-                style={{ display: 'flex', justifyContent: 'center', minHeight: 24, padding: '14px 0' }}
-              >
-                {directoryMore && <span>Загрузка…</span>}
-              </div>
+                    ))}
+                    {files.map((e) => (
+                      <FileRow
+                        key={e.entryId}
+                        entry={e}
+                        selected={!!sel && sel.entryId === e.entryId}
+                        bulkChecked={fsel.has(e.entryId)}
+                        onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
+                        onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
+                        onOpen={openEntry}
+                        onDownload={download}
+                        onRename={(t) => startRename(t, false)}
+                        onDelete={(t) => requestDelete(t, false)}
+                        onMenu={(ev, t) => openAt(ev, fileMenu(t, ev.currentTarget))}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {searchQuery && searchCursor && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                  <button className="btn outlined" onClick={loadMoreSearch} disabled={searchMore}>
+                    {searchMore ? 'Загрузка…' : 'Показать ещё'}
+                  </button>
+                </div>
+              )}
+              {!searchQuery && directoryCursor && (
+                <div
+                  ref={directorySentinelRef}
+                  role={directoryMore ? 'status' : undefined}
+                  aria-label={directoryMore ? 'Загрузка файлов' : undefined}
+                  style={{ display: 'flex', justifyContent: 'center', minHeight: 24, padding: '14px 0' }}
+                >
+                  {directoryMore && <span>Загрузка…</span>}
+                </div>
+              )}
+            </div>
             )}
           </div>
-          )}
         </div>
 
         <aside className="files-inspector">
@@ -902,8 +912,7 @@ export function FilesPage() {
             </>
           }
         >
-          <label className="field-label">Имя папки</label>
-          <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createDir(); }} />
+          <TextField label="Имя папки" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createDir(); }} />
         </Modal>
       )}
 
@@ -922,8 +931,7 @@ export function FilesPage() {
             </>
           }
         >
-          <label className="field-label">Новое имя</label>
-          <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doRename(); }} />
+          <TextField label="Новое имя" value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doRename(); }} />
         </Modal>
       )}
 
@@ -968,7 +976,13 @@ export function FilesPage() {
       )}
 
       {bulkMoving && (
-        <MoveToFolderModal count={fsel.count} currentDir={currentDir} onPick={bulkMove} onClose={() => setBulkMoving(false)} />
+        <MoveToFolderModal
+          count={fsel.count}
+          currentDir={currentDir}
+          progress={moveProgress ?? undefined}
+          onPick={bulkMove}
+          onClose={() => setBulkMoving(false)}
+        />
       )}
 
       {menu}

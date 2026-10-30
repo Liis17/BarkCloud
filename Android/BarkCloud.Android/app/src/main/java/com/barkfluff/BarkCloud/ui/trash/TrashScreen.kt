@@ -3,6 +3,7 @@ package com.barkfluff.BarkCloud.ui.trash
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -10,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.AlertDialog
@@ -18,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -28,7 +31,6 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,10 +54,12 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.TrashItem
 import com.barkfluff.BarkCloud.files.ui.formatDate
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TrashScreen(
+    onNavigateUp: () -> Unit,
     viewModel: TrashViewModel = viewModel(factory = TrashViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -78,24 +82,30 @@ fun TrashScreen(
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.tab_trash)) },
-                actions = {
-                    if (state.items.isNotEmpty()) {
-                        IconButton(onClick = { showEmptyConfirm = true }) {
-                            Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.trash_empty_action))
-                        }
-                    }
-                },
-            )
-        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::reload,
+            RefreshableContentSurface(
+                onRefresh = viewModel::reloadAndWait,
+                header = {
+                    CenterAlignedTopAppBar(
+                        title = { Text(stringResource(R.string.tab_trash)) },
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        navigationIcon = {
+                            IconButton(onClick = onNavigateUp) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.files_back))
+                            }
+                        },
+                        actions = {
+                            if (state.items.isNotEmpty()) {
+                                IconButton(onClick = { showEmptyConfirm = true }) {
+                                    Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.trash_empty_action))
+                                }
+                            }
+                        },
+                    )
+                },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyColumn(Modifier.fillMaxSize(), state = listState) {
@@ -176,7 +186,9 @@ private fun TrashRow(
         },
     ) {
         val hasPreview = item.asset.previews.isNotEmpty()
+        // Фон строки совпадает с подложкой: свайп-фон SwipeToDismissBox рисуется под строкой целиком.
         ListItem(
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             headlineContent = { Text(item.name, maxLines = 1) },
             supportingContent = {
                 Text(
@@ -187,7 +199,7 @@ private fun TrashRow(
             leadingContent = {
                 if (hasPreview) {
                     MediaThumb(
-                        model = item.asset.previewUrl(128),
+                        model = item.asset.previewModel(128),
                         isVideo = item.asset.isVideo,
                         contentDescription = item.name,
                         modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),

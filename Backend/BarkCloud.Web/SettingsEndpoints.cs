@@ -1,6 +1,7 @@
 using BarkCloud.Proto.Files;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
+using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.Web.Auth;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
@@ -25,14 +26,17 @@ public static class SettingsEndpoints
     public sealed record BioBody(string? Bio);
     public sealed record UsernameBody(string? Username);
     public sealed record PrivacyBody(int ProfileVisibility, int EmailVisibility, int LastSeenVisibility, bool SearchableByUsername);
-    public sealed record PasswordBody(string? OldPassword, string? NewPassword);
-    public sealed record OtpEnableBody(int OtpType, string? Password, string? CurrentOtpCode);
+    public sealed record PasswordBody(string? OldPassword, string? NewPassword, string? PermissionToken = null);
+    public sealed record OtpEnableBody(int OtpType, string? Password, string? CurrentOtpCode, string? CurrentEmailCode);
     public sealed record OtpConfirmBody(string? OtpCode);
-    public sealed record OtpDisableBody(int OtpType, string? OtpCode, string? Password);
+    public sealed record OtpDisableBody(int OtpType, string? OtpCode, string? Password, string? CurrentEmailCode);
     public sealed record RenameBody(string? DeviceId, string? CustomName);
     public sealed record RevokeBody(string? DeviceId);
-    public sealed record WebAuthnRegisterCompleteBody(string? ChallengeId, JsonElement Attestation, string? Name);
-    public sealed record WebAuthnRemoveBody(string? CredentialId);
+    public sealed record WebAuthnRegisterBeginBody(string? PermissionToken);
+    public sealed record WebAuthnRegisterCompleteBody(string? ChallengeId, JsonElement Attestation, string? Name, string? PermissionToken);
+    public sealed record WebAuthnRemoveBody(string? CredentialId, string? PermissionToken);
+    public sealed record ReauthBeginBody(int Action, string? CredentialId, string? Password, string? OtpCode, string? ChallengeId);
+    public sealed record ReauthCompleteBody(string? ChallengeId, JsonElement Assertion, string? EmailCode);
     public sealed record RegistrationBody(bool Enabled);
     public sealed record ServerValueBody(int ServiceId, string? Section, string? Key, string? Value);
     public sealed record ServerRollbackBody(long RevisionId, int ServiceId, string? Section, string? Key);
@@ -248,7 +252,8 @@ public static class SettingsEndpoints
                 await identity.SetPasswordAsync(new SetPasswordRequest
                 {
                     Password = body.NewPassword ?? "",
-                    OldPassword = body.OldPassword ?? ""
+                    OldPassword = body.OldPassword ?? "",
+                    PermissionToken = body.PermissionToken ?? ""
                 }, token);
                 return Results.Ok(new { ok = true });
             }));
@@ -267,7 +272,8 @@ public static class SettingsEndpoints
                 {
                     OtpType = (OtpTypeId)body.OtpType,
                     Password = body.Password ?? "",
-                    CurrentOtpCode = body.CurrentOtpCode ?? ""
+                    CurrentOtpCode = body.CurrentOtpCode ?? "",
+                    CurrentEmailCode = body.CurrentEmailCode ?? ""
                 }, token);
                 return Results.Ok(new { qr = resp.OtpQr, code = resp.OtpCode });
             }));
@@ -286,7 +292,8 @@ public static class SettingsEndpoints
                 {
                     OtpType = (OtpTypeId)body.OtpType,
                     OtpCode = body.OtpCode ?? "",
-                    Password = body.Password ?? ""
+                    Password = body.Password ?? "",
+                    CurrentEmailCode = body.CurrentEmailCode ?? ""
                 }, token);
                 return Results.Ok(new { ok = true });
             }));
@@ -307,10 +314,46 @@ public static class SettingsEndpoints
                 return Results.Ok(new { keys });
             }));
 
-        api.MapPost("/security/webauthn/register/begin", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity) =>
+        api.MapPost("/security/reauth/begin", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity, ReauthBeginBody body) =>
             Do(http, auth, async (_, token) =>
             {
-                var resp = await identity.BeginWebAuthnRegistrationAsync(new BeginWebAuthnRegistrationRequest(), token);
+                var resp = await identity.BeginReauthenticationAsync(new BeginReauthenticationRequest
+                {
+                    Action = (ReauthenticationAction)body.Action,
+                    CredentialId = body.CredentialId ?? "",
+                    Password = body.Password ?? "",
+                    OtpCode = body.OtpCode ?? "",
+                    ChallengeId = body.ChallengeId ?? ""
+                }, token);
+                return Results.Ok(new
+                {
+                    permissionToken = resp.PermissionToken,
+                    challengeId = resp.ChallengeId,
+                    optionsJson = resp.OptionsJson,
+                    retryAfterSeconds = resp.RetryAfterSeconds
+                });
+            }));
+
+        api.MapPost("/security/reauth/complete", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity, ReauthCompleteBody body) =>
+            Do(http, auth, async (_, token) =>
+            {
+                var resp = await identity.CompleteReauthenticationAsync(new CompleteReauthenticationRequest
+                {
+                    ChallengeId = body.ChallengeId ?? "",
+                    AssertionJson = body.Assertion.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+                        ? string.Empty : body.Assertion.GetRawText(),
+                    EmailCode = body.EmailCode ?? ""
+                }, token);
+                return Results.Ok(new { permissionToken = resp.PermissionToken });
+            }));
+
+        api.MapPost("/security/webauthn/register/begin", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity, WebAuthnRegisterBeginBody body) =>
+            Do(http, auth, async (_, token) =>
+            {
+                var resp = await identity.BeginWebAuthnRegistrationAsync(new BeginWebAuthnRegistrationRequest
+                {
+                    PermissionToken = body.PermissionToken ?? ""
+                }, token);
                 return Results.Ok(new { optionsJson = resp.OptionsJson, challengeId = resp.ChallengeId });
             }));
 
@@ -321,7 +364,8 @@ public static class SettingsEndpoints
                 {
                     ChallengeId = body.ChallengeId ?? "",
                     AttestationJson = body.Attestation.GetRawText(),
-                    CredentialName = body.Name ?? ""
+                    CredentialName = body.Name ?? "",
+                    PermissionToken = body.PermissionToken ?? ""
                 }, token);
                 return Results.Ok(new { ok = true });
             }));
@@ -329,7 +373,11 @@ public static class SettingsEndpoints
         api.MapPost("/security/webauthn/remove", (HttpContext http, AuthGateway auth, IdentityApi.IdentityApiClient identity, WebAuthnRemoveBody body) =>
             Do(http, auth, async (_, token) =>
             {
-                await identity.RemoveWebAuthnCredentialAsync(new RemoveWebAuthnCredentialRequest { CredentialId = body.CredentialId ?? "" }, token);
+                await identity.RemoveWebAuthnCredentialAsync(new RemoveWebAuthnCredentialRequest
+                {
+                    CredentialId = body.CredentialId ?? "",
+                    PermissionToken = body.PermissionToken ?? ""
+                }, token);
                 return Results.Ok(new { ok = true });
             }));
 
@@ -538,13 +586,18 @@ public static class SettingsEndpoints
     private static IResult MapRpc(RpcException ex)
     {
         var detail = string.IsNullOrWhiteSpace(ex.Status.Detail) ? null : ex.Status.Detail;
+        var otpMethod = ex.Trailers.GetValue("x-otp-method");
+        var reauthenticationRequired = ex.Trailers.GetValue("x-error-code")
+            == new ReauthenticationRequiredException().ErrorCode;
+        var retryAfter = int.TryParse(ex.Trailers.GetValue("x-otp-retry-after-seconds"), out var seconds)
+            ? Math.Clamp(seconds, 1, 3600) : (int?)null;
         return ex.StatusCode switch
         {
             StatusCode.Unauthenticated => Results.Unauthorized(),
-            StatusCode.AlreadyExists => Results.BadRequest(new { message = detail ?? "Уже занято" }),
-            StatusCode.NotFound => Results.BadRequest(new { message = detail ?? "Не найдено" }),
-            StatusCode.PermissionDenied => Results.BadRequest(new { message = detail ?? "Недостаточно прав" }),
-            _ => Results.BadRequest(new { message = detail ?? "Ошибка сервиса" })
+            StatusCode.AlreadyExists => Results.BadRequest(new { message = detail ?? "Уже занято", otpMethod, retryAfterSeconds = retryAfter, reauthenticationRequired }),
+            StatusCode.NotFound => Results.BadRequest(new { message = detail ?? "Не найдено", otpMethod, retryAfterSeconds = retryAfter, reauthenticationRequired }),
+            StatusCode.PermissionDenied => Results.BadRequest(new { message = detail ?? "Недостаточно прав", otpMethod, retryAfterSeconds = retryAfter, reauthenticationRequired }),
+            _ => Results.BadRequest(new { message = detail ?? "Ошибка сервиса", otpMethod, retryAfterSeconds = retryAfter, reauthenticationRequired })
         };
     }
 

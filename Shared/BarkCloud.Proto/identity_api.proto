@@ -76,76 +76,24 @@ service IdentityApi {
 
   // Удалить привязанный ключ безопасности
   rpc RemoveWebAuthnCredential(RemoveWebAuthnCredentialRequest) returns(RemoveWebAuthnCredentialResponse);
+
+  // Повторная аутентификация для чувствительных действий
+  rpc BeginReauthentication(BeginReauthenticationRequest) returns(BeginReauthenticationResponse);
+  rpc CompleteReauthentication(CompleteReauthenticationRequest) returns(CompleteReauthenticationResponse);
 }
 
-// Серверное API для админ-панели
-service IdentityServerApi {
-  // Получить статус 2FA пользователя
-  rpc ListOtpVerificationServer(ListOtpVerificationServerRequest) returns(ListOtpVerificationResponse);
-
-  // Принудительно отключить 2FA пользователя
-  rpc DisableOtpVerificationServer(DisableOtpVerificationServerRequest) returns(DisableOtpVerificationResponse);
-
-  // Получить активные сессии пользователя
-  rpc GetActiveSessionsServer(GetActiveSessionsServerRequest) returns(GetActiveSessionsResponse);
-
-  // Удалить активную сессию пользователя
-  rpc RemoveActiveSessionServer(RemoveActiveSessionServerRequest) returns(RemoveActiveSessionResponse);
-
-  // Создать сессию (refresh + access) для пользователя из другого сервиса (например FastAuth).
-  // Регистрирует устройство в Users, отправляет уведомление о входе.
-  rpc CreateSessionForUserServer(CreateSessionForUserServerRequest) returns(CreateSessionForUserServerResponse);
-
-  // Принудительно сменить пароль пользователя (для админ-панели, без OTP).
-  // Отправляет email-уведомление пользователю.
-  rpc ForceSetPasswordServer(ForceSetPasswordServerRequest) returns(ForceSetPasswordServerResponse);
-}
-
-message CreateSessionForUserServerRequest {
-  int64 user_id = 1;
-  string device_id = 2;            // GUID нового устройства
-  string device_name = 3;
-  string operation_system = 4;
-  string app_name = 5;             // "AppName v.X.Y.Z" (склеено вызывающим)
-  string ip_address = 6;
-}
-
-message CreateSessionForUserServerResponse {
-  Token access_token = 1;
-  Token refresh_token = 2;
-}
-
-message ListOtpVerificationServerRequest {
-  int64 user_id = 1;
-}
-
-message DisableOtpVerificationServerRequest {
-  int64 user_id = 1;
-  OtpTypeId otp_type = 2;
-}
-
-message GetActiveSessionsServerRequest {
-  int64 user_id = 1;
-}
-
-message RemoveActiveSessionServerRequest {
-  int64 user_id = 1;
-  string device_id = 2;
-}
-
-// Принудительная смена пароля (серверный, для админ-панели)
-message ForceSetPasswordServerRequest {
-  int64 user_id = 1;
-  string new_password = 2;
-}
-
-message ForceSetPasswordServerResponse { }
+// Серверное API IdentityServerApi удалено: не имело вызывающих, а CreateSessionForUserServer
+// позволял любому обладателю сервисного токена выпустить сессию произвольного пользователя
+// (аудит безопасности, п. 9). Server-потребители Identity — только SessionRevocationApi
+// и ServiceCredentialsApi ниже.
 
 message ConfirmResetPasswordRequest {
   string reset_id = 1; // идентификатор сброса пароля
   string otp_code = 2; // код подтверждения
   string new_password = 3; // новый пароль — устанавливается атомарно при подтверждении
   optional bool revoke_other_sessions = 4; // завершить остальные сессии (если не передано — true)
+  string authenticator_code = 5; // код Authenticator (TOTP); обязателен для email-сброса при включённом Authenticator
+  optional bool reset_passkeys = 6; // удалить все passkey (если не передано — true)
 }
 
 message ConfirmResetPasswordResponse {
@@ -201,6 +149,7 @@ message DisableOtpVerificationRequest {
   string otp_code = 2; // Текущий код из приложения-аутентификатора (для отключения Authenticator; для email не передавать)
 
   string password = 3; // Текущий пароль — обязателен при отключении email-2FA
+  string current_email_code = 4; // Текущий email-фактор — обязателен при отключении email-2FA
 }
 
 message DisableOtpVerificationResponse {
@@ -219,6 +168,7 @@ message EnableOtpVerificationRequest {
     OtpTypeId otp_type = 1; // Тип 2ФА авторизации
     string password = 2; // Текущий пароль — обязателен при настройке Authenticator
     string current_otp_code = 3; // Текущий код действующего Authenticator — обязателен при его замене
+    string current_email_code = 4; // Текущий email-фактор при переходе с Email на Authenticator
 }
 
 message EnableOtpVerificationResponse {
@@ -314,6 +264,7 @@ message Token {
 message SetPasswordRequest {
   string password = 1; // пароль
   string old_password = 2; // старый пароль (обязателен если пароль уже установлен)
+  string permission_token = 3; // подтверждение passkey при первоначальной установке с уже привязанными ключами
 }
 
 message SetPasswordResponse { }
@@ -327,7 +278,9 @@ message LogoutResponse { }
 // PublicKeyCredentialRequestOptions и ответы authenticator'а). Передаём строкой: Fido2NetLib
 // сериализует/десериализует их штатно, браузер/webauthn.dll отдают JSON-совместимые объекты.
 
-message BeginWebAuthnRegistrationRequest { } // userId берётся из токена
+message BeginWebAuthnRegistrationRequest {
+  string permission_token = 1; // одноразовое разрешение на управление passkey
+} // userId берётся из токена
 
 message BeginWebAuthnRegistrationResponse {
   string options_json = 1; // CredentialCreateOptions (challenge, rp, user, pubKeyCredParams, excludeCredentials)
@@ -338,6 +291,7 @@ message CompleteWebAuthnRegistrationRequest {
   string challenge_id = 1;     // идентификатор challenge из begin
   string attestation_json = 2; // AuthenticatorAttestationRawResponse
   string credential_name = 3;  // отображаемое имя ключа ("Мой YubiKey")
+  string permission_token = 4; // привязка завершения к разрешению, погашенному при Begin
 }
 
 message CompleteWebAuthnRegistrationResponse { }
@@ -372,6 +326,39 @@ message ListWebAuthnCredentialsResponse {
 
 message RemoveWebAuthnCredentialRequest {
   string credential_id = 1; // идентификатор записи (из List)
+  string permission_token = 2; // разрешение на удаление именно этого ключа
 }
 
 message RemoveWebAuthnCredentialResponse { }
+
+enum ReauthenticationAction {
+  REAUTHENTICATION_ACTION_UNSPECIFIED = 0;
+  REAUTHENTICATION_ACTION_ADD_PASSKEY = 1;
+  REAUTHENTICATION_ACTION_REMOVE_PASSKEY = 2;
+  REAUTHENTICATION_ACTION_SET_INITIAL_PASSWORD = 3;
+}
+
+message BeginReauthenticationRequest {
+  ReauthenticationAction action = 1;
+  string credential_id = 2; // обязателен для удаления passkey
+  string password = 3; // парольный способ
+  string otp_code = 4; // TOTP при включённом Authenticator
+  string challenge_id = 5; // существующий email challenge при повторной отправке кода
+}
+
+message BeginReauthenticationResponse {
+  string permission_token = 1; // заполнен при немедленном подтверждении паролем
+  string challenge_id = 2; // заполнен для email-кода или passkey
+  string options_json = 3; // WebAuthn options при подтверждении ключом
+  int32 retry_after_seconds = 4; // cooldown повторной отправки email-кода
+}
+
+message CompleteReauthenticationRequest {
+  string challenge_id = 1;
+  string assertion_json = 2; // passkey assertion; пусто для email-кода
+  string email_code = 3; // email-фактор; пусто для passkey
+}
+
+message CompleteReauthenticationResponse {
+  string permission_token = 1;
+}

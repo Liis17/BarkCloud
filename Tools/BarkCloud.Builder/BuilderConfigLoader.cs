@@ -43,7 +43,38 @@ public static class BuilderConfigLoader
                 setter(value);
         }
 
-        Set("CONFIGURATION_ACCESS_KEY", v => m.ConfigurationAccessKey = v);
+        void SetSecret(string key, Action<string> setter)
+        {
+            if (e.TryGetValue(key, out var value)
+                && !string.IsNullOrWhiteSpace(value)
+                && !value.StartsWith("replace-", StringComparison.OrdinalIgnoreCase))
+                setter(value);
+        }
+
+        Set("IDENTITY_CONFIG_ACCESS_KEY", v => m.IdentityConfigAccessKey = v);
+        Set("USERS_CONFIG_ACCESS_KEY", v => m.UsersConfigAccessKey = v);
+        Set("NOTIFICATION_CONFIG_ACCESS_KEY", v => m.NotificationConfigAccessKey = v);
+        Set("FILES_CONFIG_ACCESS_KEY", v => m.FilesConfigAccessKey = v);
+        Set("TORRENT_CONFIG_ACCESS_KEY", v => m.TorrentConfigAccessKey = v);
+        Set("WEB_CONFIG_ACCESS_KEY", v => m.WebConfigAccessKey = v);
+        Set("IDENTITY_SERVICE_CREDENTIAL", v => m.IdentityServiceCredential = v);
+        Set("USERS_SERVICE_CREDENTIAL", v => m.UsersServiceCredential = v);
+        Set("FILES_SERVICE_CREDENTIAL", v => m.FilesServiceCredential = v);
+        Set("TORRENT_SERVICE_CREDENTIAL", v => m.TorrentServiceCredential = v);
+        Set("WEB_SERVICE_CREDENTIAL", v => m.WebServiceCredential = v);
+        SetSecret("CONFIGURATION_DB_PASSWORD", v => m.ConfigurationDbPassword = v);
+        SetSecret("IDENTITY_DB_PASSWORD", v => m.IdentityDbPassword = v);
+        SetSecret("USERS_DB_PASSWORD", v => m.UsersDbPassword = v);
+        SetSecret("FILES_DB_PASSWORD", v => m.FilesDbPassword = v);
+        SetSecret("TORRENT_DB_PASSWORD", v => m.TorrentDbPassword = v);
+        SetSecret("RABBITMQ_IDENTITY_PASSWORD", v => m.IdentityRabbitPassword = v);
+        SetSecret("RABBITMQ_USERS_PASSWORD", v => m.UsersRabbitPassword = v);
+        SetSecret("RABBITMQ_FILES_PASSWORD", v => m.FilesRabbitPassword = v);
+        SetSecret("RABBITMQ_TORRENT_PASSWORD", v => m.TorrentRabbitPassword = v);
+        SetSecret("RABBITMQ_NOTIFICATION_PASSWORD", v => m.NotificationRabbitPassword = v);
+        SetSecret("TRANSCODER_TOKEN", v => m.TranscoderToken = v);
+        RestoreSecretRegistries(m, e);
+        Set("WEB_ADMIN_COOKIE_KEY", v => m.WebAdminCookieKey = v);
         Set("DOCKER_NETWORK_NAME", v => m.DockerNetworkName = v);
         Set("CONFIGURATION_CONTAINER_NAME", v => m.ConfigurationContainerName = v);
         Set("IDENTITY_CONTAINER_NAME", v => m.IdentityContainerName = v);
@@ -65,9 +96,12 @@ public static class BuilderConfigLoader
         Set("MINIO_WEBPORT", v => m.MinioWebPort = v);
         Set("MINIO_DATA_PATH", v => m.MinioDataPath = v);
         Set("RABBITMQ_DEFAULT_USER", v => m.RabbitUser = v);
-        Set("RABBITMQ_DEFAULT_PASS", v => m.RabbitPass = v);
+        SetSecret("RABBITMQ_DEFAULT_PASS", v => m.RabbitPass = v);
+        Set("RABBITMQ_HOST", v => m.RabbitHost = v);
+        Set("RABBITMQ_VIRTUAL_HOST", v => m.RabbitVirtualHost = v);
         Set("POSTGRES_USER", v => m.PostgresUser = v);
-        Set("POSTGRES_PASSWORD", v => m.PostgresPassword = v);
+        SetSecret("POSTGRES_PASSWORD", v => m.PostgresPassword = v);
+        Set("POSTGRES_HOST", v => m.PostgresHost = v);
         Set("POSTGRES_DB", v => m.PostgresDb = v);
         Set("POSTGRES_PORT", v => m.PostgresPort = v);
         Set("POSTGRES_DATA_PATH", v => m.PostgresDataPath = v);
@@ -83,6 +117,10 @@ public static class BuilderConfigLoader
         Set("TORRENT_PEER_PORT", v => m.TorrentPeerPort = v);
         Set("TORRENT_DOWNLOAD_PATH", v => m.TorrentDownloadPath = v);
         Set("ARCHIVE_TEMP_PATH", v => m.ArchiveTempPath = v);
+        Set("TRANSCODE_WORK_PATH", v => m.TranscodeWorkPath = v);
+        Set("TRANSCODER_THREADS", v => m.TranscoderThreads = v);
+        Set("TRANSCODER_CPUS", v => m.TranscoderCpus = v);
+        Set("TRANSCODER_MEMORY", v => m.TranscoderMemory = v);
 
         Set("SEQ_ADMIN_PASSWORD", v => m.SeqAdminPassword = v);
         Set("SEQ_WEBPORT", v => m.SeqWebPort = v);
@@ -140,6 +178,7 @@ public static class BuilderConfigLoader
         Set("WEB_PORT", v => m.WebPort = v);
         Set("WEB_COOKIE_SECURE", v => m.WebCookieSecure = v.Equals("true", StringComparison.OrdinalIgnoreCase));
         Set("WEB_PUBLIC_HOST", v => m.WebPublicHost = v);
+        Set("WEB_TRUSTED_PROXY_NETWORKS", v => m.WebTrustedProxyNetworks = v);
         Set("WEB_ADMIN_PASSWORD", v => m.WebAdminPassword = v);
         Set("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT", v => m.AndroidCertificateSha256Fingerprint = v);
 
@@ -198,10 +237,132 @@ public static class BuilderConfigLoader
                 continue;
             int eq = line.IndexOf('=');
             if (eq > 0)
-                result[line[..eq].Trim()] = line[(eq + 1)..];
+            {
+                var key = line[..eq].Trim();
+                result[key] = ParseEnvValue(key, line[(eq + 1)..]);
+            }
         }
         return result;
     }
+
+    private static string ParseEnvValue(string key, string raw)
+    {
+        var value = raw.Trim();
+        if (value.Length == 0)
+            return "";
+
+        var quote = value[0];
+        if (quote is not ('\'' or '"'))
+        {
+            var comment = value.IndexOf(" #", StringComparison.Ordinal);
+            value = (comment < 0 ? value : value[..comment]).TrimEnd();
+            if (IsSecretVariable(key) && value.Contains('$'))
+                throw new InvalidDataException($"Значение {key} содержит знак доллара, который Docker Compose интерпретирует; используйте одинарные кавычки.");
+            return value;
+        }
+
+        var decoded = new System.Text.StringBuilder();
+        var closingIndex = -1;
+        for (var index = 1; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (character == '\\' && index + 1 < value.Length)
+            {
+                var next = value[++index];
+                if (quote == '"')
+                {
+                    decoded.Append(next switch
+                    {
+                        '"' => '"',
+                        '\\' => '\\',
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        _ => throw new InvalidDataException($"Неподдерживаемая escape-последовательность в {key}.")
+                    });
+                }
+                else if (next == '\'')
+                    decoded.Append('\'');
+                else
+                    decoded.Append('\\').Append(next);
+                continue;
+            }
+
+            if (character == quote)
+            {
+                closingIndex = index;
+                break;
+            }
+            decoded.Append(character);
+        }
+
+        if (closingIndex < 0)
+            throw new InvalidDataException($"Незакрытая кавычка в значении {key}.");
+        var suffix = value[(closingIndex + 1)..];
+        if (suffix.Length > 0 && !(char.IsWhiteSpace(suffix[0]) && suffix.TrimStart().StartsWith('#')))
+            throw new InvalidDataException($"Текст после закрывающей кавычки в значении {key} не поддерживается.");
+
+        var decodedValue = decoded.ToString();
+        if (quote == '"' && IsSecretVariable(key) && decodedValue.Contains('$'))
+            throw new InvalidDataException($"Значение {key} содержит знак доллара, который Docker Compose интерпретирует; используйте одинарные кавычки.");
+        return decodedValue;
+    }
+
+    private static void RestoreSecretRegistries(BuilderModel model, IReadOnlyDictionary<string, string> env)
+    {
+        var configurationKeys = ParseSecretRegistry(env.GetValueOrDefault("CONFIGURATION_ACCESS_KEYS"), "CONFIGURATION_ACCESS_KEYS");
+        var serviceCredentials = ParseSecretRegistry(env.GetValueOrDefault("SERVICE_CREDENTIALS"), "SERVICE_CREDENTIALS");
+
+        model.IdentityConfigAccessKey = RegistryFallback(model.IdentityConfigAccessKey, configurationKeys, "Identity");
+        model.UsersConfigAccessKey = RegistryFallback(model.UsersConfigAccessKey, configurationKeys, "Users");
+        model.NotificationConfigAccessKey = RegistryFallback(model.NotificationConfigAccessKey, configurationKeys, "Notification");
+        model.FilesConfigAccessKey = RegistryFallback(model.FilesConfigAccessKey, configurationKeys, "Files");
+        model.TorrentConfigAccessKey = RegistryFallback(model.TorrentConfigAccessKey, configurationKeys, "Torrent");
+        model.WebConfigAccessKey = RegistryFallback(model.WebConfigAccessKey, configurationKeys, "Web");
+        model.IdentityServiceCredential = RegistryFallback(model.IdentityServiceCredential, serviceCredentials, "Identity");
+        model.UsersServiceCredential = RegistryFallback(model.UsersServiceCredential, serviceCredentials, "Users");
+        model.FilesServiceCredential = RegistryFallback(model.FilesServiceCredential, serviceCredentials, "Files");
+        model.TorrentServiceCredential = RegistryFallback(model.TorrentServiceCredential, serviceCredentials, "Torrent");
+        model.WebServiceCredential = RegistryFallback(model.WebServiceCredential, serviceCredentials, "Web");
+    }
+
+    private static Dictionary<string, string> ParseSecretRegistry(string? registry, string key)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(registry))
+            return result;
+
+        foreach (var entry in registry.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = entry.IndexOf('=');
+            if (separator <= 0)
+                throw new InvalidDataException($"Некорректная запись в {key}; ожидается имя=секрет.");
+            var name = entry[..separator].Trim();
+            if (!result.TryAdd(name, entry[(separator + 1)..]))
+                throw new InvalidDataException($"Повторная запись {name} в {key}.");
+        }
+        return result;
+    }
+
+    private static string RegistryFallback(string current, IReadOnlyDictionary<string, string> registry, string service)
+    {
+        if (!string.IsNullOrWhiteSpace(current) && !current.StartsWith("replace-", StringComparison.OrdinalIgnoreCase))
+            return current;
+        return registry.TryGetValue(service, out var value)
+               && !string.IsNullOrWhiteSpace(value)
+               && !value.StartsWith("replace-", StringComparison.OrdinalIgnoreCase)
+            ? value
+            : current;
+    }
+
+    private static bool IsSecretVariable(string key) =>
+        key is "CONFIGURATION_ACCESS_KEYS" or "SERVICE_CREDENTIALS" or "WEB_ADMIN_COOKIE_KEY" or "TRANSCODER_TOKEN"
+        or "RABBITMQ_DEFAULT_PASS" or "POSTGRES_PASSWORD"
+        || (key.StartsWith("RABBITMQ_", StringComparison.Ordinal)
+            && key.EndsWith("_PASSWORD", StringComparison.Ordinal))
+        || key.EndsWith("_DB_PASSWORD", StringComparison.Ordinal)
+        || key.EndsWith("_CONFIG_ACCESS_KEY", StringComparison.Ordinal)
+        || key.EndsWith("_SERVICE_CREDENTIAL", StringComparison.Ordinal);
 
     private static bool ParseBoolean(string value, bool fallback) =>
         bool.TryParse(value, out var parsed) ? parsed : fallback;

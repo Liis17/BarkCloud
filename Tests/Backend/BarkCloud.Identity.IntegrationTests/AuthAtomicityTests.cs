@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.Identity.Domain;
@@ -11,6 +13,7 @@ using BarkCloud.Identity.Settings;
 using BarkCloud.Proto.Identity;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Queue.Notifications;
+using BarkCloud.Shared.Exceptions.Identity;
 using BarkCloud.TestKit;
 
 using Grpc.Core;
@@ -20,6 +23,7 @@ using MassTransit;
 using MediatR;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -110,6 +114,34 @@ public class AuthAtomicityTests
         (await afterSave.AuthAttemptCounters.AsNoTracking().SingleAsync(x => x.Key == "login:42")).Count.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Auth_PasswordResetAfterPasswordRead_DoesNotIssueSessionFromStaleProof()
+    {
+        await using var database = await PostgresIdentityDatabase.CreateAsync();
+        await using var setup = database.CreateContext();
+        var reset = await ResetPasswordTests.Seed(setup);
+        var passwordRead = new PasswordHashReadPause();
+        await using var loginContext = database.CreateContext(passwordRead);
+        var login = CreateHandler(loginContext).Handle(new AuthCommand
+        {
+            Username = "user", Password = "old-password"
+        }, default);
+        await passwordRead.Reached;
+
+        await using var resetContext = database.CreateContext();
+        await ResetPasswordTests.CreateHandler(resetContext)
+            .Handle(ResetPasswordTests.Command(reset.Id), default);
+        passwordRead.Release();
+
+        await FluentActions.Awaiting(() => login)
+            .Should().ThrowAsync<InvalidLoginOrPasswordException>();
+        await using var reader = database.CreateContext();
+        (await new RefreshTokensStorage(reader, new JwtSettings()).GetRefreshTokens(42))
+            .Should().ContainSingle(x => x.DeviceId == "current");
+        (await reader.PendingNotifications.Select(x => x.Type).ToListAsync())
+            .Should().Equal(NotificationType.PasswordChanged);
+    }
+
     private static AuthCommandHandler CreateHandler(IdentityContext context, MetricsCollector? metrics = null)
     {
         metrics ??= new MetricsCollector();
@@ -120,8 +152,8 @@ public class AuthAtomicityTests
         };
         var jwtSettings = new JwtSettings
         {
-            SecretKey = "supersecretkey_at_least_32_chars_long_for_hs256!!",
-            Issuer = "bark", Audience = "bark", ExpiryMinutes = 60
+            Issuer = "bark", Audience = "bark", ExpiryMinutes = 60,
+            PrivateKeyFile = IntegrationJwtKeys.Instance.PrivateKeyFile
         };
         var refreshTokens = new RefreshTokensStorage(context, jwtSettings);
         var outbox = new NotificationOutbox(context, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -155,5 +187,27 @@ public class AuthAtomicityTests
         return new AuthCommandHandler(users.Object, new AuthPropertiesStorage(context), notificationSender.Object,
             outbox, sessionIssuer, requestContext, new PasswordsStorage(context), location.Object, metrics,
             rateLimiter, NullLogger<AuthCommandHandler>.Instance);
+    }
+
+    private sealed class PasswordHashReadPause : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Reached => _reached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        public void Release() => _release.TrySetResult();
+
+        public override async ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command,
+            CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("FROM \"UserPasswords\"", StringComparison.Ordinal)
+                && command.CommandText.Contains("\"PasswordHash\"", StringComparison.Ordinal))
+            {
+                _reached.TrySetResult();
+                await _release.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
+            return result;
+        }
     }
 }

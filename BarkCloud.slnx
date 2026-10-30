@@ -6,6 +6,7 @@
     <Project Path="Backend/BarkCloud.Identity/BarkCloud.Identity.csproj" />
     <Project Path="Backend/BarkCloud.Notification/BarkCloud.Notification.csproj" />
     <Project Path="Backend/BarkCloud.Torrent/BarkCloud.Torrent.csproj" />
+    <Project Path="Backend/BarkCloud.Transcoder/BarkCloud.Transcoder.csproj" />
     <Project Path="Backend/BarkCloud.Users/BarkCloud.Users.csproj" />
     <Project Path="Backend/BarkCloud.Web/BarkCloud.Web.csproj" Id="cdc48aaa-a672-4432-97e4-d3f3b4065687" />
   </Folder>
@@ -32,6 +33,7 @@
     <Project Path="Tests/Backend/BarkCloud.Identity.IntegrationTests/BarkCloud.Identity.IntegrationTests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Notification.Tests/BarkCloud.Notification.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Torrent.Tests/BarkCloud.Torrent.Tests.csproj" />
+    <Project Path="Tests/Backend/BarkCloud.Transcoder.Tests/BarkCloud.Transcoder.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Users.Tests/BarkCloud.Users.Tests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Users.IntegrationTests/BarkCloud.Users.IntegrationTests.csproj" />
     <Project Path="Tests/Backend/BarkCloud.Web.Tests/BarkCloud.Web.Tests.csproj" />

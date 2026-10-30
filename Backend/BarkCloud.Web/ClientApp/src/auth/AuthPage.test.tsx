@@ -113,8 +113,9 @@ describe('auth screen states', () => {
   it('shows optional registration names and does not require them', async () => {
     const request = requestReturning(state({ screen: 'register-otp', flowId: 'reg-flow' }));
     render(<AuthPage initialState={state({ screen: 'register' })} request={request} />);
-    const firstName = screen.getByLabelText('Имя (необязательно)') as HTMLInputElement;
-    const lastName = screen.getByLabelText('Фамилия (необязательно)') as HTMLInputElement;
+    const firstName = screen.getByLabelText('Имя') as HTMLInputElement;
+    const lastName = screen.getByLabelText('Фамилия') as HTMLInputElement;
+    expect(screen.getAllByText('Необязательно')).toHaveLength(2);
     expect(firstName.required).toBe(false);
     expect(lastName.required).toBe(false);
     fireEvent.change(screen.getByLabelText('Логин'), { target: { value: 'liis' } });
@@ -161,12 +162,75 @@ describe('auth screen states', () => {
     })} request={request} />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
     fireEvent.change(screen.getByLabelText('Новый пароль'), { target: { value: 'another1' } });
+    fireEvent.click(screen.getByLabelText('Сбросить все passkey'));
 
     await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Сменить пароль' }).closest('form')!));
 
     expect((screen.getByLabelText('Новый пароль') as HTMLInputElement).value).toBe('another1');
-    expect((screen.getByLabelText('Завершить остальные сеансы') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Выйти с других устройств') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Сбросить все passkey') as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText('Passkey сохранятся и продолжат работать после смены пароля.')).not.toBeNull();
     expect((screen.getByRole('textbox', { name: 'Шестизначный код' }) as HTMLInputElement).value).toBe('123456');
+  });
+
+  it('shows the authenticator field on the reset screen only when the server requires it', () => {
+    render(<AuthPage initialState={state({ screen: 'reset', flowId: 'reset-flow' })} />);
+    expect(screen.queryByRole('textbox', { name: 'Код приложения-аутентификатора' })).toBeNull();
+  });
+
+  it('resubmits the email code together with the authenticator code', async () => {
+    const request = requestReturning(state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+      fieldErrors: { authenticator: 'Введите код из приложения-аутентификатора, чтобы завершить восстановление.' },
+    }));
+    render(<AuthPage initialState={state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+    })} request={request} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Код приложения-аутентификатора' }), { target: { value: '654321' } });
+    fireEvent.change(screen.getByLabelText('Новый пароль'), { target: { value: 'another1' } });
+
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Сменить пароль' }).closest('form')!));
+
+    const formData = request.mock.calls[0][1]?.body as FormData;
+    expect(formData.get('otp')).toBe('123456');
+    expect(formData.get('authenticator_code')).toBe('654321');
+    expect(formData.get('password')).toBe('another1');
+  });
+
+  it('requires six digits of the authenticator code before submitting', async () => {
+    const request = requestReturning(state({ screen: 'reset', flowId: 'reset-flow', authenticatorRequired: true }));
+    render(<AuthPage initialState={state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+    })} request={request} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Код приложения-аутентификатора' }), { target: { value: '654' } });
+    fireEvent.change(screen.getByLabelText('Новый пароль'), { target: { value: 'another1' } });
+
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Сменить пароль' }).closest('form')!));
+
+    expect(request).not.toHaveBeenCalled();
+    expect(screen.getByText('Введите все шесть цифр кода из приложения.')).not.toBeNull();
+  });
+
+  it('clears the authenticator code when a resend restarts the email step', async () => {
+    const request = requestReturning(state({ screen: 'reset', flowId: 'reset-flow' }));
+    render(<AuthPage initialState={state({
+      screen: 'reset',
+      flowId: 'reset-flow',
+      authenticatorRequired: true,
+    })} request={request} />);
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Отправить код повторно' })));
+
+    expect(request.mock.calls[0][0]).toBe('/forgot/resend');
+    expect(screen.queryByRole('textbox', { name: 'Код приложения-аутентификатора' })).toBeNull();
   });
 
   it('submits a pending registration retry with only flow and CSRF fields', async () => {
@@ -335,11 +399,13 @@ describe('one-time code input', () => {
       flowId: 'reset-flow',
       values: { revoke_sessions: true },
     })} request={request} />);
-    fireEvent.click(screen.getByLabelText('Завершить остальные сеансы'));
+    fireEvent.click(screen.getByLabelText('Выйти с других устройств'));
+    fireEvent.click(screen.getByLabelText('Сбросить все passkey'));
 
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Отправить код повторно' })));
 
-    expect((screen.getByLabelText('Завершить остальные сеансы') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText('Выйти с других устройств') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText('Сбросить все passkey') as HTMLInputElement).checked).toBe(false);
     const formData = request.mock.calls[0][1]?.body as FormData;
     expect([...formData.keys()].sort()).toEqual(['__RequestVerificationToken', 'flow_id']);
   });
@@ -399,18 +465,22 @@ describe('WebAuthn passwordless login', () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults remember and revoke choices to true while preserving explicit false', () => {
+  it('defaults reset choices to true while preserving explicit false', () => {
     const { unmount } = render(<AuthPage initialState={state()} />);
     expect((screen.getByLabelText('Оставаться в системе') as HTMLInputElement).checked).toBe(true);
     unmount();
     const resetPage = state({ screen: 'reset' });
     const resetView = render(<AuthPage initialState={resetPage} />);
-    expect((screen.getByLabelText('Завершить остальные сеансы') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Выйти с других устройств') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Сбросить все passkey') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText('При сбросе пароля будут удалены все ключи доступа (passkey). Их потребуется добавить заново.')).not.toBeNull();
+    expect(screen.getByText('Выход с устройств не удаляет passkey.')).not.toBeNull();
     resetView.unmount();
     render(<AuthPage initialState={state({ values: { remember: false } })} />);
     expect((screen.getByLabelText('Оставаться в системе') as HTMLInputElement).checked).toBe(false);
-    const falseReset = render(<AuthPage initialState={state({ screen: 'reset', values: { revoke_sessions: false } })} />);
-    expect((screen.getByLabelText('Завершить остальные сеансы') as HTMLInputElement).checked).toBe(false);
+    const falseReset = render(<AuthPage initialState={state({ screen: 'reset', values: { revoke_sessions: false, reset_passkeys: false } })} />);
+    expect((screen.getByLabelText('Выйти с других устройств') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText('Сбросить все passkey') as HTMLInputElement).checked).toBe(false);
     falseReset.unmount();
   });
 });

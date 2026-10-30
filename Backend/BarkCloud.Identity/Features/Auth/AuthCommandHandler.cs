@@ -12,9 +12,6 @@ using BarkCloud.Shared.Queue.Notifications;
 
 using MediatR;
 
-using OtpNet;
-
-
 namespace BarkCloud.Identity.Features.Auth;
 
 public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
@@ -113,7 +110,8 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
         // Пароль проверяется первым: без него нельзя ни получить код 2FA, ни узнать, что 2FA включена.
         logger.LogDebug("Проверка пароля для пользователя {UserId}", user.User.Id);
 
-        var currentPasswordHash = await passwordsStorage.GetUserPasswordHash(user.User.Id);
+        var securityStateVersion = await passwordsStorage.GetSecurityStateVersion(user.User.Id, cancellationToken);
+        var currentPasswordHash = await passwordsStorage.GetUserPasswordHash(user.User.Id, cancellationToken);
 
         if (!PasswordHasher.VerifyPassword(request.Password, currentPasswordHash))
         {
@@ -221,17 +219,15 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
             throw new OtpCodeNeedException("authenticator");
         }
 
+        ValidatedTotpCode? validatedTotp = null;
         if (optOptions is { OtpEnabled: true })
         {
             logger.LogDebug("Проверка TOTP кода для пользователя {UserId}", user.User.Id);
+            await rateLimiter.EnsureTotpAttemptAsync(user.User.Id);
+            validatedTotp = TotpVerificationService.Verify(user.User.Id, optOptions.OtpSecret,
+                optOptions.OtpSecretGeneration, request.OtpCode);
 
-            var otpSecret = optOptions.OtpSecret;
-
-            var totp = new Totp(Base32Encoding.ToBytes(otpSecret));
-
-            var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
-
-            if (!isValid)
+            if (validatedTotp is null)
             {
                 metrics.Increment("auth_login_failed");
                 metrics.Increment("otp_authenticator_failed");
@@ -268,6 +264,23 @@ public class AuthCommandHandler(UsersServerApi.UsersServerApiClient usersClient,
 
         var response = await sessionIssuer.IssueAsync(user.User.Id, cancellationToken, async transactionToken =>
         {
+            if (await passwordsStorage.GetSecurityStateVersion(user.User.Id, transactionToken)
+                != securityStateVersion)
+                throw new InvalidLoginOrPasswordException();
+
+            var currentAuthProperties = await authPropertiesStorage.GetUserAuthPropertiesSnapshot(user.User.Id,
+                transactionToken);
+            if ((currentAuthProperties?.OtpEnabled ?? false) != (optOptions?.OtpEnabled ?? false)
+                || (currentAuthProperties?.EmailOtpEnabled ?? false) != (optOptions?.EmailOtpEnabled ?? false))
+                throw new InvalidLoginOrPasswordException();
+
+            if (validatedTotp is not null
+                && !await authPropertiesStorage.TryConsumeTotpStep(validatedTotp.UserId, validatedTotp.Secret,
+                    validatedTotp.Generation, validatedTotp.TimeStep, transactionToken))
+            {
+                throw new NotValidOtpCodeException();
+            }
+
             if (validatedEmailCode is not null
                 && !await authPropertiesStorage.TryConsumeValidatedEmailAuthCode(validatedEmailCode, transactionToken))
             {

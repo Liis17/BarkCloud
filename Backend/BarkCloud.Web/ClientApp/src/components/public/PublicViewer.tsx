@@ -1,15 +1,19 @@
 import React from 'react';
 import { Icon } from '../Icon';
 import { VideoPlayer } from '../media/MediaPlayer';
+import type { VideoQuality } from '../media/MediaPlayer';
 import { persistVolumeRef } from '../../lib/volume';
 import { fmtSize } from './publicFile';
 import { usePublicShareActions } from './usePublicShareActions';
+import { isSvgFileName } from '../../lib/imagePreviewSource';
 
 export interface PublicViewerFile {
   name: string;
   mediaKind: string;
   downloadUrl: string;
+  previewUrl?: string;
   fileSize: number;
+  videoQualities?: VideoQuality[];
 }
 
 interface Props {
@@ -20,8 +24,10 @@ interface Props {
 /** Оверлей просмотра фото/видео на публичных страницах папки и альбома.
  *  Урезанные действия без авторизации: скачать, скопировать изображение (фото), копировать ссылку на страницу. */
 export function PublicViewer({ file, onClose }: Props) {
-  const { copyLink, copyImage, toastNode } = usePublicShareActions(file.downloadUrl);
   const isVideo = file.mediaKind === 'video';
+  const isSvg = isSvgFileName(file.name);
+  const imageSrc = isVideo ? null : isSvg ? file.previewUrl || null : file.downloadUrl || null;
+  const { copyLink, copyImage, toastNode } = usePublicShareActions(imageSrc || undefined);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,9 +51,13 @@ export function PublicViewer({ file, onClose }: Props) {
       <div className="public-viewer-stage">
         <div className="public-viewer-media" onClick={(e) => e.stopPropagation()}>
           {isVideo ? (
-            <VideoPlayer onMediaRef={persistVolumeRef} src={file.downloadUrl} autoPlay />
+            <VideoPlayer onMediaRef={persistVolumeRef} src={file.downloadUrl} qualities={file.videoQualities} autoPlay />
+          ) : imageSrc ? (
+            <img src={imageSrc} alt={file.name} />
           ) : (
-            <img src={file.downloadUrl} alt={file.name} />
+            <div className="public-viewer-placeholder">
+              {isSvg ? 'Безопасное превью недоступно' : 'Предпросмотр недоступен'}
+            </div>
           )}
         </div>
       </div>
@@ -56,7 +66,7 @@ export function PublicViewer({ file, onClose }: Props) {
           <Icon.download size={20} />
           Скачать
         </a>
-        {file.mediaKind === 'photo' && (
+        {file.mediaKind === 'photo' && imageSrc && (
           <button className="public-viewer-btn public-st" type="button" title="Скопировать изображение" aria-label="Скопировать изображение" onClick={copyImage}>
             <Icon.copy size={24} />
           </button>

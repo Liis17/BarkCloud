@@ -116,17 +116,35 @@ fun ResetPasswordScreen(viewModel: ResetPasswordViewModel, server: String, onBac
                     ResendCode(maxOf(state.resendAt, state.retryAt), !state.loading, viewModel::resend)
                 }
                 2 -> {
+                    if (state.authenticatorRequired) {
+                        Text("Аккаунт защищён двухфакторной аутентификацией. Введите текущий код из приложения.",
+                            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        VerificationCodeField(state.authenticatorCode, viewModel::authenticatorChanged, !state.loading)
+                    }
                     PasswordField(state.password, viewModel::passwordChanged, "Новый пароль", !state.loading, true)
                     PasswordStrength(state.password)
                     PasswordField(state.repeatedPassword, viewModel::repeatChanged, "Повторите пароль", !state.loading, true, viewModel::next)
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.large) {
+                        Row(Modifier.fillMaxWidth().toggleable(state.resetPasskeys, enabled = !state.loading, role = Role.Checkbox,
+                            onValueChange = viewModel::resetPasskeysChanged).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(state.resetPasskeys, onCheckedChange = null, enabled = !state.loading)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Сбросить все passkey", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    AuthInfo(if (state.resetPasskeys)
+                        "При сбросе пароля будут удалены все ключи доступа (passkey). Их потребуется добавить заново."
+                    else "Passkey сохранятся и продолжат работать после смены пароля.")
                     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.large) {
                         Row(Modifier.fillMaxWidth().toggleable(state.revokeOtherSessions, enabled = !state.loading, role = Role.Checkbox,
                             onValueChange = viewModel::revokeChanged).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(state.revokeOtherSessions, onCheckedChange = null, enabled = !state.loading)
                             Spacer(Modifier.width(12.dp))
-                            Text("Выйти на остальных устройствах", style = MaterialTheme.typography.bodyMedium)
+                            Text("Выйти с других устройств", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
+                    Text("Выход с устройств не удаляет passkey.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     AuthInfo("Код будет проверен при сохранении нового пароля.")
                 }
             }

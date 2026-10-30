@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { OtpInput } from './OtpInput';
 import type { AuthPageState, AuthScreen, AuthValues } from './types';
 import { webauthnAuthenticate, webauthnSupported } from '../lib/webauthn';
+import { TextField } from '../components/ui/TextField';
 import './auth.css';
 
 interface AuthPageProps {
@@ -12,60 +13,6 @@ interface AuthPageProps {
   navigate?: (url: string) => void;
 }
 
-interface TextFieldProps {
-  id: string;
-  name: string;
-  label: string;
-  value: string;
-  error?: string;
-  disabled: boolean;
-  type?: string;
-  autoComplete?: string;
-  formError?: string;
-  required?: boolean;
-  minLength?: number;
-  inputMode?: 'text' | 'email';
-  onChange: (value: string) => void;
-}
-
-function TextField({
-  id,
-  name,
-  label,
-  value,
-  error,
-  disabled,
-  type = 'text',
-  autoComplete,
-  formError,
-  required,
-  minLength,
-  inputMode,
-  onChange,
-}: TextFieldProps) {
-  const errorId = id + '-error';
-  return (
-    <div className="auth-field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        name={name}
-        type={type}
-        value={value}
-        disabled={disabled}
-        autoComplete={autoComplete}
-        required={required}
-        minLength={minLength}
-        inputMode={inputMode}
-        aria-invalid={error ? 'true' : undefined}
-        aria-describedby={error ? errorId : undefined}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      />
-      {error && <p className="auth-field-error" id={errorId} role={error === formError ? 'alert' : undefined}>{error}</p>}
-    </div>
-  );
-}
-
 function safeValuesFromForm(form: FormData, current: AuthValues): AuthValues {
   const values: AuthValues = { ...current };
   const textKeys = ['login', 'username', 'email', 'first_name', 'last_name'] as const;
@@ -74,6 +21,7 @@ function safeValuesFromForm(form: FormData, current: AuthValues): AuthValues {
   }
   if (form.has('remember')) values.remember = String(form.get('remember')) === 'true';
   if (form.has('revoke_sessions')) values.revoke_sessions = String(form.get('revoke_sessions')) === 'true';
+  if (form.has('reset_passkeys')) values.reset_passkeys = String(form.get('reset_passkeys')) === 'true';
   return values;
 }
 
@@ -82,6 +30,7 @@ function withDefaultChoices(values: AuthValues): AuthValues {
     ...values,
     remember: values.remember ?? true,
     revoke_sessions: values.revoke_sessions ?? true,
+    reset_passkeys: values.reset_passkeys ?? true,
   };
 }
 
@@ -189,11 +138,15 @@ export function AuthPage({
   const [newPasswordVisible, setNewPasswordVisible] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState<string>();
+  const [authenticatorCode, setAuthenticatorCode] = useState('');
+  const [authenticatorError, setAuthenticatorError] = useState<string>();
   const [networkError, setNetworkError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [otpFocusRequest, setOtpFocusRequest] = useState(0);
+  const [authenticatorFocusRequest, setAuthenticatorFocusRequest] = useState(0);
   const busyRef = useRef(false);
   const otpRef = useRef<HTMLInputElement>(null);
+  const authenticatorRef = useRef<HTMLInputElement>(null);
   const retrySeconds = useCooldown(page.retryAt);
 
   useEffect(() => {
@@ -204,6 +157,10 @@ export function AuthPage({
   useEffect(() => {
     if (otpFocusRequest > 0) otpRef.current?.focus();
   }, [otpFocusRequest]);
+
+  useEffect(() => {
+    if (authenticatorFocusRequest > 0) authenticatorRef.current?.focus();
+  }, [authenticatorFocusRequest]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -249,6 +206,14 @@ export function AuthPage({
         setOtpFocusRequest((previousRequest) => previousRequest + 1);
       }
     }
+    // Повторная отправка письма (или переход) снимает требование TOTP — очищаем введённый код.
+    if (screenChanged || next.clearOtp || (previous.authenticatorRequired && !merged.authenticatorRequired)) {
+      setAuthenticatorCode('');
+      setAuthenticatorError(undefined);
+    }
+    if (!previous.authenticatorRequired && merged.authenticatorRequired && merged.screen === 'reset') {
+      setAuthenticatorFocusRequest((previousRequest) => previousRequest + 1);
+    }
     if (screenChanged) {
       setPassword('');
       setNewPassword('');
@@ -261,7 +226,7 @@ export function AuthPage({
   async function consumeResponse(
     response: Response,
     submittedValues: AuthValues,
-    preserveValues: ('remember' | 'revoke_sessions')[] = [],
+    preserveValues: ('remember' | 'revoke_sessions' | 'reset_passkeys')[] = [],
   ) {
     const body = await responseJson(response);
     if (typeof body.redirectTo === 'string') {
@@ -276,6 +241,9 @@ export function AuthPage({
         }
         if (key === 'revoke_sessions' && submittedValues.revoke_sessions !== undefined) {
           nextState.values.revoke_sessions = submittedValues.revoke_sessions;
+        }
+        if (key === 'reset_passkeys' && submittedValues.reset_passkeys !== undefined) {
+          nextState.values.reset_passkeys = submittedValues.reset_passkeys;
         }
       }
       applyPageState(nextState, submittedValues);
@@ -325,6 +293,12 @@ export function AuthPage({
       return;
     }
 
+    if (page.screen === 'reset' && page.authenticatorRequired && !/^[0-9]{6}$/.test(authenticatorCode)) {
+      setAuthenticatorError('Введите все шесть цифр кода из приложения.');
+      authenticatorRef.current?.focus();
+      return;
+    }
+
     const form = event.currentTarget;
     const formData = new FormData(form);
     formData.set('__RequestVerificationToken', page.csrfToken);
@@ -358,7 +332,7 @@ export function AuthPage({
         headers: { Accept: 'application/json' },
         body: formData,
       });
-      await consumeResponse(response, values, page.screen === 'reset' ? ['revoke_sessions'] : []);
+      await consumeResponse(response, values, page.screen === 'reset' ? ['revoke_sessions', 'reset_passkeys'] : []);
     });
   }
 
@@ -476,39 +450,34 @@ export function AuthPage({
                 label="Логин или почта"
                 value={values.login ?? ''}
                 error={fieldError('login')}
-                formError={page.formError}
+                errorRole={fieldError('login') === page.formError ? 'alert' : undefined}
                 disabled={busy}
                 autoComplete="username"
                 required
-                onChange={setTextValue('login')}
+                onChange={(event) => setTextValue('login')(event.currentTarget.value)}
               />
-              <div className="auth-field">
-                <label htmlFor="auth-password">Пароль</label>
-                <div className="auth-password-wrap">
-                  <input
-                    id="auth-password"
-                    name="password"
-                    type={passwordVisible ? 'text' : 'password'}
-                    value={password}
-                    disabled={busy}
-                    autoComplete="current-password"
-                    required
-                    aria-invalid={fieldError('password') ? 'true' : undefined}
-                    aria-describedby={fieldError('password') ? 'auth-password-error' : undefined}
-                    onChange={(event) => setPassword(event.currentTarget.value)}
-                  />
-                  <button type="button" className="auth-password-toggle" aria-label={passwordVisible ? 'Скрыть пароль' : 'Показать пароль'} disabled={busy} onClick={() => setPasswordVisible((visible) => !visible)}>
-                    {passwordVisible ? 'Скрыть' : 'Показать'}
-                  </button>
-                </div>
-                {fieldError('password') && <p className="auth-field-error" id="auth-password-error">{fieldError('password')}</p>}
-                <div className="auth-field-meta">
-                  <label className="auth-checkbox">
-                    <input type="checkbox" name="remember" value="true" checked={values.remember ?? false} disabled={busy} onChange={(event) => updateValue('remember', event.currentTarget.checked)} />
-                    <span>Оставаться в системе</span>
-                  </label>
-                  {page.features.emailEnabled && link('/forgot', 'Забыли пароль?')}
-                </div>
+              <TextField
+                id="auth-password"
+                name="password"
+                label="Пароль"
+                type={passwordVisible ? 'text' : 'password'}
+                value={password}
+                disabled={busy}
+                autoComplete="current-password"
+                required
+                error={fieldError('password')}
+                errorRole={fieldError('password') === page.formError ? 'alert' : undefined}
+                onChange={(event) => setPassword(event.currentTarget.value)}
+                trailing={<button type="button" className="auth-password-toggle" aria-label={passwordVisible ? 'Скрыть пароль' : 'Показать пароль'} disabled={busy} onClick={() => setPasswordVisible((visible) => !visible)}>
+                  {passwordVisible ? 'Скрыть' : 'Показать'}
+                </button>}
+              />
+              <div className="auth-field-meta">
+                <label className="auth-checkbox">
+                  <input type="checkbox" name="remember" value="true" checked={values.remember ?? false} disabled={busy} onChange={(event) => updateValue('remember', event.currentTarget.checked)} />
+                  <span>Оставаться в системе</span>
+                </label>
+                {page.features.emailEnabled && link('/forgot', 'Забыли пароль?')}
               </div>
               <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Входим…' : 'Войти'}</button>
               {passkeyAvailable && <button className="auth-secondary-button" type="button" disabled={busy} onClick={usePasskey}>Войти с ключом</button>}
@@ -552,34 +521,29 @@ export function AuthPage({
               <form className="auth-form" onSubmit={submitForm} aria-busy={busy}>
                 {csrfAndFlow}
                 <div className="auth-name-fields">
-                  <TextField id="auth-first-name" name="first_name" label="Имя (необязательно)" value={values.first_name ?? ''} error={fieldError('first_name')} formError={page.formError} disabled={busy} autoComplete="given-name" onChange={setTextValue('first_name')} />
-                  <TextField id="auth-last-name" name="last_name" label="Фамилия (необязательно)" value={values.last_name ?? ''} error={fieldError('last_name')} formError={page.formError} disabled={busy} autoComplete="family-name" onChange={setTextValue('last_name')} />
+                  <TextField id="auth-first-name" name="first_name" label="Имя" hint="Необязательно" value={values.first_name ?? ''} error={fieldError('first_name')} errorRole={fieldError('first_name') === page.formError ? 'alert' : undefined} disabled={busy} autoComplete="given-name" onChange={(event) => setTextValue('first_name')(event.currentTarget.value)} />
+                  <TextField id="auth-last-name" name="last_name" label="Фамилия" hint="Необязательно" value={values.last_name ?? ''} error={fieldError('last_name')} errorRole={fieldError('last_name') === page.formError ? 'alert' : undefined} disabled={busy} autoComplete="family-name" onChange={(event) => setTextValue('last_name')(event.currentTarget.value)} />
                 </div>
-                <TextField id="auth-username" name="username" label="Логин" value={values.username ?? ''} error={fieldError('username')} formError={page.formError} disabled={busy} autoComplete="username" required onChange={setTextValue('username')} />
-                <TextField id="auth-email" name="email" label="Электронная почта" value={values.email ?? ''} error={fieldError('email')} formError={page.formError} disabled={busy} type="email" autoComplete="email" inputMode="email" required onChange={setTextValue('email')} />
-                <div className="auth-field">
-                  <label htmlFor="auth-password">Пароль</label>
-                  <div className="auth-password-wrap">
-                    <input
-                      id="auth-password"
-                      name="password"
-                      type={passwordVisible ? 'text' : 'password'}
-                      value={password}
-                      disabled={busy}
-                      autoComplete="new-password"
-                      minLength={6}
-                      required
-                      aria-invalid={fieldError('password') ? 'true' : undefined}
-                      aria-describedby={fieldError('password') ? 'auth-password-error' : undefined}
-                      onChange={(event) => setPassword(event.currentTarget.value)}
-                    />
-                    <button type="button" className="auth-password-toggle" aria-label={passwordVisible ? 'Скрыть пароль' : 'Показать пароль'} disabled={busy} onClick={() => setPasswordVisible((visible) => !visible)}>
-                      {passwordVisible ? 'Скрыть' : 'Показать'}
-                    </button>
-                  </div>
-                  <p className="auth-helper">Не менее 6 символов.</p>
-                  {fieldError('password') && <p className="auth-field-error" id="auth-password-error" role={fieldError('password') === page.formError ? 'alert' : undefined}>{fieldError('password')}</p>}
-                </div>
+                <TextField id="auth-username" name="username" label="Логин" value={values.username ?? ''} error={fieldError('username')} errorRole={fieldError('username') === page.formError ? 'alert' : undefined} disabled={busy} autoComplete="username" required onChange={(event) => setTextValue('username')(event.currentTarget.value)} />
+                <TextField id="auth-email" name="email" label="Электронная почта" value={values.email ?? ''} error={fieldError('email')} errorRole={fieldError('email') === page.formError ? 'alert' : undefined} disabled={busy} type="email" autoComplete="email" inputMode="email" required onChange={(event) => setTextValue('email')(event.currentTarget.value)} />
+                <TextField
+                  id="auth-password"
+                  name="password"
+                  label="Пароль"
+                  type={passwordVisible ? 'text' : 'password'}
+                  value={password}
+                  disabled={busy}
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                  hint="Не менее 6 символов."
+                  error={fieldError('password')}
+                  errorRole={fieldError('password') === page.formError ? 'alert' : undefined}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  trailing={<button type="button" className="auth-password-toggle" aria-label={passwordVisible ? 'Скрыть пароль' : 'Показать пароль'} disabled={busy} onClick={() => setPasswordVisible((visible) => !visible)}>
+                    {passwordVisible ? 'Скрыть' : 'Показать'}
+                  </button>}
+                />
                 <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Создаём аккаунт…' : 'Создать аккаунт'}</button>
                 <p className="auth-form-footer">Уже есть аккаунт? {link('/login', 'Войти')}</p>
               </form>
@@ -611,7 +575,7 @@ export function AuthPage({
             page.features.emailEnabled ? (
               <form className="auth-form" onSubmit={submitForm} aria-busy={busy}>
                 {csrfAndFlow}
-                <TextField id="auth-login" name="login" label="Логин или почта" value={values.login ?? ''} error={fieldError('login')} formError={page.formError} disabled={busy} autoComplete="username" required onChange={setTextValue('login')} />
+                <TextField id="auth-login" name="login" label="Логин или почта" value={values.login ?? ''} error={fieldError('login')} errorRole={fieldError('login') === page.formError ? 'alert' : undefined} disabled={busy} autoComplete="username" required onChange={(event) => setTextValue('login')(event.currentTarget.value)} />
                 <p className="auth-inline-note">Если аккаунт существует, мы отправим письмо с кодом для восстановления.</p>
                 <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Отправляем…' : 'Продолжить'}</button>
                 <p className="auth-form-footer">{link('/login', 'Назад ко входу')}</p>
@@ -632,33 +596,60 @@ export function AuthPage({
                 <OtpInput ref={otpRef} value={otp} disabled={busy} error={otpError || fieldError('otp')} onChange={setOtp} onInvalid={setOtpError} />
                 {(otpError || fieldError('otp')) && <p className="auth-field-error" id="auth-otp-error" role={(otpError || fieldError('otp')) === page.formError ? 'alert' : undefined}>{otpError || fieldError('otp')}</p>}
               </div>
-              <div className="auth-field">
-                <label htmlFor="auth-new-password">Новый пароль</label>
-                <div className="auth-password-wrap">
-                  <input
-                    id="auth-new-password"
-                    name="password"
-                    type={newPasswordVisible ? 'text' : 'password'}
-                    value={newPassword}
+              {page.authenticatorRequired && (
+                <div className="auth-field">
+                  <label htmlFor="auth-authenticator">Код из приложения-аутентификатора</label>
+                  <OtpInput
+                    ref={authenticatorRef}
+                    id="auth-authenticator"
+                    name="authenticator_code"
+                    ariaLabel="Код приложения-аутентификатора"
+                    value={authenticatorCode}
                     disabled={busy}
-                    autoComplete="new-password"
-                    minLength={6}
-                    required
-                    aria-invalid={fieldError('password') ? 'true' : undefined}
-                    aria-describedby={fieldError('password') ? 'auth-new-password-error' : undefined}
-                    onChange={(event) => setNewPassword(event.currentTarget.value)}
+                    error={authenticatorError || fieldError('authenticator')}
+                    onChange={setAuthenticatorCode}
+                    onInvalid={setAuthenticatorError}
                   />
-                  <button type="button" className="auth-password-toggle" aria-label={newPasswordVisible ? 'Скрыть пароль' : 'Показать пароль'} disabled={busy} onClick={() => setNewPasswordVisible((visible) => !visible)}>
-                    {newPasswordVisible ? 'Скрыть' : 'Показать'}
-                  </button>
+                  {(authenticatorError || fieldError('authenticator')) && (
+                    <p className="auth-field-error" id="auth-authenticator-error" role={(authenticatorError || fieldError('authenticator')) === page.formError ? 'alert' : undefined}>
+                      {authenticatorError || fieldError('authenticator')}
+                    </p>
+                  )}
+                  <p className="auth-inline-note">Аккаунт защищён двухфакторной аутентификацией: введите текущий код из приложения.</p>
                 </div>
-                <p className="auth-helper">Не менее 6 символов.</p>
-                {fieldError('password') && <p className="auth-field-error" id="auth-new-password-error" role={fieldError('password') === page.formError ? 'alert' : undefined}>{fieldError('password')}</p>}
-              </div>
+              )}
+              <TextField
+                id="auth-new-password"
+                name="password"
+                label="Новый пароль"
+                type={newPasswordVisible ? 'text' : 'password'}
+                value={newPassword}
+                disabled={busy}
+                autoComplete="new-password"
+                minLength={6}
+                required
+                hint="Не менее 6 символов."
+                error={fieldError('password')}
+                errorRole={fieldError('password') === page.formError ? 'alert' : undefined}
+                onChange={(event) => setNewPassword(event.currentTarget.value)}
+                trailing={<button type="button" className="auth-password-toggle" aria-label={newPasswordVisible ? 'Скрыть пароль' : 'Показать пароль'} disabled={busy} onClick={() => setNewPasswordVisible((visible) => !visible)}>
+                  {newPasswordVisible ? 'Скрыть' : 'Показать'}
+                </button>}
+              />
               <label className="auth-checkbox">
-                <input type="checkbox" name="revoke_sessions" value="true" checked={values.revoke_sessions ?? false} disabled={busy} onChange={(event) => updateValue('revoke_sessions', event.currentTarget.checked)} />
-                <span>Завершить остальные сеансы</span>
+                <input type="checkbox" name="reset_passkeys" value="true" checked={values.reset_passkeys ?? true} disabled={busy} onChange={(event) => updateValue('reset_passkeys', event.currentTarget.checked)} />
+                <span>Сбросить все passkey</span>
               </label>
+              {values.reset_passkeys !== false ? (
+                <p className="auth-inline-note">При сбросе пароля будут удалены все ключи доступа (passkey). Их потребуется добавить заново.</p>
+              ) : (
+                <p className="auth-inline-note">Passkey сохранятся и продолжат работать после смены пароля.</p>
+              )}
+              <label className="auth-checkbox">
+                <input type="checkbox" name="revoke_sessions" value="true" checked={values.revoke_sessions ?? true} disabled={busy} onChange={(event) => updateValue('revoke_sessions', event.currentTarget.checked)} />
+                <span>Выйти с других устройств</span>
+              </label>
+              <p className="auth-inline-note">Выход с устройств не удаляет passkey.</p>
               <button className="auth-primary-button" type="submit" disabled={busy}>{busy ? 'Сохраняем…' : 'Сменить пароль'}</button>
               <button className="auth-resend-button" type="button" disabled={busy || retrySeconds > 0} onClick={resendCode}>
                 {busy ? 'Отправляем…' : retrySeconds > 0 ? 'Отправить код повторно через ' + formatSeconds(retrySeconds) : 'Отправить код повторно'}

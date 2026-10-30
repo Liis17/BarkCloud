@@ -1,6 +1,5 @@
 package com.barkfluff.BarkCloud.ui.navigation
 
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
@@ -20,6 +19,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.data.OnboardingStore
+import com.barkfluff.BarkCloud.DeepLinkEvent
 import com.barkfluff.BarkCloud.grpc.ServerSettings
 import com.barkfluff.BarkCloud.grpc.ReflectionServerConnectionProbe
 import com.barkfluff.BarkCloud.ui.auth.RegistrationViewModel
@@ -45,7 +45,7 @@ private const val ROUTE_REGISTER = "register"
 private const val ROUTE_RESET = "reset"
 
 @Composable
-fun RootNavGraph(deepLink: Uri? = null) {
+fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
     val sessionActive = app.globalParam.sessionActive.collectAsStateWithLifecycle()
@@ -101,7 +101,8 @@ fun RootNavGraph(deepLink: Uri? = null) {
             drillIn(ROUTE_SERVER) {
                 val vm: ServerViewModel = viewModel(factory = flowFactory {
                     ServerViewModel(ServerSettings.config, ServerSettings.defaults, ReflectionServerConnectionProbe()) { config ->
-                        if (config.key != ServerSettings.config.key) app.authFlowRepository.discardPendingRegistration()
+                        val serverChanged = config.key != ServerSettings.config.key
+                        if (serverChanged) app.authFlowRepository.discardPendingRegistration()
                         ServerSettings.save(config)
                         app.grpcManager.shutdown()
                         com.barkfluff.BarkCloud.net.InsecureHttp.reset()

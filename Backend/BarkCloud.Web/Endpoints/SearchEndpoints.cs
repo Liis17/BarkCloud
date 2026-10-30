@@ -7,6 +7,7 @@ using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
 
 using Grpc.Core;
+using Google.Protobuf.WellKnownTypes;
 
 namespace BarkCloud.Web.Endpoints;
 
@@ -29,6 +30,44 @@ public static class SearchEndpoints
 
     public static void MapSearchEndpoints(this WebApplication app)
     {
+        var tagsApi = app.MapGroup("/api/settings/tags");
+        tagsApi.MapGet("", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null) return Results.Unauthorized();
+            try
+            {
+                var result = await files.ListUserTagsAsync(new Empty(), BrowserContext.UserToken(user.AccessToken),
+                    deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: http.RequestAborted);
+                return Results.Json(new { items = result.Items.Select(TagJson) }, Json);
+            }
+            catch (RpcException ex) { return TagError(ex); }
+        });
+        tagsApi.MapPost("/save", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, TagBody body) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null) return Results.Unauthorized();
+            try
+            {
+                var result = await files.SaveUserTagAsync(new SaveUserTagRequest
+                    { Id = body.Id ?? "", Name = body.Name ?? "", Color = body.Color ?? "" }, BrowserContext.UserToken(user.AccessToken),
+                    deadline: DateTime.UtcNow.AddSeconds(10), cancellationToken: http.RequestAborted);
+                return Results.Json(TagJson(result), Json);
+            }
+            catch (RpcException ex) { return TagError(ex); }
+        });
+        tagsApi.MapPost("/delete", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, DeleteTagBody body) =>
+        {
+            var user = await auth.AuthenticateAsync(http);
+            if (user is null) return Results.Unauthorized();
+            try
+            {
+                await files.DeleteUserTagAsync(new DeleteUserTagRequest { Id = body.Id ?? "" }, BrowserContext.UserToken(user.AccessToken),
+                    deadline: DateTime.UtcNow.AddSeconds(10), cancellationToken: http.RequestAborted);
+                return Results.Ok();
+            }
+            catch (RpcException ex) { return TagError(ex); }
+        });
         var api = app.MapGroup("/api/search");
 
         api.MapGet("/suggest", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, TorrentApi.TorrentApiClient torrents, string? q) =>
@@ -105,6 +144,18 @@ public static class SearchEndpoints
             }
         });
     }
+
+    private sealed record TagBody(string? Id, string? Name, string? Color);
+    private sealed record DeleteTagBody(string? Id);
+    private static object TagJson(UserTagData tag) => new { id = tag.Id, name = tag.Name, color = tag.Color };
+    private static IResult TagError(RpcException ex) => Results.Json(new { error = ex.Status.Detail }, Json,
+        statusCode: ex.StatusCode switch
+        {
+            StatusCode.InvalidArgument => 400,
+            StatusCode.NotFound or StatusCode.PermissionDenied => 404,
+            StatusCode.AlreadyExists => 409,
+            _ => 502
+        });
 
     private static async Task<IResult> Search(
         HttpContext http,
@@ -269,6 +320,7 @@ public static class SearchEndpoints
         title = hit.Title,
         subtitle = hit.Subtitle,
         previewUrl = hit.PreviewUrl,
+        jpegViewUrl = hit.JpegViewUrl,
         placeholder = CloudJson.Placeholder(hit.Placeholder),
         mediaKind = hit.MediaKind.ToString().Replace("MediaKind", "", StringComparison.Ordinal).ToLowerInvariant(),
         favorite = hit.Favorite,

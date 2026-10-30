@@ -16,6 +16,25 @@ public class SettingsCatalogTests
     }
 
     [Fact]
+    public void VideoVariantSettings_AreFileSettingsAndRestartFiles()
+    {
+        foreach (var (key, kind) in new[]
+        {
+            ("Enabled", SettingValueKind.Boolean),
+            ("MaxSourceSizeMb", SettingValueKind.Integer),
+            ("MaxDurationMinutes", SettingValueKind.Integer)
+        })
+        {
+            var entry = SettingsCatalog.Resolve(ServiceId.Files, "VideoVariants", key);
+
+            entry.ValueKind.Should().Be(kind);
+            entry.RestartTargets.Should().Equal("files");
+            entry.IsSensitive.Should().BeFalse();
+            entry.IsEnvironmentManaged.Should().BeFalse();
+        }
+    }
+
+    [Fact]
     public void Resolve_UnknownSetting_Throws()
     {
         var act = () => SettingsCatalog.Resolve(ServiceId.Files, "Unknown", "Value");
@@ -31,6 +50,23 @@ public class SettingsCatalogTests
         entry.StorageKey.Should().Be("JwtSettings:Issuer");
         entry.ServiceId.Should().Be(ServiceId.Files);
         entry.RestartTargets.Should().Equal("files");
+    }
+
+    [Fact]
+    public void RabbitCredentials_AreEnvironmentManagedAndScopedPerService()
+    {
+        SettingsCatalog.All.Should().NotContain(x => x.ServiceId == ServiceId.Unknown
+                                                     && x.Section == "RabbitMQ"
+                                                     && (x.Key == "Username" || x.Key == "Password"));
+
+        var torrentUsername = SettingsCatalog.Resolve(ServiceId.Torrent, "RabbitMQ", "Username");
+        var torrentPassword = SettingsCatalog.Resolve(ServiceId.Torrent, "RabbitMQ", "Password");
+
+        torrentUsername.ServiceId.Should().Be(ServiceId.Torrent);
+        torrentUsername.IsEnvironmentManaged.Should().BeTrue();
+        torrentPassword.ServiceId.Should().Be(ServiceId.Torrent);
+        torrentPassword.IsEnvironmentManaged.Should().BeTrue();
+        torrentPassword.IsSensitive.Should().BeTrue();
     }
 
     [Fact]
@@ -104,39 +140,21 @@ public class SettingsCatalogTests
     }
 
     [Theory]
-    [InlineData("short-secret")]
-    [InlineData("жжжжжжжжжжжжжжж")] // 15 символов = 30 байт UTF-8
-    public void ValidateAndNormalize_JwtSecret_RejectsKeyShorterThanRecommendedBytes(string input)
+    [InlineData("MaxSourceSizeMb")]
+    [InlineData("MaxDurationMinutes")]
+    public void ValidateAndNormalize_VideoVariantLimit_EmptyMeansUnlimitedAndZeroIsRejected(string key)
     {
-        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "JwtSettings", "SecretKey");
+        var entry = SettingsCatalog.Resolve(ServiceId.Files, "VideoVariants", key);
 
-        var act = () => SettingsValueValidator.ValidateAndNormalize(entry, input);
-
-        act.Should().Throw<InvalidOperationException>().WithMessage("*JwtSettings:SecretKey*");
-    }
-
-    [Theory]
-    [InlineData("supersecretkey_at_least_32_chars_long!!")]
-    [InlineData("жжжжжжжжжжжжжжжж")] // 16 символов = 32 байта UTF-8
-    public void ValidateAndNormalize_JwtSecret_AcceptsKeyOfRecommendedBytesIncludingUnicode(string input)
-    {
-        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "JwtSettings", "SecretKey");
-
-        SettingsValueValidator.ValidateAndNormalize(entry, $" {input} ").Should().Be(input);
+        SettingsValueValidator.ValidateAndNormalize(entry, "").Should().BeEmpty();
+        var act = () => SettingsValueValidator.ValidateAndNormalize(entry, "0");
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void ValidateAndNormalize_JwtSecret_EmptyMeansNotSet()
+    public void ValidateAndNormalize_ServiceRabbitPassword_StillAcceptsShortValue()
     {
-        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "JwtSettings", "SecretKey");
-
-        SettingsValueValidator.ValidateAndNormalize(entry, "  ").Should().BeEmpty();
-    }
-
-    [Fact]
-    public void ValidateAndNormalize_OtherPassword_StillAcceptsShortValue()
-    {
-        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "RabbitMQ", "Password");
+        var entry = SettingsCatalog.Resolve(ServiceId.Files, "RabbitMQ", "Password");
 
         SettingsValueValidator.ValidateAndNormalize(entry, "pw").Should().Be("pw");
     }

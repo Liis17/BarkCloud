@@ -15,8 +15,8 @@ using Microsoft.IdentityModel.Tokens;
 namespace BarkCloud.Web.Auth;
 
 /// <summary>
-/// Авторизация веб-клиента: cookie с токенами, локальная валидация JWT по общему
-/// секрету (как и остальные сервисы), refresh и логин через Identity.
+/// Авторизация веб-клиента: cookie с токенами, локальная валидация JWT по публичному
+/// RSA-ключу (подписывает только Identity), refresh и логин через Identity.
 /// </summary>
 public sealed class AuthGateway
 {
@@ -53,10 +53,13 @@ public sealed class AuthGateway
         _appName = configuration.Value("App:AppName", "BarkCloud Web");
         _appVersion = configuration.Value("App:Version", AppVersion.Current);
 
-        var secret = configuration["JwtSettings:SecretKey"];
+        var secret = configuration[RsaJwtKeys.PublicKeyConfigKey]
+                     ?? Environment.GetEnvironmentVariable(RsaJwtKeys.PublicKeyEnvName);
         if (string.IsNullOrEmpty(secret))
         {
-            _logger.LogError("JwtSettings:SecretKey не задан — валидация токенов невозможна, все запросы будут неавторизованы");
+            _logger.LogError(
+                "Публичный JWT-ключ ({ConfigKey}/{Env}) не задан — валидация токенов невозможна, все запросы будут неавторизованы",
+                RsaJwtKeys.PublicKeyConfigKey, RsaJwtKeys.PublicKeyEnvName);
             _validation = null;
         }
         else
@@ -64,7 +67,9 @@ public sealed class AuthGateway
             _validation = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(JwtSecret.GetKeyBytes(secret)),
+                // Валидатор подбирает ключ по kid; HMAC отклонён разрешённым алгоритмом.
+                IssuerSigningKeys = RsaJwtKeys.LoadPublicKeyMap(secret).Values,
+                ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
                 ValidateIssuer = true,
                 ValidIssuer = configuration["JwtSettings:Issuer"],
                 ValidateAudience = true,

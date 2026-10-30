@@ -86,19 +86,29 @@ fun LocalBrowserScreen(
             when (event) {
                 is LocalBrowserViewModel.BrowserEvent.Toast -> snackbarHost.showSnackbar(event.text)
                 is LocalBrowserViewModel.BrowserEvent.OpenFile -> {
-                    val intent = FileShareHelper.buildOpenIntent(context, event.file, event.mime)
                     try {
+                        val file = FileShareHelper.prepareLocalFile(context, event.file)
+                        val intent = FileShareHelper.buildOpenIntent(context, file, event.mime)
                         context.startActivity(intent)
                     } catch (_: ActivityNotFoundException) {
                         snackbarHost.showSnackbar(errorNoApp)
+                    } catch (e: java.io.IOException) {
+                        snackbarHost.showSnackbar(e.localizedMessage ?: errorNoApp)
+                    } catch (e: SecurityException) {
+                        snackbarHost.showSnackbar(e.localizedMessage ?: errorNoApp)
                     }
                 }
                 is LocalBrowserViewModel.BrowserEvent.ShareFiles -> {
-                    val intent = FileShareHelper.buildShareIntent(context, event.files)
                     try {
+                        val files = event.files.map { FileShareHelper.prepareLocalFile(context, it) }
+                        val intent = FileShareHelper.buildShareIntent(context, files)
                         context.startActivity(Intent.createChooser(intent, null))
                     } catch (_: ActivityNotFoundException) {
                         snackbarHost.showSnackbar(errorNoApp)
+                    } catch (e: java.io.IOException) {
+                        snackbarHost.showSnackbar(e.localizedMessage ?: errorNoApp)
+                    } catch (e: SecurityException) {
+                        snackbarHost.showSnackbar(e.localizedMessage ?: errorNoApp)
                     }
                 }
             }

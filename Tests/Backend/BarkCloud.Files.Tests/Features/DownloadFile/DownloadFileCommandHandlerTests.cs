@@ -106,6 +106,23 @@ public class DownloadFileCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_VideoVariantDirectDownloadIsDenied()
+    {
+        var id = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(id)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = id, Type = UploadFileType.VideoVariant, Etag = "etag", UploadedAt = DateTime.UtcNow,
+            Filename = "360p.webm"
+        });
+        _files.Setup(s => s.IsPreviewFile(id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var act = () => CreateSut().Handle(new DownloadFileCommand { FileId = id }, default);
+
+        await act.Should().ThrowAsync<Exception>();
+        _s3.Verify(s => s.DownloadAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_UserAvatar_DownloadsFromS3()
     {
         var id = Guid.NewGuid();

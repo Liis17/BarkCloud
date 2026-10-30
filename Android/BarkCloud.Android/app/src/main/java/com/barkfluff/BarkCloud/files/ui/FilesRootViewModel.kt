@@ -1,5 +1,8 @@
 package com.barkfluff.BarkCloud.files.ui
 
+import android.content.Context
+import android.os.Environment
+import android.os.storage.StorageManager
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,10 +19,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+
+data class StorageLocation(val path: String, val name: String)
 
 data class ServerFolder(val id: String, val name: String)
 
 data class FilesRootUiState(
+    val removableStorage: List<StorageLocation> = emptyList(),
     val storageGranted: Boolean = false,
     val serverFolders: List<ServerFolder> = emptyList(),
     val smartFolders: List<DynamicFolderCard> = emptyList(),
@@ -33,15 +40,26 @@ class FilesRootViewModel(
 
     private val _state = MutableStateFlow(FilesRootUiState())
     val state: StateFlow<FilesRootUiState> = _state.asStateFlow()
+    private var smartFoldersJob: Job? = null
 
-    fun refreshPermission() {
-        _state.value = _state.value.copy(storageGranted = StoragePermission.isGranted())
+    fun refreshPermission(context: Context) {
+        val volumes = context.getSystemService(StorageManager::class.java).storageVolumes
+        _state.update { state ->
+            state.copy(
+                storageGranted = StoragePermission.isGranted(),
+                removableStorage = volumes.filter {
+                    !it.isPrimary && it.state in listOf(Environment.MEDIA_MOUNTED, Environment.MEDIA_MOUNTED_READ_ONLY)
+                }.mapNotNull { volume ->
+                    volume.directory?.let { StorageLocation(it.absolutePath, volume.getDescription(context)) }
+                },
+            )
+        }
     }
 
     fun loadSmartFolders() {
         if (_state.value.isLoadingSmartFolders) return
         _state.update { it.copy(isLoadingSmartFolders = true) }
-        viewModelScope.launch {
+        smartFoldersJob = viewModelScope.launch {
             runCatching { dynamicFolderRepository.listFolders() }
                 .onSuccess { folders ->
                     _state.update {
@@ -50,10 +68,16 @@ class FilesRootViewModel(
                 }
                 .onFailure { error ->
                     _state.update {
-                        it.copy(isLoadingSmartFolders = false, smartFolders = emptyList(), snackbar = error.message)
+                        it.copy(isLoadingSmartFolders = false, snackbar = error.message)
                     }
                 }
         }
+    }
+
+    suspend fun reloadAndWait(context: Context) {
+        refreshPermission(context)
+        loadSmartFolders()
+        smartFoldersJob?.join()
     }
 
     fun saveSmartFolder(

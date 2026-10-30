@@ -1006,6 +1006,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         LocalFile? targetFile = null;
         var targetSyncHeld = false;
+        var listingCacheHandledByMove = false;
         try
         {
             var sourceNode = ResolveSource();
@@ -1108,8 +1109,15 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     }
                 }
 
-                MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName, to.Value.DirectoryId, to.Value.Name,
-                    parentChanged, nameChanged, rollback);
+                var updateListingCache = sourceFile is null
+                    && targetFile is null
+                    && !isDirectory
+                    && !targetExists
+                    && parentChanged
+                    && !nameChanged;
+                listingCacheHandledByMove = MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName,
+                    to.Value.DirectoryId, to.Value.Name, parentChanged, nameChanged,
+                    updateListingCache, rollback);
 
                 if (sourceFile is not null)
                 {
@@ -1133,6 +1141,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             }
             catch (Exception ex)
             {
+                // После отката серверного перемещения кеш нужно инвалидировать в finally.
+                listingCacheHandledByMove = false;
                 var rollbackErrors = RollbackMove(rollback, oldName);
                 if (targetDeleted)
                 {
@@ -1163,8 +1173,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (targetSyncHeld)
                 Monitor.Exit(targetFile!.Sync);
-            _gateway.InvalidateListing(from.Value.DirectoryId);
-            _gateway.InvalidateListing(to.Value.DirectoryId);
+            if (!listingCacheHandledByMove)
+            {
+                _gateway.InvalidateListing(from.Value.DirectoryId);
+                _gateway.InvalidateListing(to.Value.DirectoryId);
+            }
         }
     }
 
@@ -1308,10 +1321,12 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
     }
 
-    private void MoveCloudNode(ResolvedNode node, string sourceDirectoryId, string sourceName,
+    private bool MoveCloudNode(ResolvedNode node, string sourceDirectoryId, string sourceName,
         string destinationDirectoryId, string destinationName, bool parentChanged, bool nameChanged,
-        Stack<Action> rollback)
+        bool updateListingCache, Stack<Action> rollback)
     {
+        var listingCacheHandled = false;
+
         void Rename(string name)
         {
             if (node.IsDirectory)
@@ -1324,6 +1339,11 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (node.IsDirectory)
                 _gateway.MoveDirectory(node.DirectoryId, directoryId);
+            else if (updateListingCache && directoryId == destinationDirectoryId)
+            {
+                _gateway.MoveFileEntryAndUpdateListings(node.EntryId, sourceDirectoryId, destinationDirectoryId);
+                listingCacheHandled = true;
+            }
             else
                 _gateway.MoveFileEntry(node.EntryId, directoryId);
         }
@@ -1376,6 +1396,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             Apply(() => Rename(destinationName), () => Rename(sourceName),
                 node.IsDirectory ? null : destinationName);
         }
+
+        return listingCacheHandled;
     }
 
     private List<Exception> RollbackMove(Stack<Action> rollback, string oldName)
@@ -1488,18 +1510,40 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         }
     }
 
+    // Ёмкость для Проводника. Уровни приоритета:
+    // 1) личный лимит пользователя — общий объём равен лимиту, свободное вычитает
+    //    занятое и резервы активных загрузок;
+    // 2) без личного лимита и с доступной статистикой S3 — сумма конечных квот
+    //    S3-групп (внешние хранилища); диск хоста, безлимитные группы и «Без группы»
+    //    в расчёт не входят, остаток группы ограничивается нулём;
+    // 3) старый сервер без групп — прежний расчёт по физическому диску хоста.
+    // Снимок без данных (первая загрузка или ошибка) бросает исключение — Dokany
+    // получит ошибку вместо пустого диска.
     public NtStatus GetDiskFreeSpace(out long freeBytesAvailable, out long totalNumberOfBytes,
         out long totalNumberOfFreeBytes, IDokanFileInfo info)
     {
         freeBytesAvailable = totalNumberOfBytes = totalNumberOfFreeBytes = 0;
         try
         {
-            var s = _gateway.GetStorage();
-            var total = s.StorageLimit > 0 ? s.StorageLimit : s.TotalAvailableStorage;
-            var used = s.StorageLimit > 0
-                ? s.TotalUsedStorage + s.ReservedStorage
-                : s.DiskUsedStorage + s.S3UsedStorage;
-            var free = Math.Max(0, total - used);
+            var s = _gateway.GetStorage().Info;
+            long total;
+            long free;
+            if (s.StorageLimit > 0)
+            {
+                total = s.StorageLimit;
+                free = Math.Max(0, total - s.TotalUsedStorage - s.ReservedStorage);
+            }
+            else if (TryGetS3QuotaCapacity(s, out total, out free))
+            {
+                // total/free посчитаны из групп S3; для групп с неизмеренными
+                // бакетами свободное место — оценка и может быть завышено.
+            }
+            else
+            {
+                total = s.TotalAvailableStorage;
+                free = Math.Max(0, total - s.DiskUsedStorage - s.S3UsedStorage);
+            }
+
             totalNumberOfBytes = total;
             freeBytesAvailable = free;
             totalNumberOfFreeBytes = free;
@@ -1510,6 +1554,26 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             EngineLog.Error("GetDiskFreeSpace", ex);
             return ToStatus(ex);
         }
+    }
+
+    // Сумма конечных квот S3-групп; false, если пригодных групп нет
+    // (нет статистики S3, старый сервер или только безлимитные/«Без группы»).
+    private static bool TryGetS3QuotaCapacity(GetUserStorageInfoResponse s, out long total, out long free)
+    {
+        total = 0;
+        free = 0;
+        if (!s.AllS3StatsAvailable)
+            return false;
+
+        foreach (var group in s.S3QuotaGroups)
+        {
+            if (group.IsUngrouped || group.QuotaBytes <= 0)
+                continue;
+            total += group.QuotaBytes;
+            free += Math.Max(0, group.QuotaBytes - group.UsedBytes);
+        }
+
+        return total > 0;
     }
 
     public NtStatus GetVolumeInformation(out string volumeLabel, out FileSystemFeatures features,

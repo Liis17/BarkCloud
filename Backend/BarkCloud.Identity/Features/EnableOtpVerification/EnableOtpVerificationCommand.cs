@@ -11,4 +11,6 @@ public class EnableOtpVerificationCommand : IRequest<EnableOtpVerificationRespon
     public string? Password { get; set; }
 
     public string? CurrentOtpCode { get; set; }
+
+    public string? CurrentEmailCode { get; set; }
 }

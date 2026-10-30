@@ -46,10 +46,12 @@ function TrashRow({ item, bulkChecked, onBulkToggle, onRestore, onPurge, opened 
         <input type="checkbox" checked={bulkChecked} onChange={() => onBulkToggle(item)} />
       </td>
       <td className="name">
-        <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
-        <div className="file-name-col">
-          <div className="fn">{item.name}</div>
-          <div className="meta">{kindLabel(m.kind)}</div>
+        <div className="name-cell">
+          <div className={'file-icon ' + (m.iconKind || 'doc')}>{m.ext || 'FILE'}</div>
+          <div className="file-name-col">
+            <div className="fn">{item.name}</div>
+            <div className="meta">{kindLabel(m.kind)}</div>
+          </div>
         </div>
       </td>
       <td className="size">{m.sizeLabel || '—'}</td>

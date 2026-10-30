@@ -70,7 +70,11 @@ class FileTransferService(
     /** Информация о хранилище (использовано / лимит, в байтах). */
     suspend fun storageInfo(): StorageInfo {
         val resp = grpc.filesStub().getUserStorageInfo(GetUserStorageInfoRequest.getDefaultInstance())
-        return StorageInfo(resp.totalUsedStorage, resp.storageLimit)
+        return StorageInfo(
+            resp.totalUsedStorage,
+            resp.storageLimit,
+            resp.storageByTypesList.groupBy { it.fileType }.mapValues { (_, items) -> items.sumOf { it.usedStorage } },
+        )
     }
 
     // MARK: Upload 2.0 — control plane
@@ -139,14 +143,51 @@ class FileTransferService(
     /** Скачать оригинал во временный файл (для предпросмотра / шеринга). */
     suspend fun download(urlString: String, suggestedName: String): File =
         withContext(Dispatchers.IO) {
-            http.newCall(Request.Builder().url(urlString).get().build()).execute().use { resp ->
-                if (!resp.isSuccessful) throw IOException("Download failed: HTTP ${resp.code}")
-                val name = suggestedName.ifEmpty { UUID.randomUUID().toString() }
-                val dest = File(appContext.cacheDir, name)
-                if (dest.exists()) dest.delete()
-                val source = resp.body ?: throw IOException("Download: empty body")
-                source.byteStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
-                dest
+            suspendCancellableCoroutine { continuation ->
+                val call = http.newCall(Request.Builder().url(urlString).get().build())
+                val destinationLock = Any()
+                var completedDestination: File? = null
+                var cancelled = false
+                continuation.invokeOnCancellation {
+                    call.cancel()
+                    synchronized(destinationLock) {
+                        cancelled = true
+                        completedDestination?.delete()
+                    }
+                }
+                call.enqueue(object : Callback {
+                    override fun onFailure(call: Call, error: IOException) {
+                        if (continuation.isActive) continuation.resumeWithException(error)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        var destination: File? = null
+                        try {
+                            response.use { resp ->
+                                if (!continuation.isActive) return
+                                if (!resp.isSuccessful) throw IOException("Download failed: HTTP ${resp.code}")
+                                val name = suggestedName.ifEmpty { UUID.randomUUID().toString() }
+                                destination = File(appContext.cacheDir, name).apply { delete() }
+                                val source = resp.body ?: throw IOException("Download: empty body")
+                                source.byteStream().use { input ->
+                                    destination!!.outputStream().use { input.copyTo(it) }
+                                }
+                            }
+                            val completed = requireNotNull(destination)
+                            synchronized(destinationLock) {
+                                if (cancelled || !continuation.isActive) {
+                                    completed.delete()
+                                } else {
+                                    completedDestination = completed
+                                    continuation.resume(completed)
+                                }
+                            }
+                        } catch (error: Throwable) {
+                            destination?.delete()
+                            if (continuation.isActive) continuation.resumeWithException(error)
+                        }
+                    }
+                })
             }
         }
 
@@ -170,7 +211,11 @@ class FileTransferService(
         errorMessage = errorMessage.takeIf { it.isNotEmpty() },
     )
 
-    data class StorageInfo(val used: Long, val limit: Long)
+    data class StorageInfo(
+        val used: Long,
+        val limit: Long,
+        val byType: Map<UploadFileType, Long> = emptyMap(),
+    )
 
     internal inner class GrpcAvatarUploadApi : AvatarUploadApi {
         override var lastAccessToken: String? = null

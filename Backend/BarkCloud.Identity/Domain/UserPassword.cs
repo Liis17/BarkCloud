@@ -12,4 +12,6 @@ public class UserPassword
     public string? PasswordHash { get; set; }
 
     public DateTime ChangedAt { get; set; }
+
+    public long SecurityStateVersion { get; set; }
 }

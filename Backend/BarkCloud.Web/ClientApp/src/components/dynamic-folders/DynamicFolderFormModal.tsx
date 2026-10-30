@@ -5,6 +5,7 @@ import { apiPost } from '../../lib/api';
 import type { DynamicFolder, DynamicFolderRule } from '../../lib/types';
 import type { ToastPush } from '../../hooks/useToast';
 import { Select } from '../ui/Select';
+import { TextField } from '../ui/TextField';
 
 // Коды совпадают с proto DfField / DfOperator / DfCombinator.
 type Op = { v: number; label: string };
@@ -137,8 +138,7 @@ export function DynamicFolderFormModal({ folder, onClose, onSaved, toast }: Prop
         </>
       }
     >
-      <label className="field-label">Название</label>
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Например: Большие видео" />
+      <TextField label="Название" value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Например: Большие видео" />
 
       <label className="field-label" style={{ marginTop: 14 }}>Файлы попадают, если выполнено</label>
       <div className="df-comb">
@@ -190,7 +190,7 @@ function RuleValue({ def, rule, onChange }: { def: FieldDef; rule: DynamicFolder
 
   if (def.kind === 'date') {
     if (rule.op === 1)
-      return <input type="number" min={1} value={rule.value} placeholder="дней" onChange={(e) => onChange(e.target.value)} />;
+      return <TextField label="Дней" aria-label="Число дней" type="number" min={1} value={rule.value} placeholder="дней" onChange={(e) => onChange(e.target.value)} />;
     return <input type="date" value={rule.value} onChange={(e) => onChange(e.target.value)} />;
   }
 
@@ -198,7 +198,8 @@ function RuleValue({ def, rule, onChange }: { def: FieldDef; rule: DynamicFolder
     const mb = rule.value ? String(Math.round(Number(rule.value) / MB)) : '';
     return (
       <span className="df-suffix">
-        <input
+        <TextField
+          label="Размер, МБ"
           type="number"
           min={0}
           value={mb}
@@ -213,13 +214,13 @@ function RuleValue({ def, rule, onChange }: { def: FieldDef; rule: DynamicFolder
   if (def.kind === 'num')
     return (
       <span className="df-suffix">
-        <input type="number" min={0} value={rule.value} placeholder="0" onChange={(e) => onChange(e.target.value)} />
+        <TextField label="Значение" type="number" min={0} value={rule.value} placeholder="0" onChange={(e) => onChange(e.target.value)} />
         px
       </span>
     );
 
   if (def.kind === 'ext')
-    return <input type="text" value={rule.value} placeholder=".png" onChange={(e) => onChange(e.target.value)} />;
+    return <TextField label="Расширение" value={rule.value} placeholder=".png" onChange={(e) => onChange(e.target.value)} />;
 
-  return <input type="text" value={rule.value} placeholder="текст" onChange={(e) => onChange(e.target.value)} />;
+  return <TextField label="Значение" value={rule.value} placeholder="текст" onChange={(e) => onChange(e.target.value)} />;
 }

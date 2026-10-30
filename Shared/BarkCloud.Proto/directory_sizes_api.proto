@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option csharp_namespace = "BarkCloud.Proto.Files";
+
+package barkcloud.files;
+
+// Размеры подпапок папки. Отдельный файл, чтобы не менять files_api.proto.
+service DirectorySizeApi {
+  rpc GetSubdirectorySizes(GetSubdirectorySizesRequest) returns (GetSubdirectorySizesResponse); // Размеры подпапок (из кеша, устаревшие пересчитываются)
+}
+
+message GetSubdirectorySizesRequest {
+  string parent_id = 1; // Пусто — корень владельца
+}
+
+message SubdirectorySizeEntry {
+  string directory_id = 1;
+  int64 size_bytes = 2;
+}
+
+message GetSubdirectorySizesResponse {
+  repeated SubdirectorySizeEntry sizes = 1;
+}

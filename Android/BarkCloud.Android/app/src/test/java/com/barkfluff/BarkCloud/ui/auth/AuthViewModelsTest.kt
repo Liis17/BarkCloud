@@ -68,6 +68,88 @@ class AuthViewModelsTest {
         time = 121001; vm.next(); advanceUntilIdle()
         coVerify(exactly = 2) { repository.requestPasswordReset(any()) }
     }
+    @Test fun `reset choices default on and survive errors and resend`() = runTest {
+        coEvery { repository.requestPasswordReset("alice") } returns "reset"
+        coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any(), any()) } throws
+            AuthFlowException(AuthFailureKind.INVALID_CODE, "bad code")
+        var time = 1000L
+        val vm = ResetPasswordViewModel(repository, now = { time })
+        assertTrue(vm.state.value.resetPasskeys)
+        assertTrue(vm.state.value.revokeOtherSessions)
+
+        vm.loginChanged("alice"); vm.next(); advanceUntilIdle()
+        vm.codeChanged("123456"); vm.next()
+        vm.passwordChanged("password123"); vm.repeatChanged("password123")
+        vm.resetPasskeysChanged(false); vm.revokeChanged(false)
+        vm.next(); advanceUntilIdle()
+
+        assertFalse(vm.state.value.resetPasskeys)
+        assertFalse(vm.state.value.revokeOtherSessions)
+        coVerify { repository.confirmPasswordReset("reset", "123456", "password123", false, "", false) }
+
+        time = 61001L
+        vm.resend(); advanceUntilIdle()
+        assertFalse(vm.state.value.resetPasskeys)
+        assertFalse(vm.state.value.revokeOtherSessions)
+    }
+    @Test fun `authenticator requirement keeps password step and resubmits both codes`() = runTest {
+        coEvery { repository.requestPasswordReset("alice") } returns "reset"
+        coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any()) } throws
+            AuthFlowException(AuthFailureKind.AUTHENTICATOR_REQUIRED, "Введите код аутентификатора")
+        val vm = ResetPasswordViewModel(repository, SavedStateHandle()) { 1000 }
+        vm.loginChanged("alice"); vm.next(); advanceUntilIdle()
+        vm.codeChanged("123456"); vm.next()
+        vm.passwordChanged("password123"); vm.repeatChanged("password123"); vm.next(); advanceUntilIdle()
+        assertEquals(2, vm.state.value.step)
+        assertTrue(vm.state.value.authenticatorRequired)
+        assertEquals("password123", vm.state.value.password)
+
+        coEvery { repository.confirmPasswordReset("reset", "123456", "password123", true, "654321") } returns Unit
+        vm.authenticatorChanged("654321"); vm.next(); advanceUntilIdle()
+        coVerify { repository.confirmPasswordReset("reset", "123456", "password123", true, "654321") }
+    }
+    @Test fun `wrong authenticator code stays on password step without resetting email code`() = runTest {
+        coEvery { repository.requestPasswordReset("alice") } returns "reset"
+        var stage = 0
+        coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any()) } coAnswers {
+            when (stage) {
+                0 -> { stage = 1; throw AuthFlowException(AuthFailureKind.AUTHENTICATOR_REQUIRED, "Введите код аутентификатора") }
+                1 -> { stage = 2; throw AuthFlowException(AuthFailureKind.INVALID_CODE, "Неверный код") }
+                else -> Unit
+            }
+        }
+        val vm = ResetPasswordViewModel(repository, SavedStateHandle()) { 1000 }
+        vm.loginChanged("alice"); vm.next(); advanceUntilIdle()
+        vm.codeChanged("123456"); vm.next()
+        vm.passwordChanged("password123"); vm.repeatChanged("password123"); vm.next(); advanceUntilIdle()
+        assertTrue(vm.state.value.authenticatorRequired)
+
+        vm.authenticatorChanged("000000"); vm.next(); advanceUntilIdle()
+        assertTrue(vm.state.value.authenticatorRequired)
+        assertEquals(2, vm.state.value.step)
+        assertEquals("123456", vm.state.value.code)
+        assertEquals("password123", vm.state.value.password)
+
+        vm.authenticatorChanged("654321"); vm.next(); advanceUntilIdle()
+        coVerify { repository.confirmPasswordReset("reset", "123456", "password123", true, "654321") }
+    }
+    @Test fun `expired reset returns to code entry and clears authenticator requirement`() = runTest {
+        coEvery { repository.requestPasswordReset("alice") } returns "reset"
+        coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any()) } throws
+            AuthFlowException(AuthFailureKind.AUTHENTICATOR_REQUIRED, "Введите код аутентификатора")
+        val vm = ResetPasswordViewModel(repository, SavedStateHandle()) { 1000 }
+        vm.loginChanged("alice"); vm.next(); advanceUntilIdle()
+        vm.codeChanged("123456"); vm.next()
+        vm.passwordChanged("password123"); vm.repeatChanged("password123"); vm.next(); advanceUntilIdle()
+        assertTrue(vm.state.value.authenticatorRequired)
+
+        coEvery { repository.confirmPasswordReset(any(), any(), any(), any(), any()) } throws
+            AuthFlowException(AuthFailureKind.EXPIRED_CODE, "Код истёк")
+        vm.authenticatorChanged("654321"); vm.next(); advanceUntilIdle()
+        assertEquals(1, vm.state.value.step)
+        assertFalse(vm.state.value.authenticatorRequired)
+        assertEquals("", vm.state.value.authenticatorCode)
+    }
     private suspend fun kotlinx.coroutines.test.TestScope.readyRegistration(): RegistrationViewModel {
         coEvery { repository.usernameAvailable("alice") } returns true
         val vm = RegistrationViewModel(repository)

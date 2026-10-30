@@ -8,13 +8,19 @@ using BarkCloud.Web.Rendering;
 
 using Grpc.Core;
 
-using System.Net;
 using System.Text.Json;
 
 namespace BarkCloud.Web;
 
 public static class WebEndpoints
 {
+    private const string SafeImageContentSecurityPolicy = "default-src 'none'; sandbox; base-uri 'none'; form-action 'none'";
+    private static readonly HashSet<string> SafeImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif", "image/bmp"
+    };
+    private const int MaxIconBytes = 2 * 1024 * 1024;
+
     public static void MapWebEndpoints(this WebApplication app)
     {
         // Корень: на главную (Фото) если авторизован, иначе на логин
@@ -23,79 +29,7 @@ public static class WebEndpoints
                 ? Results.Redirect("/photos")
                 : Results.Redirect("/login"));
 
-        // Same-origin прокси для favicon-превью: браузерный canvas не может надёжно
-        // скруглить внешнюю картинку без CORS, поэтому отдаём разрешённые preview URL через Web.
-        app.MapGet("/api/head/icon", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
-        {
-            if (!TryValidateIconProxyUrl(http, config, url, out var target))
-                return Results.BadRequest();
-
-            try
-            {
-                var client = httpFactory.CreateClient("files-upload");
-                using var resp = await client.GetAsync(target, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
-                if (!resp.IsSuccessStatusCode)
-                    return Results.StatusCode(StatusCodes.Status502BadGateway);
-
-                var contentType = resp.Content.Headers.ContentType?.MediaType ?? "";
-                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
-
-                var bytes = await resp.Content.ReadAsByteArrayAsync(http.RequestAborted);
-                if (bytes.Length > 2_097_152)
-                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
-
-                http.Response.Headers.CacheControl = "public, max-age=86400";
-                return Results.File(bytes, contentType);
-            }
-            catch
-            {
-                return Results.StatusCode(StatusCodes.Status502BadGateway);
-            }
-        });
-
-        // Same-origin прокси байтов картинки для кнопки «копировать в буфер» во вьюверах.
-        // Браузер не даёт прочитать пиксели картинки чужого origin (tainted canvas / CORS),
-        // поэтому отдаём содержимое через web. Анонимный (нужен и публичным страницам шаринга).
-        // SSRF не возможен: из входного URL берётся только GUID блоба, запрос всегда идёт на
-        // внутренний Files (/download/{id}), а тот отдаёт лишь превью-блобы и temp-файлы.
-        app.MapGet("/api/files/image", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
-        {
-            if (string.IsNullOrEmpty(url)
-                || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
-                || uri.Scheme is not ("http" or "https")
-                || !uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
-                return Results.BadRequest();
-
-            var id = uri.Segments[^1].Trim('/');
-            if (!Guid.TryParse(id, out _))
-                return Results.BadRequest();
-
-            // Тянем с внутреннего HTTP1-эндпоинта Files (минуя nginx/TLS), как upload/view-прокси.
-            var http1Base = config["FilesService:Http1Base"];
-            var fetchUrl = string.IsNullOrEmpty(http1Base) ? url : $"{http1Base}/download/{id}";
-
-            try
-            {
-                var client = httpFactory.CreateClient("files-upload");
-                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
-                if (!upstream.IsSuccessStatusCode)
-                    return Results.StatusCode(StatusCodes.Status502BadGateway);
-
-                var contentType = upstream.Content.Headers.ContentType?.MediaType ?? "";
-                if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
-
-                http.Response.ContentType = contentType;
-                http.Response.Headers.CacheControl = "private, max-age=300";
-                await upstream.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
-                return Results.Empty;
-            }
-            catch
-            {
-                return Results.StatusCode(StatusCodes.Status502BadGateway);
-            }
-        });
+        app.MapImageProxyEndpoints();
 
         // ───────── Публичная ссылка на файл ─────────
         // Анонимный резолв дружелюбного токена → 302 на публичный URL скачивания.
@@ -135,6 +69,14 @@ public static class WebEndpoints
                     imageWidth = resp.ImageWidth,
                     imageHeight = resp.ImageHeight,
                     fileSize = resp.FileSize,
+                    videoQualities = resp.VideoQualities.Select(q => new
+                    {
+                        height = q.Height,
+                        width = q.Width,
+                        fileSize = q.FileSize,
+                        isOriginal = q.IsOriginal,
+                        url = q.Url
+                    }).ToArray(),
                     downloadPath = "/s/" + token,
                 });
             }
@@ -170,7 +112,15 @@ public static class WebEndpoints
                         previewUrl = f.PreviewUrl,
                         fileSize = f.FileSize,
                         imageWidth = f.ImageWidth,
-                        imageHeight = f.ImageHeight
+                        imageHeight = f.ImageHeight,
+                        videoQualities = f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray()
                     }).ToArray()
                 });
             }
@@ -209,7 +159,15 @@ public static class WebEndpoints
                         previewUrl = f.PreviewUrl,
                         fileSize = f.FileSize,
                         imageWidth = f.ImageWidth,
-                        imageHeight = f.ImageHeight
+                        imageHeight = f.ImageHeight,
+                        videoQualities = f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray()
                     }).ToArray(),
                     nextCursorAt = resp.NextCursorAddedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId
@@ -261,52 +219,116 @@ public static class WebEndpoints
         // Данные грузятся на клиенте через /api (включая /api/me и /api/settings/full).
     }
 
-    private static bool TryValidateIconProxyUrl(HttpContext http, IConfiguration config, string? raw, out Uri target)
+    internal static void MapImageProxyEndpoints(this WebApplication app)
     {
-        target = null!;
-        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
-            return false;
-
-        if (uri.Scheme is not ("http" or "https"))
-            return false;
-
-        if (!uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        var requestHost = PublicHost(config) ?? http.Request.Host.Host;
-        if (string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase))
+        app.MapGet("/api/head/icon", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
         {
-            target = uri;
-            return true;
-        }
+            SetSafeImageResponseHeaders(http);
+            if (!TryParseImageDownloadId(url, out var id))
+                return Results.BadRequest();
 
-        if (IsLoopbackHost(requestHost) && uri.IsLoopback)
+            var http1Base = config["FilesService:Http1Base"];
+            if (string.IsNullOrWhiteSpace(http1Base))
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            try
+            {
+                var client = httpFactory.CreateClient("files-upload");
+                var target = $"{http1Base.TrimEnd('/')}/download/{id}";
+                using var resp = await client.GetAsync(target, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+                if (!resp.IsSuccessStatusCode)
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var contentType = resp.Content.Headers.ContentType?.MediaType;
+                if (!IsSafeImageContentType(contentType))
+                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
+
+                var bytes = await ReadLimitedAsync(resp.Content, MaxIconBytes, http.RequestAborted);
+                if (bytes is null)
+                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+
+                http.Response.Headers.CacheControl = "public, max-age=86400";
+                return Results.File(bytes, contentType!);
+            }
+            catch
+            {
+                return Results.StatusCode(StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // Браузерная копия пикселей через same-origin; источник ограничен ID blob Files.
+        app.MapGet("/api/files/image", async (HttpContext http, IHttpClientFactory httpFactory, IConfiguration config, string? url) =>
         {
-            target = uri;
-            return true;
-        }
+            SetSafeImageResponseHeaders(http);
+            if (!TryParseImageDownloadId(url, out var id))
+                return Results.BadRequest();
 
-        return false;
+            var http1Base = config["FilesService:Http1Base"];
+            if (string.IsNullOrWhiteSpace(http1Base))
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+            try
+            {
+                var client = httpFactory.CreateClient("files-upload");
+                var fetchUrl = $"{http1Base.TrimEnd('/')}/download/{id}";
+                using var upstream = await client.GetAsync(fetchUrl, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+                if (!upstream.IsSuccessStatusCode)
+                    return Results.StatusCode(StatusCodes.Status502BadGateway);
+
+                var contentType = upstream.Content.Headers.ContentType?.MediaType;
+                if (!IsSafeImageContentType(contentType))
+                    return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
+
+                http.Response.ContentType = contentType!;
+                http.Response.Headers.CacheControl = "private, max-age=300";
+                await upstream.Content.CopyToAsync(http.Response.Body, http.RequestAborted);
+                return Results.Empty;
+            }
+            catch
+            {
+                return Results.StatusCode(StatusCodes.Status502BadGateway);
+            }
+        });
     }
 
-    private static bool IsLoopbackHost(string host)
+    private static bool TryParseImageDownloadId(string? raw, out Guid id)
     {
-        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
-            return true;
+        id = default;
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || !uri.AbsolutePath.Contains("/download/", StringComparison.OrdinalIgnoreCase))
+            return false;
 
-        return IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip);
+        return Guid.TryParse(uri.Segments[^1].Trim('/'), out id);
     }
 
-    private static string? PublicHost(IConfiguration config)
+    private static void SetSafeImageResponseHeaders(HttpContext http)
     {
-        var value = config["App:PublicHost"];
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
+        http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        http.Response.Headers["Content-Security-Policy"] = SafeImageContentSecurityPolicy;
+    }
 
-        if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
-            return absolute.Host;
+    private static bool IsSafeImageContentType(string? contentType) =>
+        contentType is not null && SafeImageContentTypes.Contains(contentType.Trim());
 
-        return value.Split(':', 2)[0];
+    private static async Task<byte[]?> ReadLimitedAsync(HttpContent content, int maxBytes, CancellationToken cancellationToken)
+    {
+        await using var input = await content.ReadAsStreamAsync(cancellationToken);
+        var capacity = content.Headers.ContentLength is { } length ? (int)Math.Min(length, maxBytes) : 0;
+        using var output = new MemoryStream(capacity);
+        var buffer = new byte[81920];
+
+        while (true)
+        {
+            var remaining = maxBytes - (int)output.Length;
+            var read = await input.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, remaining + 1)), cancellationToken);
+            if (read == 0)
+                return output.ToArray();
+            if (read > remaining)
+                return null;
+
+            output.Write(buffer, 0, read);
+        }
     }
 
 }

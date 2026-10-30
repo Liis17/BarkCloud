@@ -1,12 +1,19 @@
 package com.barkfluff.BarkCloud.data.cloud
 
 import barkcloud.files.FilesApiOuterClass.AddFavoriteRequest
+import barkcloud.files.FilesApiOuterClass.FileMetadataInfo
+import barkcloud.files.FilesApiOuterClass.FileSearchMetadata
+import barkcloud.files.FilesApiOuterClass.GetFileMetadataRequest
+import barkcloud.files.FilesApiOuterClass.GetFileSearchMetadataRequest
+import barkcloud.files.FilesApiOuterClass.ReplaceFileSearchMetadataRequest
+import barkcloud.files.FilesApiOuterClass.UserTagData
 import barkcloud.files.FilesApiOuterClass.AttachFileRequest
 import barkcloud.files.FilesApiOuterClass.CheckFileHashesRequest
 import barkcloud.files.FilesApiOuterClass.CreateDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.DeleteDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.DeleteFileEntryRequest
 import barkcloud.files.FilesApiOuterClass.DeleteFromTrashRequest
+import barkcloud.files.FilesApiOuterClass.DeleteUserMediaRequest
 import barkcloud.files.FilesApiOuterClass.EmptyTrashRequest
 import barkcloud.files.FilesApiOuterClass.GetPathRequest
 import barkcloud.files.FilesApiOuterClass.ListDirectoryRequest
@@ -20,6 +27,7 @@ import barkcloud.files.FilesApiOuterClass.RemoveFavoriteRequest
 import barkcloud.files.FilesApiOuterClass.RenameDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.RenameFileEntryRequest
 import barkcloud.files.FilesApiOuterClass.RestoreFromTrashRequest
+import com.google.protobuf.Empty
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.net.FileTransferService
 
@@ -31,6 +39,43 @@ class CloudRepository(
     private val grpc: GrpcManager,
     val transfer: FileTransferService,
 ) {
+
+    suspend fun search(
+        query: String,
+        pages: List<barkcloud.files.FilesApiOuterClass.SearchSectionPage>,
+    ): List<barkcloud.files.FilesApiOuterClass.SearchSectionResult> =
+        grpc.searchStub().search(
+            barkcloud.files.FilesApiOuterClass.SearchRequest.newBuilder()
+                .setQuery(query).addAllPages(pages).build(),
+        ).sectionsList
+
+    // MARK: Свойства файла, поиск и теги
+
+    /** Метаданные (EXIF/ffprobe/Office); null, если для файла ничего не извлечено. */
+    suspend fun fileMetadata(fileId: String): FileMetadataInfo? {
+        val response = grpc.filesStub().getFileMetadata(
+            GetFileMetadataRequest.newBuilder().setFileId(fileId).build(),
+        )
+        return if (response.hasMetadata) response.metadata else null
+    }
+
+    suspend fun fileSearchMetadata(fileId: String): FileSearchMetadata =
+        grpc.searchStub().getFileSearchMetadata(
+            GetFileSearchMetadataRequest.newBuilder().setFileId(fileId).build(),
+        )
+
+    /** Пустой [alias] удаляет алиас поиска. */
+    suspend fun replaceFileSearchMetadata(fileId: String, alias: String, tags: List<String>): FileSearchMetadata =
+        grpc.searchStub().replaceFileSearchMetadata(
+            ReplaceFileSearchMetadataRequest.newBuilder()
+                .setFileId(fileId)
+                .setAlias(alias)
+                .addAllTags(tags)
+                .build(),
+        )
+
+    suspend fun listUserTags(): List<UserTagData> =
+        grpc.searchStub().listUserTags(Empty.getDefaultInstance()).itemsList
 
     // MARK: Галерея
 
@@ -50,6 +95,12 @@ class CloudRepository(
             items = resp.itemsList.map { MediaAsset.from(it.file) },
             nextCursorCreatedAtMillis = if (resp.hasNextCursorCreatedAt()) resp.nextCursorCreatedAt.toEpochMillis() else null,
             nextCursorFileId = resp.nextCursorFileId,
+        )
+    }
+
+    suspend fun deleteUserMedia(fileId: String) {
+        grpc.cloudStub().deleteUserMedia(
+            DeleteUserMediaRequest.newBuilder().setFileId(fileId).build(),
         )
     }
 

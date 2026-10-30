@@ -2,15 +2,17 @@ import React from 'react';
 import { Icon } from '../components/Icon';
 import { Loading } from '../components/ui/EmptyState';
 import { StorageStatsStatus } from '../components/ui/StorageStatsStatus';
+import { SearchField, TextAreaField, TextField } from '../components/ui/TextField';
 import { useApiResource } from '../hooks/useApiResource';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
 import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
-import { webauthnRegister, webauthnSupported } from '../lib/webauthn';
+import { webauthnAuthenticate, webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import { useConfirm, usePrompt } from '../hooks/useDialog';
 import { Switch as Toggle } from '../components/ui/Switch';
 import { Select } from '../components/ui/Select';
+import { TagsTab } from './TagsTab';
 import type { Privacy, Session, SettingsState } from '../lib/types';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
@@ -614,7 +616,7 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
       <div>
         <div style={{ color: 'var(--md-on-surface-variant)', fontSize: 14, marginBottom: 16 }}>Введите админ-пароль, чтобы управлять обновлением бэкенда.</div>
         <div className="unlock-row">
-          <input type="password" placeholder="Админ-пароль" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doUnlock(); }} autoFocus />
+          <TextField label="Админ-пароль" type="password" placeholder="Админ-пароль" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doUnlock(); }} autoFocus />
           <button className="btn primary" onClick={doUnlock} disabled={unlocking || !password}>
             {unlocking ? <span className="spin" /> : <Icon.lock size={16} />} Разблокировать
           </button>
@@ -1009,10 +1011,8 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
           </div>
           <hr className="divider" />
           <div className="form-stack">
-            <label>Имя</label>
-            <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Имя" />
-            <label>Фамилия</label>
-            <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Фамилия" />
+            <TextField label="Имя" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Имя" />
+            <TextField label="Фамилия" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Фамилия" />
             <div>
               <SaveBtn saving={savingName} onClick={saveName} icon={<Icon.check size={16} />}>
                 Сохранить имя
@@ -1020,9 +1020,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
             </div>
           </div>
           <hr className="divider" />
-          <Field label="Email" help="Используется для входа, изменить нельзя">
-            <input type="email" value={profile.email || ''} disabled placeholder="—" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
-          </Field>
+          <TextField label="Email" type="email" value={profile.email || ''} disabled placeholder="—" hint="Используется для входа, изменить нельзя" />
         </div>
       </div>
 
@@ -1034,7 +1032,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
         <div className="set-card-body">
           <div className="uname-wrap">
             <div className="row">
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))} placeholder="username" />
+              <TextField label="Имя пользователя" type="text" value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))} placeholder="username" />
               {uPill}
             </div>
             <div>
@@ -1052,7 +1050,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
           <div className="sub">Короткое описание профиля (до 200 символов)</div>
         </div>
         <div className="set-card-body">
-          <textarea value={bio} maxLength={200} onChange={(e) => setBio(e.target.value)} placeholder="Расскажите о себе…" />
+          <TextAreaField label="О себе" value={bio} maxLength={200} onChange={(e) => setBio(e.target.value)} placeholder="Расскажите о себе…" />
           <div className="char-counter">{bio.length}/200</div>
           <div>
             <SaveBtn saving={savingBio} onClick={saveBio} icon={<Icon.check size={16} />}>
@@ -1087,7 +1085,7 @@ function AccountTab({ profile, flash }: { profile: SettingsState['profile']; fla
             <div className="sub">
               Это необратимо. Введите <b>УДАЛИТЬ</b> для подтверждения.
             </div>
-            <input className="dlg-input" value={delText} onChange={(e) => setDelText(e.target.value)} placeholder="УДАЛИТЬ" autoFocus />
+            <TextField label="Введите УДАЛИТЬ" value={delText} onChange={(e) => setDelText(e.target.value)} placeholder="УДАЛИТЬ" autoFocus />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setDelOpen(false)} disabled={deleting}>
                 Отмена
@@ -1121,9 +1119,27 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   const [disableCode, setDisableCode] = React.useState('');
   const [disableBusy, setDisableBusy] = React.useState(false);
   // Повторное подтверждение паролем: настройка Authenticator и отключение email-2FA.
-  const [reauthDlg, setReauthDlg] = React.useState<'enableAuth' | 'disableEmail' | null>(null);
+  const [reauthDlg, setReauthDlg] = React.useState<'enableAuth' | 'disableEmail' | 'passkeyAdd' | 'passkeyRemove' | 'setInitialPassword' | null>(null);
   const [reauthPwd, setReauthPwd] = React.useState('');
   const [reauthBusy, setReauthBusy] = React.useState(false);
+  const [reauthOtpCode, setReauthOtpCode] = React.useState('');
+  const [reauthEmailCode, setReauthEmailCode] = React.useState('');
+  const [reauthChallengeId, setReauthChallengeId] = React.useState('');
+  const [reauthEmailRequired, setReauthEmailRequired] = React.useState(false);
+  const [reauthOtpRequired, setReauthOtpRequired] = React.useState(false);
+  const [reauthRetryAt, setReauthRetryAt] = React.useState(0);
+  const [reauthNow, setReauthNow] = React.useState(Date.now());
+  const [reauthCredentialId, setReauthCredentialId] = React.useState('');
+  const [confirmNode, confirm] = useConfirm();
+
+  React.useEffect(() => {
+    if (!reauthDlg) return;
+    const timer = window.setInterval(() => setReauthNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [reauthDlg]);
+  const reauthRetrySeconds = Math.max(0, Math.ceil((reauthRetryAt - reauthNow) / 1000));
+  const passkeyReauth = reauthDlg === 'passkeyAdd' || reauthDlg === 'passkeyRemove' || reauthDlg === 'setInitialPassword';
+  const reauthEmailPrompt = reauthEmailRequired && (!passkeyReauth || Boolean(reauthChallengeId));
 
   async function refresh2fa() {
     const res = await sGet<{ authenticator: boolean; email: boolean }>('/api/settings/security/2fa');
@@ -1132,7 +1148,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       setEmail2fa(res.data.email);
     }
   }
-  async function savePassword() {
+  async function savePassword(permissionToken?: string) {
     if (newPwd.length < 6) {
       flash('err', 'Пароль слишком короткий (мин. 6)');
       return;
@@ -1142,39 +1158,255 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       return;
     }
     setSavingPwd(true);
-    const res = await sPost('/api/settings/security/password', { oldPassword: oldPwd, newPassword: newPwd });
+    const res = await sPost<{ reauthenticationRequired?: boolean }>('/api/settings/security/password', {
+      oldPassword: oldPwd, newPassword: newPwd, permissionToken: permissionToken || '',
+    });
     setSavingPwd(false);
     if (res.ok) {
       setPwdOpen(false);
       setOldPwd('');
       setNewPwd('');
       setConfirmPwd('');
+      if (permissionToken) closeReauth();
       flash('ok', 'Пароль изменён');
+    } else if (res.data?.reauthenticationRequired) {
+      setReauthCredentialId('');
+      setReauthPwd('');
+      setReauthOtpCode('');
+      setReauthEmailCode('');
+      setReauthChallengeId('');
+      setReauthEmailRequired(false);
+      setReauthOtpRequired(false);
+      setReauthDlg('setInitialPassword');
     } else flash('err', errMsg(res));
   }
+  function reauthErrorInfo(res: ApiResp) {
+    return res.data && typeof res.data === 'object'
+      ? res.data as { otpMethod?: string; retryAfterSeconds?: number; reauthenticationRequired?: boolean }
+      : {};
+  }
+
+  function showReauthFactors(res: ApiResp) {
+    const info = reauthErrorInfo(res);
+    if (info.otpMethod === 'authenticator') {
+      setReauthOtpRequired(true);
+      setReauthEmailRequired(false);
+      setReauthChallengeId('');
+    }
+    if (info.otpMethod === 'email') {
+      setReauthEmailRequired(true);
+      setReauthOtpRequired(false);
+    }
+    if (info.retryAfterSeconds) setReauthRetryAt(Date.now() + info.retryAfterSeconds * 1000);
+  }
+
+  function closeReauth() {
+    setReauthDlg(null);
+    setReauthPwd('');
+    setReauthOtpCode('');
+    setReauthEmailCode('');
+    setReauthChallengeId('');
+    setReauthEmailRequired(false);
+    setReauthOtpRequired(false);
+  }
+
+  async function finishPasskeyAction(permissionToken: string) {
+    if (reauthDlg === 'setInitialPassword') {
+      await savePassword(permissionToken);
+      return;
+    }
+    if (reauthDlg === 'passkeyAdd') {
+      const begin = await sPost<{ optionsJson: string; challengeId: string }>('/api/settings/security/webauthn/register/begin', { permissionToken });
+      if (!begin.ok || !begin.data) {
+        flash('err', errMsg(begin));
+        return;
+      }
+      const attestationJson = await webauthnRegister(begin.data.optionsJson);
+      const name = (await prompt({ title: 'Название ключа', label: 'Название', initial: 'Ключ безопасности' })) || 'Ключ безопасности';
+      const complete = await sPost('/api/settings/security/webauthn/register/complete', {
+        challengeId: begin.data.challengeId,
+        attestation: JSON.parse(attestationJson),
+        name,
+        permissionToken,
+      });
+      if (complete.ok) {
+        flash('ok', 'Ключ привязан');
+        loadKeys();
+        closeReauth();
+      } else flash('err', errMsg(complete));
+      return;
+    }
+
+    const removed = await sPost('/api/settings/security/webauthn/remove', {
+      credentialId: reauthCredentialId,
+      permissionToken,
+    });
+    if (removed.ok) {
+      flash('ok', 'Ключ удалён');
+      loadKeys();
+      closeReauth();
+    } else flash('err', errMsg(removed));
+  }
+
+  async function completePasskeyReauth(permissionToken?: string) {
+    if (permissionToken) {
+      await finishPasskeyAction(permissionToken);
+      return;
+    }
+    const begin = await sPost<{ optionsJson: string; challengeId: string; permissionToken: string }>('/api/settings/security/reauth/begin', {
+      action: reauthDlg === 'passkeyAdd' ? 1 : reauthDlg === 'passkeyRemove' ? 2 : 3,
+      credentialId: reauthCredentialId,
+    });
+    if (!begin.ok || !begin.data) {
+      showReauthFactors(begin);
+      flash('err', errMsg(begin));
+      return;
+    }
+    const assertion = await webauthnAuthenticate(begin.data.optionsJson);
+    const complete = await sPost<{ permissionToken: string }>('/api/settings/security/reauth/complete', {
+      challengeId: begin.data.challengeId,
+      assertion: JSON.parse(assertion),
+    });
+    if (complete.ok && complete.data) await finishPasskeyAction(complete.data.permissionToken);
+    else flash('err', errMsg(complete));
+  }
+
+  async function useExistingPasskey() {
+    setReauthBusy(true);
+    try {
+      await completePasskeyReauth();
+    } catch (e) {
+      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Подтверждение ключом отменено' : 'Не удалось подтвердить действие');
+    } finally {
+      setReauthBusy(false);
+    }
+  }
+
+  async function resendReauthEmail() {
+    if (!reauthDlg || !reauthChallengeId || reauthRetrySeconds > 0) return;
+    setReauthBusy(true);
+    const res = await sPost<{ retryAfterSeconds: number }>('/api/settings/security/reauth/begin', {
+      action: reauthDlg === 'passkeyAdd' ? 1 : reauthDlg === 'passkeyRemove' ? 2 : 3,
+      credentialId: reauthCredentialId,
+      challengeId: reauthChallengeId,
+    });
+    setReauthBusy(false);
+    if (res.ok && res.data?.retryAfterSeconds) setReauthRetryAt(Date.now() + res.data.retryAfterSeconds * 1000);
+    else if (!res.ok) flash('err', errMsg(res));
+  }
+
+  async function resendFactorEmail() {
+    if (reauthRetrySeconds > 0) return;
+    setReauthBusy(true);
+    try {
+      if (reauthDlg === 'enableAuth') {
+        const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', {
+          otpType: 1, password: reauthPwd, currentOtpCode: reauthOtpCode.trim(), currentEmailCode: '',
+        });
+        if (res.ok && res.data) {
+          closeReauth();
+          setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      } else if (reauthDlg === 'disableEmail') {
+        const res = await sPost('/api/settings/security/2fa/disable', {
+          otpType: 2, otpCode: '', password: reauthPwd, currentEmailCode: '',
+        });
+        if (res.ok) {
+          closeReauth();
+          flash('ok', 'Email-2FA отключена');
+          refresh2fa();
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      }
+    } finally {
+      setReauthBusy(false);
+    }
+  }
+
   async function submitReauth() {
     if (!reauthDlg) return;
     setReauthBusy(true);
-    if (reauthDlg === 'enableAuth') {
-      const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', { otpType: 1, password: reauthPwd });
-      if (res.ok && res.data) {
-        setReauthDlg(null);
-        setEnableCode('');
-        setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
-      } else flash('err', errMsg(res));
-    } else {
-      const res = await sPost('/api/settings/security/2fa/disable', { otpType: 2, otpCode: '', password: reauthPwd });
-      if (res.ok) {
-        setReauthDlg(null);
-        flash('ok', 'Email-2FA отключена');
-        refresh2fa();
-      } else flash('err', errMsg(res));
+    try {
+      if (reauthDlg === 'passkeyAdd' || reauthDlg === 'passkeyRemove' || reauthDlg === 'setInitialPassword') {
+        if (reauthEmailRequired && reauthChallengeId) {
+          const complete = await sPost<{ permissionToken: string }>('/api/settings/security/reauth/complete', {
+            challengeId: reauthChallengeId,
+            emailCode: reauthEmailCode.trim(),
+          });
+          if (complete.ok && complete.data) await finishPasskeyAction(complete.data.permissionToken);
+          else {
+            showReauthFactors(complete);
+            flash('err', errMsg(complete));
+          }
+          return;
+        }
+
+        const begin = await sPost<{ permissionToken: string; challengeId: string; retryAfterSeconds: number }>('/api/settings/security/reauth/begin', {
+          action: reauthDlg === 'passkeyAdd' ? 1 : reauthDlg === 'passkeyRemove' ? 2 : 3,
+          credentialId: reauthCredentialId,
+          password: reauthPwd,
+          otpCode: reauthOtpCode.trim(),
+          challengeId: reauthChallengeId,
+        });
+        if (!begin.ok || !begin.data) {
+          showReauthFactors(begin);
+          flash('err', errMsg(begin));
+          return;
+        }
+        if (begin.data.permissionToken) await finishPasskeyAction(begin.data.permissionToken);
+        else if (begin.data.challengeId) {
+          setReauthChallengeId(begin.data.challengeId);
+          setReauthEmailRequired(true);
+          if (begin.data.retryAfterSeconds) setReauthRetryAt(Date.now() + begin.data.retryAfterSeconds * 1000);
+        }
+        return;
+      }
+
+      if (reauthDlg === 'enableAuth') {
+        const res = await sPost<{ qr: string; code: string }>('/api/settings/security/2fa/enable', {
+          otpType: 1,
+          password: reauthPwd,
+          currentOtpCode: reauthOtpCode.trim(),
+          currentEmailCode: reauthEmailCode.trim(),
+        });
+        if (res.ok && res.data) {
+          closeReauth();
+          setEnableCode('');
+          setEnableDlg({ otpType: 1, qr: res.data.qr, code: res.data.code });
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      } else {
+        const res = await sPost('/api/settings/security/2fa/disable', {
+          otpType: 2,
+          otpCode: '',
+          password: reauthPwd,
+          currentEmailCode: reauthEmailCode.trim(),
+        });
+        if (res.ok) {
+          closeReauth();
+          flash('ok', 'Email-2FA отключена');
+          refresh2fa();
+        } else {
+          showReauthFactors(res);
+          flash('err', errMsg(res));
+        }
+      }
+    } catch (e) {
+      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Подтверждение ключом отменено' : 'Не удалось подтвердить действие');
+    } finally {
+      setReauthBusy(false);
     }
-    setReauthBusy(false);
   }
   async function startEnable(otpType: number) {
     if (otpType === 1) {
-      setReauthPwd('');
+      closeReauth();
       setReauthDlg('enableAuth');
       return;
     }
@@ -1198,7 +1430,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }
   async function startDisable(otpType: number) {
     if (otpType === 2) {
-      setReauthPwd('');
+      closeReauth();
       setReauthDlg('disableEmail');
       return;
     }
@@ -1218,7 +1450,6 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }
 
   const [keys, setKeys] = React.useState<WebAuthnKey[]>([]);
-  const [keyBusy, setKeyBusy] = React.useState(false);
   const canWebAuthn = webauthnSupported();
 
   async function loadKeys() {
@@ -1230,42 +1461,33 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
   }, []);
 
   async function addKey() {
-    setKeyBusy(true);
-    try {
-      const begin = await sPost<{ optionsJson: string; challengeId: string }>('/api/settings/security/webauthn/register/begin');
-      if (!begin.ok || !begin.data) {
-        flash('err', errMsg(begin));
-        return;
-      }
-      const attestationJson = await webauthnRegister(begin.data.optionsJson);
-      const name = (await prompt({ title: 'Название ключа', label: 'Название', initial: 'Ключ безопасности' })) || 'Ключ безопасности';
-      const complete = await sPost('/api/settings/security/webauthn/register/complete', {
-        challengeId: begin.data.challengeId,
-        attestation: JSON.parse(attestationJson),
-        name,
-      });
-      if (complete.ok) {
-        flash('ok', 'Ключ привязан');
-        loadKeys();
-      } else flash('err', errMsg(complete));
-    } catch (e) {
-      flash('err', e instanceof Error && e.name === 'NotAllowedError' ? 'Отменено' : 'Не удалось привязать ключ');
-    } finally {
-      setKeyBusy(false);
-    }
+    setReauthCredentialId('');
+    setReauthPwd('');
+    setReauthOtpCode('');
+    setReauthEmailCode('');
+    setReauthChallengeId('');
+    setReauthEmailRequired(false);
+    setReauthOtpRequired(false);
+    setReauthDlg('passkeyAdd');
   }
 
   async function removeKey(id: string) {
-    const res = await sPost('/api/settings/security/webauthn/remove', { credentialId: id });
-    if (res.ok) {
-      flash('ok', 'Ключ удалён');
-      loadKeys();
-    } else flash('err', errMsg(res));
+    const accepted = await confirm({ title: 'Удалить ключ?', message: 'Для удаления потребуется повторное подтверждение паролем или другим passkey.', confirmLabel: 'Продолжить', danger: true });
+    if (!accepted) return;
+    setReauthCredentialId(id);
+    setReauthPwd('');
+    setReauthOtpCode('');
+    setReauthEmailCode('');
+    setReauthChallengeId('');
+    setReauthEmailRequired(false);
+    setReauthOtpRequired(false);
+    setReauthDlg('passkeyRemove');
   }
 
   return (
     <>
       {promptNode}
+      {confirmNode}
       <div className="set-card">
         <div className="set-card-head">
           <h3>Пароль</h3>
@@ -1280,12 +1502,9 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
             </div>
           ) : (
             <div className="form-stack">
-              <label>Текущий пароль</label>
-              <input type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} autoFocus />
-              <label>Новый пароль</label>
-              <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-              <label>Повторите новый пароль</label>
-              <input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+              <TextField label="Текущий пароль" type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} autoFocus />
+              <TextField label="Новый пароль" type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+              <TextField label="Повторите новый пароль" type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
               <div style={{ display: 'flex', gap: 8 }}>
                 <SaveBtn saving={savingPwd} onClick={savePassword} icon={<Icon.check size={16} />}>
                   Сохранить
@@ -1312,15 +1531,15 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
               label={k.name}
               help={k.lastUsedAt ? 'использован ' + new Date(k.lastUsedAt).toLocaleDateString() : 'не использовался'}
               end={
-                <button className="btn text" onClick={() => removeKey(k.id)} disabled={keyBusy}>
+                <button className="btn text" onClick={() => removeKey(k.id)} disabled={reauthBusy}>
                   Удалить
                 </button>
               }
             />
           ))}
           {canWebAuthn ? (
-            <button className="btn" onClick={addKey} disabled={keyBusy} style={{ marginTop: 8 }}>
-              {keyBusy ? <span className="spin" /> : <Icon.key size={16} />} Добавить ключ
+            <button className="btn" onClick={addKey} disabled={reauthBusy} style={{ marginTop: 8 }}>
+              {reauthBusy ? <span className="spin" /> : <Icon.key size={16} />} Добавить ключ
             </button>
           ) : (
             <div className="sub">Браузер не поддерживает ключи безопасности</div>
@@ -1352,18 +1571,48 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
       </div>
 
       {reauthDlg && (
-        <div className="sys-scrim" onClick={() => !reauthBusy && setReauthDlg(null)}>
+        <div className="sys-scrim" onClick={() => !reauthBusy && closeReauth()}>
           <div className="sys-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>{reauthDlg === 'enableAuth' ? 'Настройка аутентификатора' : 'Отключить email-2FA'}</h3>
-            <div className="sub">Введите текущий пароль, чтобы подтвердить изменение двухфакторной защиты.</div>
-            <input className="dlg-input" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
+            <h3>{reauthDlg === 'enableAuth' ? 'Настройка аутентификатора' : reauthDlg === 'disableEmail' ? 'Отключить email-2FA' : reauthDlg === 'passkeyAdd' ? 'Добавить passkey' : reauthDlg === 'passkeyRemove' ? 'Удалить passkey' : 'Подтвердите установку пароля'}</h3>
+            <div className="sub">{reauthDlg === 'setInitialPassword'
+              ? 'Для аккаунта с passkey первую установку пароля нужно подтвердить существующим ключом.'
+              : reauthDlg === 'passkeyAdd' || reauthDlg === 'passkeyRemove'
+                ? 'Подтвердите действие паролем и активным вторым фактором или существующим passkey.'
+              : 'Введите текущий пароль, чтобы подтвердить изменение двухфакторной защиты.'}</div>
+            {reauthDlg !== 'setInitialPassword' && (reauthDlg !== 'passkeyAdd' && reauthDlg !== 'passkeyRemove' || !reauthEmailRequired || !reauthChallengeId) ? (
+              <TextField label="Пароль" type="password" value={reauthPwd} onChange={(e) => setReauthPwd(e.target.value)} placeholder="Пароль" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && reauthPwd) submitReauth(); }} />
+            ) : null}
+            {reauthOtpRequired && <TextField label="Код из приложения-аутентификатора" value={reauthOtpCode} onChange={(e) => setReauthOtpCode(e.target.value)} placeholder="Код из приложения-аутентификатора" inputMode="numeric" autoComplete="one-time-code" containerClassName="sys-dialog-code" />}
+            {reauthEmailPrompt && (
+              <>
+                <TextField label="Код из письма" value={reauthEmailCode} onChange={(e) => setReauthEmailCode(e.target.value)} placeholder="Код из письма" inputMode="numeric" autoComplete="one-time-code" containerClassName="sys-dialog-code" />
+                {passkeyReauth ? (
+                  <button className="btn text" onClick={resendReauthEmail} disabled={reauthBusy || reauthRetrySeconds > 0}>
+                    {reauthRetrySeconds > 0 ? `Повторная отправка через ${reauthRetrySeconds} с` : 'Отправить код повторно'}
+                  </button>
+                ) : (
+                  <button className="btn text" onClick={resendFactorEmail} disabled={reauthBusy || reauthRetrySeconds > 0}>
+                    {reauthRetrySeconds > 0 ? `Повторная отправка через ${reauthRetrySeconds} с` : 'Отправить код повторно'}
+                  </button>
+                )}
+              </>
+            )}
             <div className="dlg-actions two">
-              <button className="btn text" onClick={() => setReauthDlg(null)} disabled={reauthBusy}>
+              <button className="btn text" onClick={closeReauth} disabled={reauthBusy}>
                 Отмена
               </button>
-              <button className="btn primary" onClick={submitReauth} disabled={reauthBusy || !reauthPwd}>
-                {reauthBusy ? <span className="spin" /> : null} Продолжить
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {passkeyReauth ? (
+                  keys.length > 0 && canWebAuthn && <button className="btn" onClick={useExistingPasskey} disabled={reauthBusy}>
+                    Подтвердить passkey
+                  </button>
+                ) : null}
+                {reauthDlg !== 'setInitialPassword' && (
+                  <button className="btn primary" onClick={submitReauth} disabled={reauthBusy || !reauthPwd && !reauthEmailPrompt}>
+                    {reauthBusy ? <span className="spin" /> : null} {reauthEmailPrompt ? 'Подтвердить код' : passkeyReauth ? 'Подтвердить паролем' : 'Продолжить'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1378,7 +1627,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
               {enableDlg.qr && <img src={'data:image/png;base64,' + enableDlg.qr} alt="QR" />}
               {enableDlg.code && <div className="qr-code">Ключ: {enableDlg.code}</div>}
             </div>
-            <input className="dlg-input" value={enableCode} onChange={(e) => setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmEnable(); }} />
+            <TextField label="Код подтверждения" value={enableCode} onChange={(e) => setEnableCode(e.target.value)} placeholder="Код подтверждения" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmEnable(); }} containerClassName="sys-dialog-code" />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setEnableDlg(null)} disabled={enableBusy}>
                 Отмена
@@ -1396,7 +1645,7 @@ function SecurityTab({ security, flash }: { security: SettingsState['security'];
           <div className="sys-dialog" onClick={(e) => e.stopPropagation()}>
             <h3>Отключить 2FA</h3>
             <div className="sub">Введите текущий код из приложения-аутентификатора.</div>
-            <input className="dlg-input" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="Код" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmDisable(); }} />
+            <TextField label="Код" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="Код" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') confirmDisable(); }} containerClassName="sys-dialog-code" />
             <div className="dlg-actions two">
               <button className="btn text" onClick={() => setDisableDlg(null)} disabled={disableBusy}>
                 Отмена
@@ -1593,9 +1842,8 @@ function SessionsTab({ sessions: initial, flash }: { sessions: Session[]; flash:
             </div>
             <div style={{ minWidth: 0 }}>
               {renaming === s.deviceId ? (
-                <input
-                  className="dlg-input"
-                  style={{ marginTop: 0 }}
+                <TextField
+                  label="Название устройства"
                   value={renameVal}
                   autoFocus
                   onChange={(e) => setRenameVal(e.target.value)}
@@ -1687,11 +1935,13 @@ const SECTIONS: NavItem[] = [
   { key: 'storage', label: 'Хранилище', icon: 'server' },
   { key: 'sessions', label: 'Устройства и сессии', icon: 'device' },
   { key: 'appearance', label: 'Внешний вид', icon: 'palette' },
+  { key: 'tags', label: 'Теги', icon: 'palette' },
   { key: 'system', label: 'Обслуживание', icon: 'server' },
   { key: 'server-settings', label: 'Настройки сервера', icon: 'settings' },
   { key: 'migration', label: 'Миграция', icon: 'server' },
 ];
 const SEARCH_ITEMS = [
+  ['tags', 'Теги', 'Создание, название и цвет меток файлов'],
   ['account', 'Профиль', 'Аватар, имя и фамилия'], ['account', 'Email', 'Адрес для входа'],
   ['account', 'Имя пользователя', 'Username'], ['account', 'О себе', 'Описание профиля'],
   ['account', 'Опасная зона', 'Удаление аккаунта'], ['security', 'Пароль', 'Смена пароля'],
@@ -1726,6 +1976,7 @@ function SettingsPanel({ section, active, admin, flash, onUnlockedChange }: {
   const resource = useApiResource<unknown>(SECTION_PATHS[section] || null, active,
     section === 'storage' ? settingsStoragePending : undefined);
   if (section === 'appearance') return <AppearanceTab />;
+  if (section === 'tags') return <TagsTab active={active} />;
   if (section === 'server-settings') return <React.Suspense fallback={<Loading label="Загрузка редактора…" />}>
     <ServerSettingsTab active={active} onAccessExpired={() => onUnlockedChange(false)} />
   </React.Suspense>;
@@ -1812,9 +2063,9 @@ export function SettingsPage() {
       <div className="set-nav">
         <div className="settings-search">
           <label htmlFor="settings-search">Поиск по настройкам</label>
-          <div className="settings-search-input"><Icon.search size={18} /><input id="settings-search" type="search" value={search}
-            placeholder="Название пункта…" onChange={(event) => setSearch(event.target.value)} />
-            {search && <button className="icon-btn" aria-label="Очистить поиск настроек" onClick={() => setSearch('')}><Icon.x size={16} /></button>}</div>
+          <SearchField id="settings-search" label="Поиск по настройкам" containerClassName="settings-search-input" leading={<Icon.search size={18} />} value={search}
+            placeholder="Название пункта…" onChange={(event) => setSearch(event.target.value)}
+            trailing={search ? <button type="button" className="icon-btn" aria-label="Очистить поиск настроек" onClick={() => setSearch('')}><Icon.x size={16} /></button> : undefined} />
           {query && <div className="settings-search-results" aria-label="Результаты поиска настроек">
             {results.length === 0 ? <div className="server-empty">Ничего не найдено</div> : results.map(([key, label, help]) =>
               <button key={`${key}:${label}`} onClick={() => { go(key); setTarget(label); setSearch(''); }}><strong>{label}</strong><small>{SECTIONS.find((item) => item.key === key)?.label} · {help}</small></button>)}

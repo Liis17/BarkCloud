@@ -15,6 +15,7 @@ export interface AuthValues {
   last_name?: string;
   remember?: boolean;
   revoke_sessions?: boolean;
+  reset_passkeys?: boolean;
 }
 
 export interface AuthPageState {
@@ -28,6 +29,7 @@ export interface AuthPageState {
   retryAt?: string;
   otpMethod?: 'email' | 'authenticator';
   otpMailStatus?: 'sent' | 'existing';
+  authenticatorRequired?: boolean;
   values: AuthValues;
   fieldErrors: Record<string, string>;
   formError?: string;

@@ -1,10 +1,81 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using BarkCloud.Builder;
 
 namespace BarkCloud.Builder.Tests;
 
 public sealed class BuilderGeneratorTests
 {
+    [Fact]
+    public void Configuration_receives_service_ports_used_to_seed_internal_addresses()
+    {
+        var compose = BackendComposeGenerator.BuildCompose(new BuilderModel());
+        var configuration = ComposeService(compose, "cloud-configuration");
+
+        foreach (var service in new[] { "IDENTITY", "USERS", "FILES", "TORRENT" })
+            Assert.Contains(service + "_PORT: ${" + service + "_PORT}", configuration);
+        Assert.Contains("FILES_HTTP1PORT: ${FILES_HTTP1PORT}", configuration);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Identity_and_users_keep_jwt_and_lognara_mounts_in_one_volumes_section(bool includeLognara)
+    {
+        var model = new BuilderModel { IncludeLognara = includeLognara };
+        if (includeLognara)
+            model.SetGlobalLognara(true);
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var identity = ComposeService(compose, "cloud-identity");
+        var users = ComposeService(compose, "cloud-users");
+
+        Assert.Single(Regex.Matches(identity, "(?m)^    volumes:$").Cast<System.Text.RegularExpressions.Match>());
+        Assert.Single(Regex.Matches(users, "(?m)^    volumes:$").Cast<System.Text.RegularExpressions.Match>());
+        Assert.Contains("./secrets/jwt/jwt-private.pem:/keys/jwt/jwt-private.pem:ro", identity);
+        Assert.Contains("./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro", identity);
+        Assert.Contains("./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro", users);
+
+        if (includeLognara)
+        {
+            Assert.Contains("${LOGNARA_IDENTITY_SPOOL_PATH:-lognara_identity_spool}:/var/lib/lognara-agent/spool", identity);
+            Assert.Contains("${LOGNARA_USERS_SPOOL_PATH:-lognara_users_spool}:/var/lib/lognara-agent/spool", users);
+        }
+        else
+        {
+            Assert.DoesNotContain("/var/lib/lognara-agent/spool", identity);
+            Assert.DoesNotContain("/var/lib/lognara-agent/spool", users);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    public void Configuration_receives_only_service_credentials_and_builder_carries_provisioning_artifacts(
+        bool includeLognara, bool includeRabbitmq, bool includePostgres)
+    {
+        var model = new BuilderModel { IncludeRabbitmq = includeRabbitmq, IncludePostgres = includePostgres };
+        model.SetGlobalLognara(includeLognara);
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+        var configuration = ComposeService(compose, "cloud-configuration");
+        var web = ComposeService(compose, "cloud-web");
+
+        Assert.DoesNotContain("env_file:", configuration);
+        Assert.DoesNotContain("POSTGRES_USER:", configuration);
+        Assert.DoesNotContain("POSTGRES_PASSWORD:", configuration);
+        Assert.DoesNotContain("RABBITMQ_DEFAULT_USER:", configuration);
+        Assert.DoesNotContain("RABBITMQ_DEFAULT_PASS:", configuration);
+        Assert.Contains("CONFIGURATION_USERNAME: barkcloud_configuration", configuration);
+        Assert.Contains("IDENTITY_DB_PASSWORD:", configuration);
+        Assert.Contains("RABBITMQ_TORRENT_PASSWORD:", configuration);
+        Assert.Contains("env_file:", web);
+        Assert.Contains("/var/run/docker.sock:/var/run/docker.sock", web);
+        Assert.Contains("CONFIGURATION_DB_PASSWORD='", env);
+        Assert.Contains("IDENTITY_DB_PASSWORD='", env);
+        Assert.Contains("RABBITMQ_NOTIFICATION_PASSWORD='", env);
+    }
+
     [Fact]
     public void Default_external_mode_generates_config_without_nginx_service_or_host_ports()
     {
@@ -34,6 +105,7 @@ public sealed class BuilderGeneratorTests
         Assert.Contains("POSTGRES_PORT=5432", env);
         Assert.DoesNotContain("SEQ_WEBPORT=", env);
         Assert.Contains("WEB_PORT=8080", env);
+        Assert.Contains("App__TrustedProxyNetworks: \"${WEB_TRUSTED_PROXY_NETWORKS}\"", compose);
         Assert.Contains("BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT=", env);
         Assert.Contains("BarkCloud__AndroidCertificateSha256Fingerprint: \"${BARKCLOUD_ANDROID_CERT_SHA256_FINGERPRINT:-}\"", compose);
         Assert.Contains("MINIO_DATA_PATH=./data/minio", env);
@@ -71,6 +143,57 @@ public sealed class BuilderGeneratorTests
         Assert.DoesNotContain("}}", nginx);
         Assert.DoesNotContain("NGINX_SEQ_PORT", env);
         Assert.DoesNotContain("NGINX_MINIO_CONSOLE_PORT", env);
+    }
+
+    [Fact]
+    public void Trusted_proxy_networks_survive_env_round_trip()
+    {
+        const string trustedNetworks = "10.5.0.0/16;192.168.0.0/16";
+        var model = new BuilderModel { WebTrustedProxyNetworks = trustedNetworks };
+
+        var loaded = BuilderConfigLoader.Load(
+            BackendComposeGenerator.BuildCompose(model),
+            BackendComposeGenerator.BuildEnv(model),
+            null,
+            ".");
+        var generatedEnv = BackendComposeGenerator.BuildEnv(loaded);
+
+        Assert.Equal(trustedNetworks, loaded.WebTrustedProxyNetworks);
+        Assert.Contains("WEB_TRUSTED_PROXY_NETWORKS=" + trustedNetworks + "\n", generatedEnv);
+    }
+
+    [Fact]
+    public void Video_transcoder_shares_work_directory_with_files_and_applies_resource_limits()
+    {
+        var model = new BuilderModel
+        {
+            TranscodeWorkPath = "./data/custom-transcode",
+            TranscoderToken = "video-transcoder-token",
+            TranscoderThreads = "3",
+            TranscoderCpus = "1.5",
+            TranscoderMemory = "3g",
+        };
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+        var files = ComposeService(compose, "cloud-files");
+        var transcoder = ComposeService(compose, "cloud-transcoder");
+
+        Assert.Contains("VideoVariants__WorkDirectory: \"/mnt/transcode\"", files);
+        Assert.Contains("VideoVariants__TranscoderUrl: \"http://cloud-transcoder:8080\"", files);
+        Assert.Contains("TRANSCODER_TOKEN: \"${TRANSCODER_TOKEN}\"", files);
+        Assert.Contains("- cloud-transcoder", files);
+        Assert.Contains("image: docker.barkfluff.com/barkcloud-transcoder:latest", transcoder);
+        Assert.Contains("TRANSCODER_THREADS: \"${TRANSCODER_THREADS}\"", transcoder);
+        Assert.Contains("cpus: \"${TRANSCODER_CPUS}\"", transcoder);
+        Assert.Contains("mem_limit: \"${TRANSCODER_MEMORY}\"", transcoder);
+        Assert.Contains("${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode", files);
+        Assert.Contains("${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode", transcoder);
+        Assert.Contains("TRANSCODE_WORK_PATH=./data/custom-transcode\n", env);
+        Assert.Contains("TRANSCODER_TOKEN='video-transcoder-token'\n", env);
+        Assert.Contains("TRANSCODER_THREADS=3\n", env);
+        Assert.Contains("TRANSCODER_CPUS=1.5\n", env);
+        Assert.Contains("TRANSCODER_MEMORY=3g\n", env);
     }
 
     [Fact]
@@ -346,6 +469,15 @@ public sealed class BuilderGeneratorTests
         Assert.Contains(errors, x => x.Contains("Путь к сертификату внешнего nginx"));
     }
 
+    private static string ComposeService(string compose, string service)
+    {
+        compose = compose.Replace("\r\n", "\n");
+        var match = Regex.Match(compose,
+            $"(?ms)^  {Regex.Escape(service)}:\\n(?<section>.*?)(?=^  [a-z0-9-]+:\\n|\\z)");
+        Assert.True(match.Success, $"Compose service {service} was not generated.");
+        return match.Groups["section"].Value;
+    }
+
     [Theory]
     [InlineData(" 7025")]
     [InlineData("7025 ")]
@@ -566,12 +698,14 @@ public sealed class BuilderGeneratorTests
 
         var compose = BackendComposeGenerator.BuildCompose(model);
         var env = BackendComposeGenerator.BuildEnv(model);
+        var configuration = ComposeService(compose, "cloud-configuration");
 
         Assert.Empty(BuilderModelValidator.Validate(model));
         Assert.DoesNotContain("  cloud-minio:\n", compose);
         Assert.DoesNotContain("  cloud-rabbitmq:\n", compose);
         Assert.DoesNotContain("  cloud-postgres:\n", compose);
         Assert.DoesNotContain("  cloud-seq:\n", compose);
+        Assert.DoesNotContain("MINIO_HOST:", configuration);
         Assert.DoesNotContain("barkcloud-lognara-minio", compose);
         Assert.DoesNotContain("barkcloud-lognara-postgres", compose);
         Assert.DoesNotContain("LOGNARA_MINIO_TOKEN=", env);

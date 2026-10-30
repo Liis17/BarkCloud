@@ -86,8 +86,22 @@ public class UnifiedSearchServiceTests : IDisposable
         var hit = await CreateService().ResolveHit(new SearchHitReference { Kind = SearchHitKind.Photo, Id = entryId.ToString() }, default);
 
         hit.PreviewUrl.Should().Be($"http://localhost:7026/download/{previewId}");
+        hit.JpegViewUrl.Should().BeEmpty();
         hit.Placeholder.Colors.Should().Equal(Enumerable.Repeat("#112233", 9));
         hit.Placeholder.AspectRatio.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResolveHit_PhotoWithJpegView_ReturnsJpegViewUrl()
+    {
+        var (fileId, entryId) = await AddCloudFile(MediaKind.Photo);
+        var (jpegViewId, _) = await AddCloudFile(MediaKind.Photo);
+        _db.Context.UploadedFiles.Single(x => x.Id == fileId).JpegViewFileId = jpegViewId;
+        await _db.Context.SaveChangesAsync();
+
+        var hit = await CreateService().ResolveHit(new SearchHitReference { Kind = SearchHitKind.Photo, Id = entryId.ToString() }, default);
+
+        hit.JpegViewUrl.Should().Be($"http://localhost:7026/download/{jpegViewId}");
     }
 
     [Fact]
@@ -134,6 +148,71 @@ public class UnifiedSearchServiceTests : IDisposable
         UserContextFactory.Create(OwnerId),
         new RunSettings { Host = "http://localhost", Http1Port = 7026 },
         TestConfiguration.Empty());
+
+    [Fact]
+    public async Task Tags_CreateAndList_ArePrivateAndPreserveColor()
+    {
+        var service = CreateService();
+        var saved = await service.SaveUserTag(new SaveUserTagRequest { Name = "  Личное  ", Color = "#ab12cd" }, default);
+        saved.Name.Should().Be("Личное");
+        saved.Color.Should().Be("#AB12CD");
+        var other = new UnifiedSearchService(_db.Context, UserContextFactory.Create(99), new RunSettings(), TestConfiguration.Empty());
+        (await other.ListUserTags(default)).Items.Should().BeEmpty();
+        (await service.ListUserTags(default)).Items.Should().ContainSingle(x => x.Id == saved.Id);
+        var act = () => other.DeleteUserTag(saved.Id, default);
+        (await act.Should().ThrowAsync<RpcException>()).Which.StatusCode.Should().Be(StatusCode.NotFound);
+    }
+
+    [Theory]
+    [InlineData("", "#123456")]
+    [InlineData("тег", "red")]
+    [InlineData("тег", "#zzzzzz")]
+    public async Task Tags_RejectInvalidNameOrColor(string name, string color)
+    {
+        var act = () => CreateService().SaveUserTag(new SaveUserTagRequest { Name = name, Color = color }, default);
+        (await act.Should().ThrowAsync<RpcException>()).Which.StatusCode.Should().Be(StatusCode.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task Tags_RejectNormalizedDuplicates()
+    {
+        var service = CreateService();
+        await service.SaveUserTag(new SaveUserTagRequest { Name = "Личное", Color = "#123456" }, default);
+        var act = () => service.SaveUserTag(new SaveUserTagRequest { Name = "  ЛИЧНОЕ ", Color = "#654321" }, default);
+        (await act.Should().ThrowAsync<RpcException>()).Which.StatusCode.Should().Be(StatusCode.AlreadyExists);
+    }
+
+    [Fact]
+    public async Task Tags_RenameAndDelete_UpdateAssignmentsAndPreserveOtherOwners()
+    {
+        var (fileId, _) = await AddCloudFile(MediaKind.Document);
+        var service = CreateService();
+        await service.ReplaceFileSearchMetadata(fileId, "псевдоним", ["старый"], default);
+        var tag = (await service.ListUserTags(default)).Items.Single();
+        _db.Context.FileTags.Add(new FileTag { OwnerId = 99, FileId = fileId, Value = "старый", NormalizedValue = "старый" });
+        await _db.Context.SaveChangesAsync();
+
+        await service.SaveUserTag(new SaveUserTagRequest { Id = tag.Id, Name = "Новый", Color = "#123456" }, default);
+        (await service.GetFileSearchMetadata(fileId, default)).Tags.Should().Equal("Новый");
+        await service.DeleteUserTag(tag.Id, default);
+        var metadata = await service.GetFileSearchMetadata(fileId, default);
+        metadata.Tags.Should().BeEmpty();
+        metadata.Alias.Should().Be("псевдоним");
+        _db.Context.FileTags.Count(x => x.OwnerId == 99).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Tags_LegacyStringApi_UsesCatalogCasingAndRetainsUnusedTags()
+    {
+        var (fileId, _) = await AddCloudFile(MediaKind.Document);
+        var service = CreateService();
+        await service.SaveUserTag(new SaveUserTagRequest { Name = "Личное", Color = "#123456" }, default);
+        var saved = await service.ReplaceFileSearchMetadata(fileId, "", ["личное", "Архив"], default);
+        saved.Tags.Should().Contain("Личное");
+        (await service.ListUserTags(default)).Items.Should().HaveCount(2);
+        await service.ReplaceFileSearchMetadata(fileId, "", [], default);
+        (await service.ListUserTags(default)).Items.Should().HaveCount(2);
+    }
 
     public void Dispose() => _db.Dispose();
 }

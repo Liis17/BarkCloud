@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.data
 
 import barkcloud.identity.IdentityApiOuterClass.*
 import barkcloud.users.UsersApiOuterClass.CheckExistUsernameRequest
+import com.barkfluff.BarkCloud.grpc.AuthErrorCodes
 import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.grpc.ServerSettings
 import com.barkfluff.BarkCloud.grpc.errorCode
@@ -15,7 +16,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /** Domain outcomes shared by signup/reset forms, including server retry deadlines. */
-enum class AuthFailureKind { NETWORK, INVALID_CODE, EXPIRED_CODE, USERNAME, EMAIL, REGISTRATION_DISABLED, EMAIL_DISABLED, RATE_LIMIT, OTHER }
+enum class AuthFailureKind { NETWORK, INVALID_CODE, EXPIRED_CODE, AUTHENTICATOR_REQUIRED, USERNAME, EMAIL, REGISTRATION_DISABLED, EMAIL_DISABLED, RATE_LIMIT, OTHER }
 class AuthFlowException(
     val kind: AuthFailureKind,
     override val message: String,
@@ -97,9 +98,11 @@ class AuthFlowRepository(
         identity().resetPassword(builder.build()).resetId
     }
 
-    suspend fun confirmPasswordReset(resetId: String, code: String, password: String, revokeOthers: Boolean) = request {
+    suspend fun confirmPasswordReset(resetId: String, code: String, password: String, revokeOthers: Boolean,
+                                    authenticatorCode: String = "", resetPasskeys: Boolean = true) = request {
         val response = identity().confirmResetPassword(ConfirmResetPasswordRequest.newBuilder()
-            .setResetId(resetId).setOtpCode(code).setNewPassword(password).setRevokeOtherSessions(revokeOthers).build())
+            .setResetId(resetId).setOtpCode(code).setNewPassword(password).setRevokeOtherSessions(revokeOthers)
+            .setResetPasskeys(resetPasskeys).setAuthenticatorCode(authenticatorCode).build())
         persist(response.accessToken, response.refreshToken)
         pendingStore.clear()
     }
@@ -150,6 +153,7 @@ fun StatusRuntimeException.toAuthFlowException(): AuthFlowException {
         "7AABF347-1210-4B14-A93B-2BA8574D74E7", "56D9BB63-DA40-40DE-9C56-7487A1A437D0", "9F3D1B82-8E55-4C71-BD2A-3D7FAC2E6AE1", "5B9A8269-617E-4D4C-9696-A554C59E3A86", "BE708516-BF40-44F9-A6D1-A7F30AB02BED" -> AuthFailureKind.EXPIRED_CODE to "Код истёк или уже использован. Запросите новый. Если аккаунт подтверждён, перейдите ко входу."
         "DB157CD8-98A3-4A35-9857-33821813D422", "A3F1B2C4-7D8E-4F5A-9B6C-1E2D3F4A5B6C" -> AuthFailureKind.USERNAME to "Это имя пользователя уже занято. Выберите другое."
         "7599F3F1-C2EC-4D05-BF38-A1A60D40BA4E" -> AuthFailureKind.EMAIL to "Эта почта уже используется. Войдите или восстановите пароль."
+        AuthErrorCodes.OTP_REQUIRED -> AuthFailureKind.AUTHENTICATOR_REQUIRED to "Введите код из приложения-аутентификатора, чтобы завершить восстановление."
         "C46C2E13-9838-4935-A88F-D6E0F62F4D23" -> AuthFailureKind.REGISTRATION_DISABLED to "Администратор отключил регистрацию на этом сервере."
         "A1F0C3E2-5B47-4E8A-9C21-7D6F0B2E9A14" -> AuthFailureKind.EMAIL_DISABLED to "На этом сервере отключена почта. Для восстановления обратитесь к администратору."
         "8F2B6D41-5A93-4C7E-B0D8-1E4A7C9F3B26", "3C8E5A17-6D42-4B90-A1F3-7E2B9D0C4A58" -> AuthFailureKind.RATE_LIMIT to "Слишком много попыток. Попробуйте позже."

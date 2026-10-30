@@ -132,6 +132,51 @@ public sealed class StorageMigrationGateTests
     }
 
     [Fact]
+    public async Task DrainingCountsPendingVariantOnceAndAllowsItsRecoveryCleanup()
+    {
+        using var fixture = new Fixture();
+        var gate = fixture.Gate();
+        var originalId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        await fixture.WithDb(async db =>
+        {
+            db.UploadedFiles.Add(new UploadFile
+            {
+                Id = originalId, Uploaders = [], CreatedAt = DateTime.UtcNow,
+                Type = UploadFileType.CloudFile, StorageProfileId = "images-v1", Filename = "video.mp4"
+            });
+            db.VideoTranscodeStates.Add(new VideoTranscodeState
+            {
+                FileId = originalId, PendingVariantFileId = variantId,
+                PendingProfileId = "images-v1", UpdatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        });
+        var upload = await gate.TrackUploadAsync(["images-v1"], default, variantId);
+        await gate.BeginAsync(fixture.Request, default);
+        var draining = await gate.FreezeAsync(fixture.Request.MigrationId, default);
+        draining.State.Should().Be("draining");
+        draining.ActiveUploads.Should().Be(1, "the durable intent and live activity describe the same blob");
+        await FluentActions.Awaiting(() => gate.TrackUploadAsync(["images-v1"], default, Guid.NewGuid()))
+            .Should().ThrowAsync<StorageMigrationPausedException>();
+
+        await using var cleanup = await gate.TrackCleanupAsync(["images-v1"], default, variantId);
+        (await gate.FreezeAsync(fixture.Request.MigrationId, default)).ActiveUploads.Should().Be(1);
+        await fixture.WithDb(async db =>
+        {
+            var state = await db.VideoTranscodeStates.SingleAsync(x => x.FileId == originalId);
+            state.PendingVariantFileId = null;
+            state.PendingProfileId = null;
+            await db.SaveChangesAsync();
+        });
+        await upload.DisposeAsync();
+
+        (await gate.FreezeAsync(fixture.Request.MigrationId, default)).ActiveUploads.Should().Be(1);
+        await cleanup.DisposeAsync();
+        (await gate.FreezeAsync(fixture.Request.MigrationId, default)).State.Should().Be("frozen");
+    }
+
+    [Fact]
     public async Task Freeze_WaitsForAnInFlightMutationBeforeSealingTheBucket()
     {
         using var fixture = new Fixture(); var gate = fixture.Gate(); await gate.BeginAsync(fixture.Request, default);

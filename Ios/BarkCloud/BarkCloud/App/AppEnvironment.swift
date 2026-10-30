@@ -209,7 +209,7 @@ final class AppEnvironment {
         ShareInbox.purgeAll()
         backupManager.setAutoUpload(false)
         RemoteImageCache.shared.clear()
-        InsecureHTTP.clearCaches()
+        await InsecureHTTP.clearCaches()
         await fileCache.clearAll()
         await AssetHashStore.shared.clearAll()
         await CloudDeviceLinkStore.shared.clearAll()

@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using System.Security.Cryptography;
@@ -7,8 +8,6 @@ using System.Text;
 using BarkCloud.Shared.Exceptions.Identity;
 
 using MediatR;
-
-using OtpNet;
 
 using OtpType = BarkCloud.Identity.Domain.OtpType;
 
@@ -30,6 +29,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
         private readonly IAuthPropertiesStorage _authPropertiesStorage;
         private readonly IPasswordsStorage _passwordsStorage;
         private readonly IRefreshTokensStorage refreshTokensStorage;
+        private readonly IWebAuthnStorage _webAuthnStorage;
         private readonly IMediator _mediator;
         private readonly PasswordChangedNotifier _passwordChangedNotifier;
         private readonly RequestContext requestContext;
@@ -42,7 +42,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
 
         public ConfirmResetPasswordCommandHandler(IResetPasswordsStorage resetPasswordsStorage, IAuthPropertiesStorage authPropertiesStorage,
-            IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage, IMediator mediator,
+            IPasswordsStorage passwordsStorage, IRefreshTokensStorage refreshTokensStorage,
+            IWebAuthnStorage webAuthnStorage, IMediator mediator,
             PasswordChangedNotifier passwordChangedNotifier,
             RequestContext requestContext, MetricsCollector metrics, IAuthRateLimiter rateLimiter,
             ILogger<ConfirmResetPasswordCommandHandler> logger, IdentityContext context)
@@ -51,6 +52,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             _authPropertiesStorage = authPropertiesStorage;
             _passwordsStorage = passwordsStorage;
             this.refreshTokensStorage = refreshTokensStorage;
+            _webAuthnStorage = webAuthnStorage;
             _mediator = mediator;
             _passwordChangedNotifier = passwordChangedNotifier;
             this.requestContext = requestContext;
@@ -118,6 +120,9 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 throw new ResetIdExpiredException();
             }
 
+            if (resetPasswordInfo.OtpType != OtpType.Email)
+                throw new NotValidOtpCodeException();
+
             _logger.LogDebug(
                 "Проверка OTP кода для пользователя {UserId}, тип OTP: {OtpType}",
                 resetPasswordInfo.UserId,
@@ -138,29 +143,7 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                 throw new NotValidOtpCodeException();
             }
 
-            if (resetPasswordInfo.OtpType == OtpType.Authenticator)
-            {
-                var otpSecret = await _authPropertiesStorage.GetOtpSecretKey(resetPasswordInfo.UserId, cancellationToken);
-
-                var totp = new Totp(Base32Encoding.ToBytes(otpSecret));
-
-                var isValid = totp.VerifyTotp(request.OtpCode, out long timeStepMatched, VerificationWindow.RfcSpecifiedNetworkDelay);
-
-                if (!isValid)
-                {
-                    _metrics.Increment("password_reset_confirmation_failed");
-                    _metrics.Increment("otp_authenticator_failed");
-                    _logger.LogWarning(
-                        "Неверный Authenticator OTP код для пользователя {UserId}",
-                        resetPasswordInfo.UserId
-                    );
-                    throw new NotValidOtpCodeException();
-                }
-
-                _metrics.Increment("otp_authenticator_verified");
-                _logger.LogDebug("Authenticator OTP код успешно проверен для пользователя {UserId}", resetPasswordInfo.UserId);
-            }
-            else
+            ValidatedTotpCode? validatedTotp = null;
             {
                 if (!FixedTimeEquals(resetPasswordInfo.OtpCode, request.OtpCode))
                 {
@@ -175,6 +158,42 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
 
                 _metrics.Increment("otp_email_verified");
                 _logger.LogDebug("Email OTP код успешно проверен для пользователя {UserId}", resetPasswordInfo.UserId);
+
+                // Email-код подтверждает первый фактор; включённый Authenticator — второй.
+                // Настройки читаются на момент подтверждения: даже reset, созданный до включения
+                // Authenticator, не даёт сменить пароль без TOTP. Проверка идёт до проверок нового
+                // пароля, чтобы ответы не раскрывали совпадение с текущим паролем.
+                var authProperties = await _authPropertiesStorage.GetUserAuthProperties(resetPasswordInfo.UserId, cancellationToken);
+
+                if (authProperties is { OtpEnabled: true })
+                {
+                    if (string.IsNullOrEmpty(request.AuthenticatorCode))
+                    {
+                        _metrics.Increment("auth_otp_required");
+                        _logger.LogInformation(
+                            "Для подтверждения email-сброса пароля требуется код Authenticator, пользователь {UserId}",
+                            resetPasswordInfo.UserId
+                        );
+                        throw new OtpCodeNeedException("authenticator");
+                    }
+
+                    await _rateLimiter.EnsureTotpAttemptAsync(resetPasswordInfo.UserId);
+                    validatedTotp = TotpVerificationService.Verify(resetPasswordInfo.UserId, authProperties.OtpSecret,
+                        authProperties.OtpSecretGeneration, request.AuthenticatorCode);
+                    if (validatedTotp is null)
+                    {
+                        _metrics.Increment("password_reset_confirmation_failed");
+                        _metrics.Increment("otp_authenticator_failed");
+                        _logger.LogWarning(
+                            "Неверный код Authenticator при email-сбросе пароля для пользователя {UserId}",
+                            resetPasswordInfo.UserId
+                        );
+                        throw new NotValidOtpCodeException();
+                    }
+
+                    _metrics.Increment("otp_authenticator_verified");
+                    _logger.LogDebug("Код Authenticator успешно проверен для пользователя {UserId}", resetPasswordInfo.UserId);
+                }
             }
 
             if (string.IsNullOrEmpty(request.NewPassword))
@@ -199,12 +218,37 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             var refreshTokenString = RefreshTokenGenerator.GenerateRefreshToken();
             CreateTokenResponse accessTokenResponse;
             var notificationEnqueued = false;
+            _context.ChangeTracker.Clear();
 
             try
             {
                 await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
+                    await IdentityOwnerLock.AcquireAsync(_context, resetPasswordInfo.UserId, cancellationToken);
+                    var lockedReset = await _resetPasswordsStorage.GetResetPassword(request.ResetId, cancellationToken);
+                    if (lockedReset is null || lockedReset.UserId != resetPasswordInfo.UserId)
+                        throw new ResetIdNotFoundException();
+                    if (lockedReset.IsApproved)
+                        throw new ResetIdHasIsApprovedException();
+                    if (lockedReset.ExpiresAt <= DateTime.UtcNow)
+                        throw new ResetIdExpiredException();
+                    if (lockedReset.OtpType != OtpType.Email
+                        || !FixedTimeEquals(lockedReset.OtpCode, request.OtpCode))
+                        throw new NotValidOtpCodeException();
+
+                    var lockedAuthProperties = await _authPropertiesStorage.GetUserAuthPropertiesSnapshot(
+                        resetPasswordInfo.UserId, cancellationToken);
+                    if (lockedAuthProperties is { OtpEnabled: true })
+                    {
+                        if (validatedTotp is null)
+                            throw new OtpCodeNeedException("authenticator");
+                        if (!await _authPropertiesStorage.TryConsumeTotpStep(validatedTotp.UserId,
+                                validatedTotp.Secret, validatedTotp.Generation, validatedTotp.TimeStep,
+                                cancellationToken))
+                            throw new NotValidOtpCodeException();
+                    }
+
                     // Захват reset, изменения сессий/пароля и уведомление фиксируются одним коммитом.
                     if (!await _resetPasswordsStorage.TryApprove(request.ResetId, cancellationToken))
                     {
@@ -223,6 +267,9 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
                         _logger.LogDebug("Отзыв прежних сессий пользователя {UserId}", resetPasswordInfo.UserId);
                         await refreshTokensStorage.RevokeAllSessions(resetPasswordInfo.UserId, deviceId, cancellationToken);
                     }
+
+                    if (request.ResetPasskeys)
+                        await _webAuthnStorage.RemoveAllCredentials(resetPasswordInfo.UserId, cancellationToken);
 
                     _logger.LogDebug("Установка нового хеша пароля для пользователя {UserId}", resetPasswordInfo.UserId);
                     await _passwordsStorage.UpdateUserPasswordHash(resetPasswordInfo.UserId, newPasswordHash, cancellationToken);
@@ -286,5 +333,8 @@ namespace BarkCloud.Identity.Features.ConfirmResetPassword
             => !string.IsNullOrEmpty(stored)
                && CryptographicOperations.FixedTimeEquals(
                    Encoding.UTF8.GetBytes(stored), Encoding.UTF8.GetBytes(provided ?? string.Empty));
+
+        // Отсутствующий или повреждённый секрет активного Authenticator безопасно отклоняет запрос:
+        // окно проверки то же, что при обычном входе (VerificationWindow.RfcSpecifiedNetworkDelay).
     }
 }

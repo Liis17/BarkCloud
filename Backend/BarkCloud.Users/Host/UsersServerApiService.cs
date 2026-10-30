@@ -1,9 +1,8 @@
 using BarkCloud.GrpcServer.Metrics;
+using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Identity;
 using BarkCloud.Users.Features.AddDraftUser;
-using BarkCloud.Users.Features.CheckExistEmail;
-using BarkCloud.Users.Features.CheckExistUsername;
 using BarkCloud.Users.Features.ConfirmUser;
 using BarkCloud.Users.Features.Devices.DeleteUserDevice;
 using BarkCloud.Users.Features.Devices.GetUserDevices;
@@ -14,8 +13,6 @@ using BarkCloud.Users.Features.GetUserContacts;
 using BarkCloud.Users.Features.ListByIds;
 using BarkCloud.Users.Features.OverrideDraftUser;
 using BarkCloud.Users.Features.SetProfilePictureServer;
-using BarkCloud.Users.Features.UpdateProfileServer;
-using BarkCloud.Users.Features.UpdateStorageLimit;
 
 using Grpc.Core;
 
@@ -25,6 +22,10 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace BarkCloud.Users.Host;
 
+/// <summary>
+/// Межсервисное API: класс — минимум «валидный сервисный токен для Users», каждый метод
+/// дополнительно требует своё право (см. <see cref="ServicePermissions"/>).
+/// </summary>
 [Authorize(Policy = nameof(TokenType.Service))]
 public class UsersServerApiService : UsersServerApi.UsersServerApiBase
 {
@@ -39,22 +40,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         _metrics = metrics;
     }
 
-    public override Task<CheckExistResponse> CheckExistEmail(CheckExistEmailRequest request, ServerCallContext context)
-    {
-        _metrics.Increment("existence_checks");
-        var command = new CheckExistEmailQuery() { Email = request.Email?.Trim() };
-
-        return _mediator.Send(command);
-    }
-
-    public override Task<CheckExistResponse> CheckExistUsername(CheckExistUsernameRequest request, ServerCallContext context)
-    {
-        _metrics.Increment("existence_checks");
-        var command = new CheckExistUsernameQuery() { Username = request.Username?.Trim() };
-
-        return _mediator.Send(command);
-    }
-
+    [Authorize(Policy = XAuthPolicies.UsersServerReadPolicy)]
     public override Task<FindByLoginResponse> FindByLogin(FindByLoginRequest request, ServerCallContext context)
     {
         _metrics.Increment("login_lookups");
@@ -63,6 +49,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return _mediator.Send(command);
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerWritePolicy)]
     public override async Task<AddDraftUserResponse> AddDraftUser(AddDraftUserRequest request, ServerCallContext context)
     {
         _metrics.Increment("drafts_create_requests");
@@ -81,6 +68,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         }
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerWritePolicy)]
     public override async Task<ConfirmUserResponse> ConfirmUser(ConfirmUserRequest request, ServerCallContext context)
     {
         _metrics.Increment("users_confirm_requests");
@@ -99,6 +87,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         }
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerReadPolicy)]
     public override async Task<GetByIdResponse> GetById(GetByIdRequest request, ServerCallContext context)
     {
         _metrics.Increment("user_lookups");
@@ -108,6 +97,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return new GetByIdResponse { User = res.User };
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerReadPolicy)]
     public override Task<GetUserContactsResponse> GetUserContacts(GetUserContactsRequest request, ServerCallContext context)
     {
         _metrics.Increment("contact_lookups");
@@ -119,6 +109,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return _mediator.Send(command);
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerWritePolicy)]
     public override Task<AddDraftUserResponse> OverrideDraftUser(AddDraftUserRequest request, ServerCallContext context)
     {
         _metrics.Increment("drafts_overridden");
@@ -133,6 +124,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return _mediator.Send(command);
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerReadPolicy)]
     public override async Task<ListByIdsResponse> ListByIds(ListByIdsRequest request, ServerCallContext context)
     {
         _metrics.Increment("user_lookups");
@@ -146,6 +138,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
 
     // Методы для работы с устройствами
 
+    [Authorize(Policy = XAuthPolicies.UsersServerWritePolicy)]
     public override async Task<RegisterDeviceResponse> RegisterDevice(RegisterDeviceRequest request, ServerCallContext context)
     {
         _metrics.Increment("device_registrations");
@@ -162,6 +155,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return response;
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerReadPolicy)]
     public override Task<GetUserDevicesResponse> GetUserDevices(GetUserDevicesRequest request, ServerCallContext context)
     {
         _metrics.Increment("device_lookups");
@@ -173,6 +167,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return _mediator.Send(query);
     }
 
+    [Authorize(Policy = XAuthPolicies.UsersServerWritePolicy)]
     public override Task<DeleteUserDeviceResponse> DeleteUserDevice(DeleteUserDeviceRequest request, ServerCallContext context)
     {
         _metrics.Increment("device_deletions");
@@ -185,18 +180,7 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         return _mediator.Send(command);
     }
 
-    public override Task<UpdateStorageLimitResponse> UpdateStorageLimit(UpdateStorageLimitRequest request, ServerCallContext context)
-    {
-        _metrics.Increment("storage_limit_updates");
-        var command = new UpdateStorageLimitCommand
-        {
-            UserId = request.UserId,
-            StorageLimitGb = request.StorageLimitGb
-        };
-
-        return _mediator.Send(command);
-    }
-
+    [Authorize(Policy = XAuthPolicies.UsersServerWritePolicy)]
     public override Task<SetProfilePictureServerResponse> SetProfilePictureServer(SetProfilePictureServerRequest request, ServerCallContext context)
     {
         _metrics.Increment("profile_avatar_updates");
@@ -208,17 +192,5 @@ public class UsersServerApiService : UsersServerApi.UsersServerApiBase
         };
 
         return _mediator.Send(command);
-    }
-
-    public override Task<UpdateProfileServerResponse> UpdateProfileServer(UpdateProfileServerRequest request, ServerCallContext context)
-    {
-        _metrics.Increment("profile_updates_server");
-        return _mediator.Send(new UpdateProfileServerCommand
-        {
-            UserId = request.UserId,
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Username = request.Username
-        });
     }
 }

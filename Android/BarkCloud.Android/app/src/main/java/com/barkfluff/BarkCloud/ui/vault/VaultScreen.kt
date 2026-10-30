@@ -50,8 +50,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.vault.VaultItem
+import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
+import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -66,6 +69,7 @@ fun VaultScreen(
     val unlockTitle = stringResource(R.string.vault_unlock_button)
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
     val openRemote = rememberRemoteOpener()
+    val vaultAssets = remember(state.items) { state.items.map { it.toMediaAsset() } }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -82,6 +86,7 @@ fun VaultScreen(
         }
     }
 
+    CloudMediaTransitionLayout(viewer?.id) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -132,11 +137,13 @@ fun VaultScreen(
         }
     }
 
-    viewer?.let { asset ->
         CloudMediaViewer(
-            asset = asset,
+            assets = vaultAssets,
+            selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { openRemote(asset.id, asset.fileName) { } },
+            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
+            infoEnabled = false,
+            onDelete = { item -> viewModel.deleteFile(item.id) },
         )
     }
 }
@@ -160,7 +167,10 @@ private fun VaultCell(
             model = item.previewUrl,
             isVideo = item.isVideo,
             contentDescription = item.fileName,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().cloudMediaSharedElement(
+                key = item.fileId,
+                visible = LocalCloudMediaViewerAssetId.current != item.fileId,
+            ),
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(

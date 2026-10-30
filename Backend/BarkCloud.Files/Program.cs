@@ -1,4 +1,5 @@
 using BarkCloud.Files.Consumers;
+using BarkCloud.Files.Configurations;
 using BarkCloud.Files.Extensions;
 using BarkCloud.Files.Host;
 using BarkCloud.Files.Infrastructure;
@@ -6,10 +7,10 @@ using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
 using BarkCloud.Files.Scheduling;
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.SessionRevocation;
-using BarkCloud.Shared.Auth;
 using BarkCloud.Shared.Exceptions.Interceptors;
 using BarkCloud.Shared.Identity;
 
@@ -53,12 +54,16 @@ public class Program
 
         builder.Services.AddGrpcReflection();
 
-        builder.Services.AddXAuth(builder.Configuration);
+        builder.Services.AddXAuth(builder.Configuration, ServiceId.Files);
         builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+
+        // Сервисные токены: выдаёт Identity по секрету сервиса (ServiceAuth:Credential / SERVICE_CREDENTIAL).
+        builder.Services.AddServiceTokenClient(builder.Configuration);
         builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["IdentityService:Host"]!);
-            }).AddInterceptor(() => new JwtClientInterceptor(builder.Configuration["IdentityService:Token"]!))
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Identity))
             .AddInterceptor(() => new ExceptionClientInterceptor());
         builder.Services.AddRequestContext();
 
@@ -66,7 +71,8 @@ public class Program
         builder.Services.AddGrpcClient<BarkCloud.Proto.Users.UsersServerApi.UsersServerApiClient>(o =>
             {
                 o.Address = new Uri(builder.Configuration["UsersService:Host"]);
-            }).AddInterceptor(() => new BarkCloud.Shared.Auth.JwtClientInterceptor(builder.Configuration["UsersService:Token"]))
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Users))
             .AddInterceptor(() => new BarkCloud.Shared.Exceptions.Interceptors.ExceptionClientInterceptor());
 
         builder.Services.AddControllers();
@@ -93,6 +99,8 @@ public class Program
         builder.Services.AddSingleton<VideoThumbnailExtractor>();
         builder.Services.AddSingleton<AudioMetadataExtractor>();
         builder.Services.AddSingleton<HeicImageConverter>();
+        builder.Services.AddSingleton<ISvgProcessRunner, SvgProcessRunner>();
+        builder.Services.AddSingleton<ISvgRasterizer, SvgRasterizer>();
         builder.Services.AddSingleton<FileMetadataExtractor>();
         builder.Services.AddScoped<PreviewPersistenceService>();
         builder.Services.AddScoped<AlbumViewBuilder>();
@@ -111,6 +119,10 @@ public class Program
         builder.Services.AddSingleton<IMultipartUploadStore, S3MultipartUploadStore>();
         builder.Services.AddSingleton<StorageMigrationGate>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.Configure<VideoVariantOptions>(builder.Configuration.GetSection("VideoVariants"));
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<VideoTranscodeLeaseManager>();
+        builder.Services.AddHostedService<VideoVariantWorker>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddSingleton<IS3StorageStatsProvider, S3StorageStatsProvider>();
@@ -152,11 +164,12 @@ public class Program
 
             x.UsingRabbitMq((context, cfg) =>
             {
-                cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                cfg.Host(builder.Configuration["RabbitMQ:Host"], builder.Configuration["RabbitMQ:VirtualHost"], h =>
                 {
                     h.Username(builder.Configuration["RabbitMQ:Username"]);
                     h.Password(builder.Configuration["RabbitMQ:Password"]);
                 });
+                cfg.OverrideDefaultBusEndpointQueueName("bark-files-bus-" + Guid.NewGuid().ToString("N"));
 
                 cfg.ReceiveEndpoint("user-deleted-files", e =>
                 {
@@ -186,6 +199,7 @@ public class Program
         app.MapGrpcService<FilesApiService>();
         app.MapGrpcService<FilesServerApiService>();
         app.MapGrpcService<CloudApiService>();
+        app.MapGrpcService<DirectorySizeApiService>();
         app.MapGrpcService<AlbumApiService>();
         app.MapGrpcService<MusicApiService>();
         app.MapGrpcService<DynamicFolderApiService>();

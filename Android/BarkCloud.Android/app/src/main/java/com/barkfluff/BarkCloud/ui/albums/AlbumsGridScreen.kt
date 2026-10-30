@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -24,7 +25,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -44,6 +44,7 @@ import com.barkfluff.BarkCloud.data.cloud.AlbumCard
 import com.barkfluff.BarkCloud.files.ui.formatChildCount
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
+import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +52,8 @@ import androidx.compose.ui.platform.LocalContext
 fun AlbumsGridScreen(
     onOpenAlbum: (id: String, name: String) -> Unit,
     onSnackbar: (String) -> Unit,
+    header: @Composable () -> Unit = {},
+    shortcuts: @Composable () -> Unit = {},
     viewModel: AlbumsViewModel = viewModel(factory = AlbumsViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -65,15 +68,15 @@ fun AlbumsGridScreen(
     val shouldLoadMore by remember {
         derivedStateOf {
             val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            last >= state.albums.size - 4
+            last >= state.albums.size + 2 - 4
         }
     }
     LaunchedEffect(shouldLoadMore) { if (shouldLoadMore) viewModel.loadMore() }
 
     Box(Modifier.fillMaxSize()) {
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::reload,
+        RefreshableContentSurface(
+            onRefresh = viewModel::reloadAndWait,
+            header = header,
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyVerticalGrid(
@@ -82,8 +85,18 @@ fun AlbumsGridScreen(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 12.dp, bottom = 88.dp),
             ) {
+                item(key = "shortcuts", span = { GridItemSpan(maxLineSpan) }) {
+                    shortcuts()
+                }
+                item(key = "cloud_heading", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        stringResource(R.string.collections_cloud_albums),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                    )
+                }
                 items(state.albums, key = { it.id }) { album ->
                     AlbumCardItem(album = album, onClick = { onOpenAlbum(album.id, album.name) })
                 }

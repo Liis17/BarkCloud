@@ -38,7 +38,7 @@ public struct ServerConfig: Sendable, Equatable {
         identityHost: "cloud.barkfluff.com", identityPort: 7020,
         usersHost: "cloud.barkfluff.com", usersPort: 7021,
         filesHost: "cloud.barkfluff.com", filesPort: 7025,
-        useTLS: true, allowSelfSigned: true
+        useTLS: true, allowSelfSigned: false
     )
 
     private enum Key {
@@ -53,8 +53,10 @@ public struct ServerConfig: Sendable, Equatable {
         static let configured = "BarkCloud.server.configured"
     }
 
+    nonisolated(unsafe) static var storeOverride: UserDefaults?
+
     private static var store: UserDefaults {
-        UserDefaults(suiteName: BarkCloudAppGroup.identifier) ?? .standard
+        storeOverride ?? UserDefaults(suiteName: BarkCloudAppGroup.identifier) ?? .standard
     }
 
     /// Пользователь хотя бы раз сохранил адреса. До этого `RootView` показывает экран ввода.
@@ -77,7 +79,7 @@ public struct ServerConfig: Sendable, Equatable {
             filesHost: d.string(forKey: Key.filesHost) ?? p.filesHost,
             filesPort: port(Key.filesPort, p.filesPort),
             useTLS: d.object(forKey: Key.useTLS) as? Bool ?? p.useTLS,
-            allowSelfSigned: d.object(forKey: Key.allowSelfSigned) as? Bool ?? p.allowSelfSigned
+            allowSelfSigned: d.object(forKey: Key.allowSelfSigned) as? Bool ?? false
         )
     }
 

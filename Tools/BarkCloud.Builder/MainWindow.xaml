@@ -242,18 +242,13 @@
                         <ui:TextBox x:Name="ConfigurationServiceUrlBox" IsReadOnly="True" ClearButtonEnabled="False"
                                     Text="{Binding Text, ElementName=ConfigPortBox, Mode=OneWay, StringFormat='http://cloud-configuration:{0}'}" />
 
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="CONFIGURATION_ACCESS_KEY (одинаковый у всех сервисов)" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ui:TextBox x:Name="AccessKeyBox" Grid.Column="0"
-                                        Text="{Binding ConfigurationAccessKey, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="Случайный"
-                                       Icon="{ui:SymbolIcon ArrowSync24}" Tag="50"
-                                       CommandParameter="{Binding ElementName=AccessKeyBox}" Click="OnRandom" />
-                        </Grid>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Секреты сервисов (разделённые, аудит №9): bootstrap-ключи Configuration, секреты сервисных токенов и RSA-ключи JWT (secrets/jwt) генерируются автоматически и пишутся в .env. При загрузке существующего .env значения сохраняются." TextWrapping="Wrap" />
+                        <ui:TextBox x:Name="AccessKeyBox" IsReadOnly="True" ClearButtonEnabled="False"
+                                    Text="{Binding ConfigurationAccessKeysRegistry, Mode=OneWay}" />
+                        <ui:Button Content="Сгенерировать новые данные" Click="OnRegenerateServiceSecrets"
+                                   Margin="0,8,0,0" />
+                        <TextBlock Style="{StaticResource FieldLabel}" TextWrapping="Wrap"
+                                   Text="Кнопка заменяет bootstrap-ключи Configuration и секреты сервисных токенов. Для сохранения нажмите «Создать». После сохранения обновите конфигурацию всех сервисов. Существующие RSA-ключи JWT сохраняются." />
                     </StackPanel>
                 </ui:CardExpander>
 
@@ -368,6 +363,36 @@
                         </ui:TextBox>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="ARCHIVE_TEMP_PATH (пусто — named volume archive_temp)" />
                         <ui:TextBox PlaceholderText="./data/archive-temp" Text="{Binding ArchiveTempPath, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Video24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Варианты качества видео" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Ресурсы cloud-transcoder и общий рабочий каталог Files" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODE_WORK_PATH (общая папка на хосте)" />
+                        <ui:TextBox PlaceholderText="./data/transcode" Text="{Binding TranscodeWorkPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_TOKEN" />
+                        <ui:TextBox Text="{Binding TranscoderToken, UpdateSourceTrigger=PropertyChanged}" />
+                        <UniformGrid Margin="0,4,0,0" Columns="3">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_THREADS" />
+                                <ui:TextBox Text="{Binding TranscoderThreads, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="4,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_CPUS" />
+                                <ui:TextBox Text="{Binding TranscoderCpus, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_MEMORY" />
+                                <ui:TextBox Text="{Binding TranscoderMemory, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </UniformGrid>
                     </StackPanel>
                 </ui:CardExpander>
 

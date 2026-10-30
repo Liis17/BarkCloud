@@ -5,7 +5,6 @@ using BarkCloud.GrpcServer.Tracker;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Identity.Domain;
 using BarkCloud.Identity.Features.SetPassword;
-using BarkCloud.Identity.Features.ForceSetPasswordServer;
 using BarkCloud.Identity.Persistence.Contexts;
 using BarkCloud.Identity.Persistence.Services;
 using BarkCloud.Identity.Services;
@@ -24,35 +23,6 @@ namespace BarkCloud.Identity.IntegrationTests;
 
 public class OutboxAtomicityTests
 {
-    [Fact]
-    public async Task ForceSetPassword_WhenNotificationInsertFails_RollsBackPassword()
-    {
-        await using var database = await PostgresIdentityDatabase.CreateAsync();
-        await using (var setup = database.CreateContext())
-        {
-            await new PasswordsStorage(setup).UpdateUserPasswordHash(42, PasswordHasher.HashPassword("old-password"));
-            await RejectNotificationInsert(setup);
-        }
-
-        await using var context = database.CreateContext();
-        var metrics = new MetricsCollector();
-        var outbox = new NotificationOutbox(context, new ConfigurationBuilder().Build(), metrics,
-            NullLogger<NotificationOutbox>.Instance);
-        var handler = new ForceSetPasswordServerCommandHandler(new PasswordsStorage(context), outbox,
-            NullLogger<ForceSetPasswordServerCommandHandler>.Instance, context, metrics);
-
-        await FluentActions.Awaiting(() => handler.Handle(
-                new ForceSetPasswordServerCommand { UserId = 42, NewPassword = "new-password" }, default))
-            .Should().ThrowAsync<DbUpdateException>();
-
-        await context.SaveChangesAsync();
-
-        await using var observer = database.CreateContext();
-        PasswordHasher.VerifyPassword("old-password", await new PasswordsStorage(observer).GetUserPasswordHash(42))
-            .Should().BeTrue();
-        (await observer.PendingNotifications.AnyAsync()).Should().BeFalse();
-    }
-
     [Fact]
     public async Task ConfirmResetPassword_WhenNotificationInsertFails_RollsBackResetPasswordAndSessions()
     {
@@ -104,6 +74,7 @@ public class OutboxAtomicityTests
         var handler = new SetPasswordCommandHandler(
             UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, new RequestContext()), metrics,
             NullLogger<SetPasswordCommandHandler>.Instance, context);
 
@@ -140,6 +111,7 @@ public class OutboxAtomicityTests
             new PasswordsStorage(context),
             new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, requestContext),
             metrics,
             NullLogger<SetPasswordCommandHandler>.Instance,
@@ -179,6 +151,7 @@ public class OutboxAtomicityTests
         var handler = new SetPasswordCommandHandler(
             UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, new RequestContext()), metrics,
             NullLogger<SetPasswordCommandHandler>.Instance, context);
 
@@ -218,6 +191,7 @@ public class OutboxAtomicityTests
         var handler = new SetPasswordCommandHandler(
             UserContextFor(42), new PasswordsStorage(context), new AuthPropertiesStorage(context),
             new RefreshTokensStorage(context, new JwtSettings { ExpiryMinutes = 60 }),
+            new WebAuthnStorage(context), new ReauthenticationService(context, new PasswordsStorage(context)),
             new PasswordChangedNotifier(outbox, new RequestContext()), metrics,
             NullLogger<SetPasswordCommandHandler>.Instance, context);
 
