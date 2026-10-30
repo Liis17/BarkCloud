@@ -29,8 +29,12 @@ internal object UniqueWorkEnqueuer {
         if (startQuery) query(name)
     }
 
+    fun cancelPending(name: String) {
+        synchronized(lock) { pending.remove(name) }
+    }
+
     private fun query(name: String) {
-        val workManager = synchronized(lock) { pending.getValue(name).workManager }
+        val workManager = synchronized(lock) { pending[name]?.workManager } ?: return
         val query = workManager.getWorkInfosForUniqueWork(name)
         query.addListener({
             val infos = runCatching { query.get() }.getOrNull()
