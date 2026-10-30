@@ -293,6 +293,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.telephoto.zoomable.image.coil3)
     implementation(libs.okhttp)
 
     implementation(libs.androidx.graphics.shapes)
