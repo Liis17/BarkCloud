@@ -34,7 +34,10 @@ object AutoUploadScheduler {
             ExistingPeriodicWorkPolicy.UPDATE,
             periodic,
         )
-        if (policyChanged) enqueueOnce(context, policy, ExistingWorkPolicy.REPLACE)
+        if (policyChanged) {
+            UniqueWorkEnqueuer.cancelPending(ONCE_NAME)
+            enqueueOnce(context, policy, ExistingWorkPolicy.REPLACE)
+        }
     }
 
     fun runOnce(context: Context, policy: AutoUploadNetworkPolicy = AutoUploadSettings(context).policy) {
@@ -46,6 +49,7 @@ object AutoUploadScheduler {
         val settings = AutoUploadSettings(context)
         settings.policy = AutoUploadNetworkPolicy.OFF
         settings.lastAppliedPolicy = AutoUploadNetworkPolicy.OFF
+        UniqueWorkEnqueuer.cancelPending(ONCE_NAME)
         WorkManager.getInstance(context).cancelUniqueWork(ONCE_NAME)
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_NAME)
     }

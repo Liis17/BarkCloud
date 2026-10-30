@@ -34,16 +34,30 @@ class SessionManager(
     fun resetLocalState() {
         globalParam.clearSession()
         runBlocking {
-            AutoUploadScheduler.disableAndAwait(appContext)
-            UploadScheduler.cancelAndAwait(appContext)
-            grpcManager.shutdown()
-            vaultStore.removeAll()
-            fileCache.clearAll()
-            uploadQueue.clear()
-            BarkCloudDatabase.get(appContext).mediaCloudStateDao().deleteAll()
+            cancelUploadWorkBeforeQueueClear(
+                cancelDiscovery = { AutoUploadScheduler.disableAndAwait(appContext) },
+                cancelUploads = { UploadScheduler.cancelAndAwait(appContext) },
+                clearLocalQueueAndState = {
+                    grpcManager.shutdown()
+                    vaultStore.removeAll()
+                    fileCache.clearAll()
+                    uploadQueue.clear()
+                    BarkCloudDatabase.get(appContext).mediaCloudStateDao().deleteAll()
+                },
+            )
         }
         val loader = SingletonImageLoader.get(appContext)
         loader.memoryCache?.clear()
         loader.diskCache?.clear()
     }
+}
+
+internal suspend fun cancelUploadWorkBeforeQueueClear(
+    cancelDiscovery: suspend () -> Unit,
+    cancelUploads: suspend () -> Unit,
+    clearLocalQueueAndState: suspend () -> Unit,
+) {
+    cancelDiscovery()
+    cancelUploads()
+    clearLocalQueueAndState()
 }

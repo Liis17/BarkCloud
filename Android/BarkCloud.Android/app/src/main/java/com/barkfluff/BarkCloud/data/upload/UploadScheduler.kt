@@ -35,6 +35,7 @@ object UploadScheduler {
 
     suspend fun cancelAndAwait(context: Context) {
         val workManager = WorkManager.getInstance(context)
+        UniqueWorkEnqueuer.cancelPending(WORK_NAME)
         workManager.cancelUniqueWork(WORK_NAME)
         workManager.getWorkInfosForUniqueWorkFlow(WORK_NAME).first { infos ->
             infos.all { it.state.isFinished }
