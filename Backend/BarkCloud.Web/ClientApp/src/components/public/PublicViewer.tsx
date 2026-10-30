@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '../Icon';
 import { VideoPlayer } from '../media/MediaPlayer';
+import type { VideoQuality } from '../media/MediaPlayer';
 import { persistVolumeRef } from '../../lib/volume';
 import { fmtSize } from './publicFile';
 import { usePublicShareActions } from './usePublicShareActions';
@@ -12,6 +13,7 @@ export interface PublicViewerFile {
   downloadUrl: string;
   previewUrl?: string;
   fileSize: number;
+  videoQualities?: VideoQuality[];
 }
 
 interface Props {
@@ -49,7 +51,7 @@ export function PublicViewer({ file, onClose }: Props) {
       <div className="public-viewer-stage">
         <div className="public-viewer-media" onClick={(e) => e.stopPropagation()}>
           {isVideo ? (
-            <VideoPlayer onMediaRef={persistVolumeRef} src={file.downloadUrl} autoPlay />
+            <VideoPlayer onMediaRef={persistVolumeRef} src={file.downloadUrl} qualities={file.videoQualities} autoPlay />
           ) : imageSrc ? (
             <img src={imageSrc} alt={file.name} />
           ) : (
