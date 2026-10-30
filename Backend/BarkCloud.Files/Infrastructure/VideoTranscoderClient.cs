@@ -60,10 +60,22 @@ internal sealed class VideoTranscoderClient : IDisposable
             throw new InvalidOperationException("Transcoder не подтвердил остановку задания.");
     }
 
-    public async Task CancelCurrentJobAsync(CancellationToken cancellationToken)
+    public async Task CancelPriorGenerationJobsAsync(long generation, CancellationToken cancellationToken)
     {
         var job = await GetCurrentJobAsync(cancellationToken);
-        if (job?.Status == "running")
+        if (job?.Status != "running")
+            return;
+
+        if (job.Generation > generation)
+            throw new InvalidOperationException("Transcoder выполняет задание более нового поколения Files.");
+
+        await CancelJobAsync(job.Id, cancellationToken);
+    }
+
+    public async Task CancelJobForGenerationAsync(long generation, CancellationToken cancellationToken)
+    {
+        var job = await GetCurrentJobAsync(cancellationToken);
+        if (job?.Status == "running" && job.Generation == generation)
             await CancelJobAsync(job.Id, cancellationToken);
     }
 
