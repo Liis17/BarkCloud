@@ -26,6 +26,7 @@ BarkCloud — самохостируемое облако файлов и мед
 | `Backend/BarkCloud.Identity` | [[Backend/Identity]] | Вход, токены, 2FA, сессии и их отзыв |
 | `Backend/BarkCloud.Users` | [[Backend/Users]] | Профили, устройства, контакты |
 | `Backend/BarkCloud.Files` | [[Backend/Files]] | Файлы в S3, медиа, облачная иерархия, загрузки |
+| `Backend/BarkCloud.Transcoder` | [[Backend/VideoVariants]] | Изолированный FFmpeg sidecar для AV1/WebM |
 | `Backend/BarkCloud.Torrent` | [[Backend/Torrent]] | Скачивание торрентов на хост-диск и импорт в облако |
 | `Backend/BarkCloud.Notification` | [[Backend/Notification]] | Потребитель RabbitMQ → письма SMTP |
 | `Backend/BarkCloud.GrpcServer` | [[Backend/GrpcServer]] | Общая библиотека хостинга сервисов (не запускается сама) |
@@ -40,7 +41,7 @@ BarkCloud — самохостируемое облако файлов и мед
 
 ### Старт сервиса
 
-Потребители Configuration в `Program.cs` вызывают `await builder.LoadConfigurationAsync(ServiceId.X)` — сначала опрашивают внутренний `GetReadiness` по `CONFIGURATION_SERVICE_URL`, затем получают настройки. Общий загрузчик делает максимум 5 проверок с deadline 2 секунды и интервалами 5 секунд; после исчерпания попыток запуск прерывается. Configuration начинает слушать сеть только после успешных миграций и заполнения настроек. Затем общие расширения из `BarkCloud.GrpcServer` подключают Serilog, метрики и перехватчики. Все сервисы в compose зависят от `cloud-configuration`, а ожидание его готовности выполняется приложениями. Подробнее: [[Backend/Configuration]], [[Backend/GrpcServer]].
+Потребители Configuration в `Program.cs` вызывают `await builder.LoadConfigurationAsync(ServiceId.X)` — сначала опрашивают внутренний `GetReadiness` по `CONFIGURATION_SERVICE_URL`, затем получают настройки. Общий загрузчик делает максимум 5 проверок с deadline 2 секунды и интервалами 5 секунд; после исчерпания попыток запуск прерывается. Configuration начинает слушать сеть только после успешных миграций и заполнения настроек. Затем общие расширения из `BarkCloud.GrpcServer` подключают Serilog, метрики и перехватчики. Все backend-приложения в compose, кроме изолированного `cloud-transcoder`, зависят от `cloud-configuration`; ожидание его готовности выполняется приложениями. Подробнее: [[Backend/Configuration]], [[Backend/GrpcServer]]. Поток транскодирования видео описан в [[Backend/VideoVariants]].
 
 ### Каналы логирования
 
