@@ -40,11 +40,23 @@ class AutoUploadSettings(context: Context) {
         get() = prefs.getLong(KEY_LAST_RUN, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_RUN, value).apply()
 
+    var lastAppliedPolicy: AutoUploadNetworkPolicy?
+        get() = prefs.getString(KEY_LAST_APPLIED_POLICY, null)?.let {
+            runCatching { AutoUploadNetworkPolicy.valueOf(it) }.getOrNull()
+        }
+        set(value) {
+            val edit = prefs.edit()
+            if (value == null) edit.remove(KEY_LAST_APPLIED_POLICY)
+            else edit.putString(KEY_LAST_APPLIED_POLICY, value.name)
+            edit.commit()
+        }
+
     companion object {
         private const val KEY_LEGACY_ENABLED = "enabled"
         private const val KEY_POLICY = "network_policy"
         private const val KEY_LAST_UPLOADED = "last_uploaded_count"
         private const val KEY_LAST_RUN = "last_run_at_millis"
+        private const val KEY_LAST_APPLIED_POLICY = "last_applied_network_policy"
     }
 }
 
