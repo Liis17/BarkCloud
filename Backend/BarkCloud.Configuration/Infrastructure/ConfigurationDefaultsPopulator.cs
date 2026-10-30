@@ -220,6 +220,8 @@ public class ConfigurationDefaultsPopulator
             return "http://cloud-seq:5341";
         if (entry.Section == "Features" && entry.Key == "RegistrationEnabled")
             return "true";
+        if (entry.ServiceId == ServiceId.Files && entry.Section == "VideoVariants" && entry.Key == "Enabled")
+            return "false";
 
         if (DatabaseNames.TryGetValue(entry.ServiceId, out var database) && entry.Section == database.Section)
         {

@@ -49,6 +49,7 @@ public class TrashPurgeServiceTests : IDisposable
         MediaKind = MediaKind.Photo,
         CreatedAt = DateTime.UtcNow,
         UploadedAt = DateTime.UtcNow,
+        Etag = "etag",
     };
 
     private CloudFileEntry SeedEntry(Guid fileId, bool deleted, DateTime? purgeAt = null)
@@ -182,6 +183,74 @@ public class TrashPurgeServiceTests : IDisposable
         (await _db.Context.UploadedFiles.FindAsync(preview)).Should().BeNull("приватное превью осиротевает вместе с оригиналом");
         _deletedKeys.Should().Contain(preview.ToString());
         (await _db.Context.FilePreviews.AnyAsync(p => p.PreviewFileId == preview)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PurgeEntries_RemovesVideoVariantsAndReleasesQuota()
+    {
+        const long limitBytes = 100;
+        var original = Blob(Guid.NewGuid(), OwnerId);
+        original.MediaKind = MediaKind.Video;
+        original.Size = 80;
+        var variant = Blob(Guid.NewGuid(), OwnerId);
+        variant.Type = UploadFileType.VideoVariant;
+        variant.MediaKind = MediaKind.Video;
+        variant.Size = 40;
+        var entry = SeedEntry(original.Id, deleted: true);
+        _db.Context.UploadedFiles.AddRange(original, variant);
+        _db.Context.VideoVariants.Add(new VideoVariant
+        {
+            Id = Guid.NewGuid(), OriginalFileId = original.Id, VariantFileId = variant.Id,
+            Height = 360, Width = 640, ActualHeight = 360, CreatedAt = DateTime.UtcNow
+        });
+        _db.Context.VideoTranscodeStates.Add(new VideoTranscodeState
+        {
+            FileId = original.Id, Status = VideoTranscodeStatus.Done, UpdatedAt = DateTime.UtcNow
+        });
+        await _db.Context.SaveChangesAsync();
+        var limits = new Mock<IStorageLimitProvider>();
+        limits.Setup(x => x.GetLimitBytesAsync(OwnerId, It.IsAny<CancellationToken>())).ReturnsAsync(limitBytes);
+        var quota = new StorageQuotaService(_db.Context, limits.Object);
+
+        var beforePurge = await quota.GetSnapshotAsync(OwnerId, false, default);
+        beforePurge.UsedBytes.Should().Be(120);
+        Action reserve = () => beforePurge.EnsureCanReserve(1);
+        reserve.Should().Throw<BarkCloud.Shared.Exceptions.Files.UploadQuotaExceededException>();
+
+        var result = await CreateSut().PurgeEntriesAsync([entry], default);
+
+        _db.Context.ChangeTracker.Clear();
+        result.Blobs.Should().Be(2);
+        (await _db.Context.VideoVariants.AnyAsync()).Should().BeFalse();
+        (await _db.Context.VideoTranscodeStates.AnyAsync()).Should().BeFalse();
+        _deletedKeys.Should().Contain(original.Id.ToString()).And.Contain(variant.Id.ToString());
+        var afterPurge = await quota.GetSnapshotAsync(OwnerId, false, default);
+        afterPurge.UsedBytes.Should().Be(0);
+        afterPurge.EnsureCanReserve(1);
+    }
+
+    [Fact]
+    public async Task PurgeOrphanWithPendingVariantIntent_DefersDeletionForRecovery()
+    {
+        var original = Blob(Guid.NewGuid());
+        original.MediaKind = MediaKind.Video;
+        var variantId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(original);
+        _db.Context.VideoTranscodeStates.Add(new VideoTranscodeState
+        {
+            FileId = original.Id,
+            PendingVariantFileId = variantId,
+            PendingProfileId = "video-variants-v1",
+            UpdatedAt = DateTime.UtcNow
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var deleted = await CreateSut().PurgeOrphanBlobsAsync([original.Id], default);
+
+        deleted.Should().Be(0);
+        (await _db.Context.UploadedFiles.FindAsync(original.Id)).Should().NotBeNull();
+        (await _db.Context.VideoTranscodeStates.FindAsync(original.Id))!.PendingVariantFileId.Should().Be(variantId);
+        _deletedKeys.Should().BeEmpty();
     }
 
     [Fact]

@@ -942,6 +942,8 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 .media-controls .icon-btn { flex: 0 0 auto; }
 .media-controls .media-seek { flex: 1 1 auto; }
 .media-controls .media-volume { flex: 0 0 96px; width: 96px; }
+.media-quality { flex: 0 0 auto; max-width: 96px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; background: rgba(0,0,0,.3); color: #fff; font-size: 12px; }
+.media-quality option { background: #fff; color: #111; }
 .media-time { flex: 0 0 auto; font-size: 12px; letter-spacing: .4px; font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); white-space: nowrap; }
 
 .video-player {

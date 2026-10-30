@@ -21,6 +21,7 @@
 | [[Backend/AccountDeletionOutbox]] | Надёжная доставка удаления аккаунта |
 | [[Backend/GrpcServer]] | Общий хостинг gRPC-сервисов |
 | [[Backend/Files]] | Файлы, медиа, альбомы, API Files |
+| [[Backend/VideoVariants]] | AV1/WebM-варианты, очередь транскодирования и выбор качества |
 | [[Backend/FilesCloud]] | Облачная иерархия папок |
 | [[Backend/DynamicFolders]] | Умные (динамические) папки |
 | [[Backend/ResumableUpload]] | Возобновляемая загрузка частями |

@@ -59,7 +59,14 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
         catch { foreach (var lease in leases.AsEnumerable().Reverse()) await lease.DisposeAsync(); throw; }
     }
 
-    public async Task<UploadActivity> TrackUploadAsync(IEnumerable<string> profileIds, CancellationToken ct, Guid? fileId = null)
+    public Task<UploadActivity> TrackUploadAsync(IEnumerable<string> profileIds, CancellationToken ct, Guid? fileId = null)
+        => TrackActivityAsync(profileIds, ct, fileId, admission: true);
+
+    public Task<UploadActivity> TrackCleanupAsync(IEnumerable<string> profileIds, CancellationToken ct, Guid? fileId = null)
+        => TrackActivityAsync(profileIds, ct, fileId, admission: false);
+
+    private async Task<UploadActivity> TrackActivityAsync(
+        IEnumerable<string> profileIds, CancellationToken ct, Guid? fileId, bool admission)
     {
         var ids = profileIds.Distinct(StringComparer.Ordinal).ToArray();
         var leases = new List<IAsyncDisposable>();
@@ -74,8 +81,8 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
             var groups = ids.Select(profiles.GetProfile).GroupBy(x => NormalizeEndpoint(x.ServiceUrl, x.IsR2) + "\n" + x.BucketName).OrderBy(x => x.Key).ToArray();
             foreach (var group in groups)
             {
-                if (db.Database.IsNpgsql() || leases.Count == 0) leases.Add(await EnterAsync(group.First().ProfileId, true, ct));
-                else await EnsureAllowedAsync(db, group.First().ProfileId, true, ct);
+                if (db.Database.IsNpgsql() || leases.Count == 0) leases.Add(await EnterAsync(group.First().ProfileId, admission, ct));
+                else await EnsureAllowedAsync(db, group.First().ProfileId, admission, ct);
             }
             if (db.Database.IsNpgsql()) lifetime = await OpenActivityLockAsync(activityId, ct);
             else LocalActivities[activityId] = 0;
@@ -90,6 +97,17 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
             throw;
         }
         finally { foreach (var lease in leases.AsEnumerable().Reverse()) await lease.DisposeAsync(); }
+    }
+
+    public async Task<bool> HasActiveUploadActivityAsync(Guid fileId, CancellationToken ct)
+    {
+        using var scope = scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FilesContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await PruneActivitiesAsync(db, ct);
+        var active = await db.StorageWriteActivities.AsNoTracking().AnyAsync(activity => activity.FileId == fileId, ct);
+        await transaction.CommitAsync(ct);
+        return active;
     }
 
     public async Task<IAsyncDisposable> EnterAsync(string profileId, bool admission, CancellationToken ct)
@@ -248,11 +266,20 @@ public sealed class StorageMigrationGate(IServiceScopeFactory scopes, S3BucketRe
             x.Status == UploadSessionStatus.Uploading || x.Status == UploadSessionStatus.Processing || x.CleanupPending).ToArrayAsync(ct);
         var activeSessions = sessions.Where(x => UploadProfiles(x.FileType, x.StorageProfileId, x.FileName, x.ContentType).Intersect(ids).Any())
             .Select(x => x.FileId).ToArray();
+        var pendingVariants = await db.VideoTranscodeStates.AsNoTracking()
+            .Where(x => x.PendingVariantFileId != null
+                && (x.PendingProfileId == null || ids.Contains(x.PendingProfileId)))
+            .Select(x => x.PendingVariantFileId!.Value)
+            .Distinct()
+            .ToArrayAsync(ct);
+        var pendingVariantIds = pendingVariants.ToHashSet();
         var status = new StorageCutoverStatus
         {
             MigrationId = barrier.MigrationId, State = barrier.State,
             ActiveUploads = activeSessions.Length + activities.Count(x => (!x.FileId.HasValue || !activeSessions.Contains(x.FileId.Value))
-                && JsonSerializer.Deserialize<string[]>(x.ProfileIdsJson)!.Intersect(ids).Any()),
+                && (!x.FileId.HasValue || !pendingVariantIds.Contains(x.FileId.Value))
+                && JsonSerializer.Deserialize<string[]>(x.ProfileIdsJson)!.Intersect(ids).Any())
+                + pendingVariantIds.Count,
             SourceServiceUrl = barrier.SourceServiceUrl, SourceBucketName = barrier.SourceBucketName,
             TargetServiceUrl = barrier.TargetServiceUrl, TargetBucketName = barrier.TargetBucketName,
             TargetRegion = barrier.TargetRegion, TargetForcePathStyle = barrier.TargetForcePathStyle,

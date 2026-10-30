@@ -17,6 +17,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске; на PR в `master` и при `force-all` — полный прогон, вызывается из `release.yml` через `workflow_call` |
 | `.github/workflows/release.yml` | релизный pipeline | Push в `master`: полный прогон тестов → сборка APK/IPA/DMG/Drive ZIP/Builder ZIP → один релиз `v1.x.y` с автоинкрементом |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа; общий version action использует registry SemVer для dev/master |
+| `.github/workflows/build-backend-transcoder.yml` | Transcoder CI/CD | Тесты нового sidecar, затем сборка и публикация его образа; ручной запуск на `dev` и `Backend/rebuild.trigger` тоже собирают образ |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
 
 ## Публичные контракты
@@ -24,6 +25,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | Проект/команда | Содержание |
 |---|---|
 | `Tests/Backend/BarkCloud.*.Tests` | Тесты backend и инфраструктуры по сервисам |
+| `Tests/Backend/BarkCloud.Transcoder.Tests` | Проверка безопасных путей, аргументов ffmpeg, параллельного задания и отмены sidecar |
 | `Tests/Backend/BarkCloud.Identity.IntegrationTests`, `Tests/Backend/BarkCloud.Users.IntegrationTests` | Отдельные интеграционные проекты |
 | `Tests/Tools/BarkCloud.Builder.Tests` | Проверки режимов Builder, генерации compose/env/nginx и валидации имён/портов без зависимости от WPF |
 | `Tests/Shared/*` | Тесты общих библиотек |
@@ -33,7 +35,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 
 ## Версии backend-образов
 
-`.github/actions/docker-version/` вычисляет независимую SemVer-версию для каждого из семи backend-образов. Сборка из `dev` выбирает максимум тегов master и dev и повышает patch, затем публикует `SemVer`, `latest` и SHA-теги в репозиторий `*-dev`. Сборка master использует последний SemVer dev-образа без повышения и публикует теги в master-репозиторий. Master workflow запускается только после слитого PR из `dev` в `master` с изменениями путей соответствующего сервиса. Изменение `Backend/rebuild.trigger` запускает все семь dev-сборок.
+`.github/actions/docker-version/` вычисляет независимую SemVer-версию для каждого из восьми backend-образов. Сборка из `dev` выбирает максимум тегов master и dev и повышает patch, затем публикует `SemVer`, `latest` и SHA-теги в репозиторий `*-dev`. Сборка master использует последний SemVer dev-образа без повышения и публикует теги в master-репозиторий. Master workflow запускается только после слитого PR из `dev` в `master` с изменениями путей соответствующего сервиса. Изменение `Backend/rebuild.trigger` запускает все восемь dev-сборок.
 
 Локальная проверка выбора версии: `bash Tests/CI/docker-version.test.sh`.
 

@@ -1191,6 +1191,101 @@ namespace BarkCloud.Files.Persistence.Migrations
                     b.ToTable("UserTags");
                 });
 
+            modelBuilder.Entity("BarkCloud.Files.Domain.VideoTranscodeLease", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OwnerInstanceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("VideoTranscodeLeases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_VideoTranscodeLeases_SingletonId", "\"Id\" = 1");
+                        });
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.VideoTranscodeState", b =>
+                {
+                    b.Property<Guid>("FileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("PendingProfileId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid?>("PendingVariantFileId")
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<List<int>>("SkippedHeights")
+                        .IsRequired()
+                        .HasColumnType("integer[]");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("FileId");
+
+                    b.HasIndex("Status", "UpdatedAt");
+
+                    b.ToTable("VideoTranscodeStates");
+                });
+
+            modelBuilder.Entity("BarkCloud.Files.Domain.VideoVariant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActualHeight")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OriginalFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VariantFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VariantFileId");
+
+                    b.HasIndex("OriginalFileId", "Height")
+                        .IsUnique();
+
+                    b.ToTable("VideoVariants");
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")

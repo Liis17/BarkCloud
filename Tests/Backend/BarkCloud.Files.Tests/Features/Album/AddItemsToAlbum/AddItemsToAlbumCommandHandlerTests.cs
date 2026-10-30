@@ -24,7 +24,10 @@ public class AddItemsToAlbumCommandHandlerTests
         UserContextFactory.Create(OwnerId),
         NullLogger<AddItemsToAlbumCommandHandler>.Instance);
 
-    private UploadFileEntity OwnedPhoto(Guid id) => new() { Id = id, Uploaders = new() { OwnerId }, MediaKind = MediaKind.Photo };
+    private UploadFileEntity OwnedPhoto(Guid id) => new()
+    {
+        Id = id, Type = UploadFileType.CloudFile, Uploaders = new() { OwnerId }, MediaKind = MediaKind.Photo
+    };
 
     [Fact]
     public async Task Handle_AlbumNotFound_Throws()
@@ -97,5 +100,21 @@ public class AddItemsToAlbumCommandHandlerTests
 
         _storage.Verify(s => s.AddItems(It.IsAny<IEnumerable<DomainAlbumItem>>(), It.IsAny<CancellationToken>()), Times.Never);
         _storage.Verify(s => s.UpdateAlbum(It.IsAny<DomainAlbum>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_VideoVariantCannotBeAddedById()
+    {
+        var albumId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        _storage.Setup(s => s.GetAlbum(albumId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DomainAlbum { Id = albumId, OwnerId = OwnerId });
+        var variant = OwnedPhoto(variantId);
+        variant.Type = UploadFileType.VideoVariant;
+        _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync([variant]);
+
+        await CreateSut().Handle(new AddItemsToAlbumCommand { AlbumId = albumId, FileIds = [variantId] }, default);
+
+        _storage.Verify(s => s.AddItems(It.IsAny<IEnumerable<DomainAlbumItem>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

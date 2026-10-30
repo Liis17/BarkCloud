@@ -34,12 +34,28 @@ public class ShareFileWithUserCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_VideoVariantCannotBeGrantedById()
+    {
+        var fileId = Guid.NewGuid();
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId, Type = UploadFileType.VideoVariant, Uploaders = [OwnerId], Etag = "etag", UploadedAt = DateTime.UtcNow
+        });
+
+        var act = () => CreateSut().Handle(new ShareFileWithUserCommand { FileId = fileId, RecipientUserId = 7 }, default);
+
+        await act.Should().ThrowAsync<CloudAccessDeniedException>();
+        _grants.Verify(s => s.Add(It.IsAny<FileGrant>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_FileNotReady_ThrowsFileNotReady()
     {
         var fileId = Guid.NewGuid();
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
             Id = fileId,
+            Type = UploadFileType.CloudFile,
             Uploaders = new() { OwnerId }
         });
 
@@ -90,6 +106,7 @@ public class ShareFileWithUserCommandHandlerTests
     private static UploadFileEntity ReadyFile(Guid fileId) => new()
     {
         Id = fileId,
+        Type = UploadFileType.CloudFile,
         Uploaders = new() { OwnerId },
         Etag = "etag",
         UploadedAt = DateTime.UtcNow

@@ -68,6 +68,7 @@ public class S3BucketRegistry : IDisposable
         var role = isPreview ? "previews" : fileType switch
         {
             UploadFileType.UserAvatar => "avatars",
+            UploadFileType.VideoVariant => "video-variants",
             UploadFileType.CloudFile => mediaKind switch
             {
                 MediaKind.Photo => "images",

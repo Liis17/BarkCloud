@@ -91,7 +91,9 @@ run_migration "$sample_dir" "$temp_root/sample-first.log" || fail "sample.env mi
 sample_env_file="$sample_dir/.env"
 assert_registry_matches "$sample_env_file" CONFIGURATION_ACCESS_KEYS _CONFIG_ACCESS_KEY "Identity Users Notification Files Torrent Web"
 assert_registry_matches "$sample_env_file" SERVICE_CREDENTIALS _SERVICE_CREDENTIAL "Identity Users Files Torrent Web"
-sample_snapshot="$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)"
+sample_snapshot="$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)|$(read_env_value "$sample_env_file" TRANSCODER_TOKEN)"
+transcoder_token=$(read_env_value "$sample_env_file" TRANSCODER_TOKEN)
+[[ -n "$transcoder_token" && "$transcoder_token" != replace-* ]] || fail "TRANSCODER_TOKEN was not generated from sample.env"
 for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILES_DB_PASSWORD TORRENT_DB_PASSWORD \
            RABBITMQ_IDENTITY_PASSWORD RABBITMQ_USERS_PASSWORD RABBITMQ_FILES_PASSWORD \
            RABBITMQ_TORRENT_PASSWORD RABBITMQ_NOTIFICATION_PASSWORD; do
@@ -100,7 +102,7 @@ for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILE
   sample_snapshot+="|$value"
 done
 run_migration "$sample_dir" "$temp_root/sample-repeat.log" || fail "sample.env repeat failed"
-repeat_snapshot="$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)"
+repeat_snapshot="$(read_env_value "$sample_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$sample_env_file" WEB_SERVICE_CREDENTIAL)|$(read_env_value "$sample_env_file" WEB_ADMIN_COOKIE_KEY)|$(read_env_value "$sample_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$sample_env_file" SERVICE_CREDENTIALS)|$(read_env_value "$sample_env_file" TRANSCODER_TOKEN)"
 for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILES_DB_PASSWORD TORRENT_DB_PASSWORD \
            RABBITMQ_IDENTITY_PASSWORD RABBITMQ_USERS_PASSWORD RABBITMQ_FILES_PASSWORD \
            RABBITMQ_TORRENT_PASSWORD RABBITMQ_NOTIFICATION_PASSWORD; do
@@ -118,6 +120,7 @@ replace_env_line "$partial_env_file" USERS_CONFIG_ACCESS_KEY '"known-users-key" 
 replace_env_line "$partial_env_file" USERS_SERVICE_CREDENTIAL "'known-users-credential=with=equals'"
 replace_env_line "$partial_env_file" IDENTITY_DB_PASSWORD "'keep-identity-db-password'"
 replace_env_line "$partial_env_file" RABBITMQ_USERS_PASSWORD '"keep-users-rabbit-password" # preserved custom value'
+replace_env_line "$partial_env_file" TRANSCODER_TOKEN "'keep-transcoder-token'"
 run_migration "$partial_dir" "$temp_root/partial-first.log" || fail "quoted CRLF fixture migration failed"
 assert_equal "$(read_env_value "$partial_env_file" IDENTITY_CONFIG_ACCESS_KEY)" "known-identity-key" "single-quoted custom key was not preserved"
 assert_equal "$(read_env_value "$partial_env_file" USERS_CONFIG_ACCESS_KEY)" "known-users-key" "double-quoted custom key was not preserved"
@@ -125,6 +128,7 @@ assert_equal "$(read_env_value "$partial_env_file" IDENTITY_SERVICE_CREDENTIAL)"
 assert_equal "$(read_env_value "$partial_env_file" USERS_SERVICE_CREDENTIAL)" "known-users-credential=with=equals" "single-quoted custom credential was not preserved"
 assert_equal "$(read_env_value "$partial_env_file" IDENTITY_DB_PASSWORD)" "keep-identity-db-password" "single-quoted database password was not preserved"
 assert_equal "$(read_env_value "$partial_env_file" RABBITMQ_USERS_PASSWORD)" "keep-users-rabbit-password" "double-quoted RabbitMQ password was not preserved"
+assert_equal "$(read_env_value "$partial_env_file" TRANSCODER_TOKEN)" "keep-transcoder-token" "custom transcoder token was not preserved"
 assert_registry_matches "$partial_env_file" CONFIGURATION_ACCESS_KEYS _CONFIG_ACCESS_KEY "Identity Users Notification Files Torrent Web"
 assert_registry_matches "$partial_env_file" SERVICE_CREDENTIALS _SERVICE_CREDENTIAL "Identity Users Files Torrent Web"
 partial_snapshot="$(read_env_value "$partial_env_file" IDENTITY_CONFIG_ACCESS_KEY)|$(read_env_value "$partial_env_file" USERS_CONFIG_ACCESS_KEY)|$(read_env_value "$partial_env_file" USERS_SERVICE_CREDENTIAL)|$(read_env_value "$partial_env_file" CONFIGURATION_ACCESS_KEYS)|$(read_env_value "$partial_env_file" SERVICE_CREDENTIALS)"

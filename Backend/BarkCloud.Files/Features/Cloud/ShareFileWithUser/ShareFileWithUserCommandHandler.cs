@@ -7,6 +7,8 @@ using BarkCloud.Shared.Exceptions.Files;
 
 using MediatR;
 
+using DomainUploadFileType = BarkCloud.Files.Domain.UploadFileType;
+
 namespace BarkCloud.Files.Features.Cloud.ShareFileWithUser;
 
 public class ShareFileWithUserCommandHandler : IRequestHandler<ShareFileWithUserCommand, CloudEmpty>
@@ -37,7 +39,7 @@ public class ShareFileWithUserCommandHandler : IRequestHandler<ShareFileWithUser
 
         // Поделиться можно только своим файлом.
         var file = await _filesStorage.GetFile(request.FileId);
-        if (file is null || !file.Uploaders.Contains(ownerId))
+        if (file is null || file.Type != DomainUploadFileType.CloudFile || !file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
         if (!file.IsReady())
             throw new FileNotReadyException();

@@ -136,6 +136,13 @@ public sealed class BuilderModel : INotifyPropertyChanged
     // Пусто — named volume archive_temp (создаётся от root → files под uid 1654 не запишет).
     public string ArchiveTempPath { get; set; } = "./data/archive-temp";
 
+    // Транскодер и Files используют одну папку; оба контейнера работают под uid 1654.
+    public string TranscodeWorkPath { get; set; } = "./data/transcode";
+    public string TranscoderToken { get; set; } = GenerateSecret(48);
+    public string TranscoderThreads { get; set; } = "2";
+    public string TranscoderCpus { get; set; } = "2.0";
+    public string TranscoderMemory { get; set; } = "4g";
+
     // Seq
     public string SeqAdminPassword { get; set; } = "password";
     public string SeqWebPort { get; set; } = "80";

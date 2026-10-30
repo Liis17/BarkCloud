@@ -366,6 +366,36 @@
                     </StackPanel>
                 </ui:CardExpander>
 
+                <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Video24}">
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <TextBlock FontWeight="Medium" Text="Варианты качества видео" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Ресурсы cloud-transcoder и общий рабочий каталог Files" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODE_WORK_PATH (общая папка на хосте)" />
+                        <ui:TextBox PlaceholderText="./data/transcode" Text="{Binding TranscodeWorkPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_TOKEN" />
+                        <ui:TextBox Text="{Binding TranscoderToken, UpdateSourceTrigger=PropertyChanged}" />
+                        <UniformGrid Margin="0,4,0,0" Columns="3">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_THREADS" />
+                                <ui:TextBox Text="{Binding TranscoderThreads, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="4,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_CPUS" />
+                                <ui:TextBox Text="{Binding TranscoderCpus, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="8,0,0,0">
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="TRANSCODER_MEMORY" />
+                                <ui:TextBox Text="{Binding TranscoderMemory, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </UniformGrid>
+                    </StackPanel>
+                </ui:CardExpander>
+
                 <!-- RabbitMQ -->
                 <ui:CardExpander Margin="0,0,0,8" Icon="{ui:SymbolIcon Mail24}">
                     <ui:CardExpander.Header>

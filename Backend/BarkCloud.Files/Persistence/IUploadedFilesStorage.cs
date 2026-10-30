@@ -13,6 +13,7 @@ public interface IUploadedFilesStorage
     Task<UploadFile?> GetOriginalByPreviewFileId(Guid previewFileId, CancellationToken cancellationToken = default);
     Task<List<FilePreview>> GetPreviewsForFile(Guid originalFileId, CancellationToken cancellationToken = default);
     Task<Dictionary<Guid, List<FilePreview>>> GetPreviewsForFiles(IEnumerable<Guid> originalFileIds, CancellationToken cancellationToken = default);
+    Task<Dictionary<Guid, List<VideoVariantDownloadInfo>>> GetVideoVariantsForFiles(IEnumerable<Guid> originalFileIds, CancellationToken cancellationToken = default);
     Task<Dictionary<Guid, FilePlaceholder>> GetPlaceholdersForFiles(IEnumerable<Guid> fileIds, CancellationToken cancellationToken = default);
     Task RemoveUploaderFromFile(Guid fileId, long userId, CancellationToken cancellationToken = default);
     Task<long> GetUserStorageUsed(long userId);
@@ -43,3 +44,6 @@ public sealed record MemoryMediaItem(UploadFile File, DateTime TakenAt);
 
 /// <summary>Блоб + его GPS-координаты и дата съёмки (для точек на карте).</summary>
 public sealed record LocatedMediaItem(UploadFile File, double Latitude, double Longitude, DateTime? TakenAt);
+
+/// <summary>Метаданные готового варианта для выдачи ссылки на скачивание.</summary>
+public sealed record VideoVariantDownloadInfo(Guid FileId, int QualityHeight, int Width, int Height, long FileSize);

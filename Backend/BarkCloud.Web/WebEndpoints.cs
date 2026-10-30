@@ -69,6 +69,14 @@ public static class WebEndpoints
                     imageWidth = resp.ImageWidth,
                     imageHeight = resp.ImageHeight,
                     fileSize = resp.FileSize,
+                    videoQualities = resp.VideoQualities.Select(q => new
+                    {
+                        height = q.Height,
+                        width = q.Width,
+                        fileSize = q.FileSize,
+                        isOriginal = q.IsOriginal,
+                        url = q.Url
+                    }).ToArray(),
                     downloadPath = "/s/" + token,
                 });
             }
@@ -104,7 +112,15 @@ public static class WebEndpoints
                         previewUrl = f.PreviewUrl,
                         fileSize = f.FileSize,
                         imageWidth = f.ImageWidth,
-                        imageHeight = f.ImageHeight
+                        imageHeight = f.ImageHeight,
+                        videoQualities = f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray()
                     }).ToArray()
                 });
             }
@@ -143,7 +159,15 @@ public static class WebEndpoints
                         previewUrl = f.PreviewUrl,
                         fileSize = f.FileSize,
                         imageWidth = f.ImageWidth,
-                        imageHeight = f.ImageHeight
+                        imageHeight = f.ImageHeight,
+                        videoQualities = f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray()
                     }).ToArray(),
                     nextCursorAt = resp.NextCursorAddedAt?.ToDateTimeOffset(),
                     nextCursorId = resp.NextCursorFileId

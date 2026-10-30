@@ -262,6 +262,7 @@ public sealed class CloudTreeWriterRacePostgresTests
         {
             Id = Guid.NewGuid(),
             Uploaders = [OwnerId],
+            Type = UploadFileType.CloudFile,
             CreatedAt = DateTime.UtcNow,
             UploadedAt = DateTime.UtcNow,
             Etag = "etag",

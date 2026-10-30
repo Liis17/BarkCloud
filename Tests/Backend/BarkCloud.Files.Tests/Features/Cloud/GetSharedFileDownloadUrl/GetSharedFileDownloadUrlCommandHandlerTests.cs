@@ -50,20 +50,41 @@ public class GetSharedFileDownloadUrlCommandHandlerTests
     public async Task Handle_WithGrant_ReturnsTempUrl()
     {
         var fileId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
         var tempId = Guid.NewGuid();
+        var variantTempId = Guid.NewGuid();
         _grants.Setup(s => s.RecipientHasAccess(RecipientId, fileId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
         {
             Id = fileId,
+            Type = UploadFileType.CloudFile,
+            MediaKind = MediaKind.Video,
+            ImageWidth = 1920,
+            ImageHeight = 1080,
+            Size = 1000,
             Etag = "etag",
             UploadedAt = DateTime.UtcNow
         });
+        _files.Setup(s => s.GetVideoVariantsForFiles(
+                It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, List<VideoVariantDownloadInfo>>
+            {
+                [fileId] = [new(variantId, 360, 640, 360, 300)]
+            });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<TempFileEntity> { new() { Id = tempId, OriginalFileId = fileId } });
+            .ReturnsAsync(new List<TempFileEntity>
+            {
+                new() { Id = tempId, OriginalFileId = fileId },
+                new() { Id = variantTempId, OriginalFileId = variantId }
+            });
 
         var response = await CreateSut().Handle(new GetSharedFileDownloadUrlCommand { FileId = fileId }, default);
 
         response.DownloadUrl.Should().Contain(tempId.ToString());
+        response.VideoQualities.Should().HaveCount(2);
+        response.VideoQualities[0].IsOriginal.Should().BeTrue();
+        response.VideoQualities[1].IsOriginal.Should().BeFalse();
+        response.VideoQualities[1].Url.Should().Contain(variantTempId.ToString());
     }
 
     [Fact]

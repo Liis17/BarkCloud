@@ -120,18 +120,36 @@ services:
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
       Archive__TempPath: "/mnt/archive-temp"
+      VideoVariants__WorkDirectory: "/mnt/transcode"
+      VideoVariants__TranscoderUrl: "http://cloud-transcoder:8080"
+      TRANSCODER_TOKEN: "${TRANSCODER_TOKEN}"
       ConsoleOutput: ${FILES_CONSOLE_OUTPUT}
       SeqEnable: ${FILES_SEQ_ENABLE}
       LognaraEnable: ${FILES_LOGNARA_ENABLE}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode
       - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro
     networks:
       - barkcloud-network
     depends_on:
       - cloud-configuration
       - cloud-identity
+      - cloud-transcoder
+
+  cloud-transcoder:
+    image: docker.barkfluff.com/barkcloud-transcoder:latest
+    restart: always
+    environment:
+      TRANSCODER_TOKEN: "${TRANSCODER_TOKEN}"
+      TRANSCODER_THREADS: "${TRANSCODER_THREADS}"
+    cpus: "${TRANSCODER_CPUS}"
+    mem_limit: "${TRANSCODER_MEMORY}"
+    volumes:
+      - ${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode
+    networks:
+      - barkcloud-network
 
   # Сервис уведомлений. Внешнего API нет — в nginx не маршрутизируется. Опционален
   cloud-notification:

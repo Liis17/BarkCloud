@@ -72,6 +72,7 @@ public static class BuilderConfigLoader
         SetSecret("RABBITMQ_FILES_PASSWORD", v => m.FilesRabbitPassword = v);
         SetSecret("RABBITMQ_TORRENT_PASSWORD", v => m.TorrentRabbitPassword = v);
         SetSecret("RABBITMQ_NOTIFICATION_PASSWORD", v => m.NotificationRabbitPassword = v);
+        SetSecret("TRANSCODER_TOKEN", v => m.TranscoderToken = v);
         RestoreSecretRegistries(m, e);
         Set("WEB_ADMIN_COOKIE_KEY", v => m.WebAdminCookieKey = v);
         Set("DOCKER_NETWORK_NAME", v => m.DockerNetworkName = v);
@@ -116,6 +117,10 @@ public static class BuilderConfigLoader
         Set("TORRENT_PEER_PORT", v => m.TorrentPeerPort = v);
         Set("TORRENT_DOWNLOAD_PATH", v => m.TorrentDownloadPath = v);
         Set("ARCHIVE_TEMP_PATH", v => m.ArchiveTempPath = v);
+        Set("TRANSCODE_WORK_PATH", v => m.TranscodeWorkPath = v);
+        Set("TRANSCODER_THREADS", v => m.TranscoderThreads = v);
+        Set("TRANSCODER_CPUS", v => m.TranscoderCpus = v);
+        Set("TRANSCODER_MEMORY", v => m.TranscoderMemory = v);
 
         Set("SEQ_ADMIN_PASSWORD", v => m.SeqAdminPassword = v);
         Set("SEQ_WEBPORT", v => m.SeqWebPort = v);
@@ -351,7 +356,7 @@ public static class BuilderConfigLoader
     }
 
     private static bool IsSecretVariable(string key) =>
-        key is "CONFIGURATION_ACCESS_KEYS" or "SERVICE_CREDENTIALS" or "WEB_ADMIN_COOKIE_KEY"
+        key is "CONFIGURATION_ACCESS_KEYS" or "SERVICE_CREDENTIALS" or "WEB_ADMIN_COOKIE_KEY" or "TRANSCODER_TOKEN"
         or "RABBITMQ_DEFAULT_PASS" or "POSTGRES_PASSWORD"
         || (key.StartsWith("RABBITMQ_", StringComparison.Ordinal)
             && key.EndsWith("_PASSWORD", StringComparison.Ordinal))

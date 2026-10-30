@@ -16,6 +16,25 @@ public class SettingsCatalogTests
     }
 
     [Fact]
+    public void VideoVariantSettings_AreFileSettingsAndRestartFiles()
+    {
+        foreach (var (key, kind) in new[]
+        {
+            ("Enabled", SettingValueKind.Boolean),
+            ("MaxSourceSizeMb", SettingValueKind.Integer),
+            ("MaxDurationMinutes", SettingValueKind.Integer)
+        })
+        {
+            var entry = SettingsCatalog.Resolve(ServiceId.Files, "VideoVariants", key);
+
+            entry.ValueKind.Should().Be(kind);
+            entry.RestartTargets.Should().Equal("files");
+            entry.IsSensitive.Should().BeFalse();
+            entry.IsEnvironmentManaged.Should().BeFalse();
+        }
+    }
+
+    [Fact]
     public void Resolve_UnknownSetting_Throws()
     {
         var act = () => SettingsCatalog.Resolve(ServiceId.Files, "Unknown", "Value");
@@ -117,6 +136,18 @@ public class SettingsCatalogTests
 
         var act = () => SettingsValueValidator.ValidateAndNormalize(entry, input);
 
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Theory]
+    [InlineData("MaxSourceSizeMb")]
+    [InlineData("MaxDurationMinutes")]
+    public void ValidateAndNormalize_VideoVariantLimit_EmptyMeansUnlimitedAndZeroIsRejected(string key)
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Files, "VideoVariants", key);
+
+        SettingsValueValidator.ValidateAndNormalize(entry, "").Should().BeEmpty();
+        var act = () => SettingsValueValidator.ValidateAndNormalize(entry, "0");
         act.Should().Throw<InvalidOperationException>();
     }
 

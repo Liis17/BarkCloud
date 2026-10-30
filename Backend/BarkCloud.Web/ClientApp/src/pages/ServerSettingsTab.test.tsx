@@ -20,6 +20,13 @@ function editor() { return within(document.querySelector('.storage-profile-card'
 async function confirm() { fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Подтвердить' })); }
 
 describe('ServerSettingsTab', () => {
+  it('показывает роль S3 для вариантов видео', async () => {
+    mockServer();
+    render(<ServerSettingsTab />);
+
+    expect(await screen.findByText('Варианты видео')).toBeTruthy();
+  });
+
   it('не выводит секреты профиля и скрывает служебные токены', async () => {
     const unsafeProfile = { ...storageProfile, accessKey: 'RAW_ACCESS_MUST_NOT_RENDER', secretKey: 'RAW_SECRET_MUST_NOT_RENDER' };
     mockServer({ ...serverSettings, settings: [
