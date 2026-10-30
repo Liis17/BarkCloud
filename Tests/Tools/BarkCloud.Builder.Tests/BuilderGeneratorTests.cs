@@ -163,6 +163,40 @@ public sealed class BuilderGeneratorTests
     }
 
     [Fact]
+    public void Video_transcoder_shares_work_directory_with_files_and_applies_resource_limits()
+    {
+        var model = new BuilderModel
+        {
+            TranscodeWorkPath = "./data/custom-transcode",
+            TranscoderToken = "video-transcoder-token",
+            TranscoderThreads = "3",
+            TranscoderCpus = "1.5",
+            TranscoderMemory = "3g",
+        };
+
+        var compose = BackendComposeGenerator.BuildCompose(model);
+        var env = BackendComposeGenerator.BuildEnv(model);
+        var files = ComposeService(compose, "cloud-files");
+        var transcoder = ComposeService(compose, "cloud-transcoder");
+
+        Assert.Contains("VideoVariants__WorkDirectory: \"/mnt/transcode\"", files);
+        Assert.Contains("VideoVariants__TranscoderUrl: \"http://cloud-transcoder:8080\"", files);
+        Assert.Contains("TRANSCODER_TOKEN: \"${TRANSCODER_TOKEN}\"", files);
+        Assert.Contains("- cloud-transcoder", files);
+        Assert.Contains("image: docker.barkfluff.com/barkcloud-transcoder:latest", transcoder);
+        Assert.Contains("TRANSCODER_THREADS: \"${TRANSCODER_THREADS}\"", transcoder);
+        Assert.Contains("cpus: \"${TRANSCODER_CPUS}\"", transcoder);
+        Assert.Contains("mem_limit: \"${TRANSCODER_MEMORY}\"", transcoder);
+        Assert.Contains("${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode", files);
+        Assert.Contains("${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode", transcoder);
+        Assert.Contains("TRANSCODE_WORK_PATH=./data/custom-transcode\n", env);
+        Assert.Contains("TRANSCODER_TOKEN='video-transcoder-token'\n", env);
+        Assert.Contains("TRANSCODER_THREADS=3\n", env);
+        Assert.Contains("TRANSCODER_CPUS=1.5\n", env);
+        Assert.Contains("TRANSCODER_MEMORY=3g\n", env);
+    }
+
+    [Fact]
     public void Empty_data_paths_are_written_as_empty_and_use_named_volume_fallbacks()
     {
         var model = new BuilderModel

@@ -6,6 +6,38 @@ namespace BarkCloud.Builder.Tests;
 public sealed class BuilderConfigLoaderTests
 {
     [Fact]
+    public void Video_transcoder_settings_round_trip_and_replace_placeholder_token()
+    {
+        var model = new BuilderModel
+        {
+            TranscodeWorkPath = "./video-work",
+            TranscoderToken = "video-$-transcoder-secret",
+            TranscoderThreads = "4",
+            TranscoderCpus = "2.5",
+            TranscoderMemory = "6g",
+        };
+
+        var loaded = RoundTrip(model, "C:\\out");
+
+        Assert.Equal(model.TranscodeWorkPath, loaded.TranscodeWorkPath);
+        Assert.Equal(model.TranscoderToken, loaded.TranscoderToken);
+        Assert.Equal(model.TranscoderThreads, loaded.TranscoderThreads);
+        Assert.Equal(model.TranscoderCpus, loaded.TranscoderCpus);
+        Assert.Equal(model.TranscoderMemory, loaded.TranscoderMemory);
+        AssertSameOutput(model, loaded);
+
+        var defaults = new BuilderModel();
+        var repaired = BuilderConfigLoader.Load(
+            BackendComposeGenerator.BuildCompose(defaults),
+            "TRANSCODER_TOKEN=replace-transcoder-token\n",
+            null,
+            "C:\\out");
+
+        Assert.False(string.IsNullOrWhiteSpace(repaired.TranscoderToken));
+        Assert.NotEqual("replace-transcoder-token", repaired.TranscoderToken);
+    }
+
+    [Fact]
     public void Registry_only_env_restores_split_secrets_and_prefers_explicit_values()
     {
         const string env = """

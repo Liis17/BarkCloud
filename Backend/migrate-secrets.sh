@@ -341,6 +341,8 @@ for key in CONFIGURATION_DB_PASSWORD IDENTITY_DB_PASSWORD USERS_DB_PASSWORD FILE
   ensure_generated_env "$key" "$(gen_secret)"
 done
 
+ensure_generated_env "TRANSCODER_TOKEN" "$(gen_secret)"
+
 # --- Убираем упразднённый общий ключ, если он ещё в .env ---
 sed -i -E '/^CONFIGURATION_ACCESS_KEY=/d' "$ENV_FILE" || true
 
