@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -346,12 +347,6 @@ private fun CloudMediaViewerContent(
     val scope = rememberCoroutineScope()
     var panelExpanded by remember { mutableStateOf(false) }
     val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
-    val currentAsset = assets.getOrNull(pagerState.currentPage) ?: return
-    val dateTimeText = remember(currentAsset.createdAtMillis) {
-        currentAsset.createdAtMillis.takeIf { it > 0L }?.let {
-            DateFormat.getDateTimeInstance().format(Date(it))
-        }.orEmpty()
-    }
     val zoomStates = remember { mutableMapOf<String, ZoomableImageState>() }
     val activeZoomState = remember { mutableStateOf<ZoomableImageState?>(null) }
     val isZoomed by remember {
@@ -361,22 +356,14 @@ private fun CloudMediaViewerContent(
     }
     var previousAssetIds by remember { mutableStateOf(assetIds) }
     var previousSettledAssetId by remember { mutableStateOf(assetIds.getOrNull(initialIndex)) }
-    val infoState by infoViewModel.state.collectAsStateWithLifecycle()
-    val viewerAssetId = LocalCloudMediaViewerAssetId.current
-    val jpegViewModel = currentAsset.jpegViewModel()
-    var useJpegView by remember(currentAsset.id) {
-        mutableStateOf(requiresJpegView(currentAsset.fileName, jpegViewModel != null))
-    }
-    var retryCount by remember(currentAsset.id) { mutableIntStateOf(0) }
-    var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
-    var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
+    val assetListTargetIndex = viewerIndexAfterAssetListChange(
+        previousIds = previousAssetIds,
+        currentId = previousSettledAssetId,
+        currentIds = assetIds,
+    )
 
     LaunchedEffect(assetIds) {
-        val targetIndex = viewerIndexAfterAssetListChange(
-            previousIds = previousAssetIds,
-            currentId = previousSettledAssetId,
-            currentIds = assetIds,
-        ) ?: run {
+        val targetIndex = assetListTargetIndex ?: run {
             onDismiss()
             return@LaunchedEffect
         }
@@ -389,6 +376,24 @@ private fun CloudMediaViewerContent(
         previousAssetIds = assetIds
         previousSettledAssetId = targetAssetId
     }
+
+    val currentAsset = assets.getOrNull(pagerState.currentPage)
+        ?: assetListTargetIndex?.let(assets::getOrNull)
+        ?: return
+    val dateTimeText = remember(currentAsset.createdAtMillis) {
+        currentAsset.createdAtMillis.takeIf { it > 0L }?.let {
+            DateFormat.getDateTimeInstance().format(Date(it))
+        }.orEmpty()
+    }
+    val infoState by infoViewModel.state.collectAsStateWithLifecycle()
+    val viewerAssetId = LocalCloudMediaViewerAssetId.current
+    val jpegViewModel = currentAsset.jpegViewModel()
+    var useJpegView by remember(currentAsset.id) {
+        mutableStateOf(requiresJpegView(currentAsset.fileName, jpegViewModel != null))
+    }
+    var retryCount by remember(currentAsset.id) { mutableIntStateOf(0) }
+    var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
+    var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
 
     LaunchedEffect(pagerState.settledPage, assetIds) {
         val settledAsset = assets.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
@@ -452,7 +457,7 @@ private fun CloudMediaViewerContent(
                     key = { page -> assets[page].id },
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
-                    val asset = assets[page]
+                    val asset = assets.getOrNull(page) ?: return@HorizontalPager
                     val isCurrentPage = page == pagerState.currentPage
                     val zoomableImageState = rememberZoomableImageState()
                     SideEffect {
@@ -560,7 +565,10 @@ private fun CloudMediaViewerContent(
                                         retryCount++
                                     }
                                 },
-                                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding()
+                                    .padding(bottom = 104.dp),
                             ) {
                                 Text(stringResource(R.string.viewer_retry_original))
                             }
