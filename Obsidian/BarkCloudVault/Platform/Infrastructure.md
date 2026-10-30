@@ -11,6 +11,7 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 | Файл | Символ | Роль |
 |---|---|---|
 | `Backend/docker-compose.yml` | services, networks, volumes | Сервисы, зависимости и постоянные данные |
+| `Backend/BarkCloud.Transcoder/Dockerfile` | `cloud-transcoder` | Изолированный AV1/WebM-транскодер с ffmpeg |
 | `Backend/sample.env` | переменные окружения | Шаблон настройки compose |
 | `Backend/provision-isolation.sh`, `provision-postgres.sql`, `provision-rabbitmq.sh` | service identities and permissions | Provisioning PostgreSQL и RabbitMQ |
 | `Backend/isolation-guide.md` | operator procedure | Порядок установки, перехода и отката |
@@ -25,21 +26,22 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 | `CONFIGURATION_SERVICE_URL`, `CONFIGURATION_ACCESS_KEY` | Bootstrap-адрес и ключ для получения конфигурации сервисами |
 | `*_CONSOLE_OUTPUT`, `*_SEQ_ENABLE`, `*_LOGNARA_ENABLE` | Независимые локальные настройки sink для каждого из семи backend-приложений; defaults — Console on, Seq и Lognara off |
 | `IDENTITY_PORT`, `USERS_PORT`, `CONFIGURATION_PORT`, `FILES_PORT`, `FILES_HTTP1PORT`, `TORRENT_PORT`, `TORRENT_HTTP1PORT` | Внутренние gRPC и HTTP/1 порты; значения по умолчанию: 8000, 8001, 8003, 8005/8006 и 8007/8008 |
+| `TRANSCODER_TOKEN`, `TRANSCODER_THREADS`, `TRANSCODER_CPUS`, `TRANSCODER_MEMORY`, `TRANSCODE_WORK_PATH` | Общий токен Files/Transcoder, параллелизм ffmpeg, лимиты контейнера и общая хост-папка |
 | `EXTERNAL_*_HOST` | Публичные адреса сервисов для клиентских приложений |
 | `WEB_COOKIE_SECURE`, `WEB_PUBLIC_HOST`, `WEB_TRUSTED_PROXY_NETWORKS`, `WEB_ADMIN_PASSWORD` | Настройки браузерной cookie, публичного адреса, доверенных reverse-proxy и AdminGate |
 
 ## Зависимости и взаимодействия
 
-- `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-notification`, `cloud-torrent` и `cloud-web` получают общие параметры Configuration. Compose задаёт порядок запуска зависимостей через `depends_on`; редактируемые Docker container names не меняют ключи сервисов и их DNS alias `cloud-*`.
-- `cloud-files` подключает данные MinIO для проверки диска read-only и отдельный каталог временных архивов. `cloud-torrent` хранит загружаемые торренты в `/mnt/torrents`.
-- `Backend/sample.env` задаёт относительные хост-пути `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/torrent` и `./data/archive-temp`; Seq-путь появляется при его включении. Пустой путь в Compose означает использование named volume. MinIO использует образ `docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1`.
+- `cloud-identity`, `cloud-users`, `cloud-files`, `cloud-notification`, `cloud-torrent` и `cloud-web` получают общие параметры Configuration. Изолированный `cloud-transcoder` не подключается к Configuration, БД или RabbitMQ; Compose задаёт порядок запуска Files после него через `depends_on`.
+- `cloud-files` подключает данные MinIO для проверки диска read-only, каталог временных архивов и общую с `cloud-transcoder` папку `/mnt/transcode`. Sidecar слушает только внутри Docker-сети на 8080; host-порты не опубликованы. Доступ к API требует `X-Transcoder-Token`; compose передаёт один `TRANSCODER_TOKEN` обоим контейнерам. `cloud-torrent` хранит загружаемые торренты в `/mnt/torrents`.
+- `Backend/sample.env` задаёт относительные хост-пути `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/torrent`, `./data/archive-temp` и `./data/transcode`; Seq-путь появляется при его включении. Пустой путь в Compose означает использование named volume. Для транскодера `TRANSCODER_THREADS` ограничивает ffmpeg, `TRANSCODER_CPUS` и `TRANSCODER_MEMORY` задают лимиты Docker; `TRANSCODE_WORK_PATH` монтируется одинаково в Files и sidecar. MinIO использует образ `docker.barkfluff.com/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1`.
 - `cloud-configuration` не использует `env_file`: получает только явные service-scoped PostgreSQL/RabbitMQ secrets и нужные bootstrap-настройки, без operator credentials. `cloud-web` остаётся доверенной admin-границей: работает от root и получает полный `.env`, Docker socket и compose-файл для записи.
 - Приложения фиксируют локальные startup flags до загрузки удалённой конфигурации. Console, Seq и Lognara не зависят друг от друга; значения задаются через `.env`, а command-line параметры имеют приоритет над environment.
 - При включении Lognara Compose добавляет локальный `lognara-relay` в `barkcloud-network`. Включённые агенты используют его по адресу `http://lognara-relay:7401/v1/batches`; relay пересылает данные на вручную указанный Core URL `/v1/batches`. Порты relay не публикуются на хост.
 - Включённые инфраструктурные контейнеры nginx, MinIO, PostgreSQL, RabbitMQ и Seq получают отдельный сгенерированный agent image на основе исходного image. Wrapper сохраняет исходные `ENTRYPOINT`, `CMD`, `USER` и `STOPSIGNAL`; Compose `command` остаётся применимым. Внешний nginx не меняется. Для PostgreSQL Lognara включение отключает файловый logging collector и направляет логи в stderr; Seq не получает источники из своих файлов или БД.
 - `Backend/nginx/cloud.barkfluff.conf` направляет gRPC backend-сервисов под TLS, HTTP/1 загрузки и скачивания Files/Torrent, и Web через отдельные upstream. Поток байтов resumable upload идёт через nginx напрямую в HTTP/1 Files; детали в [[Backend/ResumableUpload]].
 - Все nginx upstream используют shared zone и разрешают Docker DNS через `127.0.0.11` с периодом 5 секунд. Это позволяет переживать пересоздание контейнеров без перезапуска nginx; требуется nginx OSS 1.27.3 или новее. Session cache использует имя `barkcloud_ssl`, чтобы не пересекаться с конфигами других приложений в общем nginx.
-- Для хранения используются тома или хост-пути: PostgreSQL и backup, MinIO, RabbitMQ, Seq, временные архивы, Torrent и состояние обслуживания Web.
+- Для хранения используются тома или хост-пути: PostgreSQL и backup, MinIO, RabbitMQ, Seq, временные архивы, рабочий каталог транскодирования, Torrent и состояние обслуживания Web.
 
 ## Ограничения и важные детали
 
@@ -50,7 +52,7 @@ Parent: [[Architecture]] · See also: [[Tools/Builder]] · [[Web/SystemUpdates]]
 
 ## Переход на разделённые секреты и RS256
 
-`Backend/migrate-secrets.sh` заполняет отсутствующие или `replace-*` bootstrap-ключи Configuration, сервисные token credentials и индивидуальные PostgreSQL/RabbitMQ passwords, сохраняя заданные значения и восстанавливая пропущенные bootstrap/token values из старых реестров. Реестры `CONFIGURATION_ACCESS_KEYS` и `SERVICE_CREDENTIALS` являются производными от индивидуальных переменных и синхронизируются при каждом запуске. Builder помещает скрипт и provisioning/smoke artifacts в папку вывода. Скрипт создаёт резервную копию `.env`, но не меняет инфраструктуру.
+`Backend/migrate-secrets.sh` заполняет отсутствующие или `replace-*` bootstrap-ключи Configuration, сервисные token credentials, `TRANSCODER_TOKEN` и индивидуальные PostgreSQL/RabbitMQ passwords, сохраняя заданные значения и восстанавливая пропущенные bootstrap/token values из старых реестров. Реестры `CONFIGURATION_ACCESS_KEYS` и `SERVICE_CREDENTIALS` являются производными от индивидуальных переменных и синхронизируются при каждом запуске. Builder помещает скрипт и provisioning/smoke artifacts в папку вывода. Скрипт создаёт резервную копию `.env`, но не меняет инфраструктуру.
 
 Для новой установки сначала создайте PostgreSQL/RabbitMQ, выполните `provision-isolation.sh fresh`, затем запускайте приложения. Для существующей установки сделайте и проверьте backup PostgreSQL/RabbitMQ, остановите все приложения, затем установите новый `docker-compose.yml`, `.env` и provisioning files **до любого restart**. Запустите `migrate-secrets.sh`, затем `provision-isolation.sh existing` с `BARKCLOUD_BACKUP_VERIFIED=YES` и `BARKCLOUD_APPS_STOPPED=YES`; после provisioning запускайте сначала Configuration, затем остальные новые образы. Не смешивайте версии backend. Миграция `20261028120000_IsolateServiceCredentials` удаляет прежние root-based service connection strings и общие RabbitMQ credentials вместе с историей. Откат после provisioning требует восстановить предыдущие образы, compose, `.env`, PostgreSQL backup и RabbitMQ backup/definitions согласованно.
 

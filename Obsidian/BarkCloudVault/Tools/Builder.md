@@ -35,17 +35,19 @@ Configuration получает внутренние порты Identity, Users, 
 | Внешний nginx | По умолчанию генерирует `nginx/cloud.barkfluff.conf`, не добавляя nginx-контейнер, публикацию портов или копирование сертификатов |
 | Docker-сеть | Переменная `DOCKER_NETWORK_NAME` задаёт реальное имя общей внешней сети; логический ключ Compose остаётся `barkcloud-network` |
 | Каналы логирования | Для каждого из семи backend-приложений независимо генерирует `ConsoleOutput`, `SeqEnable` и `LognaraEnable`; начальные значения — `true`, `false`, `false`. Общие переключатели задают канал всем приложениям, после чего можно менять строки по отдельности |
+| Варианты видео | Всегда добавляет `cloud-transcoder`; поля `TRANSCODE_WORK_PATH`, `TRANSCODER_TOKEN`, `TRANSCODER_THREADS`, `TRANSCODER_CPUS` и `TRANSCODER_MEMORY` редактируются и восстанавливаются из `.env` |
 | Lognara | Опционально добавляет relay в общую сеть BarkCloud и настраивает выбранных агентов приложений и включённой инфраструктуры; для каждого агента задаются отдельные token и spool |
 | Имена контейнеров | Редактируемые `*_CONTAINER_NAME` задают фактические имена только включённых сервисов; ключи сервисов Compose `cloud-*` и внутренние адреса `CONFIGURATION_SERVICE_URL` остаются стабильными |
 | Предпросмотр адресов | В блоках сервисов отображаются выбранные имена контейнеров и внутренние адреса, вычисленные из центральных полей имён и портов; все предпросмотры только для чтения |
 | Канал образа | Release или Dev выбирает реестр `docker.barkfluff.com` и суффикс образа |
 | Порты по умолчанию | Identity 8000, Users 8001, Configuration 8003, Files 8005/8006 и Torrent 8007/8008; стандартные внутренние порты инфраструктуры остаются фиксированными |
-| Состав сервисов | Configuration, Identity, Users, Files и Web включены всегда; Notification, Torrent, MinIO, RabbitMQ, PostgreSQL и Seq переключаются в UI |
+| Состав сервисов | Configuration, Identity, Users, Files, Web и `cloud-transcoder` включены всегда; Notification, Torrent, MinIO, RabbitMQ, PostgreSQL и Seq переключаются в UI |
 | JWT ключи | Пара лежит в `secrets/jwt/`; приватный ключ смонтирован только в Identity, публичный — в валидаторы. После копирования Windows-вывода на Linux запустите `bash ./migrate-secrets.sh` в папке вывода, чтобы закрыть приватный файл и дать чтение UID 1654 |
 
 ## Зависимости и взаимодействия
 
-- Модель по умолчанию включает backend-ядро, Web, инфраструктурные сервисы и внешний nginx. Порты и хост-пути основаны на `Backend/sample.env`; стандартные пути данных — `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/seq`, `./data/torrent` и `./data/archive-temp`, относительно папки с генерируемым `docker-compose.yml`.
+- Модель по умолчанию включает backend-ядро, Web, `cloud-transcoder`, инфраструктурные сервисы и внешний nginx. Порты и хост-пути основаны на `Backend/sample.env`; стандартные пути данных — `./data/minio`, `./data/pgdata`, `./data/pgbackup`, `./data/seq`, `./data/torrent`, `./data/archive-temp` и `./data/transcode`, относительно папки с генерируемым `docker-compose.yml`.
+- Files и `cloud-transcoder` монтируют `TRANSCODE_WORK_PATH` одинаково в `/mnt/transcode`. Builder сохраняет token в `.env` как quoted secret; `migrate-secrets.sh` генерирует его, если поле отсутствует или начинается с `replace-`. По умолчанию ffmpeg ограничен 2 потоками, CPU — 2.0, память — 4g.
 - Web получает фактические имена Configuration, Identity, Users, Files и Web через `Docker__ContainerNames__*`; Notification и Torrent передаются только при включённых сервисах.
 - Android fingerprint в модели Builder по умолчанию равен публичному сертификату официального APK и записывается в `.env`; пустое поле отключает Android passkeys, а пользовательская подпись APK требует заменить отпечаток. Compose передаёт его в Identity и Web.
 - Каждый backend-сервис получает три независимых параметра логирования из своего набора `*_CONSOLE_OUTPUT`, `*_SEQ_ENABLE` и `*_LOGNARA_ENABLE`. `IncludeSeq` и `IncludeLognara` по умолчанию выключены. Предупреждение об отключённом централизованном сборе логов показывается, только когда оба переключателя выключены; включение любого из них скрывает предупреждение. Если optional Notification или Torrent выключен, его агент не включается в Compose и его поля не валидируются; значения каналов сохраняются в `.env` для последующего включения сервиса.
