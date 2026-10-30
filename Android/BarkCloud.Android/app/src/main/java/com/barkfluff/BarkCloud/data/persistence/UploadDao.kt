@@ -32,14 +32,14 @@ interface UploadDao {
     @Query("SELECT COUNT(*) FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase NOT IN ('COMPLETED', 'CANCELLED')")
     suspend fun stagedBackupCount(): Int
 
-    @Query("SELECT * FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase IN ('ATTACHING', 'UPLOADED_NOT_ATTACHED') ORDER BY createdAtMillis, id LIMIT :limit")
-    suspend fun attachOnlyBackupStagePage(limit: Int): List<UploadJob>
+    @Query("SELECT * FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase IN ('FAILED', 'PAUSED', 'ATTACHING', 'UPLOADED_NOT_ATTACHED') ORDER BY createdAtMillis, id LIMIT :limit")
+    suspend fun inactiveStagedBackupPage(limit: Int): List<UploadJob>
 
-    @Query("SELECT * FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase NOT IN ('COMPLETED', 'CANCELLED') ORDER BY createdAtMillis, id LIMIT :limit OFFSET :offset")
-    suspend fun stagedBackupPage(limit: Int, offset: Int): List<UploadJob>
+    @Query("SELECT * FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase IN ('QUEUED', 'FAILED', 'PAUSED', 'UPLOADED_NOT_ATTACHED') ORDER BY createdAtMillis DESC, id DESC LIMIT :limit")
+    suspend fun releasableBackupStagePage(limit: Int): List<UploadJob>
 
-    @Query("UPDATE upload_jobs SET stagedFilePath = NULL WHERE id = :id AND source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase NOT IN ('COMPLETED', 'CANCELLED')")
-    suspend fun releaseBackupStage(id: String): Int
+    @Query("UPDATE upload_jobs SET stagedFilePath = NULL WHERE id = :id AND source = 'BACKUP' AND stagedFilePath = :path AND phase = :expectedPhase AND phase IN ('QUEUED', 'FAILED', 'PAUSED', 'ATTACHING', 'UPLOADED_NOT_ATTACHED')")
+    suspend fun releaseBackupStage(id: String, path: String, expectedPhase: UploadPhase): Int
 
     @Query("SELECT * FROM upload_jobs WHERE phase = 'CANCELLED' AND sessionId IS NOT NULL")
     suspend fun cancelledWithSession(): List<UploadJob>
