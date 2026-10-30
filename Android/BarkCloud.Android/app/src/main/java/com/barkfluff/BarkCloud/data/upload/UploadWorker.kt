@@ -12,8 +12,9 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
-import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
+import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
+import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.MediaCloudStateDao
@@ -25,17 +26,17 @@ import com.barkfluff.BarkCloud.net.InsecureHttp
 import com.barkfluff.BarkCloud.net.UploadPartHttpException
 import com.barkfluff.BarkCloud.net.UploadSessionInfo
 import com.barkfluff.BarkCloud.net.UploadSessionState
-import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 
 /**
@@ -63,39 +64,48 @@ class UploadWorker(
             val albums = AlbumRepository(grpc)
             val mediaDao = BarkCloudDatabase.get(applicationContext).mediaCloudStateDao()
 
+            // Older app versions staged the whole discovered backup queue at once.
+            queue.releaseExcessBackupStages(MAX_CONCURRENT_JOBS)
+
             // Задачи, отменённые мимо воркера: освобождаем резерв квоты на сервере.
             queue.cancelledWithSessions().forEach { cancelled ->
                 runCatching { transfer.cancelUploadSession(requireNotNull(cancelled.sessionId)) }
                 queue.clearSession(cancelled.id)
             }
 
-            if (queue.activeJobs().isEmpty()) return Result.success()
+            if (queue.activeCount() == 0) return Result.success()
 
             val tracker = ProgressTracker { notifyChannel.trySend(Unit) }
             val pending = mutableListOf<PendingRetry>()
+            val stopClaiming = AtomicBoolean(false)
+            val stagingBudget = BackupStagingBudget(queue.stagedBackupCount())
             setForeground(progressInfo(tracker.snapshot()))
 
             coroutineScope {
-                launch {
-                    for (ignored in notifyChannel) {
-                        runCatching { setForeground(progressInfo(tracker.snapshot())) }
+                val notificationConsumer = launch {
+                    consumeUploadNotifications(notifyChannel) {
+                        setForeground(progressInfo(tracker.snapshot()))
                     }
                 }
-                val semaphore = Semaphore(MAX_CONCURRENT_JOBS)
-                val claimed = mutableSetOf<String>()
-                while (true) {
-                    semaphore.acquire()
-                    val job = queue.activeJobs().firstOrNull { it.id !in claimed }
-                    if (job == null) {
-                        semaphore.release()
-                        break
-                    }
-                    claimed += job.id
-                    tracker.register(job.id, job.bytesTotal, job.fileName)
-                    launch {
+                try {
+                    UploadQueueDrain.run(queue, MAX_CONCURRENT_JOBS, stopClaiming::get) { job ->
+                        tracker.register(job.id, job.bytesTotal, job.fileName)
+                        val hadStagedFile = job.source == UploadSource.BACKUP && job.stagedFilePath != null
+                        val reservedStage = AtomicBoolean(false)
                         try {
-                            process(job, queue, transfer, cloud, albums, mediaDao, tracker)
+                            process(
+                                job,
+                                queue,
+                                transfer,
+                                cloud,
+                                albums,
+                                mediaDao,
+                                tracker,
+                                stagingBudget,
+                            ) { reservedStage.set(true) }
                             tracker.finish(job.id)
+                        } catch (deferred: BackupStageDeferredException) {
+                            tracker.remove(job.id)
                         } catch (paused: JobPausedException) {
                             tracker.remove(job.id)
                         } catch (cancelled: JobCancelledException) {
@@ -105,22 +115,37 @@ class UploadWorker(
                             throw error
                         } catch (error: Throwable) {
                             tracker.finish(job.id)
-                            handleFailure(job, error, queue, transfer, mediaDao, pending)
+                            handleFailure(job, error, queue, transfer, mediaDao, pending, stopClaiming)
                         } finally {
-                            semaphore.release()
+                            if (job.source == UploadSource.BACKUP && (hadStagedFile || reservedStage.get())) {
+                                if (queue.byId(job.id)?.stagedFilePath == null) stagingBudget.release()
+                            }
                         }
                     }
+                } finally {
+                    notifyChannel.close()
+                    notificationConsumer.cancelAndJoin()
                 }
             }
 
-            applicationContext.getSystemService(NotificationManager::class.java)
-                .notify(UploadNotification.ID, UploadNotification.finished(applicationContext, tracker.doneTotal))
-
             val retryable = pending.filter { it.retryable }
             if (retryable.isNotEmpty() && runAttemptCount < MAX_RETRY_ATTEMPTS) {
+                applicationContext.getSystemService(NotificationManager::class.java)
+                    .notify(UploadNotification.ID, UploadNotification.finished(applicationContext, tracker.doneTotal))
                 Result.retry()
             } else {
                 retryable.forEach { finalizeExhausted(it, queue, mediaDao) }
+                if (shouldScheduleUploadContinuation(
+                        stopClaiming = stopClaiming.get(),
+                        activeJobs = queue.activeCount(),
+                        stagedBackups = queue.stagedBackupCount(),
+                        maxStagedBackups = MAX_CONCURRENT_JOBS,
+                    )
+                ) {
+                    UploadScheduler.enqueue(applicationContext, userInitiated = false)
+                }
+                applicationContext.getSystemService(NotificationManager::class.java)
+                    .notify(UploadNotification.ID, UploadNotification.finished(applicationContext, tracker.doneTotal))
                 Result.success()
             }
         } finally {
@@ -138,13 +163,47 @@ class UploadWorker(
         albums: AlbumRepository,
         mediaDao: MediaCloudStateDao,
         tracker: ProgressTracker,
+        stagingBudget: BackupStagingBudget,
+        onStageReserved: () -> Unit,
     ) {
         var job = initial
+        val backupSettings = if (job.source == UploadSource.BACKUP) AutoUploadSettings(applicationContext) else null
+        if (backupSettings != null) {
+            ensureActive(job.id, queue)
+            if (!backupSettings.enabled) {
+                queue.pauseBackup()
+                throw JobPausedException()
+            }
+        }
+
+        // A ready upload needs only its saved file ID and destination; source staging is irrelevant.
+        if (job.isAttachOnlyPhase()) {
+            attachReady(job, queue, cloud, albums, mediaDao)
+            return
+        }
+
+        if (job.needsBackupStaging()) {
+            if (job.stagedFilePath == null && !stagingBudget.reserve()) throw BackupStageDeferredException()
+            if (job.stagedFilePath == null) onStageReserved()
+            val prepared = queue.prepareBackup(job.id, mediaDao) { media ->
+                ensureBackupActive(job.id, queue, requireNotNull(backupSettings), media)
+            }
+            if (prepared == null) {
+                when (queue.byId(job.id)?.phase) {
+                    UploadPhase.CANCELLED -> throw JobCancelledException()
+                    UploadPhase.PAUSED -> throw JobPausedException()
+                    else -> throw BackupStageDeferredException()
+                }
+            }
+            prepared.staleSessionId?.let { staleSession -> runCatching { transfer.cancelUploadSession(staleSession) } }
+            job = prepared.job
+        }
+
         val staged = job.stagedFilePath?.let(::File) ?: throw UploadTerminalException("No staged file for ${job.id}")
         if (!staged.exists()) throw FileNotFoundException(staged.path)
         if (job.bytesTotal <= 0L) throw UploadTerminalException(applicationContext.getString(R.string.upload_error_empty_file))
 
-        // 1. SHA-256 оригинала (backup приносит готовый хеш).
+        // 1. Manual/share uploads still hash their eager staged file here.
         if (job.mediaHash == null) {
             queue.setPhase(job.id, UploadPhase.HASHING)
             val hashed = UploadFileHasher.hashAndSize(staged)
@@ -156,10 +215,16 @@ class UploadWorker(
             job = requireNotNull(queue.byId(job.id))
         }
 
-        // 2. Байты уже на сервере — только привязка.
-        if (job.phase == UploadPhase.ATTACHING || job.phase == UploadPhase.UPLOADED_NOT_ATTACHED) {
-            attachReady(job, queue, cloud, albums, mediaDao)
-            return
+        // Backups retain the existing cloud-hash dedupe, now after lazy staging.
+        if (job.source == UploadSource.BACKUP && job.sessionId == null && job.preparedFileId == null) {
+            val hash = requireNotNull(job.mediaHash)
+            if (cloud.checkFileHashes(listOf(hash))[hash] == true) {
+                queue.complete(job)
+                job.mediaKey?.let { key ->
+                    mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(hash = hash, status = MediaCloudStatus.IN_CLOUD, cloudFileId = null)) }
+                }
+                return
+            }
         }
 
         // 3. Сессия и дальше по серверному состоянию.
@@ -175,6 +240,40 @@ class UploadWorker(
                 else -> throw UploadTerminalException(info.errorMessage ?: "Сессия ${info.state}")
             }
         }
+    }
+
+    private suspend fun ensureBackupActive(
+        id: String,
+        queue: UploadQueueStore,
+        settings: AutoUploadSettings,
+        media: DeviceMedia,
+    ) {
+        ensureActive(id, queue)
+        if (!settings.enabled) {
+            queue.pauseBackup()
+            throw JobPausedException()
+        }
+        if (!hasMediaPermission(media.isVideo)) throw BackupPermissionUnavailableException()
+        if (!settings.includesFolder(media.folderKey)) {
+            queue.pauseBackupJob(id)
+            throw JobPausedException()
+        }
+    }
+
+    private fun hasMediaPermission(isVideo: Boolean): Boolean {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (isVideo) android.Manifest.permission.READ_MEDIA_VIDEO else android.Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (androidx.core.content.ContextCompat.checkSelfPermission(applicationContext, permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                applicationContext,
+                android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     private suspend fun obtainSession(job: UploadJob, queue: UploadQueueStore, transfer: FileTransferService): UploadSessionInfo {
@@ -203,22 +302,22 @@ class UploadWorker(
         queue: UploadQueueStore,
         transfer: FileTransferService,
     ): UploadSessionInfo {
-        queue.setPhase(job.id, UploadPhase.CREATING_SESSION)
-        val info = try {
-            transfer.createUploadSession(
-                idempotencyKey = idempotencyKey,
-                fileName = job.fileName,
-                fileSize = job.bytesTotal,
-                contentType = job.mimeType ?: "application/octet-stream",
-                sha256 = requireNotNull(job.mediaHash),
-            )
-        } catch (error: StatusRuntimeException) {
-            if (error.errorCode() == UploadErrorCodes.QUOTA_EXCEEDED) {
-                throw UploadTerminalException(applicationContext.getString(R.string.upload_error_quota_exceeded), error)
-            }
-            throw error
+        if (queue.prepareUploadSession(job.id, idempotencyKey, replaceExisting = job.sessionId != null) == 0) {
+            if (queue.byId(job.id)?.phase == UploadPhase.PAUSED) throw JobPausedException()
+            throw JobCancelledException()
         }
-        queue.bindSession(job.id, info.sessionId, idempotencyKey, info.fileId, info.partSize)
+        val info = transfer.createUploadSession(
+            idempotencyKey = idempotencyKey,
+            fileName = job.fileName,
+            fileSize = job.bytesTotal,
+            contentType = job.mimeType ?: "application/octet-stream",
+            sha256 = requireNotNull(job.mediaHash),
+        )
+        if (queue.bindSession(job.id, info.sessionId, idempotencyKey, info.fileId, info.partSize) == 0) {
+            runCatching { transfer.cancelUploadSession(info.sessionId) }
+            if (queue.byId(job.id)?.phase == UploadPhase.PAUSED) throw JobPausedException()
+            throw JobCancelledException()
+        }
         return info
     }
 
@@ -366,9 +465,6 @@ class UploadWorker(
         job.mediaKey?.let { key ->
             mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(status = MediaCloudStatus.IN_CLOUD, cloudFileId = fileId)) }
         }
-        if (job.source == UploadSource.BACKUP) {
-            AutoUploadScheduler.runOnce(applicationContext, AutoUploadSettings(applicationContext).policy)
-        }
     }
 
     // MARK: Ошибки и retry
@@ -380,32 +476,73 @@ class UploadWorker(
         transfer: FileTransferService,
         mediaDao: MediaCloudStateDao,
         pending: MutableList<PendingRetry>,
+        stopClaiming: AtomicBoolean,
     ) {
         val current = queue.byId(job.id)
         if (current?.phase == UploadPhase.CANCELLED) {
             runCatching { current.sessionId?.let { transfer.cancelUploadSession(it) } }
             return
         }
-        val message = error.message ?: error::class.java.simpleName
-        when {
-            error is AttachFailedException -> if (shouldRetry(error.cause)) {
-                queue.setPhase(job.id, UploadPhase.ATTACHING, message)
-                synchronized(pending) { pending.add(PendingRetry(job.id, retryable = true)) }
-            } else {
-                queue.setPhase(job.id, UploadPhase.UPLOADED_NOT_ATTACHED, message)
-                queue.dropStaging(job.id)
+        if (current?.phase == UploadPhase.PAUSED) return
+        val activeJob = current ?: job
+        if (error is AttachFailedException) {
+            val cause = error.cause ?: error
+            val disposition = UploadFailurePolicy.classify(
+                cause,
+                job.source,
+                explicitTerminal = cause is UploadTerminalException,
+                permissionUnavailable = cause is BackupPermissionUnavailableException,
+            )
+            val message = failureMessage(cause, disposition)
+            when (disposition) {
+                UploadFailureDisposition.ITEM_TERMINAL -> {
+                    queue.setPhase(job.id, UploadPhase.UPLOADED_NOT_ATTACHED, message)
+                    queue.dropStaging(job.id)
+                }
+                else -> {
+                    queue.setPhase(job.id, UploadPhase.ATTACHING, message)
+                    synchronized(pending) { pending.add(PendingRetry(job.id, retryable = true)) }
+                    stopClaiming.set(true)
+                }
             }
-            error is UploadTerminalException -> {
-                queue.setPhase(job.id, UploadPhase.FAILED, message)
+            return
+        }
+
+        val disposition = UploadFailurePolicy.classify(
+            error,
+            job.source,
+            explicitTerminal = error is UploadTerminalException,
+            permissionUnavailable = error is BackupPermissionUnavailableException,
+        )
+        val message = failureMessage(error, disposition)
+        when (disposition) {
+            UploadFailureDisposition.PERMISSION_STOP_CLAIMING -> {
+                queue.setPhase(job.id, UploadPhase.QUEUED, message)
+                stopClaiming.set(true)
+            }
+            UploadFailureDisposition.QUOTA_STOP_CLAIMING -> {
+                queue.failAfterQuota(job.id, message)
+                markMediaError(job, mediaDao)
+                stopClaiming.set(true)
+            }
+            UploadFailureDisposition.STORAGE_STOP_CLAIMING -> {
+                queue.setPhase(job.id, UploadPhase.QUEUED, message)
+                synchronized(pending) { pending.add(PendingRetry(job.id, retryable = true)) }
+                stopClaiming.set(true)
+            }
+            UploadFailureDisposition.ITEM_TERMINAL -> {
+                if (job.source == UploadSource.BACKUP) {
+                    runCatching { activeJob.sessionId?.let { transfer.cancelUploadSession(it) } }
+                    queue.failBackupAndDropStage(job.id, message)
+                } else {
+                    queue.setPhase(job.id, UploadPhase.FAILED, message)
+                }
                 markMediaError(job, mediaDao)
             }
-            shouldRetry(error) -> {
-                queue.setPhase(job.id, resumePhase(job), message)
+            UploadFailureDisposition.RETRY_AND_STOP_CLAIMING -> {
+                queue.setPhase(job.id, resumePhase(activeJob), message)
                 synchronized(pending) { pending.add(PendingRetry(job.id, retryable = true)) }
-            }
-            else -> {
-                queue.setPhase(job.id, UploadPhase.FAILED, message)
-                markMediaError(job, mediaDao)
+                stopClaiming.set(true)
             }
         }
     }
@@ -420,7 +557,8 @@ class UploadWorker(
             }
             UploadPhase.QUEUED, UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
             UploadPhase.UPLOADING, UploadPhase.COMPLETING, UploadPhase.PROCESSING -> {
-                queue.setPhase(job.id, UploadPhase.FAILED, job.errorMessage)
+                if (job.source == UploadSource.BACKUP) queue.failBackupAndDropStage(job.id, job.errorMessage)
+                else queue.setPhase(job.id, UploadPhase.FAILED, job.errorMessage)
                 markMediaError(job, mediaDao)
             }
             else -> Unit
@@ -435,27 +573,22 @@ class UploadWorker(
         }
     }
 
+    private fun failureMessage(error: Throwable, disposition: UploadFailureDisposition): String =
+        if (disposition == UploadFailureDisposition.QUOTA_STOP_CLAIMING) {
+            applicationContext.getString(R.string.upload_error_quota_exceeded)
+        } else {
+            error.message ?: error::class.java.simpleName
+        }
+
     private fun resumePhase(job: UploadJob): UploadPhase = when {
         job.sessionId == null -> UploadPhase.QUEUED
         job.phase == UploadPhase.PROCESSING -> UploadPhase.PROCESSING
         else -> UploadPhase.UPLOADING
     }
 
-    private fun shouldRetry(error: Throwable?): Boolean = when (error) {
-        null -> false
-        is FileNotFoundException -> false
-        is UploadTerminalException -> false
-        is UploadPartHttpException -> error.retryable
-        is StatusRuntimeException -> error.status.code in setOf(
-            Status.Code.UNAVAILABLE,
-            Status.Code.DEADLINE_EXCEEDED,
-            Status.Code.RESOURCE_EXHAUSTED,
-        )
-        else -> true
-    }
-
     private suspend fun ensureActive(id: String, queue: UploadQueueStore) {
         when (queue.byId(id)?.phase) {
+            null,
             UploadPhase.CANCELLED -> throw JobCancelledException()
             UploadPhase.PAUSED -> throw JobPausedException()
             else -> Unit
@@ -476,7 +609,8 @@ class UploadWorker(
 
     private class JobCancelledException : RuntimeException()
     private class JobPausedException : RuntimeException()
-
+    private class BackupStageDeferredException : RuntimeException()
+    private class BackupPermissionUnavailableException : RuntimeException()
     private class UploadTerminalException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
     /** Байты уже на сервере; упало только post-ready действие. */
@@ -551,4 +685,27 @@ class UploadWorker(
         const val PROCESSING_POLL_MILLIS = 2_000L
         const val EMIT_INTERVAL_MILLIS = 250L
     }
+}
+
+internal suspend fun consumeUploadNotifications(channel: kotlinx.coroutines.channels.ReceiveChannel<Unit>, update: suspend () -> Unit) {
+    for (ignored in channel) update()
+}
+
+internal class BackupStagingBudget(initialCount: Int, private val maximum: Int = 4) {
+    private var held = initialCount.coerceAtLeast(0)
+
+    @Synchronized
+    fun reserve(): Boolean {
+        if (held >= maximum) return false
+        held++
+        return true
+    }
+
+    @Synchronized
+    fun release() {
+        if (held > 0) held--
+    }
+
+    @Synchronized
+    fun heldCount(): Int = held
 }
