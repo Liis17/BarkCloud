@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using BarkCloud.Files.Configurations;
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Infrastructure;
@@ -15,6 +17,7 @@ internal sealed class VideoVariantWorker : BackgroundService
     private static readonly TimeSpan IdleDelay = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan ErrorDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan TranscoderPollInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan ActivityPollInterval = TimeSpan.FromSeconds(1);
     private const int BatchSize = 100;
     private const int MaximumAttempts = 3;
     private const int MaximumErrorLength = 2048;
@@ -93,7 +96,7 @@ internal sealed class VideoVariantWorker : BackgroundService
             var retryAfterRelease = false;
             try
             {
-                await PrepareTakeoverAsync(transcoder, workDirectory, generation.Value, ownerTokenSource.Token);
+                await PrepareTakeoverAsync(transcoder, generation.Value, ownerTokenSource.Token);
                 await ProcessQueueAsync(transcoder, workDirectory, generation.Value, ownerTokenSource.Token);
             }
             catch (OperationCanceledException) when (ownerTokenSource.IsCancellationRequested)
@@ -167,13 +170,11 @@ internal sealed class VideoVariantWorker : BackgroundService
 
     private async Task PrepareTakeoverAsync(
         VideoTranscoderClient transcoder,
-        string workDirectory,
         long generation,
         CancellationToken cancellationToken)
     {
-        await transcoder.CancelCurrentJobAsync(cancellationToken);
+        await transcoder.CancelPriorGenerationJobsAsync(generation, cancellationToken);
         await ReconcilePendingIntentsAsync(generation, cancellationToken);
-        CleanWorkDirectory(workDirectory);
         _logger.LogInformation("Files получил аренду обработки видео поколения {Generation}", generation);
     }
 
@@ -198,6 +199,10 @@ internal sealed class VideoVariantWorker : BackgroundService
                 await ProcessCandidateAsync(candidate, transcoder, workDirectory, generation, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (TranscoderStopUnconfirmedException)
             {
                 throw;
             }
@@ -263,6 +268,7 @@ internal sealed class VideoVariantWorker : BackgroundService
         }, cancellationToken);
 
         string? fileDirectory = null;
+        var keepDirectoryForRunningTranscoder = false;
         try
         {
             var stateAndVariants = await GetVariantProgressAsync(file.Id, cancellationToken);
@@ -273,7 +279,7 @@ internal sealed class VideoVariantWorker : BackgroundService
 
             if (shortSide == 0)
             {
-                fileDirectory = PrepareFileDirectory(workDirectory, file.Id);
+                fileDirectory = PrepareFileDirectory(workDirectory, file.Id, generation);
                 sourcePath = Path.Combine(fileDirectory, "source");
                 await DownloadOriginalAsync(file, sourcePath, cancellationToken);
                 using var scope = _scopeFactory.CreateScope();
@@ -303,7 +309,7 @@ internal sealed class VideoVariantWorker : BackgroundService
                 return;
             }
 
-            fileDirectory ??= PrepareFileDirectory(workDirectory, file.Id);
+            fileDirectory ??= PrepareFileDirectory(workDirectory, file.Id, generation);
             sourcePath ??= Path.Combine(fileDirectory, "source");
             if (!File.Exists(sourcePath))
                 await DownloadOriginalAsync(file, sourcePath, cancellationToken);
@@ -312,8 +318,8 @@ internal sealed class VideoVariantWorker : BackgroundService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var outputPath = Path.Combine(fileDirectory, $"{targetHeight}p.webm");
-                var relativeInput = $"{file.Id:N}/source";
-                var relativeOutput = $"{file.Id:N}/{targetHeight}p.webm";
+                var relativeInput = $"{generation.ToString(CultureInfo.InvariantCulture)}/{file.Id:N}/source";
+                var relativeOutput = $"{generation.ToString(CultureInfo.InvariantCulture)}/{file.Id:N}/{targetHeight}p.webm";
                 await RunTranscodeJobAsync(
                     transcoder, relativeInput, relativeOutput, targetHeight, generation, cancellationToken);
 
@@ -338,9 +344,14 @@ internal sealed class VideoVariantWorker : BackgroundService
 
             await MarkDoneAsync(file.Id, generation, cancellationToken);
         }
+        catch (TranscoderStopUnconfirmedException)
+        {
+            keepDirectoryForRunningTranscoder = true;
+            throw;
+        }
         finally
         {
-            if (fileDirectory is not null)
+            if (fileDirectory is not null && !keepDirectoryForRunningTranscoder)
                 TryDeleteWorkDirectory(fileDirectory);
         }
     }
@@ -379,7 +390,7 @@ internal sealed class VideoVariantWorker : BackgroundService
         await source.CopyToAsync(target, cancellationToken);
     }
 
-    private async Task RunTranscodeJobAsync(
+    internal async Task RunTranscodeJobAsync(
         VideoTranscoderClient transcoder,
         string relativeInput,
         string relativeOutput,
@@ -404,18 +415,21 @@ internal sealed class VideoVariantWorker : BackgroundService
             if (job.Status != "completed")
                 throw new InvalidOperationException(job.Error ?? $"Transcoder завершил задание со статусом {job.Status}.");
         }
-        catch
+        catch (Exception jobException)
         {
-            if (jobId is not null)
+            try
             {
-                try
-                {
+                if (jobId is not null)
                     await transcoder.CancelJobAsync(jobId, CancellationToken.None);
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning(exception, "Не удалось подтвердить остановку задания Transcoder {JobId}", jobId);
-                }
+                else
+                    await transcoder.CancelJobForGenerationAsync(generation, CancellationToken.None);
+            }
+            catch (Exception stopException)
+            {
+                _logger.LogWarning(stopException,
+                    "Не удалось подтвердить остановку задания Transcoder поколения {Generation}; рабочие файлы сохраняются",
+                    generation);
+                throw new TranscoderStopUnconfirmedException(jobException, stopException);
             }
 
             throw;
@@ -443,32 +457,65 @@ internal sealed class VideoVariantWorker : BackgroundService
         try
         {
             string etag;
-            await using (var stream = new FileStream(outputPath, FileMode.Open, FileAccess.Read, FileShare.Read,
-                             1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            try
             {
+                await using var stream = new FileStream(outputPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
                 etag = await uploader.UploadAsync(profileId, variantFileId.ToString(), stream, "video/webm", cancellationToken);
             }
+            catch (Exception uploadException)
+            {
+                var compensation = await CompensateVariantAsync(
+                    original.Id, variantFileId, profileId, generation, uploader, cancellationToken);
+                if (compensation == CompensationDisposition.Committed)
+                {
+                    TryDeleteOutputFile(outputPath);
+                    return;
+                }
 
-            var disposition = await CommitVariantAsync(
-                original.Id, targetHeight, width, actualHeight, size, etag,
-                variantFileId, profileId, generation, cancellationToken);
+                if (compensation is CompensationDisposition.Protected or CompensationDisposition.Deferred)
+                    _logger.LogWarning(uploadException,
+                        "Не удалось подтвердить загрузку варианта {VariantFileId}; объект оставлен до восстановления",
+                        variantFileId);
+                throw;
+            }
+
+            CommitDisposition disposition;
+            try
+            {
+                disposition = await CommitVariantAsync(
+                    original.Id, targetHeight, width, actualHeight, size, etag,
+                    variantFileId, profileId, generation, cancellationToken);
+            }
+            catch (Exception commitException)
+            {
+                var compensation = await CompensateVariantAsync(
+                    original.Id, variantFileId, profileId, generation, uploader, cancellationToken);
+                if (compensation == CompensationDisposition.Committed)
+                {
+                    TryDeleteOutputFile(outputPath);
+                    return;
+                }
+
+                if (compensation is CompensationDisposition.Protected or CompensationDisposition.Deferred)
+                    _logger.LogWarning(commitException,
+                        "Не удалось подтвердить коммит варианта {VariantFileId}; объект оставлен до восстановления",
+                        variantFileId);
+                throw;
+            }
+
             if (disposition == CommitDisposition.Committed)
             {
-                try
-                {
-                    File.Delete(outputPath);
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning(exception, "Не удалось удалить локальный вариант видео {OutputPath}", outputPath);
-                }
-
+                TryDeleteOutputFile(outputPath);
                 return;
             }
 
-            await uploader.DeleteAsync(profileId, variantFileId.ToString(), cancellationToken);
-            await ClearIntentAsync(original.Id, variantFileId, generation, cancellationToken);
-            File.Delete(outputPath);
+            var cleanup = await CompensateVariantAsync(
+                original.Id, variantFileId, profileId, generation, uploader, cancellationToken);
+            if (cleanup is CompensationDisposition.Protected or CompensationDisposition.Deferred)
+                throw new InvalidOperationException($"Не удалось безопасно удалить незарегистрированный вариант {variantFileId}.");
+
+            TryDeleteOutputFile(outputPath);
             if (disposition == CommitDisposition.OriginalRemoved)
                 throw new OriginalVideoRemovedException();
         }
@@ -476,19 +523,68 @@ internal sealed class VideoVariantWorker : BackgroundService
         {
             throw;
         }
-        catch
+    }
+
+    private async Task<CompensationDisposition> CompensateVariantAsync(
+        Guid originalFileId,
+        Guid variantFileId,
+        string profileId,
+        long generation,
+        S3Uploader uploader,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            try
+            using var scope = _scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<FilesContext>();
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            await _leaseManager.EnsureCurrentAsync(context, _ownerInstanceId, generation, cancellationToken);
+
+            var fileType = await context.UploadedFiles.AsNoTracking()
+                .Where(file => file.Id == variantFileId)
+                .Select(file => (UploadFileType?)file.Type)
+                .SingleOrDefaultAsync(cancellationToken);
+            var hasLink = await context.VideoVariants.AsNoTracking()
+                .AnyAsync(variant => variant.OriginalFileId == originalFileId && variant.VariantFileId == variantFileId, cancellationToken);
+            if (fileType is not null || hasLink)
             {
-                await uploader.DeleteAsync(profileId, variantFileId.ToString(), cancellationToken);
-                await ClearIntentAsync(original.Id, variantFileId, generation, cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                _logger.LogWarning(exception, "Объект варианта {VariantFileId} останется до восстановления намерения", variantFileId);
+                await transaction.CommitAsync(cancellationToken);
+                return fileType == UploadFileType.VideoVariant && hasLink
+                    ? CompensationDisposition.Committed
+                    : CompensationDisposition.Protected;
             }
 
-            throw;
+            await uploader.DeleteAsync(profileId, variantFileId.ToString(), cancellationToken);
+            var state = await context.VideoTranscodeStates.SingleOrDefaultAsync(x => x.FileId == originalFileId, cancellationToken);
+            if (state?.PendingVariantFileId == variantFileId && state.PendingProfileId == profileId)
+            {
+                state.PendingVariantFileId = null;
+                state.PendingProfileId = null;
+                state.UpdatedAt = _timeProvider.GetUtcNow().UtcDateTime;
+                await context.SaveChangesAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return CompensationDisposition.Deleted;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Не удалось сверить или компенсировать вариант {VariantFileId}; объект останется до восстановления",
+                variantFileId);
+            return CompensationDisposition.Deferred;
+        }
+    }
+
+    private void TryDeleteOutputFile(string outputPath)
+    {
+        try
+        {
+            File.Delete(outputPath);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Не удалось удалить локальный вариант видео {OutputPath}", outputPath);
         }
     }
 
@@ -585,7 +681,7 @@ internal sealed class VideoVariantWorker : BackgroundService
         return CommitDisposition.Committed;
     }
 
-    private async Task ReconcilePendingIntentsAsync(long generation, CancellationToken cancellationToken)
+    internal async Task ReconcilePendingIntentsAsync(long generation, CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<FilesContext>();
@@ -602,6 +698,13 @@ internal sealed class VideoVariantWorker : BackgroundService
             if (string.IsNullOrWhiteSpace(intent.ProfileId))
                 throw new InvalidOperationException($"Для намерения {intent.VariantFileId} не задан S3-профиль.");
 
+            var stillPending = await context.VideoTranscodeStates.AsNoTracking()
+                .AnyAsync(state => state.FileId == intent.FileId
+                    && state.PendingVariantFileId == intent.VariantFileId
+                    && state.PendingProfileId == intent.ProfileId, cancellationToken);
+            if (!stillPending)
+                continue;
+
             var isRegistered = await context.UploadedFiles.AsNoTracking()
                 .AnyAsync(file => file.Id == intent.VariantFileId, cancellationToken);
             if (!isRegistered)
@@ -609,8 +712,23 @@ internal sealed class VideoVariantWorker : BackgroundService
                 using var cleanupScope = _scopeFactory.CreateScope();
                 var gate = cleanupScope.ServiceProvider.GetRequiredService<StorageMigrationGate>();
                 var uploader = cleanupScope.ServiceProvider.GetRequiredService<S3Uploader>();
-                await using var activity = await gate.TrackUploadAsync([intent.ProfileId], cancellationToken, intent.VariantFileId);
-                await uploader.DeleteAsync(intent.ProfileId, intent.VariantFileId.ToString(), cancellationToken);
+                while (await gate.HasActiveUploadActivityAsync(intent.VariantFileId, cancellationToken))
+                    await DelayAsync(ActivityPollInterval, cancellationToken);
+
+                stillPending = await context.VideoTranscodeStates.AsNoTracking()
+                    .AnyAsync(state => state.FileId == intent.FileId
+                        && state.PendingVariantFileId == intent.VariantFileId
+                        && state.PendingProfileId == intent.ProfileId, cancellationToken);
+                if (!stillPending)
+                    continue;
+
+                isRegistered = await context.UploadedFiles.AsNoTracking()
+                    .AnyAsync(file => file.Id == intent.VariantFileId, cancellationToken);
+                if (!isRegistered)
+                {
+                    await using var activity = await gate.TrackCleanupAsync([intent.ProfileId], cancellationToken, intent.VariantFileId);
+                    await uploader.DeleteAsync(intent.ProfileId, intent.VariantFileId.ToString(), cancellationToken);
+                }
             }
 
             await ClearIntentAsync(intent.FileId, intent.VariantFileId, generation, cancellationToken);
@@ -699,29 +817,29 @@ internal sealed class VideoVariantWorker : BackgroundService
         }
     }
 
-    private string PrepareFileDirectory(string workDirectory, Guid fileId)
+    internal string PrepareFileDirectory(string workDirectory, Guid fileId, long generation)
     {
-        var path = Path.Combine(workDirectory, fileId.ToString("N"));
-        if (Directory.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("Рабочий каталог видео не может быть символической ссылкой.");
+        if (generation < 1)
+            throw new ArgumentOutOfRangeException(nameof(generation));
+
+        var generationDirectory = Path.Combine(workDirectory, generation.ToString(CultureInfo.InvariantCulture));
+        EnsureWorkDirectoryIsNotLink(generationDirectory);
+        Directory.CreateDirectory(generationDirectory);
+
+        var path = Path.Combine(generationDirectory, fileId.ToString("N"));
+        EnsureWorkDirectoryIsNotLink(path);
 
         Directory.CreateDirectory(path);
         return path;
     }
 
-    private void CleanWorkDirectory(string workDirectory)
+    private static void EnsureWorkDirectoryIsNotLink(string path)
     {
-        foreach (var directory in Directory.EnumerateDirectories(workDirectory))
-        {
-            if (!Guid.TryParseExact(Path.GetFileName(directory), "N", out _)
-                || (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
-                continue;
-
-            Directory.Delete(directory, recursive: true);
-        }
+        if (Directory.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new IOException("Рабочий каталог видео не может быть символической ссылкой.");
     }
 
-    private void TryDeleteWorkDirectory(string path)
+    internal void TryDeleteWorkDirectory(string path)
     {
         try
         {
@@ -740,11 +858,22 @@ internal sealed class VideoVariantWorker : BackgroundService
     internal sealed record VideoCandidate(UploadFile File, double? DurationSeconds);
     private sealed record PendingIntent(Guid FileId, Guid VariantFileId, string? ProfileId);
 
+    private sealed class TranscoderStopUnconfirmedException(Exception jobException, Exception stopException)
+        : InvalidOperationException("Не подтверждена остановка задания Transcoder.", new AggregateException(jobException, stopException));
+
     private enum CommitDisposition
     {
         Committed,
         OriginalRemoved,
         AlreadyExists
+    }
+
+    private enum CompensationDisposition
+    {
+        Deleted,
+        Committed,
+        Protected,
+        Deferred
     }
 
     private sealed class OriginalVideoRemovedException : InvalidOperationException

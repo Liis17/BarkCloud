@@ -1,3 +1,8 @@
+using System.Data.Common;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+
 using Amazon.S3;
 using Amazon.S3.Model;
 
@@ -9,6 +14,7 @@ using BarkCloud.Files.Services;
 using BarkCloud.Files.Tests._Helpers;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -24,6 +30,38 @@ namespace BarkCloud.Files.Tests.Services;
 
 public sealed class VideoVariantWorkerTests
 {
+    [Fact]
+    public async Task StaleGenerationCleanupDoesNotDeleteTakeoverWorkDirectory()
+    {
+        await using var fixture = await WorkerFixture.CreateAsync();
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var fileId = Guid.NewGuid();
+        var staleDirectory = fixture.Worker.PrepareFileDirectory(root, fileId, 1);
+        var takeoverDirectory = fixture.Worker.PrepareFileDirectory(root, fileId, 2);
+        var takeoverOutput = Path.Combine(takeoverDirectory, "source");
+        await File.WriteAllTextAsync(takeoverOutput, "new-generation");
+
+        fixture.Worker.TryDeleteWorkDirectory(staleDirectory);
+
+        Assert.False(Directory.Exists(staleDirectory));
+        Assert.Equal("new-generation", await File.ReadAllTextAsync(takeoverOutput));
+        Directory.Delete(root, recursive: true);
+    }
+
+    [Fact]
+    public async Task StartJobAcknowledgementLost_CancelsAcceptedJobByGeneration()
+    {
+        await using var fixture = await WorkerFixture.CreateAsync();
+        var handler = new LostStartAcknowledgementHandler(fixture.Generation);
+        using var transcoder = new VideoTranscoderClient(
+            new HttpClient(handler), "https://transcoder.example", "test-token");
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => fixture.Worker.RunTranscodeJobAsync(
+            transcoder, "1/source.mp4", "1/360p.webm", 360, fixture.Generation, CancellationToken.None));
+
+        Assert.True(handler.Cancelled);
+    }
+
     [Fact]
     public async Task UploadPersistsIntentBeforePutAndCopiesCurrentOwnersOnCommit()
     {
@@ -173,6 +211,68 @@ public sealed class VideoVariantWorkerTests
         var state = await result.VideoTranscodeStates.FindAsync(originalId);
         Assert.Equal(variantId, state!.PendingVariantFileId);
         Assert.Equal(WorkerFixture.VariantProfileId, state.PendingProfileId);
+        fixture.Client.Verify(client => client.DeleteObjectAsync(
+            It.Is<DeleteObjectRequest>(request => request.Key == variantId.ToString()),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CommitAcknowledgementLostAfterSuccessfulCommit_PreservesRegisteredVariant()
+    {
+        var commitInterceptor = new FailAfterSuccessfulCommit();
+        await using var fixture = await WorkerFixture.CreateAsync(commitInterceptor);
+        var originalId = Guid.NewGuid();
+        await fixture.AddOriginalAsync(originalId, [42]);
+        var variantId = Guid.NewGuid();
+        var outputPath = fixture.CreateOutputFile();
+        fixture.Client.Setup(client => client.PutObjectAsync(
+                It.IsAny<PutObjectRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<PutObjectRequest, CancellationToken>((_, _) =>
+            {
+                commitInterceptor.FailNextCommit();
+                return Task.FromResult(new PutObjectResponse { ETag = "variant-etag" });
+            });
+
+        await fixture.Worker.UploadAndCommitVariantAsync(
+            await fixture.GetOriginalAsync(originalId), 360, 640, 360, 10,
+            outputPath, variantId, WorkerFixture.VariantProfileId, fixture.Generation, CancellationToken.None);
+
+        await using var result = fixture.Database.CreateAdditionalContext();
+        Assert.True(await result.UploadedFiles.AnyAsync(file => file.Id == variantId && file.Type == UploadFileType.VideoVariant));
+        Assert.True(await result.VideoVariants.AnyAsync(variant => variant.OriginalFileId == originalId && variant.VariantFileId == variantId));
+        Assert.Null((await result.VideoTranscodeStates.FindAsync(originalId))!.PendingVariantFileId);
+        fixture.Client.Verify(client => client.DeleteObjectAsync(
+            It.Is<DeleteObjectRequest>(request => request.Key == variantId.ToString()),
+            It.IsAny<CancellationToken>()), Times.Never);
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public async Task StaleWorkerAfterTakeover_DefersS3CompensationToCurrentGeneration()
+    {
+        await using var fixture = await WorkerFixture.CreateAsync();
+        var originalId = Guid.NewGuid();
+        await fixture.AddOriginalAsync(originalId, [42]);
+        var variantId = Guid.NewGuid();
+        var outputPath = fixture.CreateOutputFile();
+        fixture.Client.Setup(client => client.PutObjectAsync(
+                It.IsAny<PutObjectRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<PutObjectRequest, CancellationToken>(async (_, _) =>
+            {
+                await fixture.TakeOverAsync();
+                return new PutObjectResponse { ETag = "variant-etag" };
+            });
+        var original = await fixture.GetOriginalAsync(originalId);
+
+        await Assert.ThrowsAsync<VideoTranscodeLeaseLostException>(() => fixture.Worker.UploadAndCommitVariantAsync(
+            original, 360, 640, 360, 10,
+            outputPath, variantId, WorkerFixture.VariantProfileId, fixture.Generation, CancellationToken.None));
+
+        await using var result = fixture.Database.CreateAdditionalContext();
+        Assert.Equal(variantId, (await result.VideoTranscodeStates.FindAsync(originalId))!.PendingVariantFileId);
+        fixture.Client.Verify(client => client.DeleteObjectAsync(
+            It.Is<DeleteObjectRequest>(request => request.Key == variantId.ToString()),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -204,13 +304,14 @@ public sealed class VideoVariantWorkerTests
         private readonly VideoTranscodeLeaseManager _leaseManager;
         private readonly string _outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.webm");
 
-        public SqliteFilesContext Database { get; } = new();
+        public SqliteFilesContext Database { get; }
         public Mock<IAmazonS3> Client { get; } = new();
         public VideoVariantWorker Worker { get; }
         public long Generation { get; }
 
-        private WorkerFixture()
+        private WorkerFixture(params IInterceptor[] interceptors)
         {
+            Database = new SqliteFilesContext(interceptors);
             var registry = new Mock<S3BucketRegistry>(TestConfiguration.Empty()) { CallBase = false };
             _registry = registry.Object;
             var profile = new StorageProfileOptions
@@ -259,7 +360,19 @@ public sealed class VideoVariantWorkerTests
             Generation = _leaseManager.TryAcquireAsync("files-test", CancellationToken.None).GetAwaiter().GetResult()!.Value;
         }
 
-        public static Task<WorkerFixture> CreateAsync() => Task.FromResult(new WorkerFixture());
+        public static Task<WorkerFixture> CreateAsync(params IInterceptor[] interceptors) => Task.FromResult(new WorkerFixture(interceptors));
+
+        public async Task<long> TakeOverAsync()
+        {
+            await using (var context = Database.CreateAdditionalContext())
+            {
+                var expiredAt = DateTime.UtcNow.AddMinutes(-3);
+                await context.VideoTranscodeLeases.ExecuteUpdateAsync(update =>
+                    update.SetProperty(lease => lease.ExpiresAt, expiredAt));
+            }
+
+            return (await _leaseManager.TryAcquireAsync("files-takeover", CancellationToken.None))!.Value;
+        }
 
         public async Task AddOriginalAsync(Guid id, List<long> uploaders)
         {
@@ -302,5 +415,50 @@ public sealed class VideoVariantWorkerTests
             if (File.Exists(_outputPath))
                 File.Delete(_outputPath);
         }
+    }
+
+    private sealed class FailAfterSuccessfulCommit : DbTransactionInterceptor
+    {
+        private int _failNextCommit;
+
+        public void FailNextCommit() => Interlocked.Exchange(ref _failNextCommit, 1);
+
+        public override Task TransactionCommittedAsync(
+            DbTransaction transaction,
+            TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Exchange(ref _failNextCommit, 0) == 1)
+                throw new IOException("commit acknowledgement lost");
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class LostStartAcknowledgementHandler(long generation) : HttpMessageHandler
+    {
+        public bool Cancelled { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath == "/jobs")
+                throw new HttpRequestException("The accepted response was lost.");
+
+            if (request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == "/jobs")
+                return Task.FromResult(JsonResponse(new { id = "accepted-job", generation, status = "running", progress = 0, error = (string?)null }));
+
+            if (request.Method == HttpMethod.Delete && request.RequestUri!.AbsolutePath == "/jobs/accepted-job")
+            {
+                Cancelled = true;
+                return Task.FromResult(JsonResponse(new { id = "accepted-job", generation, status = "cancelled", progress = 0, error = (string?)null }));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+
+        private static HttpResponseMessage JsonResponse<T>(T value) => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(value), Encoding.UTF8, "application/json")
+        };
     }
 }
