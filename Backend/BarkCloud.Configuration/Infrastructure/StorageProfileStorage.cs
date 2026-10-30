@@ -26,6 +26,7 @@ public static class StorageProfileRoles
     public const string Universal = "universal";
     public const string UserAvatarsOld = "user-avatars-old";
     public const string CloudFilesOld = "cloud-files-old";
+    public const string VideoVariants = "video-variants";
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -37,6 +38,7 @@ public static class StorageProfileRoles
         "documents",
         "other",
         "previews",
+        VideoVariants,
         UserAvatarsOld,
         CloudFilesOld
     };

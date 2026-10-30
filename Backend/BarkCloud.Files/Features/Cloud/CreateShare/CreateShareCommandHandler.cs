@@ -12,6 +12,7 @@ using Google.Protobuf.WellKnownTypes;
 using MediatR;
 
 using DomainShareLink = BarkCloud.Files.Domain.ShareLink;
+using DomainUploadFileType = BarkCloud.Files.Domain.UploadFileType;
 
 namespace BarkCloud.Files.Features.Cloud.CreateShare;
 
@@ -43,7 +44,7 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
 
         // Ссылку можно создать только на свой файл.
         var file = await _filesStorage.GetFile(request.FileId);
-        if (file is null || !file.Uploaders.Contains(ownerId))
+        if (file is null || file.Type != DomainUploadFileType.CloudFile || !file.Uploaders.Contains(ownerId))
             throw new CloudAccessDeniedException();
         if (!file.IsReady())
             throw new FileNotReadyException();

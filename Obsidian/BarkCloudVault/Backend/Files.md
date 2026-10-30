@@ -19,6 +19,8 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 | `Backend/BarkCloud.Files/Services/SvgProcessRunner.cs` | `SvgProcessRunner`, `ISvgProcessRunner` | процесс без shell, ограничение вывода и завершение дерева |
 | `Backend/BarkCloud.Files/Services/LegacyPreviewBackfillService.cs` | `LegacyPreviewBackfillService` | старые обычные превью, включая SVG |
 | `Backend/BarkCloud.Files/Services/LegacyJpegViewBackfillService.cs` | `LegacyJpegViewBackfillService` | старый полноразмерный JPEG для просмотра |
+| `Backend/BarkCloud.Files/Services/VideoVariantWorker.cs` | `VideoVariantWorker` | очередь AV1/WebM-производных с арендой и fencing |
+| `Backend/BarkCloud.Files/Services/VideoQualityLinkBuilder.cs` | `VideoQualityLinkBuilder` | пакетные temp-ссылки для оригиналов и вариантов |
 | `Backend/BarkCloud.Files/Domain/UploadFile.cs` | `UploadFile` | запись блоба и профиль хранения |
 | `Backend/BarkCloud.Files/Persistence/FilesContext.cs` | EF-модель | таблицы и ограничения |
 | `Backend/BarkCloud.Files/Services/SearchRanking.cs` | `SearchTerms`, `SearchQueryExtensions`, `SearchCursor` | SQL-правило ранга, набор кандидатов и курсор поиска |
@@ -43,7 +45,7 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 
 Для клиентского сценария сессий см. [[Backend/ResumableUpload]] и [[Api/FilesClientGuide]]. Контракты объявлены в `Shared/BarkCloud.Proto/files_api.proto`.
 
-`GetTempDownloadUrl` возвращает временные ссылки по `file_id`. `CheckFileHash`/`CheckFileHashes` проверяют наличие SHA-256; `GetFileMetadata` возвращает извлечённые EXIF, видео, аудио и документные поля; `GetUserStorageInfo` включает квоту аккаунта и активный резерв загрузки, а также `s3_quota_groups` со статистикой групп S3.
+`GetTempDownloadUrl` возвращает временные ссылки по `file_id`. Видео дополнительно содержат `video_qualities` с оригиналом и AV1/WebM-вариантами; blob-id вариантов наружу не передаются. Обогащение получает варианты пачкой и создаёт временные ссылки одним `CreateTempFilesBatchAsync`, без N+1. Подробности контракта клиента — [[Api/FilesClientGuide#скачивание-и-карточка-файла]], генерации — [[Backend/VideoVariants]]. `CheckFileHash`/`CheckFileHashes` проверяют наличие SHA-256; `GetFileMetadata` возвращает извлечённые EXIF, видео, аудио и документные поля; `GetUserStorageInfo` включает квоту аккаунта и активный резерв загрузки, а также `s3_quota_groups` со статистикой групп S3.
 
 `GetUserStorageInfoResponse.s3_quota_groups` содержит для каждой группы `id`, `name`, `used_bytes`, `quota_bytes`, `is_ungrouped` и `unmeasured_buckets`. Квота задаётся группой в Configuration; квот у S3-профилей нет. `S3StorageStatsProvider` сопоставляет членство с физическими бакетами через нормализованный endpoint и имя бакета, измеряет бакет один раз любым доступным профилем этой локации и суммирует расход группы. Член без профиля доступа увеличивает `unmeasured_buckets`, но не мешает учитывать остальные члены. Если у члена есть только неактивные или legacy-профили и измерение завершается ошибкой, он также увеличивает `unmeasured_buckets` с warning в журнале; ошибка активного не-legacy бакета оставляет снимок недоступным. Бакеты без группы учитываются только если у них есть активный не-legacy профиль; они объединяются в строку «Без группы» без квоты. Состояние и время обновления общей статистики S3 передаются отдельно от списка групп.
 
@@ -74,14 +76,15 @@ See also: [[Backend/FilesCloud]] · [[Backend/ResumableUpload]] · [[Backend/Ori
 - EF Core и PostgreSQL хранят записи файлов, хеши, метаданные, загрузочные сессии и производные объекты.
 - `S3BucketRegistry` выбирает профиль для каждого объекта; `UploadFile.StorageProfileId` нужен для последующего чтения и удаления.
 - После загрузки `ProcessUploadedFileConsumer` запускает извлечение метаданных и создание производных объектов через MassTransit/RabbitMQ. `Scheduling/UploadProcessingQueue.cs` задаёт два слота `process-uploaded-file` и scheduled redelivery через persistent Quartz/PostgreSQL; ожидание повторов освобождает слоты. Подробности исходов и расписания — [[Backend/ResumableUpload]].
-- Изображения обрабатываются ImageSharp; видео анализируются и обрабатываются через FFMpegCore/ffmpeg.
+- `VideoVariantWorker` отдельно обрабатывает готовые видео, когда `VideoVariants:Enabled=true`; sidecar и межсервисная аренда описаны в [[Backend/VideoVariants]].
+- Изображения обрабатываются ImageSharp; видео анализируются через FFMpegCore/ffmpeg, а AV1-варианты создаёт отдельный `cloud-transcoder` по [[Backend/VideoVariants]].
 - Конфигурация профилей S3 поступает из Configuration; Web использует Files API и HTTP upload-маршрут.
 
 ## Ограничения и важные детали
 
 - Метрики `files_uploaded` и `upload_bytes_total` относились к legacy-загрузке и больше не инкрементируются. Upload 2.0 учитывает принятые части в `upload_parts_total` и `upload_part_bytes_total`.
 - `UploadFileReadiness` считает блоб готовым при заданном `UploadedAt` и непустом `Etag`. Клиентские выборки используют это условие, чтобы не показывать неполностью обработанные файлы.
-- `UploadFileType`: `Unknown=0`, `UserAvatar=1`, `CloudFile=2`. `MediaKind`: `Other=0`, `Photo=1`, `Video=2`, `Document=3`, `Audio=4`; категория вычисляется через `FileExtensions.GetMediaKind()` по имени файла.
+- `UploadFileType`: `Unknown=0`, `UserAvatar=1`, `CloudFile=2`, `VideoVariant=3`. Вариант связывается с оригиналом таблицей `VideoVariants`, не попадает в пользовательские листинги, поиск, альбомы и умные папки, но его размер учитывается в `UsedBytes` владельцев. Прямая выдача варианта по анонимному blob-id запрещена; очистка оригинала удаляет варианты и связи. `MediaKind`: `Other=0`, `Photo=1`, `Video=2`, `Document=3`, `Audio=4`; категория вычисляется через `FileExtensions.GetMediaKind()` по имени файла.
 - Каждая загрузка оригинала создаёт отдельный блоб. SHA-256 сохраняется для `CheckFileHash`/`CheckFileHashes`; он не объединяет одинаковые оригиналы. Превью могут дедуплицироваться по SHA-256.
 - Для облачных изображений pipeline создаёт отдельный JPEG-вариант просмотра (`JpegView`) и связывает его как превью с `TargetWidth=0`. Оригинал сохраняется отдельно; обычные превью хранятся как самостоятельные `UploadFile`.
 - SVG облачного файла распознаётся по расширению `.svg` или MIME `image/svg+xml`. `SvgRasterizer` запрещает DTD, внешние сущности, XInclude и `xml:base`, затем передаёт те же проверенные байты в `rsvg-convert` через stdin без имени файла и base URI. SVGZ не растрируется. Исходное имя, содержимое S3 и SHA-256 сохраняются; ошибка или превышение лимита оставляет файл готовым без производных изображений. Аватары через rasterizer не проходят.

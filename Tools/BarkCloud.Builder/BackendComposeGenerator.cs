@@ -171,18 +171,39 @@ services:
       SERVICE_PORT: ${FILES_PORT}
       SERVICE_HTTP1PORT: ${FILES_HTTP1PORT}
       StorageProbe__Path: "/mnt/minio-data"
-      Archive__TempPath: "/mnt/archive-temp"{{filesAgentSettings}}
+      Archive__TempPath: "/mnt/archive-temp"
+      VideoVariants__WorkDirectory: "/mnt/transcode"
+      VideoVariants__TranscoderUrl: "http://cloud-transcoder:8080"
+      TRANSCODER_TOKEN: "${TRANSCODER_TOKEN}"{{filesAgentSettings}}
     volumes:
       - ${MINIO_DATA_PATH:-cloud-minio_data}:/mnt/minio-data:ro
       - ${ARCHIVE_TEMP_PATH:-archive_temp}:/mnt/archive-temp
+      - ${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode
       - ./secrets/jwt/jwt-public.pem:/keys/jwt/jwt-public.pem:ro{{AppVolume("FILES")}}
     networks:
       - barkcloud-network
     depends_on:
       - cloud-configuration
       - cloud-identity
+      - cloud-transcoder
 """,
         };
+
+        sections.Add($$"""
+  # FFmpeg выполняется в отдельном контейнере с общим рабочим каталогом Files.
+  cloud-transcoder:
+    image: {{Img("transcoder")}}
+    restart: always
+    environment:
+      TRANSCODER_TOKEN: "${TRANSCODER_TOKEN}"
+      TRANSCODER_THREADS: "${TRANSCODER_THREADS}"
+    cpus: "${TRANSCODER_CPUS}"
+    mem_limit: "${TRANSCODER_MEMORY}"
+    volumes:
+      - ${TRANSCODE_WORK_PATH:-./data/transcode}:/mnt/transcode
+    networks:
+      - barkcloud-network
+""");
 
         if (m.IncludeNotification)
             sections.Add($$"""
@@ -554,6 +575,13 @@ networks:
 
         Section("Files — внешняя папка для временных ZIP-архивов (пусто — named volume archive_temp)");
         K("ARCHIVE_TEMP_PATH", m.ArchiveTempPath);
+
+        Section("Транскодирование видео");
+        K("TRANSCODE_WORK_PATH", m.TranscodeWorkPath);
+        KS("TRANSCODER_TOKEN", m.TranscoderToken);
+        K("TRANSCODER_THREADS", m.TranscoderThreads);
+        K("TRANSCODER_CPUS", m.TranscoderCpus);
+        K("TRANSCODER_MEMORY", m.TranscoderMemory);
 
         if (m.IncludeSeq)
         {

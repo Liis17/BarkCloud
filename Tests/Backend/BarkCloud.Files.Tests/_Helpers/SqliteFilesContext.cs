@@ -2,6 +2,7 @@ using BarkCloud.Files.Persistence;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace BarkCloud.Files.Tests._Helpers;
 
@@ -13,16 +14,19 @@ namespace BarkCloud.Files.Tests._Helpers;
 internal sealed class SqliteFilesContext : IDisposable
 {
     private readonly SqliteConnection _connection;
+    private readonly IInterceptor[] _interceptors;
 
     public FilesContext Context { get; }
 
-    public SqliteFilesContext()
+    public SqliteFilesContext(params IInterceptor[] interceptors)
     {
+        _interceptors = interceptors;
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
 
         var options = new DbContextOptionsBuilder<FilesContext>()
             .UseSqlite(_connection)
+            .AddInterceptors(_interceptors)
             .Options;
 
         Context = new FilesContext(options);
@@ -33,6 +37,7 @@ internal sealed class SqliteFilesContext : IDisposable
     {
         var options = new DbContextOptionsBuilder<FilesContext>()
             .UseSqlite(_connection)
+            .AddInterceptors(_interceptors)
             .Options;
         return new FilesContext(options);
     }

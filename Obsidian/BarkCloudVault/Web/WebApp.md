@@ -30,7 +30,7 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 
 | Контракт | Поведение |
 |---|---|
-| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.19.3`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
+| `AppVersion.Current` | Единственный источник версии по умолчанию (сейчас `v1.20.0`, поднимается при каждой функциональной правке веба); конфигурация `App:Version` может его переопределить. Версия попадает в данные оболочки и метаданные устройства клиента |
 | Cookie `bark_at`, `bark_rt`, `bark_did` | Access-, refresh- и device-id cookie. Все HttpOnly, режим Secure задаётся `App:CookieSecure` |
 | `GET /login`, `GET /register`, `GET /forgot` | Отдают лёгкую HTML-оболочку и state для React auth entry. `Accept: application/json` возвращает сам state; успешная операция возвращает `{ "redirectTo": "/photos" }` |
 | `POST /login`, `/register`, `/register/confirm`, `/forgot`, `/forgot/confirm` | Формы входа, регистрации и сброса пароля; все POST требуют antiforgery token и отвечают с `no-store` |
@@ -47,6 +47,8 @@ Parent: [[Architecture]] · See also: [[Web/Settings]] · [[Web/SystemUpdates]] 
 `GET /api/files/view` сохраняет проверку пользовательской сессии и временную ссылку Files, но отдаёт оригинал как `application/octet-stream` с `Content-Disposition: attachment` и `nosniff`. Копирование изображения проверяет HTTP-статус `/api/files/image` до декодирования; HTTP 415 показывает сообщение о недоступности безопасного представления.
 
 Облачные SVG после безопасной растеризации Files имеют обычные JPEG-превью и `JpegView`. Приватный и публичный viewer для SVG используют только эти производные изображения; если их нет, показывают заглушку и не предлагают копирование. Для остальных фото публичный viewer отображает и копирует оригинал по `downloadUrl`, а одиночная публичная страница выбирает `downloadUrl` для копирования с фолбэком на `previewUrl`. Скачивание SVG по исходной временной ссылке остаётся доступно; детали ограничений рендерера и backfill — [[Backend/Files]].
+
+`VideoPlayer` принимает `video_qualities` для собственных файлов, пользовательских грантов и публичных ссылок. Меню предлагает оригинал и доступные варианты; при смене сохраняет позицию и паузу, выбор хранит cookie `bc_video_quality`. AV1/WebM предлагается только когда браузер сообщает поддержку `video/webm; codecs="av01, opus"`; иначе остаются доступные источники, включая оригинал. Серверный поток и правила URL — [[Backend/VideoVariants]] и [[Api/FilesClientGuide]].
 
 ## Зависимости и взаимодействия
 

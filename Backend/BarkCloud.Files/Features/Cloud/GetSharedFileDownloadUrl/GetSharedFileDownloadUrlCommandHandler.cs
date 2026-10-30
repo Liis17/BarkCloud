@@ -57,11 +57,13 @@ public class GetSharedFileDownloadUrlCommandHandler : IRequestHandler<GetSharedF
         if (!file.IsReady())
             throw new FileNotReadyException();
 
-        // Прямой /download/{fileId} для CloudFile запрещён — выдаём временную ссылку (как публичный резолв).
-        var tempFiles = await _tempFilesStorage.CreateTempFilesBatchAsync(new[] { request.FileId }, cancellationToken);
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
-        var downloadUrl = FileUrlHelper.GenerateDownloadUrl(baseUrl, tempFiles[0].Id);
+        var links = await VideoQualityLinkBuilder.CreateAsync(
+            _filesStorage, _tempFilesStorage, [file], baseUrl, cancellationToken);
+        var fileLinks = links[request.FileId];
 
-        return new GetSharedFileDownloadUrlResponse { DownloadUrl = downloadUrl };
+        var response = new GetSharedFileDownloadUrlResponse { DownloadUrl = fileLinks.OriginalUrl };
+        response.VideoQualities.AddRange(fileLinks.VideoQualities);
+        return response;
     }
 }

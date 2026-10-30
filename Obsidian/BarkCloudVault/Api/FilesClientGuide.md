@@ -39,6 +39,7 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 ### Скачивание и карточка файла
 
 - Для собственных файлов запрашивайте `FilesApi.GetTempDownloadUrl(file_ids)`; используйте возвращённые `file_urls[].url` и `preview_url`, не конструируйте URL самостоятельно. Чужой ID отклоняет весь пакет. Для файла, которым поделились с пользователем, используйте `CloudApi.GetSharedFileDownloadUrl`.
+- Для видео эти ответы также содержат `video_qualities`: `VideoQualityInfo` задаёт `height`, `width`, `file_size`, `is_original` и временный `url`. Для доступа через пользовательский grant поле возвращает `GetSharedFileDownloadUrl`; публичные `ResolveShare`, `ResolveFolderShare`, `ResolveAlbumShare` и списки общей директории передают его внутри `PublicFileEntry`. Используйте URL из записи; blob-id варианта не выдаётся и напрямую анонимно не скачивается.
 - `UploadFileInfo.previews` содержит размеры и URL отдельных миниатюр. `preview_url` верхнего уровня deprecated.
 - Для полного просмотра JPEG-варианта используйте `jpeg_view_url`; оригинал скачивается отдельно по обычной download-ссылке.
 - `GetFileMetadata(file_id)` для готового собственного файла возвращает `has_metadata`; показывайте только заданные optional поля.

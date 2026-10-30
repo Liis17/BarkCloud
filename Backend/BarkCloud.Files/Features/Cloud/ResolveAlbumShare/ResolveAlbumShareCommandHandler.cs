@@ -1,5 +1,6 @@
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Proto.Files;
 
@@ -85,12 +86,12 @@ public class ResolveAlbumShareCommandHandler : IRequestHandler<ResolveAlbumShare
             var files = (await _filesStorage.GetFiles(fileIds)).ToDictionary(f => f.Id);
             var previewsByFile = await _filesStorage.GetPreviewsForFiles(files.Keys, cancellationToken);
             var trashed = await _hierarchy.GetEffectivelyTrashedFileIds(ownerId, files.Keys.ToList(), cancellationToken);
-
-            var tempByOriginal = files.Count == 0
-                ? new Dictionary<Guid, Guid>()
-                : (await _tempFilesStorage.CreateTempFilesBatchAsync(files.Keys, cancellationToken))
-                    .GroupBy(t => t.OriginalFileId)
-                    .ToDictionary(g => g.Key, g => g.First().Id);
+            var downloadLinks = await VideoQualityLinkBuilder.CreateAsync(
+                _filesStorage,
+                _tempFilesStorage,
+                files.Values.Where(file => !trashed.Contains(file.Id)),
+                baseUrl,
+                cancellationToken);
 
             foreach (var item in page)
             {
@@ -99,15 +100,14 @@ public class ResolveAlbumShareCommandHandler : IRequestHandler<ResolveAlbumShare
                 if (trashed.Contains(item.FileId))
                     continue;
 
-                var downloadUrl = tempByOriginal.TryGetValue(item.FileId, out var tempId)
-                    ? FileUrlHelper.GenerateDownloadUrl(baseUrl, tempId)
-                    : string.Empty;
+                downloadLinks.TryGetValue(item.FileId, out var links);
+                var downloadUrl = links?.OriginalUrl ?? string.Empty;
 
                 var previewUrl = string.Empty;
                 if (previewsByFile.TryGetValue(item.FileId, out var previews) && previews.Count > 0)
                     previewUrl = FileUrlHelper.GenerateDownloadUrl(baseUrl, previews.OrderByDescending(p => p.TargetWidth).First().PreviewFileId);
 
-                response.Items.Add(new PublicFileEntry
+                var fileEntry = new PublicFileEntry
                 {
                     FileId = item.FileId.ToString(),
                     Name = file.Filename ?? string.Empty,
@@ -117,7 +117,10 @@ public class ResolveAlbumShareCommandHandler : IRequestHandler<ResolveAlbumShare
                     FileSize = file.Size,
                     ImageWidth = file.ImageWidth ?? 0,
                     ImageHeight = file.ImageHeight ?? 0
-                });
+                };
+                if (links is not null)
+                    fileEntry.VideoQualities.AddRange(links.VideoQualities);
+                response.Items.Add(fileEntry);
             }
         }
 

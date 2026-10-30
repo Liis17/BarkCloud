@@ -76,6 +76,50 @@ public class GetTempDownloadUrlCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_OwnVideo_IncludesOriginalAndVariantQualitiesInOneTempBatch()
+    {
+        var fileId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var originalTempId = Guid.NewGuid();
+        var variantTempId = Guid.NewGuid();
+        var video = ReadyFile(fileId, OwnerId);
+        video.Type = UploadFileType.CloudFile;
+        video.MediaKind = MediaKind.Video;
+        video.ImageWidth = 1920;
+        video.ImageHeight = 1080;
+        video.Size = 1000;
+        _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync([video]);
+        _files.Setup(s => s.GetVideoVariantsForFiles(
+                It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, List<VideoVariantDownloadInfo>>
+            {
+                [fileId] = [new(variantId, 360, 640, 360, 300)]
+            });
+        _temp.Setup(s => s.CreateTempFilesBatchAsync(
+                It.Is<IEnumerable<Guid>>(ids => ids.ToHashSet().SetEquals(new[] { fileId, variantId })),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new TempFile { Id = originalTempId, OriginalFileId = fileId },
+                new TempFile { Id = variantTempId, OriginalFileId = variantId }
+            ]);
+
+        var response = await CreateSut().Handle(
+            new GetTempDownloadUrlCommand { FileIds = [fileId] }, CancellationToken.None);
+
+        var fileData = response.FileUrls.Should().ContainSingle().Which;
+        fileData.FileId.Should().Be(fileId.ToString());
+        fileData.Url.Should().Contain(originalTempId.ToString());
+        fileData.VideoQualities.Should().HaveCount(2);
+        fileData.VideoQualities[0].IsOriginal.Should().BeTrue();
+        fileData.VideoQualities[0].Url.Should().Contain(originalTempId.ToString());
+        fileData.VideoQualities[1].IsOriginal.Should().BeFalse();
+        fileData.VideoQualities[1].Url.Should().Contain(variantTempId.ToString());
+        fileData.VideoQualities.Should().NotContain(quality => quality.Url.Contains(variantId.ToString()));
+        _temp.Verify(s => s.CreateTempFilesBatchAsync(
+            It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_ForeignFile_ThrowsAccessDeniedAndCreatesNoTempFile()
     {
         var foreignId = Guid.NewGuid();

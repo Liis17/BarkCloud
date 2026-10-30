@@ -1,6 +1,7 @@
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.Settings;
 using BarkCloud.Proto.Files;
 
@@ -52,11 +53,11 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
 
         await _storage.IncrementClicks(share.Id, cancellationToken);
 
-        // Прямой /download/{fileId} для CloudFile запрещён (DownloadFileCommandHandler) — нужна временная ссылка.
-        var tempFiles = await _tempFilesStorage.CreateTempFilesBatchAsync(new[] { share.FileId }, cancellationToken);
-        var tempId = tempFiles[0].Id;
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
-        var downloadUrl = FileUrlHelper.GenerateDownloadUrl(baseUrl, tempId);
+        var links = await VideoQualityLinkBuilder.CreateAsync(
+            _filesStorage, _tempFilesStorage, [file], baseUrl, cancellationToken);
+        var fileLinks = links[share.FileId];
+        var downloadUrl = fileLinks.OriginalUrl;
 
         // Публичное превью (фото/видео) для страницы просмотра: берём самое крупное доступное.
         // Превью-блобы отдаются анонимно через /download/{previewFileId}.
@@ -64,9 +65,9 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
         var bestPreview = previews.Count > 0 ? previews.OrderByDescending(p => p.TargetWidth).First() : null;
         var previewUrl = bestPreview is null ? string.Empty : FileUrlHelper.GenerateDownloadUrl(baseUrl, bestPreview.PreviewFileId);
 
-        _logger.LogInformation("Резолв публичной ссылки {ShareId} → файл {FileId} (temp {TempId})", share.Id, share.FileId, tempId);
+        _logger.LogInformation("Резолв публичной ссылки {ShareId} → файл {FileId}", share.Id, share.FileId);
 
-        return new ResolveShareResponse
+        var response = new ResolveShareResponse
         {
             Found = true,
             FileId = share.FileId.ToString(),
@@ -78,5 +79,7 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
             ImageHeight = file.ImageHeight ?? 0,
             FileSize = file.Size
         };
+        response.VideoQualities.AddRange(fileLinks.VideoQualities);
+        return response;
     }
 }

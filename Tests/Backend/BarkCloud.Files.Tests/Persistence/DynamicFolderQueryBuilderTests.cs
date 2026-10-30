@@ -105,6 +105,32 @@ public sealed class DynamicFolderQueryBuilderTests : IDisposable
         ids.Should().Equal(readyFile);
     }
 
+    [Fact]
+    public async Task BuildBaseQuery_ExcludesVideoVariants()
+    {
+        var originalId = AddFile("video", null, null);
+        var variantId = Guid.NewGuid();
+        _db.Context.UploadedFiles.Add(new UploadFile
+        {
+            Id = variantId,
+            Uploaders = [OwnerId],
+            CreatedAt = Now,
+            Type = UploadFileType.VideoVariant,
+            MediaKind = MediaKind.Video,
+            Filename = "360p.webm",
+            Size = 1,
+            UploadedAt = Now,
+            Etag = "variant-etag"
+        });
+        await _db.Context.SaveChangesAsync();
+
+        var ids = await DynamicFolderQueryBuilder.BuildBaseQuery(_db.Context, OwnerId)
+            .Select(file => file.Id)
+            .ToListAsync();
+
+        ids.Should().Contain(originalId).And.NotContain(variantId);
+    }
+
     private Guid AddFile(string uploadDevice, string? cameraMake, string? cameraModel, bool ready = true)
     {
         var fileId = Guid.NewGuid();

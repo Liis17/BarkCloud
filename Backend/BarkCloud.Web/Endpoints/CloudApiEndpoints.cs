@@ -994,7 +994,18 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 var resp = await cloud.GetSharedFileDownloadUrlAsync(new GetSharedFileDownloadUrlRequest { FileId = body.FileId }, token);
-                return Results.Json(new { downloadUrl = resp.DownloadUrl }, Json);
+                return Results.Json(new
+                {
+                    downloadUrl = resp.DownloadUrl,
+                    videoQualities = resp.VideoQualities.Select(q => new
+                    {
+                        height = q.Height,
+                        width = q.Width,
+                        fileSize = q.FileSize,
+                        isOriginal = q.IsOriginal,
+                        url = q.Url
+                    }).ToArray()
+                }, Json);
             }));
 
         // ───────────────────────── Шаринг папок между пользователями ─────────────────────────
@@ -1079,7 +1090,15 @@ public static class CloudApiEndpoints
                         previewUrl = f.PreviewUrl,
                         fileSize = f.FileSize,
                         imageWidth = f.ImageWidth,
-                        imageHeight = f.ImageHeight
+                        imageHeight = f.ImageHeight,
+                        videoQualities = f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray()
                     }).ToArray()
                 }, Json);
             }));
@@ -1356,7 +1375,17 @@ public static class CloudApiEndpoints
                 var resp = await files.GetTempDownloadUrlAsync(req, token);
                 return Results.Json(new
                 {
-                    urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url)
+                    urls = resp.FileUrls.ToDictionary(f => f.FileId, f => f.Url),
+                    videoQualities = resp.FileUrls
+                        .Where(f => f.VideoQualities.Count > 0)
+                        .ToDictionary(f => f.FileId, f => f.VideoQualities.Select(q => new
+                        {
+                            height = q.Height,
+                            width = q.Width,
+                            fileSize = q.FileSize,
+                            isOriginal = q.IsOriginal,
+                            url = q.Url
+                        }).ToArray())
                 }, Json);
             }));
 
