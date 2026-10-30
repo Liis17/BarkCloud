@@ -14,16 +14,29 @@ import com.barkfluff.BarkCloud.net.queryFileName
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
 
 internal data class PreparedBackup(val job: UploadJob, val staleSessionId: String?)
 private data class StagedBackupBytes(val file: File, val hash: Pair<String, Long>, val mediaAfter: DeviceMedia)
+
+internal interface BackupMediaAccess {
+    suspend fun findByKey(mediaKey: String): DeviceMedia?
+    fun open(media: DeviceMedia): InputStream?
+}
+
+private class MediaStoreBackupMediaAccess(private val context: Context) : BackupMediaAccess {
+    override suspend fun findByKey(mediaKey: String): DeviceMedia? = DeviceMediaStore.findByKey(context, mediaKey)
+    override fun open(media: DeviceMedia): InputStream? = context.contentResolver.openInputStream(media.uri)
+}
 
 /** Persistent source of truth for every outgoing upload. */
 class UploadQueueStore(
@@ -32,8 +45,26 @@ class UploadQueueStore(
     private val database: BarkCloudDatabase = BarkCloudDatabase.get(context),
 ) : BackupUploadQueue, ActiveUploadPageSource {
     private val appContext = context.applicationContext
-    private val queueDir = File(appContext.filesDir, "upload_queue")
+    private var backupMediaAccess: BackupMediaAccess = MediaStoreBackupMediaAccess(appContext)
+    private var queueDir = File(appContext.filesDir, "upload_queue")
+    private var afterBackupStagePublished: suspend (File) -> Unit = {}
+    private var afterBackupStageSaved: suspend (File) -> Unit = {}
     private val mediaDao get() = database.mediaCloudStateDao()
+
+    internal constructor(
+        context: Context,
+        dao: UploadDao,
+        database: BarkCloudDatabase,
+        backupMediaAccess: BackupMediaAccess,
+        queueDirectory: File,
+        afterBackupStagePublished: suspend (File) -> Unit = {},
+        afterBackupStageSaved: suspend (File) -> Unit = {},
+    ) : this(context, dao, database) {
+        this.backupMediaAccess = backupMediaAccess
+        queueDir = queueDirectory
+        this.afterBackupStagePublished = afterBackupStagePublished
+        this.afterBackupStageSaved = afterBackupStageSaved
+    }
 
     val visibleJobs: Flow<List<UploadJob>> = dao.observeVisible()
     val recentJobs: Flow<List<UploadJob>> = dao.observeRecent()
@@ -42,6 +73,7 @@ class UploadQueueStore(
         migrateLegacyQueue()
         migrateV1Jobs()
         dao.deleteCompletedBefore(System.currentTimeMillis() - COMPLETED_RETENTION_MILLIS)
+        reconcileBackupStageFiles()
     }
 
     /**
@@ -176,14 +208,22 @@ class UploadQueueStore(
         mediaDao: MediaCloudStateDao,
         ensureActive: suspend (DeviceMedia) -> Unit,
     ): PreparedBackup? = withContext(Dispatchers.IO) {
+        withBackupJobLock(id) { prepareBackupLocked(id, mediaDao, ensureActive) }
+    }
+
+    private suspend fun prepareBackupLocked(
+        id: String,
+        mediaDao: MediaCloudStateDao,
+        ensureActive: suspend (DeviceMedia) -> Unit,
+    ): PreparedBackup? {
         var staleSessionId: String? = null
         repeat(MAX_SOURCE_SNAPSHOT_ATTEMPTS) { attempt ->
-            val job = dao.byId(id) ?: return@withContext null
+            val job = dao.byId(id) ?: return null
             if (job.source != UploadSource.BACKUP || job.phase in setOf(UploadPhase.CANCELLED, UploadPhase.COMPLETED, UploadPhase.PAUSED)) {
-                return@withContext null
+                return null
             }
             val mediaKey = job.mediaKey ?: throw FileNotFoundException("Backup media key is missing")
-            val media = DeviceMediaStore.findByKey(appContext, mediaKey) ?: throw FileNotFoundException(mediaKey)
+            val media = backupMediaAccess.findByKey(mediaKey) ?: throw FileNotFoundException(mediaKey)
             ensureActive(media)
 
             val state = mediaDao.byKey(mediaKey)
@@ -193,11 +233,11 @@ class UploadQueueStore(
             if (sourceChanged || (job.stagedFilePath != null && !isValidBackupStage(job))) {
                 staleSessionId = resetForCurrentMedia(job, media, mediaDao) ?: staleSessionId
             } else if (isValidBackupStage(job)) {
-                return@withContext PreparedBackup(job, staleSessionId)
+                return PreparedBackup(job, staleSessionId)
             }
 
-            val current = dao.byId(id) ?: return@withContext null
-            if (current.phase in setOf(UploadPhase.CANCELLED, UploadPhase.COMPLETED, UploadPhase.PAUSED)) return@withContext null
+            val current = dao.byId(id) ?: return null
+            if (current.phase in setOf(UploadPhase.CANCELLED, UploadPhase.COMPLETED, UploadPhase.PAUSED)) return null
             dao.setPhase(id, UploadPhase.HASHING)
             val stagedBytes = try {
                 copyAndHashBackup(current, media, ensureActive)
@@ -214,34 +254,40 @@ class UploadQueueStore(
                 return@repeat
             }
             val staged = stagedBytes.file
-            val hash = stagedBytes.hash
-            if (hash.second != media.sizeBytes) {
-                deleteBackupOwnedFiles(id, null)
-                throw FileNotFoundException("MediaStore size does not match source bytes")
+            try {
+                afterBackupStagePublished(staged)
+                val hash = stagedBytes.hash
+                if (hash.second != media.sizeBytes) {
+                    throw FileNotFoundException("MediaStore size does not match source bytes")
+                }
+                val currentBeforeSave = requireNotNull(dao.byId(id))
+                val resetSession = currentBeforeSave.mediaHash != hash.first &&
+                    (currentBeforeSave.sessionId != null || currentBeforeSave.idempotencyKey != null || currentBeforeSave.preparedFileId != null)
+                if (resetSession) staleSessionId = currentBeforeSave.sessionId
+                val saved = database.withTransaction {
+                    val updated = dao.setBackupPrepared(
+                        id = id,
+                        path = staged.absolutePath,
+                        hash = hash.first,
+                        bytesTotal = hash.second,
+                        mimeType = media.mimeType,
+                        resetSession = resetSession,
+                    )
+                    if (updated > 0) mediaDao.upsert(mediaState(media, hash.first, MediaCloudStatus.QUEUED))
+                    updated > 0
+                }
+                if (!saved) {
+                    deleteBackupStageIfUntracked(id, staged)
+                    return null
+                }
+                afterBackupStageSaved(staged)
+                return PreparedBackup(requireNotNull(dao.byId(id)), staleSessionId)
+            } catch (error: Throwable) {
+                deleteBackupStageIfUntracked(id, staged)
+                throw error
             }
-            val currentBeforeSave = requireNotNull(dao.byId(id))
-            val resetSession = currentBeforeSave.mediaHash != hash.first &&
-                (currentBeforeSave.sessionId != null || currentBeforeSave.idempotencyKey != null || currentBeforeSave.preparedFileId != null)
-            if (resetSession) staleSessionId = currentBeforeSave.sessionId
-            val saved = database.withTransaction {
-                val updated = dao.setBackupPrepared(
-                    id = id,
-                    path = staged.absolutePath,
-                    hash = hash.first,
-                    bytesTotal = hash.second,
-                    mimeType = media.mimeType,
-                    resetSession = resetSession,
-                )
-                if (updated > 0) mediaDao.upsert(mediaState(media, hash.first, MediaCloudStatus.QUEUED))
-                updated > 0
-            }
-            if (!saved) {
-                staged.delete()
-                return@withContext null
-            }
-            return@withContext PreparedBackup(requireNotNull(dao.byId(id)), staleSessionId)
         }
-        return@withContext null
+        return null
     }
 
     override suspend fun activePage(afterId: String?, limit: Int): List<UploadJob> = dao.nextActivePage(afterId, limit)
@@ -249,32 +295,40 @@ class UploadQueueStore(
     suspend fun stagedBackupCount(): Int = dao.stagedBackupCount()
     suspend fun byId(id: String): UploadJob? = dao.byId(id)
 
-    /** Keep only the oldest bounded set of app-private copies, retaining valid server sessions. */
+    /** Release inactive copies first, then trim old queued stages without touching live transfers. */
     internal suspend fun releaseExcessBackupStages(maximum: Int) = withContext(Dispatchers.IO) {
         while (true) {
-            val attachOnly = dao.attachOnlyBackupStagePage(STAGE_RELEASE_BATCH_SIZE)
-            if (attachOnly.isEmpty()) break
-            var released = 0
-            for (job in attachOnly) {
-                if (dao.releaseBackupStage(job.id) > 0) {
-                    deleteBackupOwnedFiles(job.id, job.stagedFilePath)
-                    released++
-                }
-            }
-            if (released == 0) break
+            val inactive = dao.inactiveStagedBackupPage(STAGE_RELEASE_BATCH_SIZE)
+            if (inactive.isEmpty()) break
+            if (releaseBackupStages(inactive) == 0) break
         }
-        while (true) {
-            val excess = dao.stagedBackupPage(limit = STAGE_RELEASE_BATCH_SIZE, offset = maximum.coerceAtLeast(0))
+        var stagedCount = dao.stagedBackupCount()
+        while (stagedCount > maximum.coerceAtLeast(0)) {
+            val excess = dao.releasableBackupStagePage(STAGE_RELEASE_BATCH_SIZE)
             if (excess.isEmpty()) break
             var released = 0
             for (job in excess) {
-                if (dao.releaseBackupStage(job.id) > 0) {
-                    deleteBackupOwnedFiles(job.id, job.stagedFilePath)
+                if (stagedCount <= maximum.coerceAtLeast(0)) break
+                if (releaseBackupStage(job)) {
+                    stagedCount--
                     released++
                 }
             }
             if (released == 0) break
         }
+    }
+
+    private suspend fun releaseBackupStages(jobs: List<UploadJob>): Int {
+        var released = 0
+        for (job in jobs) if (releaseBackupStage(job)) released++
+        return released
+    }
+
+    private suspend fun releaseBackupStage(job: UploadJob): Boolean = withBackupJobLock(job.id) {
+        val path = job.stagedFilePath ?: return@withBackupJobLock false
+        if (dao.releaseBackupStage(job.id, path, job.phase) == 0) return@withBackupJobLock false
+        deleteBackupOwnedFiles(job.id, path)
+        true
     }
 
     suspend fun setProgress(id: String, sent: Long, total: Long, phase: UploadPhase) =
@@ -366,7 +420,6 @@ class UploadQueueStore(
         media: DeviceMedia,
         ensureActive: suspend (DeviceMedia) -> Unit,
     ): StagedBackupBytes {
-        val uri = DeviceMediaStore.uriForKey(requireNotNull(job.mediaKey)) ?: throw FileNotFoundException(job.mediaKey)
         queueDir.mkdirs()
         val part = backupPartFile(job.id)
         val destination = backupStageFile(job.id)
@@ -376,9 +429,9 @@ class UploadQueueStore(
                 part = part,
                 destination = destination,
                 expectedSize = media.sizeBytes,
-                openSource = { appContext.contentResolver.openInputStream(uri) },
+                openSource = { backupMediaAccess.open(media) },
                 verifySource = {
-                    val current = DeviceMediaStore.findByKey(appContext, media.mediaKey)
+                    val current = backupMediaAccess.findByKey(media.mediaKey)
                         ?: throw FileNotFoundException(media.mediaKey)
                     latestMedia = current
                     ensureActive(current)
@@ -424,6 +477,49 @@ class UploadQueueStore(
 
     private fun backupPartFile(id: String) = File(queueDir, "backup-$id.part")
     private fun backupStageFile(id: String) = File(queueDir, "backup-$id.stage")
+
+    private suspend fun reconcileBackupStageFiles() = withContext(Dispatchers.IO) {
+        queueDir.listFiles()?.forEach { file ->
+            val id = backupJobIdForOwnedFile(file) ?: return@forEach
+            withBackupJobLock(id) {
+                val job = dao.byId(id)
+                val tracked = file.name.endsWith(".stage") && job?.source == UploadSource.BACKUP &&
+                    job.phase !in setOf(UploadPhase.COMPLETED, UploadPhase.CANCELLED) &&
+                    job.stagedFilePath == file.absolutePath
+                if (!tracked) file.delete()
+            }
+        }
+    }
+
+    private fun backupJobIdForOwnedFile(file: File): String? {
+        if (!isInsideQueue(file)) return null
+        val extension = when {
+            file.name.endsWith(".part") -> ".part"
+            file.name.endsWith(".stage") -> ".stage"
+            else -> return null
+        }
+        val id = file.name.removePrefix("backup-").removeSuffix(extension)
+        return id.takeIf { BACKUP_JOB_ID.matches(it) }
+    }
+
+    private suspend fun deleteBackupStageIfUntracked(id: String, file: File) = withContext(NonCancellable) {
+        val stagedFilePath = try {
+            dao.byId(id)?.stagedFilePath
+        } catch (_: Exception) {
+            return@withContext
+        }
+        if (stagedFilePath != file.absolutePath) deleteBackupFile(file.absolutePath, id)
+    }
+
+    private suspend fun <T> withBackupJobLock(id: String, action: suspend () -> T): T {
+        val lock = BACKUP_JOB_LOCKS[(id.hashCode() and Int.MAX_VALUE) % BACKUP_JOB_LOCKS.size]
+        lock.lock()
+        try {
+            return action()
+        } finally {
+            lock.unlock()
+        }
+    }
 
     private fun deleteBackupOwnedFiles(id: String, oldPath: String?) {
         backupPartFile(id).delete()
@@ -515,6 +611,8 @@ class UploadQueueStore(
         const val COMPLETED_RETENTION_MILLIS = 24L * 60L * 60L * 1000L
         const val MAX_SOURCE_SNAPSHOT_ATTEMPTS = 2
         const val STAGE_RELEASE_BATCH_SIZE = 32
+        val BACKUP_JOB_ID = Regex("backup-[0-9a-f]{64}")
+        val BACKUP_JOB_LOCKS = Array(32) { Mutex() }
         val ACTIVE_PHASES = setOf(
             UploadPhase.QUEUED,
             UploadPhase.HASHING,
