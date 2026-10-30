@@ -151,6 +151,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                                         (context.applicationContext as BarkCloudApplication).uploadQueue.resumeBackup()
                                     }
                                     AutoUploadScheduler.apply(context, backup.policy)
+                                    AutoUploadScheduler.runOnce(context, backup.policy)
                                 }
                             },
                             modifier = Modifier.semantics { contentDescription = label },

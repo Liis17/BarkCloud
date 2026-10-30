@@ -12,8 +12,6 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
-import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
-import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.MediaCloudStateDao
@@ -28,6 +26,7 @@ import com.barkfluff.BarkCloud.net.UploadSessionState
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -76,40 +75,47 @@ class UploadWorker(
             setForeground(progressInfo(tracker.snapshot()))
 
             coroutineScope {
-                launch {
-                    for (ignored in notifyChannel) {
-                        runCatching { setForeground(progressInfo(tracker.snapshot())) }
+                val notificationConsumer = launch {
+                    consumeUploadNotifications(notifyChannel) {
+                        setForeground(progressInfo(tracker.snapshot()))
                     }
                 }
-                val semaphore = Semaphore(MAX_CONCURRENT_JOBS)
-                val claimed = mutableSetOf<String>()
-                while (true) {
-                    semaphore.acquire()
-                    val job = queue.activeJobs().firstOrNull { it.id !in claimed }
-                    if (job == null) {
-                        semaphore.release()
-                        break
-                    }
-                    claimed += job.id
-                    tracker.register(job.id, job.bytesTotal, job.fileName)
-                    launch {
-                        try {
-                            process(job, queue, transfer, cloud, albums, mediaDao, tracker)
-                            tracker.finish(job.id)
-                        } catch (paused: JobPausedException) {
-                            tracker.remove(job.id)
-                        } catch (cancelled: JobCancelledException) {
-                            tracker.remove(job.id)
-                            runCatching { job.sessionId?.let { transfer.cancelUploadSession(it) } }
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (error: Throwable) {
-                            tracker.finish(job.id)
-                            handleFailure(job, error, queue, transfer, mediaDao, pending)
-                        } finally {
-                            semaphore.release()
+                try {
+                    coroutineScope {
+                        val semaphore = Semaphore(MAX_CONCURRENT_JOBS)
+                        val claimed = mutableSetOf<String>()
+                        while (true) {
+                            semaphore.acquire()
+                            val job = queue.activeJobs().firstOrNull { it.id !in claimed }
+                            if (job == null) {
+                                semaphore.release()
+                                break
+                            }
+                            claimed += job.id
+                            tracker.register(job.id, job.bytesTotal, job.fileName)
+                            launch {
+                                try {
+                                    process(job, queue, transfer, cloud, albums, mediaDao, tracker)
+                                    tracker.finish(job.id)
+                                } catch (paused: JobPausedException) {
+                                    tracker.remove(job.id)
+                                } catch (cancelled: JobCancelledException) {
+                                    tracker.remove(job.id)
+                                    runCatching { job.sessionId?.let { transfer.cancelUploadSession(it) } }
+                                } catch (error: CancellationException) {
+                                    throw error
+                                } catch (error: Throwable) {
+                                    tracker.finish(job.id)
+                                    handleFailure(job, error, queue, transfer, mediaDao, pending)
+                                } finally {
+                                    semaphore.release()
+                                }
+                            }
                         }
                     }
+                } finally {
+                    notifyChannel.close()
+                    notificationConsumer.cancelAndJoin()
                 }
             }
 
@@ -366,9 +372,6 @@ class UploadWorker(
         job.mediaKey?.let { key ->
             mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(status = MediaCloudStatus.IN_CLOUD, cloudFileId = fileId)) }
         }
-        if (job.source == UploadSource.BACKUP) {
-            AutoUploadScheduler.runOnce(applicationContext, AutoUploadSettings(applicationContext).policy)
-        }
     }
 
     // MARK: Ошибки и retry
@@ -551,4 +554,8 @@ class UploadWorker(
         const val PROCESSING_POLL_MILLIS = 2_000L
         const val EMIT_INTERVAL_MILLIS = 250L
     }
+}
+
+internal suspend fun consumeUploadNotifications(channel: kotlinx.coroutines.channels.ReceiveChannel<Unit>, update: suspend () -> Unit) {
+    for (ignored in channel) update()
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import coil3.SingletonImageLoader
 import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
+import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.vault.VaultStore
@@ -32,10 +33,11 @@ class SessionManager(
 
     fun resetLocalState() {
         globalParam.clearSession()
-        AutoUploadScheduler.disable(appContext)
-        grpcManager.shutdown()
-        vaultStore.removeAll()
         runBlocking {
+            AutoUploadScheduler.disableAndAwait(appContext)
+            UploadScheduler.cancelAndAwait(appContext)
+            grpcManager.shutdown()
+            vaultStore.removeAll()
             fileCache.clearAll()
             uploadQueue.clear()
             BarkCloudDatabase.get(appContext).mediaCloudStateDao().deleteAll()
