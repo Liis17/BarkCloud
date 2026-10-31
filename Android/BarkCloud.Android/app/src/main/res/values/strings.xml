@@ -463,4 +463,8 @@
     <string name="android_updates_prompt_title">Доступна BarkCloud %1$s</string>
     <string name="android_updates_open">Открыть обновления</string>
     <string name="android_updates_later">Позже</string>
+    <string name="viewer_action_album">В альбом</string>
+    <string name="viewer_album_added">Добавлено в альбом</string>
+    <string name="viewer_albums_empty">Создайте альбом в разделе «Подборки»</string>
+    <string name="viewer_favorite_added">Добавлено в избранное</string>
 </resources>
