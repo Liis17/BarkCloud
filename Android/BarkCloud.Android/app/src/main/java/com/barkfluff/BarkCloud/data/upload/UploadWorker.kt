@@ -3,6 +3,8 @@ package com.barkfluff.BarkCloud.data.upload
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.SystemClock
 import androidx.work.CoroutineWorker
@@ -56,6 +58,7 @@ class UploadWorker(
 
         val globalParam = GlobalParam(applicationContext)
         if (!globalParam.hasValidRefreshToken()) return Result.failure()
+        val autoUploadSettings = AutoUploadSettings(applicationContext)
 
         val grpc = GrpcManager(globalParam, ClientMetadataInterceptor.create(applicationContext))
         return try {
@@ -88,7 +91,14 @@ class UploadWorker(
                     }
                 }
                 try {
-                    UploadQueueDrain.run(queue, MAX_CONCURRENT_JOBS, stopClaiming::get) { job ->
+                    UploadQueueDrain.run(
+                        source = queue,
+                        pageSize = MAX_CONCURRENT_JOBS,
+                        shouldStop = stopClaiming::get,
+                        shouldProcess = { job ->
+                            shouldProcessUploadJob(job, autoUploadSettings.policy, isUnmeteredNetwork())
+                        },
+                    ) { job ->
                         tracker.register(job.id, job.bytesTotal, job.fileName)
                         val hadStagedFile = job.source == UploadSource.BACKUP && job.stagedFilePath != null
                         val reservedStage = AtomicBoolean(false)
@@ -135,9 +145,14 @@ class UploadWorker(
                 Result.retry()
             } else {
                 retryable.forEach { finalizeExhausted(it, queue, mediaDao) }
+                val activeJobs = if (shouldUploadBackup(autoUploadSettings.policy, isUnmeteredNetwork())) {
+                    queue.activeCount()
+                } else {
+                    queue.activeNonBackupCount()
+                }
                 if (shouldScheduleUploadContinuation(
                         stopClaiming = stopClaiming.get(),
-                        activeJobs = queue.activeCount(),
+                        activeJobs = activeJobs,
                         stagedBackups = queue.stagedBackupCount(),
                         maxStagedBackups = MAX_CONCURRENT_JOBS,
                     )
@@ -274,6 +289,13 @@ class UploadWorker(
                 applicationContext,
                 android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun isUnmeteredNetwork(): Boolean {
+        val connectivity = applicationContext.getSystemService(ConnectivityManager::class.java)
+        val network = connectivity?.activeNetwork ?: return false
+        val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
     }
 
     private suspend fun obtainSession(job: UploadJob, queue: UploadQueueStore, transfer: FileTransferService): UploadSessionInfo {

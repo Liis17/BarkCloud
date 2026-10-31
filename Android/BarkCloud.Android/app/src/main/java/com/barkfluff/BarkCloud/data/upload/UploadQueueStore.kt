@@ -292,6 +292,7 @@ class UploadQueueStore(
 
     override suspend fun activePage(afterId: String?, limit: Int): List<UploadJob> = dao.nextActivePage(afterId, limit)
     suspend fun activeCount(): Int = dao.activeCount()
+    suspend fun activeNonBackupCount(): Int = dao.activeNonBackupCount()
     suspend fun stagedBackupCount(): Int = dao.stagedBackupCount()
     suspend fun byId(id: String): UploadJob? = dao.byId(id)
 
