@@ -7,8 +7,15 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -25,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.DeepLinkEvent
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.update.AndroidReleaseMetadata
 import com.barkfluff.BarkCloud.files.ui.FilesRootScreen
 import com.barkfluff.BarkCloud.files.ui.LocalBrowserScreen
 import com.barkfluff.BarkCloud.ui.albums.AlbumDetailScreen
@@ -47,6 +55,7 @@ import com.barkfluff.BarkCloud.ui.settings.EditProfileScreen
 import com.barkfluff.BarkCloud.ui.settings.PrivacySettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.SettingsScreen
 import com.barkfluff.BarkCloud.ui.settings.UploadSettingsScreen
+import com.barkfluff.BarkCloud.ui.settings.AndroidUpdatesScreen
 import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderDetailScreen
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueScreen
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueViewModel
@@ -58,6 +67,9 @@ import kotlinx.coroutines.flow.first
 fun MainScreen(
     deepLink: DeepLinkEvent? = null,
     onSignOut: () -> Unit,
+    startupUpdatePrompt: AndroidReleaseMetadata? = null,
+    onStartupUpdatePromptShown: (AndroidReleaseMetadata) -> Unit = {},
+    onDismissStartupUpdatePrompt: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val rootCloudTitle = stringResource(R.string.cloud_storage_title)
@@ -90,6 +102,7 @@ fun MainScreen(
         }
     }
 
+    var recordedPromptTag by remember { mutableStateOf<String?>(null) }
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
@@ -273,6 +286,7 @@ fun MainScreen(
                         onCache = { navController.navigate("settings/cache") },
                         onAppLock = { navController.navigate("settings/applock") },
                         onVault = { navController.navigate("settings/vault") },
+                        onUpdates = { navController.navigate("settings/updates") },
                     )
                 }
                 drillIn("settings/editProfile") {
@@ -296,11 +310,42 @@ fun MainScreen(
                 drillIn("settings/vault") {
                     VaultScreen(onNavigateUp = { navController.popBackStack() })
                 }
+                drillIn("settings/updates") {
+                    AndroidUpdatesScreen(onNavigateUp = { navController.popBackStack() })
+                }
             }
 
             drillIn("uploads/root") {
                 UploadQueueScreen(onNavigateUp = { navController.popBackStack() })
             }
         }
+    }
+
+    startupUpdatePrompt?.let { release ->
+        SideEffect {
+            if (recordedPromptTag != release.tag) {
+                recordedPromptTag = release.tag
+                onStartupUpdatePromptShown(release)
+            }
+        }
+        AlertDialog(
+            onDismissRequest = onDismissStartupUpdatePrompt,
+            title = { Text(stringResource(R.string.android_updates_prompt_title, release.versionName)) },
+            text = { Text(stringResource(R.string.android_updates_install_warning)) },
+            confirmButton = {
+                Button(onClick = {
+                    onDismissStartupUpdatePrompt()
+                    navController.navigate("settings/updates")
+                }) { Text(stringResource(R.string.android_updates_open)) }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissStartupUpdatePrompt) {
+                    Text(stringResource(R.string.android_updates_later))
+                }
+            },
+        )
+    }
+    LaunchedEffect(startupUpdatePrompt?.tag) {
+        if (startupUpdatePrompt == null) recordedPromptTag = null
     }
 }
