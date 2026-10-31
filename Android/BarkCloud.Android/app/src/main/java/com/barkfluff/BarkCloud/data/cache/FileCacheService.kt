@@ -96,11 +96,18 @@ class FileCacheService(
         sourceFile: File? = null,
     ): File = loadInternal(key, fileName, sourceUrl, sourceFile, pinResult = false).file
 
+    suspend fun loadGenerated(
+        key: FileCacheKey,
+        fileName: String,
+        generate: suspend (File) -> Unit,
+    ): File = loadInternal(key, fileName, generatedLoader = generate, pinResult = false).file
+
     private suspend fun loadInternal(
         key: FileCacheKey,
         fileName: String,
         sourceUrl: String? = null,
         sourceFile: File? = null,
+        generatedLoader: (suspend (File) -> Unit)? = null,
         pinResult: Boolean,
         onPinAcquired: ((FileCachePin) -> Unit)? = null,
     ): LoadedFile = withContext(ioDispatcher) {
@@ -151,7 +158,12 @@ class FileCacheService(
                 candidate.job = loaderScope.launch(
                     start = CoroutineStart.UNDISPATCHED,
                 ) {
-                    performFlight(candidate, request, cacheFile(activeKey, cacheFileName(activeKey, fileName)))
+                    performFlight(
+                        candidate,
+                        request,
+                        cacheFile(activeKey, cacheFileName(activeKey, fileName)),
+                        generatedLoader,
+                    )
                 }
                 candidate.job?.invokeOnCompletion { cause ->
                     if (cause is CancellationException && !candidate.result.isCompleted) {
@@ -205,12 +217,18 @@ class FileCacheService(
         error("unreachable")
     }
 
-    private suspend fun performFlight(flight: Flight, request: FileCacheLoadRequest, target: File) {
+    private suspend fun performFlight(
+        flight: Flight,
+        request: FileCacheLoadRequest,
+        target: File,
+        generatedLoader: (suspend (File) -> Unit)?,
+    ) {
         val temporary = File(target.parentFile, ".${target.name}.${UUID.randomUUID()}.tmp")
         try {
             withCacheState { ensureCurrent(flight.key, flight.epoch) }
             target.parentFile?.mkdirs()
-            loader.load(request, temporary)
+            if (generatedLoader != null) generatedLoader(temporary)
+            else loader.load(request, temporary)
             currentCoroutineContext().ensureActive()
             if (!temporary.isFile || temporary.length() <= 0L) {
                 throw IOException("Загрузчик не создал полный файл кеша")

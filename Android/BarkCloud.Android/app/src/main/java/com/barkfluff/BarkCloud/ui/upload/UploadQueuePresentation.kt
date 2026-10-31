@@ -13,29 +13,41 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.upload.UploadJob
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
+import com.barkfluff.BarkCloud.ui.components.localPreviewModel
 import java.io.File
-
-internal fun UploadJob.thumbnailModel(): Any? = mediaKey
-    ?.let(DeviceMediaStore::uriForKey)
-    ?: stagedFilePath?.let(::File)
 
 @Composable
 internal fun UploadJobThumbnail(
     job: UploadJob,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    var media by remember(job.mediaKey) { mutableStateOf<DeviceMedia?>(null) }
+    LaunchedEffect(job.mediaKey) {
+        media = job.mediaKey?.let { DeviceMediaStore.findByKey(context, it) }
+    }
+    val thumbnailModel = media?.localPreviewModel(256) ?: job.stagedFilePath?.let { path ->
+        File(path).localPreviewModel(256, job.mimeType?.startsWith("video/") == true)
+    }
     val placeholder = painterResource(R.drawable.ic_upload_media_placeholder)
     Box(
         modifier = modifier
@@ -44,7 +56,7 @@ internal fun UploadJobThumbnail(
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         AsyncImage(
-            model = job.thumbnailModel(),
+            model = thumbnailModel,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             placeholder = placeholder,

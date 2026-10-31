@@ -49,6 +49,9 @@ data class FileCacheKey(
             return FileCacheKey(scope, fileId, variant, CacheCategory.PREVIEW)
         }
 
+        fun localPreview(scope: CacheScope, sourceId: String, sourceVersion: String, maxDimensionPx: Int) =
+            FileCacheKey(scope, sourceId, "local-preview:$sourceVersion:$maxDimensionPx", CacheCategory.PREVIEW)
+
         fun jpegView(scope: CacheScope, fileId: String) =
             jpegView(scope, fileId, null)
 
