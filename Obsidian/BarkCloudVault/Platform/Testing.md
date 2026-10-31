@@ -42,6 +42,9 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 Dev-запуски независимы и не отменяют друг друга; master-запуски сериализованы.
 Следующая стабильная версия выбирается только среди опубликованных стабильных
 релизов, поэтому prerelease не влияет на её автоинкремент.
+Android Gradle принимает `androidReleaseVersionName` в формате `major.minor.patch`
+или `major.minor.patch-dev.<run_number>.<run_attempt>+<short_sha>`; номера запуска
+и попытки положительные, short SHA — семь строчных hex-символов, как в workflow.
 Android использует код следующей стабильной версии; preview-сборки одного цикла
 имеют одинаковый `versionCode` и предназначены для ручной установки, а не
 последовательного автоматического обновления.
