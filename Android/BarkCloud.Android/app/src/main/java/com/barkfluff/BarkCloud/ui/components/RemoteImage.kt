@@ -8,6 +8,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.barkfluff.BarkCloud.grpc.GrpcEndpoint
+import com.barkfluff.BarkCloud.data.cache.CloudImageModel
 
 /**
  * Загрузка удалённой картинки по URL через Coil + trust-all OkHttp (см.
@@ -21,11 +22,13 @@ fun RemoteImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     normalize: Boolean = false,
+    fileId: String? = null,
+    previewFileId: String? = null,
 ) {
     val resolved = if (normalize) GrpcEndpoint.normalizedFileDownloadURL(url) else url
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
-            .data(resolved)
+            .data(resolved?.let { CloudImageModel(it, fileId, previewFileId) })
             .crossfade(true)
             .build(),
         contentDescription = contentDescription,

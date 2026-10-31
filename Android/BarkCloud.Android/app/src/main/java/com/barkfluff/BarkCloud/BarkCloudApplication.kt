@@ -25,6 +25,9 @@ import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.data.cache.CacheScope
 import com.barkfluff.BarkCloud.data.cache.CloudImageFetcherFactory
 import com.barkfluff.BarkCloud.data.cache.CloudImageKeyer
+import com.barkfluff.BarkCloud.data.cache.AndroidLocalMediaThumbnailLoader
+import com.barkfluff.BarkCloud.data.cache.LocalMediaImageFetcherFactory
+import com.barkfluff.BarkCloud.data.cache.LocalMediaImageKeyer
 import com.barkfluff.BarkCloud.data.cache.FileTransferCacheLoader
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
@@ -174,6 +177,8 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
             .components {
                 add(CloudImageKeyer(::currentCacheScope))
                 add(CloudImageFetcherFactory(fileCache, ::currentCacheScope))
+                add(LocalMediaImageKeyer(::currentCacheScope))
+                add(LocalMediaImageFetcherFactory(fileCache, ::currentCacheScope, AndroidLocalMediaThumbnailLoader(this@BarkCloudApplication)))
                 // Превью используют ту же выбранную TLS-политику, что и upload/download.
                 add(OkHttpNetworkFetcherFactory(callFactory = { InsecureHttp.client }))
                 add(VideoFrameDecoder.Factory())

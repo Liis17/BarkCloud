@@ -26,6 +26,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import coil3.fetch.SourceFetchResult
+import okio.FileSystem
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -101,6 +103,68 @@ class FileCacheServiceTest {
             assertEquals(saved, afterRestart)
             assertEquals(1, firstLoader.calls.get())
             assertEquals(byteArrayOf(1, 2, 3).toList(), afterRestart.readBytes().toList())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun generatedPreviewsAreReusedAcrossLoadsAndServiceRestart() = runTest {
+        val root = Files.createTempDirectory("file-cache-generated-preview-").toFile()
+        try {
+            val scope = CacheScope("server", "user-a")
+            val index = DiskFileCacheIndex(File(root, "index.json"))
+            val cache = cache(
+                root,
+                RecordingLoader { _, _ -> error("generated previews must use their generator") },
+                scope,
+                index = index,
+            )
+            val generatorCalls = AtomicInteger()
+            val thumbnailLoader = LocalMediaThumbnailLoader { _, destination ->
+                generatorCalls.incrementAndGet()
+                destination.writeBytes(byteArrayOf(1, 2, 3))
+            }
+            val model = LocalMediaImageModel(
+                uri = "content://media/external/images/media/42",
+                sourceId = "device-media:external:42",
+                sourceVersion = "revision-1",
+                maxDimensionPx = 512,
+                isVideo = false,
+            )
+            fun fetcher(image: LocalMediaImageModel, activeCache: FileCacheService, activeScope: CacheScope) =
+                LocalMediaImageFetcher(image, activeCache, { activeScope }, thumbnailLoader, FileSystem.SYSTEM)
+
+            val firstResult = fetcher(model, cache, scope).fetch() as SourceFetchResult
+            val first = cache.get(model.cacheKey(scope))!!
+            firstResult.source.close()
+            val repeatedResult = fetcher(model, cache, scope).fetch() as SourceFetchResult
+            val repeated = cache.get(model.cacheKey(scope))!!
+            repeatedResult.source.close()
+            val restarted = cache(root, RecordingLoader { _, _ -> error("cached preview must be reused") }, scope, index = index)
+            val restartedResult = fetcher(model, restarted, scope).fetch() as SourceFetchResult
+            val afterRestart = restarted.get(model.cacheKey(scope))!!
+            restartedResult.source.close()
+
+            assertEquals(first, repeated)
+            assertEquals(first, afterRestart)
+            assertEquals("The thumbnail generator should run once for a cached preview", 1, generatorCalls.get())
+            assertEquals(byteArrayOf(1, 2, 3).toList(), afterRestart.readBytes().toList())
+
+            val changedSource = model.copy(sourceVersion = "revision-2")
+            val changedResult = fetcher(changedSource, cache, scope).fetch() as SourceFetchResult
+            changedResult.source.close()
+            val otherAccount = CacheScope("server", "user-b")
+            val accountCache = cache(
+                root,
+                RecordingLoader { _, _ -> error("generated previews must use their generator") },
+                otherAccount,
+                index = index,
+            )
+            val accountResult = fetcher(model, accountCache, otherAccount).fetch() as SourceFetchResult
+            accountResult.source.close()
+            assertEquals(3, generatorCalls.get())
+            assertEquals(3, accountCache.entryCount())
         } finally {
             root.deleteRecursively()
         }
