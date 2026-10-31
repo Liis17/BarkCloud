@@ -11,8 +11,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
@@ -32,10 +37,12 @@ import com.barkfluff.BarkCloud.ui.onboarding.WelcomeScreen
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.ui.applock.AppLockScreen
 import com.barkfluff.BarkCloud.ui.login.LoginScreen
 import com.barkfluff.BarkCloud.ui.main.MainScreen
+import com.barkfluff.BarkCloud.data.update.AndroidReleaseMetadata
 
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_MAIN = "main"
@@ -62,6 +69,11 @@ fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
         }
     }
     val navController = rememberNavController()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val rootBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRootRoute = rootBackStackEntry?.destination?.route
+    val shouldShowLock by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
+    var startupUpdatePrompt by remember { mutableStateOf<AndroidReleaseMetadata?>(null) }
     fun replaceRoot(route: String) {
         navController.navigate(route) {
             popUpTo(navController.graph.id) { inclusive = true }
@@ -83,7 +95,21 @@ fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
     }
 
     LaunchedEffect(sessionActive.value) {
-        if (!sessionActive.value && navController.currentDestination?.route == ROUTE_MAIN) replaceRoot(ROUTE_LOGIN)
+        if (!sessionActive.value) {
+            startupUpdatePrompt = null
+            if (navController.currentDestination?.route == ROUTE_MAIN) replaceRoot(ROUTE_LOGIN)
+        }
+    }
+
+    val visibleStartupUpdatePrompt = startupUpdatePrompt.takeIf {
+        sessionActive.value && !shouldShowLock && currentRootRoute == ROUTE_MAIN
+    }
+
+    LaunchedEffect(sessionActive.value, shouldShowLock, currentRootRoute, lifecycleOwner) {
+        if (!sessionActive.value || shouldShowLock || currentRootRoute != ROUTE_MAIN) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            startupUpdatePrompt = app.androidUpdateRepository.checkForStartupPrompt()
+        }
     }
 
     Box {
@@ -138,12 +164,14 @@ fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
             composable(ROUTE_MAIN) {
                 MainScreen(
                     deepLink = deepLink,
-                    onSignOut = { replaceRoot(ROUTE_LOGIN) },
+                    onSignOut = { startupUpdatePrompt = null; replaceRoot(ROUTE_LOGIN) },
+                    startupUpdatePrompt = visibleStartupUpdatePrompt,
+                    onStartupUpdatePromptShown = app.androidUpdateRepository::markStartupPromptShown,
+                    onDismissStartupUpdatePrompt = { startupUpdatePrompt = null },
                 )
             }
         }
 
-        val shouldShowLock by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
         // Лок актуален только для аутентифицированной сессии — до логина показывать нечего.
         // Появление — быстрый fade+scale (effect-пружина), исчезновение мгновенное: это
         // security-оверлей, не допустимо показывать контент под ним дольше необходимого.

@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                (application as BarkCloudApplication).androidUpdateRepository.reconcile()
                 NotificationPermissionRequests.events.collect { requestNotificationPermissionIfNeeded() }
             }
         }

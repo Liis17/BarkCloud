@@ -7,6 +7,8 @@
 -->
 <full-backup-content>
     <exclude domain="sharedpref" path="barkcloud_pending_registration.xml"/>
+    <exclude domain="sharedpref" path="barkcloud_android_updates.xml"/>
+    <exclude domain="external" path="updates/"/>
     <!--
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>

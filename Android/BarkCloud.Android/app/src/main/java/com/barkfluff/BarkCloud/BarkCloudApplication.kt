@@ -34,6 +34,7 @@ import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.users.UserRepository
+import com.barkfluff.BarkCloud.data.update.AndroidUpdateRepository
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.RoomFileCacheIndex
 import com.barkfluff.BarkCloud.data.vault.VaultStore
@@ -115,6 +116,9 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
     lateinit var vaultStore: VaultStore
         private set
 
+    lateinit var androidUpdateRepository: AndroidUpdateRepository
+        private set
+
     override fun onCreate() {
         super.onCreate()
         ServerSettings.init(this)
@@ -153,6 +157,7 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue, vaultStore)
         appLockStore = AppLockStore(this)
         appLockManager = AppLockManager(appLockStore)
+        androidUpdateRepository = AndroidUpdateRepository(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
         appScope.launch {
             fileCache.runStartupSweepIfNeeded()
