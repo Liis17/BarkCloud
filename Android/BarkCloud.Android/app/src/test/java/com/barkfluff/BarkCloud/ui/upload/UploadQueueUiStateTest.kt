@@ -9,11 +9,52 @@ import org.junit.Test
 
 class UploadQueueUiStateTest {
     @Test fun unfinishedJobsRemainVisibleRegardlessOfAge() {
-        val phases = listOf(UploadPhase.QUEUED, UploadPhase.UPLOADING, UploadPhase.PAUSED,
-            UploadPhase.FAILED, UploadPhase.UPLOADED_NOT_ATTACHED)
-        val jobs = (phases + UploadPhase.COMPLETED + UploadPhase.CANCELLED).map(::job)
+        val jobs = listOf(
+            job(UploadPhase.PAUSED, id = "paused", createdAt = 2),
+            job(UploadPhase.QUEUED, id = "queued", createdAt = 1),
+            job(UploadPhase.UPLOADING, id = "uploading", createdAt = 3),
+            job(UploadPhase.FAILED, id = "failed", createdAt = 4),
+            job(UploadPhase.UPLOADED_NOT_ATTACHED, id = "detached", createdAt = 5),
+            job(UploadPhase.COMPLETED, id = "completed", createdAt = 0),
+            job(UploadPhase.CANCELLED, id = "cancelled", createdAt = 0),
+        )
 
-        assertEquals(phases, UploadQueueUiState(jobs).pendingJobs.map { it.phase })
+        assertEquals(
+            listOf("uploading", "queued", "paused", "failed", "detached"),
+            UploadQueueUiState(jobs).pendingJobs.map { it.id },
+        )
+    }
+
+    @Test fun jobsWithinGroupsUseCreationTimeThenId() {
+        val state = UploadQueueUiState(
+            listOf(
+                job(UploadPhase.UPLOADING, id = "active-z", createdAt = 10),
+                job(UploadPhase.HASHING, id = "active-b", createdAt = 5),
+                job(UploadPhase.CREATING_SESSION, id = "active-a", createdAt = 5),
+                job(UploadPhase.QUEUED, id = "queued-b", createdAt = 5),
+                job(UploadPhase.QUEUED, id = "queued-a", createdAt = 5),
+                job(UploadPhase.FAILED, id = "inactive-b", createdAt = 2),
+                job(UploadPhase.PAUSED, id = "inactive-a", createdAt = 2),
+            ),
+        )
+
+        assertEquals(
+            listOf("active-a", "active-b", "active-z", "queued-a", "queued-b", "inactive-a", "inactive-b"),
+            state.pendingJobs.map { it.id },
+        )
+    }
+
+    @Test fun pendingErrorCountIncludesOldUnfinishedFailures() {
+        val state = UploadQueueUiState(
+            listOf(
+                job(UploadPhase.FAILED, id = "old-failure", createdAt = 1),
+                job(UploadPhase.UPLOADED_NOT_ATTACHED, id = "old-attachment", createdAt = 2),
+                job(UploadPhase.COMPLETED, id = "old-completed", createdAt = 3),
+            ),
+        )
+
+        assertEquals(2, state.pendingErrorCount)
+        assertEquals(0, state.failed)
     }
 
     @Test fun completedJobDisappearsOnNextStateUpdate() {
@@ -23,12 +64,12 @@ class UploadQueueUiStateTest {
         assertEquals(emptyList<UploadJob>(), state.copy(jobs = listOf(uploading.copy(phase = UploadPhase.COMPLETED))).pendingJobs)
     }
 
-    private fun job(phase: UploadPhase) = UploadJob(
-        id = phase.name, source = UploadSource.BACKUP, stagedFilePath = null,
+    private fun job(phase: UploadPhase, id: String = phase.name, createdAt: Long = 1) = UploadJob(
+        id = id, source = UploadSource.BACKUP, stagedFilePath = null,
         mediaKey = null, mediaHash = null, fileName = "photo.jpg", mimeType = "image/jpeg",
         destination = UploadDestination.SYSTEM_BY_MEDIA_KIND, directoryId = null, albumId = null,
         phase = phase, idempotencyKey = null, sessionId = null, partSize = 0,
         preparedFileId = null, bytesTotal = 100, bytesSent = 50, errorMessage = null,
-        createdAtMillis = 1, completedAtMillis = null,
+        createdAtMillis = createdAt, completedAtMillis = null,
     )
 }
