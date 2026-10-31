@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Cancel
@@ -73,26 +76,34 @@ internal fun UploadQueueContent(
     onRetry: (String) -> Unit,
     onCancel: (String) -> Unit,
     modifier: Modifier = Modifier,
+    gridState: LazyGridState = rememberLazyGridState(),
 ) {
     var selectedJobId by remember { mutableStateOf<String?>(null) }
     val selectedJob = state.pendingJobs.firstOrNull { it.id == selectedJobId }
-    val gridState = rememberLazyGridState()
     val currentPhasesById = remember(state.pendingJobs) { state.pendingJobs.associate { it.id to it.phase } }
+    val currentIndicesById = remember(state.pendingJobs) {
+        state.pendingJobs.mapIndexed { index, job -> job.id to index }.toMap()
+    }
     var previousPhasesById by remember { mutableStateOf(currentPhasesById) }
 
     SideEffect {
-        val visibleItems = gridState.layoutInfo.visibleItemsInfo
-        val firstVisible = visibleItems.firstOrNull()
-        val firstVisibleId = firstVisible?.key as? String
-        if (firstVisible != null && firstVisibleId != null && previousPhasesById[firstVisibleId] != currentPhasesById[firstVisibleId]) {
-            val anchor = visibleItems.firstOrNull { item ->
-                val id = item.key as? String
-                item.offset.y == firstVisible.offset.y &&
+        if (previousPhasesById != currentPhasesById && state.pendingJobs.isNotEmpty()) {
+            if (gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0) {
+                gridState.requestScrollToItem(0)
+            } else {
+                val anchor = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
+                    val id = item.key as? String
                     id != null && currentPhasesById.containsKey(id) && previousPhasesById[id] == currentPhasesById[id]
-            }
-            val anchorIndex = anchor?.key?.let { key -> state.pendingJobs.indexOfFirst { it.id == key } } ?: -1
-            if (anchorIndex >= 0) {
-                gridState.requestScrollToItem(anchorIndex, gridState.firstVisibleItemScrollOffset)
+                }
+                val anchorIndex = anchor?.key?.let { currentIndicesById[it] } ?: -1
+                if (anchorIndex >= 0 && anchor != null) {
+                    gridState.requestScrollToItem(anchorIndex, -anchor.offset.y)
+                } else {
+                    gridState.requestScrollToItem(
+                        gridState.firstVisibleItemIndex.coerceAtMost(state.pendingJobs.lastIndex),
+                        gridState.firstVisibleItemScrollOffset.coerceAtMost(gridState.layoutInfo.viewportSize.height),
+                    )
+                }
             }
         }
         previousPhasesById = currentPhasesById
@@ -102,7 +113,28 @@ internal fun UploadQueueContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.gallery_uploads_title)) },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.gallery_uploads_title),
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (state.pendingErrorCount > 0) {
+                            Text(
+                                stringResource(R.string.gallery_upload_error_count, state.pendingErrorCount),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(
@@ -210,7 +242,11 @@ private fun UploadJobDetailsSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(job.fileName, style = MaterialTheme.typography.titleLarge)
