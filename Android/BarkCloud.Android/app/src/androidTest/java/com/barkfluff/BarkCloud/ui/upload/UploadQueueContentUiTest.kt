@@ -3,6 +3,8 @@ package com.barkfluff.BarkCloud.ui.upload
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -73,6 +75,27 @@ class UploadQueueContentUiTest {
     }
 
     @Test
+    fun topBarShowsOldFailedAndUnattachedErrorCount() {
+        compose.setContent {
+            MaterialTheme {
+                UploadQueueContent(
+                    state = UploadQueueUiState(
+                        listOf(
+                            job(UploadPhase.FAILED, "old-failure", 1),
+                            job(UploadPhase.UPLOADED_NOT_ATTACHED, "old-unattached", 2),
+                        ),
+                    ),
+                    onNavigateUp = {},
+                    onRetry = {},
+                    onCancel = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("Ошибок: 2").assertIsDisplayed()
+    }
+
+    @Test
     fun onlyExecutingJobsShowProgress() {
         val state = mutableStateOf(UploadQueueUiState(listOf(job(UploadPhase.QUEUED, "queued", 1))))
         compose.setContent {
@@ -127,6 +150,36 @@ class UploadQueueContentUiTest {
     }
 
     @Test
+    fun retryRemainsReachableAfterScrollingLongDetails() {
+        val retryId = AtomicReference<String?>()
+        val fileName = "large-photo-" + "archive-name-".repeat(12) + ".jpg"
+        val error = (1..80).joinToString("\n") { "Ошибка сервера с подробностями $it" }
+        val failed = job(UploadPhase.FAILED, "long-error", 1).copy(
+            fileName = fileName,
+            errorMessage = error,
+        )
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.size(360.dp, 640.dp)) {
+                    UploadQueueContent(
+                        state = UploadQueueUiState(listOf(failed)),
+                        onNavigateUp = {},
+                        onRetry = { retryId.set(it) },
+                        onCancel = {},
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithContentDescription("Загрузка $fileName, статус: Ошибка").performClick()
+        compose.onNodeWithText(fileName).assertExists()
+        compose.onNodeWithText(error).assertExists()
+        compose.onNodeWithText("Повторить").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("long-error", retryId.get()) }
+    }
+
+    @Test
     fun changingVisibleJobPhaseKeepsTheReadingRowInPlace() {
         val initial = (0..39).map { index ->
             job(UploadPhase.QUEUED, "job-${index.toString().padStart(2, '0')}", index.toLong())
@@ -157,6 +210,94 @@ class UploadQueueContentUiTest {
 
         val anchorAfter = compose.onNodeWithContentDescription("Загрузка job-16, статус: В очереди").getBoundsInRoot()
         assertEquals(anchorBefore.top.value, anchorAfter.top.value, 1f)
+    }
+
+    @Test
+    fun changingFirstRowAndRemovingTaskKeepsLaterVisibleTaskInPlace() {
+        val initial = (0..59).map { index ->
+            job(UploadPhase.QUEUED, "job-${index.toString().padStart(2, '0')}", index.toLong())
+        }
+        val state = mutableStateOf(UploadQueueUiState(initial))
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.size(360.dp, 640.dp)) {
+                    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = 30)
+                    UploadQueueContent(
+                        state = state.value,
+                        onNavigateUp = {},
+                        onRetry = {},
+                        onCancel = {},
+                        modifier = Modifier.fillMaxSize(),
+                        gridState = gridState,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+
+        val anchorLabel = "Загрузка job-33, статус: В очереди"
+        val anchorBefore = compose.onNodeWithContentDescription(anchorLabel).getBoundsInRoot()
+        compose.runOnIdle {
+            state.value = UploadQueueUiState(
+                initial.map { job ->
+                    when (job.id) {
+                        "job-30" -> job.copy(phase = UploadPhase.UPLOADING)
+                        "job-31" -> job.copy(phase = UploadPhase.FAILED)
+                        "job-32" -> job.copy(phase = UploadPhase.COMPLETED)
+                        else -> job
+                    }
+                },
+            )
+        }
+        compose.waitForIdle()
+
+        val anchorAfter = compose.onNodeWithContentDescription(anchorLabel).getBoundsInRoot()
+        assertEquals(anchorBefore.top.value, anchorAfter.top.value, 1f)
+    }
+
+    @Test
+    fun completingLeadingJobsKeepsAnUnscrolledGridAtTheStart() {
+        val initial = (0..11).map { index ->
+            job(UploadPhase.QUEUED, "job-${index.toString().padStart(2, '0')}", index.toLong())
+        }
+        val state = mutableStateOf(UploadQueueUiState(initial))
+        val gridStateRef = AtomicReference<LazyGridState>()
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.size(360.dp, 640.dp)) {
+                    val gridState = rememberLazyGridState()
+                    gridStateRef.set(gridState)
+                    UploadQueueContent(
+                        state = state.value,
+                        onNavigateUp = {},
+                        onRetry = {},
+                        onCancel = {},
+                        modifier = Modifier.fillMaxSize(),
+                        gridState = gridState,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+
+        compose.runOnIdle {
+            state.value = UploadQueueUiState(
+                initial.map { job ->
+                    if (job.id in setOf("job-00", "job-01", "job-02")) {
+                        job.copy(phase = UploadPhase.COMPLETED)
+                    } else {
+                        job
+                    }
+                },
+            )
+        }
+        compose.waitForIdle()
+
+        compose.runOnIdle {
+            assertEquals(0, gridStateRef.get().firstVisibleItemIndex)
+            assertEquals(0, gridStateRef.get().firstVisibleItemScrollOffset)
+            assertEquals("job-03", gridStateRef.get().layoutInfo.visibleItemsInfo.first().key)
+        }
     }
 
     private fun job(phase: UploadPhase, id: String, createdAt: Long) = UploadJob(
