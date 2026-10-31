@@ -33,8 +33,11 @@ if (androidReleaseVersionCodeValue != null && androidReleaseVersionCode == null)
 if ((androidReleaseVersionName == null) != (androidReleaseVersionCode == null)) {
     throw GradleException("Set both androidReleaseVersionName and androidReleaseVersionCode for release builds.")
 }
-if (androidReleaseVersionName != null && !Regex("^[0-9]+\\.[0-9]+\\.[0-9]+$").matches(androidReleaseVersionName)) {
-    throw GradleException("androidReleaseVersionName must be a stable major.minor.patch version.")
+val androidReleaseVersionPattern = Regex("""[0-9]+\.[0-9]+\.[0-9]+(-dev\.[1-9][0-9]*\.[1-9][0-9]*\+[0-9a-f]{7})?""")
+if (androidReleaseVersionName != null && !androidReleaseVersionPattern.matches(androidReleaseVersionName)) {
+    throw GradleException(
+        "androidReleaseVersionName must be major.minor.patch or major.minor.patch-dev.<run_number>.<run_attempt>+<short_sha>."
+    )
 }
 if (androidReleaseVersionCode != null && androidReleaseVersionCode <= 0) {
     throw GradleException("androidReleaseVersionCode must be a positive Android versionCode.")
