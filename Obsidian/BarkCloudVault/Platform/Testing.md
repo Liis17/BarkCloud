@@ -15,7 +15,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Dokany callbacks, outbox/Upload 2.0, сессия, кеш, TLS, настройки и pipe |
 | `Mac/BarkCloudKit/Tests/BarkCloudKitTests/` | Swift package tests | Upload 2.0, восстановление частей, отмена, токены и реальные gRPC deadline-сценарии для iOS/macOS сетевого слоя |
 | `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске; на PR в `master` и при `force-all` — полный прогон, вызывается из `release.yml` через `workflow_call` |
-| `.github/workflows/release.yml` | релизный pipeline | Push в `master`: полный прогон тестов → сборка APK/IPA/DMG/Drive ZIP/Builder ZIP → один релиз `v1.x.y` с автоинкрементом |
+| `.github/workflows/release.yml` | релизный pipeline | Push в `master` или `dev`: полный прогон тестов → сборка APK/IPA/DMG/Drive ZIP/Builder ZIP → стабильный релиз `v1.x.y` или dev prerelease |
 | `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа; общий version action использует registry SemVer для dev/master |
 | `.github/workflows/build-backend-transcoder.yml` | Transcoder CI/CD | Тесты нового sidecar, затем сборка и публикация его образа; ручной запуск на `dev` и `Backend/rebuild.trigger` тоже собирают образ |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
@@ -32,6 +32,19 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests` | `net10.0-windows`; тесты запускаются в Windows-окружении, unit-сценарии используют фейки вместо сервера и Dokany |
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
+
+## Релизы приложений
+
+`release.yml` публикует для каждого push в `dev` отдельный prerelease
+`v1.x.y-dev.<run_number>.<run_attempt>+<short_sha>` на точный коммит сборки.
+Он содержит тот же набор файлов, что и стабильный релиз, включая Android-манифест,
+и явно исключён из Latest. Публикация ждёт успешных тестов и всех пяти сборок.
+Dev-запуски независимы и не отменяют друг друга; master-запуски сериализованы.
+Следующая стабильная версия выбирается только среди опубликованных стабильных
+релизов, поэтому prerelease не влияет на её автоинкремент.
+Android использует код следующей стабильной версии; preview-сборки одного цикла
+имеют одинаковый `versionCode` и предназначены для ручной установки, а не
+последовательного автоматического обновления.
 
 ## Версии backend-образов
 
