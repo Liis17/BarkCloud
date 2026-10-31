@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -57,6 +58,7 @@ fun SettingsScreen(
     onCache: () -> Unit,
     onAppLock: () -> Unit,
     onVault: () -> Unit,
+    onUpdates: () -> Unit,
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -110,6 +112,8 @@ fun SettingsScreen(
                     SettingsRow(Icons.Outlined.Fingerprint, stringResource(R.string.applock_title), onAppLock)
                     HorizontalDivider()
                     SettingsRow(Icons.Outlined.Shield, stringResource(R.string.vault_title), onVault)
+                    HorizontalDivider()
+                    SettingsRow(Icons.Outlined.Refresh, stringResource(R.string.android_updates_title), onUpdates)
                 }
             }
         }
