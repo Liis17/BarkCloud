@@ -28,12 +28,29 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cache.LocalMediaImageModel
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.upload.UploadJob
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.ui.components.localPreviewModel
+import kotlinx.coroutines.CancellationException
 import java.io.File
+
+internal suspend fun loadUploadJobThumbnailModel(
+    mediaKey: String?,
+    fallback: LocalMediaImageModel?,
+    findByKey: suspend (String) -> DeviceMedia?,
+): LocalMediaImageModel? {
+    val media = try {
+        if (mediaKey == null) null else findByKey(mediaKey)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+    return media?.localPreviewModel(256) ?: fallback
+}
 
 @Composable
 internal fun UploadJobThumbnail(
@@ -41,12 +58,18 @@ internal fun UploadJobThumbnail(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var media by remember(job.mediaKey) { mutableStateOf<DeviceMedia?>(null) }
-    LaunchedEffect(job.mediaKey) {
-        media = job.mediaKey?.let { DeviceMediaStore.findByKey(context, it) }
+    val stagedThumbnailModel = remember(job.stagedFilePath, job.mimeType) {
+        job.stagedFilePath?.let { path ->
+            File(path).localPreviewModel(256, job.mimeType?.startsWith("video/") == true)
+        }
     }
-    val thumbnailModel = media?.localPreviewModel(256) ?: job.stagedFilePath?.let { path ->
-        File(path).localPreviewModel(256, job.mimeType?.startsWith("video/") == true)
+    var thumbnailModel by remember(job.mediaKey, job.stagedFilePath, job.mimeType) {
+        mutableStateOf(stagedThumbnailModel)
+    }
+    LaunchedEffect(job.mediaKey, job.stagedFilePath, job.mimeType) {
+        thumbnailModel = loadUploadJobThumbnailModel(job.mediaKey, stagedThumbnailModel) { mediaKey ->
+            DeviceMediaStore.findByKey(context, mediaKey)
+        }
     }
     val placeholder = painterResource(R.drawable.ic_upload_media_placeholder)
     Box(
