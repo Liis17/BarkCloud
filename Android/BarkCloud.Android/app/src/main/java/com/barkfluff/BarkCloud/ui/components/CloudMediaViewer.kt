@@ -2,7 +2,6 @@ package com.barkfluff.BarkCloud.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.spring
@@ -17,9 +16,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +30,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -182,7 +187,7 @@ internal fun CloudMediaViewerLayer(
                 }
 
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    if (!infoEnabled || available.y >= 0f) return Offset.Zero
+                    if (source != NestedScrollSource.UserInput || !infoEnabled || available.y >= 0f) return Offset.Zero
                     return Offset(0f, consumePanelDelta(available.y))
                 }
 
@@ -191,7 +196,7 @@ internal fun CloudMediaViewerLayer(
                     available: Offset,
                     source: NestedScrollSource,
                 ): Offset {
-                    if (!infoEnabled || available.y <= 0f) return Offset.Zero
+                    if (source != NestedScrollSource.UserInput || !infoEnabled || available.y <= 0f) return Offset.Zero
                     return Offset(0f, consumePanelDelta(available.y))
                 }
 
@@ -264,14 +269,37 @@ internal fun CloudMediaViewerLayer(
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     color = MaterialTheme.colorScheme.surface,
                 ) {
-                    infoContent()
+                    Column(Modifier.navigationBarsPadding()) {
+                        Box(
+                            Modifier.fillMaxWidth().height(32.dp).draggable(
+                                state = rememberDraggableState { delta ->
+                                    val start = panelState.offset.takeIf(Float::isFinite) ?: 0f
+                                    panelState.dispatchRawDelta((start + delta).coerceIn(-panelHeightPx, 0f) - start)
+                                },
+                                orientation = Orientation.Vertical,
+                                onDragStopped = { velocity ->
+                                    val target = when {
+                                        velocity > 0f -> CloudMediaPanelAnchor.Collapsed
+                                        velocity < 0f -> CloudMediaPanelAnchor.Expanded
+                                        panelState.offset < -panelHeightPx / 2f -> CloudMediaPanelAnchor.Expanded
+                                        else -> CloudMediaPanelAnchor.Collapsed
+                                    }
+                                    panelState.animateTo(target, spring())
+                                },
+                            ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(Modifier.size(32.dp, 4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(2.dp)))
+                        }
+                        Box(Modifier.weight(1f)) { infoContent() }
+                    }
                 }
             }
         }
     }
 }
 
-/** Полноэкранный просмотрщик остаётся в общем Compose-слое с сеткой для shared-element перехода. */
+/** Отдельное полноэкранное окно перекрывает навигацию экрана. */
 @Composable
 fun CloudMediaViewer(
     assets: List<MediaAsset>,
@@ -298,30 +326,35 @@ fun CloudMediaViewer(
         if (visibility.isIdle && !visibility.currentState) retainedAsset = null
     }
 
-    AnimatedVisibility(
-        visibleState = visibility,
-        modifier = Modifier.fillMaxSize().zIndex(1f),
-        enter = fadeIn(tween(180)),
-        exit = fadeOut(tween(180)),
+    if (selectedAsset == null && retainedAsset == null) return
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        val asset = retainedAsset ?: selectedAsset
-        if (asset != null) {
-            if (assets.isEmpty() && !listWasEmptyAtOpen) {
-                LaunchedEffect(asset.id) { onDismiss() }
-            } else {
-                val viewerAssets = if (assets.isEmpty()) listOf(asset) else assets
-                val initialIndex = viewerAssets.indexOfFirst { it.id == asset.id }.coerceAtLeast(0)
-                key(asset.id) {
-                    CloudMediaViewerContent(
-                        assets = viewerAssets,
-                        initialIndex = initialIndex,
-                        isOpen = selectedAsset?.id == asset.id,
-                        onDismiss = onDismiss,
-                        onPlayVideo = onPlayVideo,
-                        infoEnabled = infoEnabled,
-                        onDelete = onDelete,
-                        animatedVisibilityScope = this@AnimatedVisibility,
-                    )
+        AnimatedVisibility(
+            visibleState = visibility,
+            modifier = Modifier.fillMaxSize().zIndex(1f),
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(180)),
+        ) {
+            val asset = retainedAsset ?: selectedAsset
+            if (asset != null) {
+                if (assets.isEmpty() && !listWasEmptyAtOpen) {
+                    LaunchedEffect(asset.id) { onDismiss() }
+                } else {
+                    val viewerAssets = if (assets.isEmpty()) listOf(asset) else assets
+                    val initialIndex = viewerAssets.indexOfFirst { it.id == asset.id }.coerceAtLeast(0)
+                    key(asset.id) {
+                        CloudMediaViewerContent(
+                            assets = viewerAssets,
+                            initialIndex = initialIndex,
+                            isOpen = selectedAsset?.id == asset.id,
+                            onDismiss = onDismiss,
+                            onPlayVideo = onPlayVideo,
+                            infoEnabled = infoEnabled,
+                            onDelete = onDelete,
+                        )
+                    }
                 }
             }
         }
@@ -338,7 +371,6 @@ private fun CloudMediaViewerContent(
     onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean,
     onDelete: (suspend (MediaAsset) -> Unit)?,
-    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
@@ -386,7 +418,6 @@ private fun CloudMediaViewerContent(
         }.orEmpty()
     }
     val infoState by infoViewModel.state.collectAsStateWithLifecycle()
-    val viewerAssetId = LocalCloudMediaViewerAssetId.current
     val jpegViewModel = currentAsset.jpegViewModel()
     var useJpegView by remember(currentAsset.id) {
         mutableStateOf(requiresJpegView(currentAsset.fileName, jpegViewModel != null))
@@ -465,14 +496,10 @@ private fun CloudMediaViewerContent(
                         if (isCurrentPage) activeZoomState.value = zoomableImageState
                     }
                     val pageImageState = if (isCurrentPage) imageState else ViewerImageState.Preview
-                    val previewModifier = if (page == initialIndex) Modifier.fillMaxSize().cloudMediaSharedElement(
-                        key = asset.id,
-                        visible = viewerAssetId == asset.id && isCurrentPage,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    ) else Modifier.fillMaxSize()
+                    val previewModifier = Modifier.fillMaxSize()
 
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        AsyncImage(
+                        if (!isCurrentPage || !zoomableImageState.isImageDisplayed) AsyncImage(
                             model = asset.previewModel(1024),
                             contentDescription = asset.fileName,
                             modifier = previewModifier.clickable(onClick = onPhotoTap),
@@ -607,6 +634,7 @@ private fun CloudMediaViewerContent(
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .fillMaxWidth()
+                                .statusBarsPadding()
                                 .padding(start = 4.dp, top = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -617,13 +645,17 @@ private fun CloudMediaViewerContent(
                                     tint = Color.White,
                                 )
                             }
-                            Text(text = dateTimeText, color = Color.White)
+                            Text(text = dateTimeText, color = Color.White, modifier = Modifier.weight(1f))
+                            CloudMediaActions(
+                                asset = currentAsset, infoEnabled = infoEnabled, onInfo = onInfo,
+                                onDelete = onDelete, scope = scope, overflowOnly = true,
+                            )
                         }
                     }
                 }
                 AnimatedVisibility(
                     visible = overlayVisible,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp).zIndex(1f),
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 12.dp).padding(bottom = 16.dp).zIndex(1f),
                     enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 },
                     exit = fadeOut(tween(140)) + slideOutVertically(tween(140)) { it / 2 },
                 ) {
