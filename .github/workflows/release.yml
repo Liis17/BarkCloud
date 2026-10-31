@@ -33,6 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      version_code: ${{ steps.version.outputs.version_code }}
     steps:
       - name: "Вычисление следующей версии v1.x.y"
         id: version
@@ -43,22 +44,63 @@ jobs:
         run: |
           set -euo pipefail
           latest="$(gh release list --limit 100 --json tagName --jq '.[].tagName' \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
-          if [ -z "$latest" ]; then
-            version="v1.0.0"
-          else
-            major="$(printf '%s' "$latest" | cut -d. -f1)"
-            minor="$(printf '%s' "$latest" | cut -d. -f2)"
-            patch="$(printf '%s' "$latest" | cut -d. -f3)"
-            major="${major#v}"
-            version="v${major}.${minor}.$((patch + 1))"
+            | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            | sort -V | tail -n 1 || true)"
+          python3 - "$latest" >> "$GITHUB_OUTPUT" <<'PY'
+          import re
+          import sys
+
+          latest = sys.argv[1]
+          if latest:
+              match = re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", latest)
+              if not match:
+                  raise SystemExit(f"Некорректный предыдущий тег: {latest}")
+              major, minor, patch = map(int, match.groups())
+              patch += 1
+          else:
+              major, minor, patch = 1, 0, 0
+
+          if minor > 999 or patch > 999:
+              raise SystemExit("Minor и patch версии не могут превышать 999.")
+          version = f"v{major}.{minor}.{patch}"
+          version_code = major * 1_000_000 + minor * 1_000 + patch
+          if version_code <= 0 or version_code > 2_147_483_647:
+              raise SystemExit("versionCode выходит за допустимый диапазон Android.")
+          print(f"version={version}")
+          print(f"version_code={version_code}")
+          PY
+
+          version="$(sed -n 's/^version=//p' "$GITHUB_OUTPUT" | tail -n 1)"
+          version_code="$(sed -n 's/^version_code=//p' "$GITHUB_OUTPUT" | tail -n 1)"
+          if [ -n "$latest" ]; then
+            previous_assets="$(gh release view "$latest" --json assets --jq '.assets[].name')"
+            if printf '%s\n' "$previous_assets" | grep -Fxq 'android-update.json'; then
+              previous_dir="$RUNNER_TEMP/previous-android-release"
+              mkdir -p "$previous_dir"
+              gh release download "$latest" --pattern android-update.json --dir "$previous_dir"
+              python3 - "$previous_dir/android-update.json" "$version_code" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as manifest_file:
+              manifest = json.load(manifest_file)
+          if manifest.get("schemaVersion") != 1:
+              raise SystemExit("Манифест предыдущего Android-релиза имеет неизвестную схему.")
+          previous_code = manifest.get("versionCode")
+          if not isinstance(previous_code, int) or isinstance(previous_code, bool):
+              raise SystemExit("Манифест предыдущего Android-релиза содержит неверный versionCode.")
+          if int(sys.argv[2]) <= previous_code:
+              raise SystemExit("Новый Android versionCode должен быть больше кода предыдущего манифеста.")
+          PY
+            else
+              echo "Предыдущий релиз $latest не содержит android-update.json; он будет обновляться вручную."
+            fi
           fi
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "Коммит: ${SHA}, релиз: ${version}"
+          echo "Коммит: ${SHA}, релиз: ${version}, Android versionCode: ${version_code}"
 
   android:
     name: "Android APK"
-    needs: tests
+    needs: [tests, version]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -76,19 +118,52 @@ jobs:
       - name: "Сборка release APK"
         working-directory: Android/BarkCloud.Android
         env:
+          ANDROID_RELEASE_VERSION_NAME: ${{ needs.version.outputs.version }}
+          ANDROID_RELEASE_VERSION_CODE: ${{ needs.version.outputs.version_code }}
           BARKCLOUD_ANDROID_KEYSTORE_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEYSTORE_BASE64 }}
           BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64 }}
           BARKCLOUD_ANDROID_KEY_ALIAS_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEY_ALIAS_BASE64 }}
           BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64 }}
         run: |
           ./gradlew :app:printReleaseCertificateFingerprint --stacktrace
-          ./gradlew :app:assembleRelease --stacktrace
+          version_name="${ANDROID_RELEASE_VERSION_NAME#v}"
+          ./gradlew :app:assembleRelease \
+            -PandroidReleaseVersionName="$version_name" \
+            -PandroidReleaseVersionCode="$ANDROID_RELEASE_VERSION_CODE" \
+            --stacktrace
+          apk="app/build/outputs/apk/release/app-release.apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)"
+          test -n "$build_tools"
+          aapt2="$ANDROID_HOME/build-tools/$build_tools/aapt2"
+          apksigner="$ANDROID_HOME/build-tools/$build_tools/apksigner"
+          badging="$("$aapt2" dump badging "$apk")"
+          printf '%s\n' "$badging" | grep -F "package: name='com.barkfluff.BarkCloud' versionCode='$ANDROID_RELEASE_VERSION_CODE' versionName='$version_name'"
+          "$apksigner" verify --verbose --print-certs "$apk"
+          apk_size="$(stat -c '%s' "$apk")"
+          apk_sha256="$(sha256sum "$apk" | cut -d' ' -f1)"
+          cat > android-update.json <<JSON
+          {
+            "schemaVersion": 1,
+            "tag": "$ANDROID_RELEASE_VERSION_NAME",
+            "versionName": "$version_name",
+            "versionCode": $ANDROID_RELEASE_VERSION_CODE,
+            "apk": {
+              "fileName": "BarkCloud.Android-$ANDROID_RELEASE_VERSION_NAME.apk",
+              "size": $apk_size,
+              "sha256": "$apk_sha256"
+            }
+          }
+          JSON
+          python3 -m json.tool android-update.json >/dev/null
+          mkdir -p android-apk
+          cp "$apk" android-apk/
+          cp android-update.json android-apk/
 
       - name: "Артефакт: APK"
         uses: actions/upload-artifact@v7
         with:
           name: android-apk
-          path: Android/BarkCloud.Android/app/build/outputs/apk/release/*.apk
+          path: Android/BarkCloud.Android/android-apk/*
 
   ios:
     name: "iOS IPA"
@@ -241,6 +316,7 @@ jobs:
         run: |
           set -euo pipefail
           mv Artifacts/android-apk/*.apk        "Artifacts/BarkCloud.Android-${VERSION}.apk"
+          mv Artifacts/android-apk/android-update.json "Artifacts/android-update.json"
           mv Artifacts/ios-ipa/*.ipa            "Artifacts/BarkCloud.iOS-${VERSION}.ipa"
           mv Artifacts/macos-dmg/*.dmg          "Artifacts/BarkCloud.Mac-${VERSION}.dmg"
           mv Artifacts/drive-zip/*.zip          "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip"
@@ -258,6 +334,7 @@ jobs:
           set -euo pipefail
           gh release create "$VERSION" \
             "Artifacts/BarkCloud.Android-${VERSION}.apk" \
+            "Artifacts/android-update.json" \
             "Artifacts/BarkCloud.iOS-${VERSION}.ipa" \
             "Artifacts/BarkCloud.Mac-${VERSION}.dmg" \
             "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip" \
