@@ -9,6 +9,17 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.PhotoAlbum
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.barkfluff.BarkCloud.data.cloud.AlbumCard
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -53,6 +64,8 @@ private enum class CloudMediaAction {
     COPY,
     DOWNLOAD,
     DELETE,
+    FAVORITE,
+    ALBUM,
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -64,6 +77,7 @@ internal fun CloudMediaActions(
     onDelete: (suspend (MediaAsset) -> Unit)?,
     scope: CoroutineScope,
     modifier: Modifier = Modifier,
+    overflowOnly: Boolean = false,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
@@ -73,6 +87,8 @@ internal fun CloudMediaActions(
         canDelete = onDelete != null,
     )
     var runningAction by remember(asset.id) { mutableStateOf<CloudMediaAction?>(null) }
+    var menuOpen by remember(asset.id) { mutableStateOf(false) }
+    var albums by remember(asset.id) { mutableStateOf<List<AlbumCard>?>(null) }
     var deleteConfirmation by remember(asset.id) { mutableStateOf(false) }
 
     fun showToast(message: String) {
@@ -85,6 +101,7 @@ internal fun CloudMediaActions(
         block: suspend () -> Unit,
     ) {
         if (runningAction != null) return
+        menuOpen = false
         runningAction = action
         scope.launch {
             try {
@@ -109,11 +126,25 @@ internal fun CloudMediaActions(
         }
     }
 
-    HorizontalFloatingToolbar(
-        expanded = true,
-        modifier = modifier,
-    ) {
-        if (actions.share) {
+    val actionContent: @Composable () -> Unit = {
+        if (!overflowOnly) {
+            CloudMediaActionButton(Icons.Outlined.PhotoAlbum, stringResource(R.string.viewer_action_album), runningAction == null, onClick = {
+                runAction(CloudMediaAction.ALBUM) {
+                    val result = mutableListOf<AlbumCard>()
+                    var page = app.albumRepository.listAlbums()
+                    result.addAll(page.albums)
+                    while (page.hasMore) {
+                        page = app.albumRepository.listAlbums(cursorUpdatedAtMillis = page.nextCursorUpdatedAtMillis, cursorAlbumId = page.nextCursorAlbumId)
+                        result.addAll(page.albums)
+                    }
+                    albums = result
+                }
+            })
+            CloudMediaActionButton(Icons.Outlined.FavoriteBorder, stringResource(R.string.media_add_favorite), runningAction == null, onClick = {
+                runAction(CloudMediaAction.FAVORITE, R.string.viewer_favorite_added) { app.cloudRepository.addFavorite(asset.id) }
+            })
+        }
+        if (!overflowOnly && actions.share) {
             CloudMediaActionButton(
                 icon = Icons.Outlined.Share,
                 label = stringResource(R.string.viewer_action_share),
@@ -136,9 +167,10 @@ internal fun CloudMediaActions(
                 },
             )
         }
-        if (actions.copy) {
+        if (overflowOnly && actions.copy) {
             CloudMediaActionButton(
                 icon = Icons.Outlined.ContentCopy,
+                menuItem = true,
                 label = stringResource(R.string.viewer_action_copy),
                 loading = runningAction == CloudMediaAction.COPY,
                 enabled = runningAction == null,
@@ -159,9 +191,10 @@ internal fun CloudMediaActions(
                 },
             )
         }
-        if (actions.download) {
+        if (overflowOnly && actions.download) {
             CloudMediaActionButton(
                 icon = Icons.Outlined.Download,
+                menuItem = true,
                 label = stringResource(R.string.viewer_action_download),
                 loading = runningAction == CloudMediaAction.DOWNLOAD,
                 enabled = runningAction == null,
@@ -175,15 +208,16 @@ internal fun CloudMediaActions(
                 },
             )
         }
-        if (actions.info) {
+        if (overflowOnly && actions.info) {
             CloudMediaActionButton(
                 icon = Icons.Outlined.Info,
+                menuItem = true,
                 label = stringResource(R.string.viewer_action_info),
                 enabled = runningAction == null,
-                onClick = onInfo,
+                onClick = { menuOpen = false; onInfo() },
             )
         }
-        if (actions.delete) {
+        if (!overflowOnly && actions.delete) {
             CloudMediaActionButton(
                 icon = Icons.Outlined.Delete,
                 label = stringResource(R.string.viewer_action_delete),
@@ -192,6 +226,37 @@ internal fun CloudMediaActions(
                 onClick = { deleteConfirmation = true },
             )
         }
+    }
+
+    if (overflowOnly) {
+        Box(modifier) {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Outlined.MoreVert, stringResource(R.string.files_action_more), tint = androidx.compose.ui.graphics.Color.White)
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) { actionContent() }
+        }
+    } else {
+        HorizontalFloatingToolbar(expanded = true, modifier = modifier) { actionContent() }
+    }
+    albums?.let { choices ->
+        AlertDialog(
+            onDismissRequest = { albums = null },
+            title = { Text(stringResource(R.string.viewer_action_album)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    if (choices.isEmpty()) Text(stringResource(R.string.viewer_albums_empty))
+                    choices.forEach { album ->
+                        TextButton(enabled = runningAction == null, onClick = {
+                            runAction(CloudMediaAction.ALBUM, R.string.viewer_album_added) {
+                                app.albumRepository.addItems(album.id, listOf(asset.id))
+                                albums = null
+                            }
+                        }) { Text(album.name) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { albums = null }) { Text(stringResource(R.string.viewer_action_cancel)) } },
+        )
     }
 
     if (deleteConfirmation) {
@@ -246,9 +311,14 @@ private fun CloudMediaActionButton(
     label: String,
     enabled: Boolean,
     loading: Boolean = false,
+    menuItem: Boolean = false,
     onClick: () -> Unit,
 ) {
-    IconButton(onClick = onClick, enabled = enabled) {
+    if (menuItem) {
+        DropdownMenuItem(text = { Text(label) }, leadingIcon = { Icon(icon, null) }, enabled = enabled, onClick = onClick)
+        return
+    }
+    IconButton(modifier = Modifier.width(64.dp).size(56.dp), onClick = onClick, enabled = enabled) {
         if (loading) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
