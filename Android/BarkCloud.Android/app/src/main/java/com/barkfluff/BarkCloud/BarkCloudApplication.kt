@@ -37,7 +37,7 @@ import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
-import com.barkfluff.BarkCloud.data.upload.restoreActiveUploadQueueAtStartup
+import com.barkfluff.BarkCloud.data.upload.observeUploadStartupForSession
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.data.update.AndroidUpdateRepository
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
@@ -54,7 +54,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.io.File
 import okio.Path.Companion.toOkioPath
@@ -167,18 +166,15 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
         appScope.launch {
             fileCache.runStartupSweepIfNeeded()
-            globalParam.sessionActive.collect { sessionActive ->
-                if (!sessionActive) return@collect
-                val policy = autoUploadSettings.policy
-                restoreActiveUploadQueueAtStartup(
-                    policy = policy,
-                    initializeQueue = uploadQueue::initialize,
-                    activeCount = uploadQueue::activeCount,
-                    activeNonBackupCount = uploadQueue::activeNonBackupCount,
-                    enqueue = { UploadScheduler.enqueue(this@BarkCloudApplication, userInitiated = false) },
-                )
-                AutoUploadScheduler.apply(this@BarkCloudApplication, policy)
-            }
+            observeUploadStartupForSession(
+                sessionActive = globalParam.sessionActive,
+                readPolicy = { autoUploadSettings.policy },
+                initializeQueue = uploadQueue::initialize,
+                activeCount = uploadQueue::activeCount,
+                activeNonBackupCount = uploadQueue::activeNonBackupCount,
+                enqueue = { UploadScheduler.enqueue(this@BarkCloudApplication, userInitiated = false) },
+                applyPolicy = { policy -> AutoUploadScheduler.apply(this@BarkCloudApplication, policy) },
+            )
         }
         observeMediaStoreChanges()
     }
