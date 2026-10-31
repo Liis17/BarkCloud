@@ -1,6 +1,6 @@
 name: "🚀 BarkCloud Release"
 
-# Релизная точка: push в master публикует один релиз со сборками
+# Push в master публикует стабильный релиз, в dev — prerelease со сборками
 # всех приложений. Релиз создаётся только после успешного полного
 # прогона всех тестов (tests.yml с force-all).
 
@@ -8,12 +8,13 @@ on:
   push:
     branches:
       - master
+      - dev
 
 permissions:
   contents: read
 
 concurrency:
-  group: barkcloud-release
+  group: barkcloud-release-${{ github.ref_name == 'dev' && github.run_id || 'master' }}
   cancel-in-progress: false
 
 jobs:
@@ -41,9 +42,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          latest="$(gh release list --limit 100 --json tagName --jq '.[].tagName' \
+          latest="$(gh release list --exclude-pre-releases --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' \
             | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
             | sort -V | tail -n 1 || true)"
           python3 - "$latest" >> "$GITHUB_OUTPUT" <<'PY'
@@ -72,6 +76,10 @@ jobs:
 
           version="$(sed -n 's/^version=//p' "$GITHUB_OUTPUT" | tail -n 1)"
           version_code="$(sed -n 's/^version_code=//p' "$GITHUB_OUTPUT" | tail -n 1)"
+          if [ "$RELEASE_BRANCH" = dev ]; then
+            version="${version}-dev.${RUN_NUMBER}.${RUN_ATTEMPT}+${SHA:0:7}"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
           if [ -n "$latest" ]; then
             previous_assets="$(gh release view "$latest" --json assets --jq '.assets[].name')"
             if printf '%s\n' "$previous_assets" | grep -Fxq 'android-update.json'; then
@@ -300,7 +308,7 @@ jobs:
   publish:
     name: "Публикация релиза"
     needs: [tests, version, android, ios, macos, drive, builder]
-    if: ${{ !cancelled() && success('tests', 'android', 'ios', 'macos', 'drive', 'builder') }}
+    if: ${{ success() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -330,8 +338,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
           SHA: ${{ github.sha }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          release_flags=()
+          if [ "$RELEASE_BRANCH" = dev ]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
           gh release create "$VERSION" \
             "Artifacts/BarkCloud.Android-${VERSION}.apk" \
             "Artifacts/android-update.json" \
@@ -341,4 +354,4 @@ jobs:
             "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip" \
             --target "$SHA" \
             --title "BarkCloud $VERSION" \
-            --generate-notes
+            --generate-notes "${release_flags[@]}"
