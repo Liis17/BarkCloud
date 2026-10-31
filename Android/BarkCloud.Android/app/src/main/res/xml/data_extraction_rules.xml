@@ -6,6 +6,8 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="barkcloud_pending_registration.xml"/>
+        <exclude domain="sharedpref" path="barkcloud_android_updates.xml"/>
+        <exclude domain="external" path="updates/"/>
         <!-- TODO: Use <include> and <exclude> to control what is backed up.
         <include .../>
         <exclude .../>
@@ -13,6 +15,8 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="barkcloud_pending_registration.xml"/>
+        <exclude domain="sharedpref" path="barkcloud_android_updates.xml"/>
+        <exclude domain="external" path="updates/"/>
     </device-transfer>
     <!--
     <device-transfer>

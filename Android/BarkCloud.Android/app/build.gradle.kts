@@ -24,6 +24,21 @@ val releaseSigningValues = releaseSigningVariableNames.associateWith {
 }
 val missingReleaseSigningValues = releaseSigningValues.filterValues { it == null }.keys
 val releaseSigningConfigured = missingReleaseSigningValues.isEmpty()
+val androidReleaseVersionName = providers.gradleProperty("androidReleaseVersionName").orNull
+val androidReleaseVersionCodeValue = providers.gradleProperty("androidReleaseVersionCode").orNull
+val androidReleaseVersionCode = androidReleaseVersionCodeValue?.toIntOrNull()
+if (androidReleaseVersionCodeValue != null && androidReleaseVersionCode == null) {
+    throw GradleException("androidReleaseVersionCode must be an integer.")
+}
+if ((androidReleaseVersionName == null) != (androidReleaseVersionCode == null)) {
+    throw GradleException("Set both androidReleaseVersionName and androidReleaseVersionCode for release builds.")
+}
+if (androidReleaseVersionName != null && !Regex("^[0-9]+\\.[0-9]+\\.[0-9]+$").matches(androidReleaseVersionName)) {
+    throw GradleException("androidReleaseVersionName must be a stable major.minor.patch version.")
+}
+if (androidReleaseVersionCode != null && androidReleaseVersionCode <= 0) {
+    throw GradleException("androidReleaseVersionCode must be a positive Android versionCode.")
+}
 if (!releaseSigningConfigured && releaseSigningValues.values.any { it != null }) {
     throw GradleException(
         "Android release signing requires all Base64 environment variables: " +
@@ -80,8 +95,8 @@ android {
         applicationId = "com.barkfluff.BarkCloud"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = androidReleaseVersionCode ?: 2
+        versionName = androidReleaseVersionName ?: "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
