@@ -95,7 +95,14 @@ fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
     }
 
     LaunchedEffect(sessionActive.value) {
-        if (!sessionActive.value && navController.currentDestination?.route == ROUTE_MAIN) replaceRoot(ROUTE_LOGIN)
+        if (!sessionActive.value) {
+            startupUpdatePrompt = null
+            if (navController.currentDestination?.route == ROUTE_MAIN) replaceRoot(ROUTE_LOGIN)
+        }
+    }
+
+    val visibleStartupUpdatePrompt = startupUpdatePrompt.takeIf {
+        sessionActive.value && !shouldShowLock && currentRootRoute == ROUTE_MAIN
     }
 
     LaunchedEffect(sessionActive.value, shouldShowLock, currentRootRoute, lifecycleOwner) {
@@ -157,8 +164,8 @@ fun RootNavGraph(deepLink: DeepLinkEvent? = null) {
             composable(ROUTE_MAIN) {
                 MainScreen(
                     deepLink = deepLink,
-                    onSignOut = { replaceRoot(ROUTE_LOGIN) },
-                    startupUpdatePrompt = startupUpdatePrompt,
+                    onSignOut = { startupUpdatePrompt = null; replaceRoot(ROUTE_LOGIN) },
+                    startupUpdatePrompt = visibleStartupUpdatePrompt,
                     onStartupUpdatePromptShown = app.androidUpdateRepository::markStartupPromptShown,
                     onDismissStartupUpdatePrompt = { startupUpdatePrompt = null },
                 )
