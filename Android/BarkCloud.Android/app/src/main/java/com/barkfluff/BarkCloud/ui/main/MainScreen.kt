@@ -129,9 +129,7 @@ fun MainScreen(
                 composable("gallery/root") {
                     GalleryScreen(
                         uploadState = uploadState,
-                        onOpenProfile = { navController.navigate("settings/editProfile") },
                         onOpenSettings = { navController.navigate("settings") },
-                        onOpenTrash = { navController.navigate("trash") },
                         onOpenUploads = { navController.navigate("uploads/root") },
                         onOpenCleanup = { navController.navigate("gallery/cleanup") },
                     )

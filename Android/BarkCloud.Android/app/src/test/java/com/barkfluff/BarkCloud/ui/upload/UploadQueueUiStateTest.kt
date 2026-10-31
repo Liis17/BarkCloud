@@ -8,19 +8,25 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class UploadQueueUiStateTest {
-    @Test fun unfinishedJobsRemainVisibleRegardlessOfAge() {
+    @Test fun unfinishedJobsAreGroupedAndTerminalPhasesAreHidden() {
         val jobs = listOf(
-            job(UploadPhase.PAUSED, id = "paused", createdAt = 2),
-            job(UploadPhase.QUEUED, id = "queued", createdAt = 1),
+            job(UploadPhase.QUEUED, id = "queued", createdAt = 0),
+            job(UploadPhase.HASHING, id = "hashing", createdAt = 1),
+            job(UploadPhase.CREATING_SESSION, id = "session", createdAt = 2),
             job(UploadPhase.UPLOADING, id = "uploading", createdAt = 3),
-            job(UploadPhase.FAILED, id = "failed", createdAt = 4),
-            job(UploadPhase.UPLOADED_NOT_ATTACHED, id = "detached", createdAt = 5),
+            job(UploadPhase.COMPLETING, id = "completing", createdAt = 4),
+            job(UploadPhase.PROCESSING, id = "processing", createdAt = 5),
+            job(UploadPhase.ATTACHING, id = "attaching", createdAt = 6),
+            job(UploadPhase.PAUSED, id = "paused", createdAt = 7),
+            job(UploadPhase.FAILED, id = "failed", createdAt = 8),
+            job(UploadPhase.UPLOADED_NOT_ATTACHED, id = "detached", createdAt = 9),
+            job(UploadPhase.UPLOADED, id = "legacy", createdAt = 10),
             job(UploadPhase.COMPLETED, id = "completed", createdAt = 0),
             job(UploadPhase.CANCELLED, id = "cancelled", createdAt = 0),
         )
 
         assertEquals(
-            listOf("uploading", "queued", "paused", "failed", "detached"),
+            listOf("hashing", "session", "uploading", "completing", "processing", "attaching", "queued", "paused", "failed", "detached", "legacy"),
             UploadQueueUiState(jobs).pendingJobs.map { it.id },
         )
     }
