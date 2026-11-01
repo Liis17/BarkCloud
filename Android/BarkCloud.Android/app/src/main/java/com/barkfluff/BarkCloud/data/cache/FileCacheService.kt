@@ -341,9 +341,18 @@ class FileCacheService(
     /** Пин удерживает запись от LRU-вытеснения до соответствующего unpin. */
     suspend fun pin(key: FileCacheKey): PinnedFile? = pin(key, null)
 
-    /** Закрепляет уже закешированный оригинал для воспроизведения без загрузки; null, если файла нет. */
-    suspend fun pinCachedOriginal(fileId: String, shared: Boolean): PinnedFile? = pin(
+    /**
+     * Закрепляет уже закешированный оригинал для воспроизведения без загрузки; null, если файла нет.
+     * [onAcquired] вызывается в момент захвата пина, до любой точки отмены корутины: владелец получает пин
+     * даже если вызов отменён до возврата, и обязан снять его через [unpin] (см. `VideoPlaybackResolver`).
+     */
+    suspend fun pinCachedOriginal(
+        fileId: String,
+        shared: Boolean,
+        onAcquired: (FileCachePin) -> Unit,
+    ): PinnedFile? = pin(
         if (shared) FileCacheKey.sharedOriginal(currentScope(), fileId) else FileCacheKey.original(currentScope(), fileId),
+        onAcquired,
     )
 
     private suspend fun pin(
