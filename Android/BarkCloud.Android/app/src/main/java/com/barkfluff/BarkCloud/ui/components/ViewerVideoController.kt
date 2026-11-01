@@ -64,30 +64,6 @@ internal data class VideoPlaybackState(
  * - [onBackground] синхронно запрещает любые старты до [onForeground]; после возврата автозапуск выключен,
  *   воспроизведение запускает только действие пользователя ([open] с `userInitiated = true`).
  */
-/**
- * Общий для просмотрщика шлюз старта. Фон закрывает его синхронно (до создания плеера и любых корутин);
- * после возврата автозапуск запрещён до действия пользователя.
- */
-internal class ViewerPlaybackGate {
-    var backgrounded: Boolean = false
-        private set
-    var autoplayAllowed: Boolean = true
-        private set
-
-    fun onBackground() {
-        backgrounded = true
-        autoplayAllowed = false
-    }
-
-    fun onForeground() {
-        backgrounded = false
-    }
-
-    fun onUserAction() {
-        autoplayAllowed = true
-    }
-}
-
 internal class ViewerVideoController(
     private val engine: VideoPlaybackEngine,
     private val scope: CoroutineScope,
@@ -114,7 +90,7 @@ internal class ViewerVideoController(
      * Автозапуск ([userInitiated] = false) игнорируется в фоне и после возврата до действия пользователя.
      */
     fun open(id: String, playWhenReady: Boolean, userInitiated: Boolean = false) {
-        if (gate.backgrounded) return
+        if (!gate.started) return
         if (!userInitiated && !gate.autoplayAllowed) return
         if (userInitiated) gate.onUserAction()
         if (id == activeId) {
@@ -150,12 +126,12 @@ internal class ViewerVideoController(
 
     /** Синхронно вызывается при уходе приложения в фон: любые старты запрещены до [onForeground]. */
     fun onBackground() {
-        gate.onBackground()
+        gate.onStop()
         stop()
     }
 
     fun onForeground() {
-        gate.onForeground()
+        gate.onStart()
     }
 
     fun retry(id: String) {
@@ -164,7 +140,7 @@ internal class ViewerVideoController(
     }
 
     fun togglePlayback() {
-        if (gate.backgrounded) return
+        if (!gate.started) return
         gate.onUserAction()
         val current = _state.value
         when {
@@ -277,5 +253,12 @@ internal data class VideoSeekState(
     /** Целевая позиция для одного финального seek; null, если перетаскивания не было. */
     fun dragTarget(): Long? = dragPositionMs
 
-    fun finishDrag(): VideoSeekState = copy(dragPositionMs = null)
+    /**
+     * Завершает перетаскивание: цель становится живой позицией, поэтому на паузе (без тиков)
+     * ползунок и подпись остаются на позиции, выбранной пользователем, а не откатываются.
+     */
+    fun finishDrag(): VideoSeekState {
+        val target = dragPositionMs ?: return this
+        return copy(livePositionMs = target, dragPositionMs = null)
+    }
 }
