@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.TextureView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,21 +27,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize as MediaVideoSize
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -60,6 +64,7 @@ private const val POSITION_TICK_MS = 250L
  * Потоковые запросы идут через [streamingCallFactory] без общего таймаута вызова.
  * Ошибка 404 распознаётся по цепочке причин и отдаётся как [VideoFailure.NOT_FOUND].
  */
+@OptIn(UnstableApi::class)
 internal class ExoVideoPlaybackEngine(
     context: Context,
     streamingCallFactory: Call.Factory,
@@ -86,6 +91,19 @@ internal class ExoVideoPlaybackEngine(
 
         override fun onPlayerError(error: PlaybackException) {
             onEvent(VideoEngineEvent.Failed(classify(error)))
+        }
+
+        override fun onVideoSizeChanged(videoSize: MediaVideoSize) {
+            onEvent(
+                VideoEngineEvent.SizeChanged(
+                    VideoSize(
+                        width = videoSize.width,
+                        height = videoSize.height,
+                        pixelRatio = videoSize.pixelWidthHeightRatio,
+                        rotationDegrees = videoSize.unappliedRotationDegrees,
+                    ),
+                ),
+            )
         }
     }
 
@@ -178,6 +196,29 @@ internal class ViewerVideoSession(
 }
 
 /**
+ * Размер видео, вписанного в контейнер с сохранением пропорций. Учитывает пиксельное соотношение сторон
+ * и неприменённый поворот на 90/270 градусов (ширина и высота меняются местами).
+ */
+internal fun fitVideoSize(
+    containerWidth: Float,
+    containerHeight: Float,
+    videoWidth: Int,
+    videoHeight: Int,
+    pixelRatio: Float,
+    rotationDegrees: Int,
+): Pair<Float, Float> {
+    if (containerWidth <= 0f || containerHeight <= 0f || videoWidth <= 0 || videoHeight <= 0) {
+        return containerWidth to containerHeight
+    }
+    val ratio = if (pixelRatio > 0f) pixelRatio else 1f
+    val rotated = rotationDegrees % 180 != 0
+    val displayWidth = (if (rotated) videoHeight else videoWidth) * ratio
+    val displayHeight = (if (rotated) videoWidth else videoHeight).toFloat()
+    val scale = minOf(containerWidth / displayWidth, containerHeight / displayHeight)
+    return displayWidth * scale to displayHeight * scale
+}
+
+/**
  * Видео внутри страницы просмотрщика. Тап переключает оверлей (как у фото), drag и zoom общей оболочки
  * работают поверх [TextureView], который не перехватывает касания. Экран не гаснет, пока играет видео.
  */
@@ -192,21 +233,34 @@ internal fun ViewerVideoPlayer(
     modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
-    var positionMs by remember { mutableLongStateOf(0L) }
+    var seek by remember { mutableStateOf(VideoSeekState()) }
     var durationMs by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(state.playing) {
+    LaunchedEffect(state.playing, state.status) {
         while (true) {
-            positionMs = controller.samplePosition()
+            seek = seek.withLivePosition(controller.samplePosition())
             durationMs = engine.durationMs
             if (!state.playing) break
             delay(POSITION_TICK_MS)
         }
     }
 
-    Box(modifier.fillMaxSize().clickable(onClick = onTap)) {
+    BoxWithConstraints(modifier.fillMaxSize().clickable(onClick = onTap)) {
+        val size = state.videoSize
+        val (width, height) = if (size == null) {
+            maxWidth.value to maxHeight.value
+        } else {
+            fitVideoSize(
+                containerWidth = maxWidth.value,
+                containerHeight = maxHeight.value,
+                videoWidth = size.width,
+                videoHeight = size.height,
+                pixelRatio = size.pixelRatio,
+                rotationDegrees = size.rotationDegrees,
+            )
+        }
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.size(width.dp, height.dp).align(Alignment.Center),
             factory = { context -> TextureView(context).also { engine.attach(it) } },
             update = { view -> view.keepScreenOn = state.playing },
         )
@@ -228,7 +282,7 @@ internal fun ViewerVideoPlayer(
         if (!state.playing && state.status != VideoStatus.LOADING && state.status != VideoStatus.ERROR) {
             IconButton(
                 onClick = {
-                    if (state.status == VideoStatus.IDLE) controller.open(itemId, playWhenReady = true)
+                    if (state.status == VideoStatus.IDLE) controller.open(itemId, playWhenReady = true, userInitiated = true)
                     else controller.togglePlayback()
                 },
                 modifier = Modifier.align(Alignment.Center).size(72.dp),
@@ -243,6 +297,7 @@ internal fun ViewerVideoPlayer(
         }
 
         if (controlsVisible && state.status == VideoStatus.READY) {
+            val maxSeek = durationMs.coerceAtLeast(1L)
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -259,14 +314,17 @@ internal fun ViewerVideoPlayer(
                     )
                 }
                 Slider(
-                    value = positionMs.coerceAtMost(durationMs.coerceAtLeast(1L)).toFloat(),
-                    onValueChange = { positionMs = it.toLong() },
-                    onValueChangeFinished = { controller.seekTo(positionMs) },
-                    valueRange = 0f..durationMs.coerceAtLeast(1L).toFloat(),
+                    value = seek.displayPositionMs.coerceIn(0L, maxSeek).toFloat(),
+                    onValueChange = { seek = seek.dragTo(it.toLong()) },
+                    onValueChangeFinished = {
+                        seek.dragTarget()?.let(controller::seekTo)
+                        seek = seek.finishDrag()
+                    },
+                    valueRange = 0f..maxSeek.toFloat(),
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                 )
                 Text(
-                    text = viewerTimeLabel(positionMs, durationMs),
+                    text = viewerTimeLabel(seek.displayPositionMs, durationMs),
                     color = Color.White,
                 )
                 IconButton(onClick = { controller.setMuted(!state.muted) }) {
