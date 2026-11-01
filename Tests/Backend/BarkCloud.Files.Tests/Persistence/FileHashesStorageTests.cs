@@ -31,19 +31,22 @@ public sealed class FileHashesStorageTests : IDisposable
     public async Task GetLiveHashMatchesForOwner_ReturnsOnlyOwnerLiveEntriesWithReadyFlag()
     {
         const string hash = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-        var readyFileId = AddFile("images-v1", ready: true);
-        var pendingFileId = AddFile("images-v1");
-        var trashedFileId = AddFile("images-v1", ready: true);
-        var otherOwnerFileId = AddFile("images-v1", ready: true);
+        var readyFileId = AddFile("images-v1", ready: true, uploader: 7);
+        var pendingFileId = AddFile("images-v1", uploader: 7);
+        var foreignUploaderFileId = AddFile("images-v1", ready: true, uploader: 8);
+        var trashedFileId = AddFile("images-v1", ready: true, uploader: 7);
+        var otherOwnerFileId = AddFile("images-v1", ready: true, uploader: 8);
 
         _db.Context.FileHashes.AddRange(
             new FileHash { FileId = readyFileId, Hash = hash },
             new FileHash { FileId = pendingFileId, Hash = hash },
+            new FileHash { FileId = foreignUploaderFileId, Hash = hash },
             new FileHash { FileId = trashedFileId, Hash = hash },
             new FileHash { FileId = otherOwnerFileId, Hash = hash });
         _db.Context.CloudFileEntries.AddRange(
             NewEntry(ownerId: 7, readyFileId),
             NewEntry(ownerId: 7, pendingFileId),
+            NewEntry(ownerId: 7, foreignUploaderFileId),
             NewEntry(ownerId: 7, trashedFileId, isDeleted: true),
             NewEntry(ownerId: 8, otherOwnerFileId));
         await _db.Context.SaveChangesAsync();
@@ -52,14 +55,16 @@ public sealed class FileHashesStorageTests : IDisposable
 
         var matches = await storage.GetLiveHashMatchesForOwner(7, [hash]);
 
+        // Живая запись без членства в Uploaders видна как «есть», но не пригодна для действий.
         matches.Should().BeEquivalentTo(
         [
-            new OwnerHashMatch(hash, readyFileId, IsReady: true),
-            new OwnerHashMatch(hash, pendingFileId, IsReady: false),
+            new OwnerHashMatch(hash, readyFileId, IsActionable: true),
+            new OwnerHashMatch(hash, pendingFileId, IsActionable: false),
+            new OwnerHashMatch(hash, foreignUploaderFileId, IsActionable: false),
         ]);
     }
 
-    private Guid AddFile(string storageProfileId, bool ready = false)
+    private Guid AddFile(string storageProfileId, bool ready = false, long? uploader = null)
     {
         var id = Guid.NewGuid();
         _db.Context.UploadedFiles.Add(new UploadFile
@@ -68,6 +73,7 @@ public sealed class FileHashesStorageTests : IDisposable
             CreatedAt = DateTime.UtcNow,
             UploadedAt = ready ? DateTime.UtcNow : null,
             Etag = ready ? "etag" : null,
+            Uploaders = uploader is { } userId ? [userId] : [],
             Type = UploadFileType.CloudFile,
             StorageProfileId = storageProfileId,
             Filename = $"{id}.jpg",

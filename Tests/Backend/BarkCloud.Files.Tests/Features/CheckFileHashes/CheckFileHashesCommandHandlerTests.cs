@@ -59,7 +59,7 @@ public class CheckFileHashesCommandHandlerTests
         var hashA = new string('a', 64);
         var hashB = new string('b', 64);
         _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new OwnerHashMatch(hashA, Guid.NewGuid(), IsReady: true)]);
+            .ReturnsAsync([new OwnerHashMatch(hashA, Guid.NewGuid(), IsActionable: true)]);
 
         var response = await CreateSut().Handle(
             new CheckFileHashesCommand { FileHashes = [hashA, hashB] }, default);
@@ -93,10 +93,10 @@ public class CheckFileHashesCommandHandlerTests
         _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(
             [
-                new OwnerHashMatch(hash, ready1, IsReady: true),
-                new OwnerHashMatch(hash, pending, IsReady: false),
-                new OwnerHashMatch(hash, ready2, IsReady: true),
-                new OwnerHashMatch(hash, ready2, IsReady: true),
+                new OwnerHashMatch(hash, ready1, IsActionable: true),
+                new OwnerHashMatch(hash, pending, IsActionable: false),
+                new OwnerHashMatch(hash, ready2, IsActionable: true),
+                new OwnerHashMatch(hash, ready2, IsActionable: true),
             ]);
 
         var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = [hash] }, default);
@@ -111,7 +111,7 @@ public class CheckFileHashesCommandHandlerTests
     {
         var hash = new string('d', 64);
         _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new OwnerHashMatch(hash, Guid.NewGuid(), IsReady: false)]);
+            .ReturnsAsync([new OwnerHashMatch(hash, Guid.NewGuid(), IsActionable: false)]);
 
         var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = [hash] }, default);
 
