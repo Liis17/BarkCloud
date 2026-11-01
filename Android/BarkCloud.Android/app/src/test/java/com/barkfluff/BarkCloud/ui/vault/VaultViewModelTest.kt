@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 class VaultViewModelTest {
 
@@ -92,6 +93,42 @@ class VaultViewModelTest {
         firstGate.complete(Unit)
         advanceUntilIdle()
         // Пока заблокировано, отложенный выбор не показывается.
+        assertEquals(emptySet<String>(), vm.state.value.selected)
+
+        val generation = checkNotNull(vm.onUnlockStarted())
+        vm.onUnlockResult(generation, ok = true)
+
+        assertEquals(setOf("b", "c"), vm.state.value.selected)
+    }
+
+    @Test
+    fun failedDeletionRemainsSelectedForRetry() = runTest {
+        openWithSelectionOfAll()
+        coEvery { cloud.deleteUserMedia("b") } throws IOException("network")
+
+        vm.deleteSelected()
+        advanceUntilIdle()
+
+        assertEquals(setOf("b"), vm.state.value.selected)
+        assertEquals(listOf("b"), vm.state.value.items.map { it.fileId })
+    }
+
+    @Test
+    fun failedAndUnprocessedIdsStayHiddenUntilVaultIsUnlockedAgain() = runTest {
+        openWithSelectionOfAll()
+        val failedGate = CompletableDeferred<Unit>()
+        coEvery { cloud.deleteUserMedia("b") } coAnswers {
+            failedGate.await()
+            throw IOException("network")
+        }
+
+        vm.deleteSelected()
+        runCurrent()
+        vm.relock()
+        failedGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(VaultLockState.LOCKED, vm.state.value.lockState)
         assertEquals(emptySet<String>(), vm.state.value.selected)
 
         val generation = checkNotNull(vm.onUnlockStarted())

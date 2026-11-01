@@ -129,11 +129,12 @@ class VaultViewModel(
     private fun applyDeleteOutcome(outcome: BatchOutcome, generation: Long) {
         // Результаты уже выполненных удалений применяются всегда, даже после блокировки.
         val stillOpen = generation == sessionGeneration
-        retainedIds = outcome.remaining
+        val retryIds = outcome.retryIds
+        retainedIds = retryIds
         _state.update {
             it.copy(
                 items = it.items.filterNot { item -> item.fileId in outcome.succeeded },
-                selected = if (stillOpen) outcome.remaining else emptySet(),
+                selected = if (stillOpen) retryIds else emptySet(),
                 snackbar = if (outcome.failed > 0) appContext.getString(R.string.batch_failed_count, outcome.failed) else it.snackbar,
             )
         }
