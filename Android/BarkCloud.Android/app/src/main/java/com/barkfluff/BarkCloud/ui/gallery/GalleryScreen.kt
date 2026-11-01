@@ -90,13 +90,16 @@ import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.net.FileTransferService
+import com.barkfluff.BarkCloud.data.cloud.AlbumCard
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
+import com.barkfluff.BarkCloud.ui.components.CloudAlbumPickerDialog
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.RefreshContentSurface
 import com.barkfluff.BarkCloud.ui.components.RefreshIndicator
@@ -178,6 +181,7 @@ fun GalleryScreen(
     var cloudViewer by remember { mutableStateOf<MediaAsset?>(null) }
     var deleteDialogOpen by remember { mutableStateOf(false) }
     var deviceConfirm by remember { mutableStateOf<DeviceDeleteConfirm?>(null) }
+    var albumPick by remember { mutableStateOf<List<AlbumCard>?>(null) }
     var pendingDelete by rememberSaveable(stateSaver = pendingPhotoDeleteSaver) {
         mutableStateOf<PendingPhotoDelete?>(null)
     }
@@ -540,6 +544,9 @@ fun GalleryScreen(
                 isBusy = deletionState.isBusy || state.isQueueing,
                 isQueueing = state.isQueueing,
                 onUpload = viewModel::uploadSelected,
+                onAlbum = {
+                    scope.launch { albumPick = loadAllAlbums(app.albumRepository) }
+                },
                 onFavorite = {
                     scope.launch {
                         val added = viewModel.addFavorites(selectedCloudIds)
@@ -570,6 +577,21 @@ fun GalleryScreen(
         }
 
         SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+    }
+
+    albumPick?.let { choices ->
+        CloudAlbumPickerDialog(
+            albums = choices,
+            enabled = !deletionState.isBusy,
+            onPick = { album ->
+                albumPick = null
+                scope.launch {
+                    val added = viewModel.addCloudSelectionToAlbum(album.id, selectedCloudIds)
+                    if (added > 0) snackbarHostState.showSnackbar(context.getString(R.string.viewer_album_added))
+                }
+            },
+            onDismiss = { albumPick = null },
+        )
     }
 
     deviceConfirm?.let { confirm ->
@@ -767,6 +789,7 @@ internal fun GallerySelectionToolbar(
     isQueueing: Boolean,
     onUpload: () -> Unit,
     onFavorite: () -> Unit,
+    onAlbum: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Box(
@@ -790,6 +813,15 @@ internal fun GallerySelectionToolbar(
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                         ) {
                             Text(stringResource(R.string.gallery_upload_selected, actions.uploadCount))
+                        }
+                    }
+                    if (actions.cloudCount > 0) {
+                        TextButton(
+                            onClick = onAlbum,
+                            enabled = !isBusy,
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                        ) {
+                            Text(stringResource(R.string.album_add_selected, actions.cloudCount))
                         }
                     }
                     if (actions.favoriteCount > 0) {
