@@ -36,7 +36,7 @@ class CloudMediaViewerGestureTest {
                 isZoomed = false,
                 onDismiss = { dismissed.set(true) },
                 onPanelExpanded = infoExpanded::set,
-                photoContent = { _, _ ->
+                photoContent = { _, _, _ ->
                     Box(Modifier.fillMaxSize().testTag("viewer-photo"))
                 },
                 overlayContent = { _, _ -> },

@@ -30,7 +30,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,10 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.cloud.PublicDir
 import com.barkfluff.BarkCloud.data.cloud.PublicFile
+import com.barkfluff.BarkCloud.data.cloud.isViewerMedia
+import com.barkfluff.BarkCloud.data.cloud.toViewerAsset
 import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.data.MimeIcon
+import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 
@@ -60,6 +66,15 @@ fun SharedFolderBrowserScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var viewerAsset by remember { mutableStateOf<MediaAsset?>(null) }
+    val viewerAssets = remember(state.files) { state.files.filter { it.isViewerMedia }.map { it.toViewerAsset() } }
+
+    CloudMediaViewer(
+        assets = viewerAssets,
+        selectedAsset = viewerAsset,
+        onDismiss = { viewerAsset = null },
+        infoEnabled = false,
+    )
 
     LaunchedEffect(directoryId) { viewModel.start(directoryId) }
     LaunchedEffect(state.snackbar) {
@@ -96,6 +111,7 @@ fun SharedFolderBrowserScreen(
                         SharedFileRow(
                             file = file,
                             isDownloading = state.downloadingFileId == file.id,
+                            onOpen = if (file.isViewerMedia) ({ viewerAsset = file.toViewerAsset() }) else null,
                             onDownload = {
                                 viewModel.download(file) { downloaded ->
                                     val mime = MimeIcon.mimeFor(file.name)
@@ -135,11 +151,13 @@ private fun SharedDirRow(dir: PublicDir, onOpen: () -> Unit) {
 private fun SharedFileRow(
     file: PublicFile,
     isDownloading: Boolean,
+    onOpen: (() -> Unit)?,
     onDownload: () -> Unit,
 ) {
     ListItem(
         headlineContent = { Text(file.name, maxLines = 1) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier,
         leadingContent = {
             if (file.previewUrl != null) {
                 MediaThumb(

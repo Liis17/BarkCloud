@@ -61,7 +61,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.files.data.FileShareHelper
+import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.files.domain.FsEntry
+import com.barkfluff.BarkCloud.ui.gallery.DeviceMediaViewer
+import android.net.Uri
+import java.io.File
 import com.barkfluff.BarkCloud.files.domain.FsSort
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -80,6 +84,13 @@ fun LocalBrowserScreen(
     val snackbarHost = remember { SnackbarHostState() }
 
     val errorNoApp = stringResource(R.string.files_op_error_no_app)
+    var viewerEntry by remember { mutableStateOf<FsEntry.File?>(null) }
+    val viewerMedia = remember(state.entries) {
+        state.entries.filterIsInstance<FsEntry.File>().filter { it.isViewerMedia }.map { it.toDeviceMedia() }
+    }
+    fun openEntry(entry: FsEntry.File) {
+        if (entry.isViewerMedia) viewerEntry = entry else viewModel.openFile(entry)
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -263,7 +274,7 @@ fun LocalBrowserScreen(
                                 viewModel.toggleSelect(entry.path)
                             } else when (entry) {
                                 is FsEntry.Directory -> viewModel.enter(entry)
-                                is FsEntry.File -> viewModel.openFile(entry)
+                                is FsEntry.File -> openEntry(entry)
                             }
                         },
                         onLongPress = { viewModel.toggleSelect(entry.path) },
@@ -271,7 +282,7 @@ fun LocalBrowserScreen(
                         onActionOpen = {
                             when (entry) {
                                 is FsEntry.Directory -> viewModel.enter(entry)
-                                is FsEntry.File -> viewModel.openFile(entry)
+                                is FsEntry.File -> openEntry(entry)
                             }
                         },
                         onActionShare = {
@@ -378,9 +389,39 @@ fun LocalBrowserScreen(
             },
         )
     }
+
+    DeviceMediaViewer(
+        items = viewerMedia,
+        selected = viewerEntry?.let { entry -> viewerMedia.firstOrNull { it.uri.path == entry.path } },
+        onDismiss = { viewerEntry = null },
+        onShare = { media ->
+            viewModel.shareFiles(state.entries.filterIsInstance<FsEntry.File>().filter { it.path == media.uri.path })
+        },
+    )
 }
 
 private enum class CopyOrMove { Copy, Move }
+
+/** Фото и видео локального браузера открываются в просмотрщике; остальные файлы — внешним приложением. */
+private val FsEntry.File.isViewerMedia: Boolean
+    get() = (mimeType.startsWith("image/") && mimeType != "image/svg+xml") || mimeType.startsWith("video/")
+
+/** Файл как элемент просмотрщика: URI `file://` без копирования; шаринг копирует файл через [LocalBrowserViewModel.shareFiles]. */
+/** Ключ просмотрщика для файла локального браузера: полный путь, а не хэш (коллизии Aa.jpg/BB.jpg). */
+internal fun localViewerStableKey(entry: FsEntry.File): String = "file:${entry.path}"
+
+internal fun FsEntry.File.toDeviceMedia(): DeviceMedia = DeviceMedia(
+    id = path.hashCode().toLong(),
+    uri = Uri.fromFile(File(path)),
+    isVideo = mimeType.startsWith("video/"),
+    name = name,
+    dateTakenMillis = lastModified,
+    dateModifiedSeconds = lastModified / 1000,
+    sizeBytes = sizeBytes,
+    mimeType = mimeType,
+    // Идентичность — полный путь: хэш путей коллидирует (например, "Aa.jpg" и "BB.jpg" в одной папке).
+    stableKey = localViewerStableKey(this),
+)
 
 private fun sortOptions(): List<Pair<FsSort, Int>> = listOf(
     FsSort.NameAsc to R.string.files_sort_name_asc,
