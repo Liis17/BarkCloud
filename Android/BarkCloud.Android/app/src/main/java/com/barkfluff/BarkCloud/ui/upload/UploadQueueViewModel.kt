@@ -16,8 +16,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
-    val pendingJobs: List<UploadJob>
-        get() = jobs.filter { it.phase != UploadPhase.COMPLETED && it.phase != UploadPhase.CANCELLED }
+    val pendingJobs: List<UploadJob> = jobs
+        .filter { it.phase != UploadPhase.COMPLETED && it.phase != UploadPhase.CANCELLED }
+        .sortedWith(
+            compareBy<UploadJob> { it.presentationGroup() }
+                .thenBy { it.createdAtMillis }
+                .thenBy { it.id },
+        )
+    val pendingErrorCount: Int = pendingJobs.count {
+        it.phase == UploadPhase.FAILED || it.phase == UploadPhase.UPLOADED_NOT_ATTACHED
+    }
     private val sessionJobs: List<UploadJob>
         get() = jobs.filter { it.createdAtMillis >= System.currentTimeMillis() - SESSION_WINDOW_MILLIS }
     val current: UploadJob? get() = sessionJobs.firstOrNull { it.phase in ACTIVE_PHASES }
@@ -38,6 +46,17 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
             UploadPhase.UPLOADING, UploadPhase.COMPLETING, UploadPhase.PROCESSING, UploadPhase.ATTACHING,
         )
     }
+}
+
+private fun UploadJob.presentationGroup(): Int = when (phase) {
+    UploadPhase.HASHING,
+    UploadPhase.CREATING_SESSION,
+    UploadPhase.UPLOADING,
+    UploadPhase.COMPLETING,
+    UploadPhase.PROCESSING,
+    UploadPhase.ATTACHING -> 0
+    UploadPhase.QUEUED -> 1
+    else -> 2
 }
 
 class UploadQueueViewModel(private val app: BarkCloudApplication) : ViewModel() {

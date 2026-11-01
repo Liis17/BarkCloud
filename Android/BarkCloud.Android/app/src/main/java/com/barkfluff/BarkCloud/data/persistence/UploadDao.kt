@@ -29,6 +29,9 @@ interface UploadDao {
     @Query("SELECT COUNT(*) FROM upload_jobs WHERE phase IN ('QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'ATTACHING')")
     suspend fun activeCount(): Int
 
+    @Query("SELECT COUNT(*) FROM upload_jobs WHERE source != 'BACKUP' AND phase IN ('QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'ATTACHING')")
+    suspend fun activeNonBackupCount(): Int
+
     @Query("SELECT COUNT(*) FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase NOT IN ('COMPLETED', 'CANCELLED')")
     suspend fun stagedBackupCount(): Int
 

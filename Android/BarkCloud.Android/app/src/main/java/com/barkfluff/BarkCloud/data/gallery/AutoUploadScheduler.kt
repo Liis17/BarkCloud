@@ -37,6 +37,8 @@ object AutoUploadScheduler {
         if (policyChanged) {
             UniqueWorkEnqueuer.cancelPending(ONCE_NAME)
             enqueueOnce(context, policy, ExistingWorkPolicy.REPLACE)
+        } else {
+            runOnce(context, policy)
         }
     }
 

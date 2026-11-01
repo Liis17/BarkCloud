@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.data.upload
 
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import io.grpc.Metadata
@@ -62,6 +63,48 @@ class UploadQueueDrainTest {
             assertTrue(source.remainingActive() >= 12)
             assertFalse(source.items.filter { it.id !in attempted }.any { it.phase != UploadPhase.QUEUED })
         }
+    }
+
+    @Test
+    fun wifiOnlySkipsBackupJobsOnMeteredNetworkWithoutBlockingManualUploads() = runTest {
+        val source = FakeQueue(
+            mutableListOf(
+                job(1),
+                job(2).copy(source = UploadSource.BACKUP),
+            ),
+        )
+        val processed = mutableSetOf<String>()
+
+        UploadQueueDrain.run(
+            source = source,
+            pageSize = 4,
+            shouldStop = { false },
+            shouldProcess = { shouldProcessUploadJob(it, AutoUploadNetworkPolicy.WIFI_ONLY, isUnmeteredNetwork = false) },
+        ) { item -> processed += item.id }
+
+        assertEquals(setOf("0001"), processed)
+        assertTrue(shouldProcessUploadJob(job(2).copy(source = UploadSource.BACKUP), AutoUploadNetworkPolicy.WIFI_ONLY, true))
+        assertTrue(shouldProcessUploadJob(job(2).copy(source = UploadSource.BACKUP), AutoUploadNetworkPolicy.ANY_NETWORK, false))
+    }
+
+    @Test
+    fun offPolicySkipsBackupJobsButStillProcessesManualUploads() = runTest {
+        val source = FakeQueue(
+            mutableListOf(
+                job(1),
+                job(2).copy(source = UploadSource.BACKUP),
+            ),
+        )
+        val processed = mutableSetOf<String>()
+
+        UploadQueueDrain.run(
+            source = source,
+            pageSize = 4,
+            shouldStop = { false },
+            shouldProcess = { shouldProcessUploadJob(it, AutoUploadNetworkPolicy.OFF, isUnmeteredNetwork = true) },
+        ) { item -> processed += item.id }
+
+        assertEquals(setOf("0001"), processed)
     }
 
     @Test

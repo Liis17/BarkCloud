@@ -40,6 +40,7 @@ import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.files.ui.formatChildCount
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
+import com.barkfluff.BarkCloud.ui.components.localPreviewModel
 import com.barkfluff.BarkCloud.ui.gallery.DeviceMediaViewer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -151,7 +152,6 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                                         (context.applicationContext as BarkCloudApplication).uploadQueue.resumeBackup()
                                     }
                                     AutoUploadScheduler.apply(context, backup.policy)
-                                    AutoUploadScheduler.runOnce(context, backup.policy)
                                 }
                             },
                             modifier = Modifier.semantics { contentDescription = label },
@@ -160,7 +160,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                 }
                 items(selected?.media.orEmpty(), key = { it.mediaKey }) { media ->
                     Box(Modifier.aspectRatio(1f).clip(MaterialTheme.shapes.small).clickable { viewer = media }) {
-                        AsyncImage(media.uri, media.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        AsyncImage(media.localPreviewModel(512), media.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         if (media.isVideo) Icon(Icons.Filled.PlayCircle, stringResource(R.string.viewer_play_video), Modifier.align(Alignment.Center))
                     }
                 }
@@ -175,7 +175,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
             ) {
                 items(folders, key = { it.key }) { folder ->
                     ElevatedCard(Modifier.fillMaxWidth().clickable { selectedKey = folder.key }) {
-                        AsyncImage(folder.media.first().uri, folder.name, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop)
+                        AsyncImage(folder.media.first().localPreviewModel(512), folder.name, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop)
                         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(folder.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
