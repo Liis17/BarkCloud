@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,6 +104,10 @@ import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 import com.barkfluff.BarkCloud.ui.media.MediaCell
+import com.barkfluff.BarkCloud.ui.selection.dragSelection
+import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
+import com.barkfluff.BarkCloud.ui.selection.viewportBounds
+import com.barkfluff.BarkCloud.ui.selection.visibleCells
 import com.barkfluff.BarkCloud.ui.media.MediaGridViewModel
 import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
@@ -180,6 +185,7 @@ fun GalleryScreen(
     var storageLoading by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var refreshQueued by remember { mutableStateOf(false) }
+    var dragSelecting by remember { mutableStateOf(false) }
     var selectionToolbarHeightPx by remember { mutableStateOf(0) }
 
     val openRemote = rememberRemoteOpener()
@@ -196,8 +202,20 @@ fun GalleryScreen(
         .filter { it.startsWith(CLOUD_SELECTION_PREFIX) }
         .map { it.removePrefix(CLOUD_SELECTION_PREFIX) }
 
+    val selectableKeys = remember(dateSections) { dateSections.flatMap { section -> section.items.map { it.key } } }
+    val timelineByKey = remember(timeline) { timeline.associateBy { it.key } }
+    val dragController = rememberDragSelection(
+        orderedKeys = selectableKeys,
+        selected = state.selected,
+        onSelectionChange = viewModel::setSelection,
+        visibleCells = { gridState.visibleCells() },
+        viewport = { gridState.viewportBounds(bottomInsetPx = selectionToolbarHeightPx.toFloat()) },
+        scrollBy = { gridState.scrollBy(it) },
+        onDragActiveChange = { dragSelecting = it },
+    )
+
     fun requestRefresh() {
-        if (deletionState.isBusy) return
+        if (deletionState.isBusy || dragSelecting) return
         if (refreshing) {
             refreshQueued = true
             return
@@ -451,8 +469,19 @@ fun GalleryScreen(
             ) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 120.dp),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().dragSelection(dragController) { key ->
+                        if (!deletionState.isBusy) {
+                            if (state.selecting) {
+                                viewModel.toggle(key)
+                            } else when (val item = timelineByKey[key]) {
+                                is PhotoTimelineItem.Device -> viewer = item.media
+                                is PhotoTimelineItem.Cloud -> cloudViewer = item.asset
+                                null -> Unit
+                            }
+                        }
+                    },
                     state = gridState,
+                    userScrollEnabled = !dragSelecting,
                     contentPadding = PaddingValues(
                         bottom = 20.dp + if (state.selecting) with(density) { selectionToolbarHeightPx.toDp() } else 0.dp,
                     ),
@@ -480,23 +509,9 @@ fun GalleryScreen(
                                     selected = item.key in state.selected,
                                     cloudStatus = state.cloudStates[item.media.mediaKey],
                                     onAppear = { viewModel.observeCloudPresence(item.media) },
-                                    onTap = {
-                                        if (!deletionState.isBusy) {
-                                            if (state.selecting) viewModel.toggle(item.key) else viewer = item.media
-                                        }
-                                    },
-                                    onLongPress = { if (!deletionState.isBusy) viewModel.startSelecting(item.key) },
                                 )
                                 is PhotoTimelineItem.Cloud -> MediaCell(
                                     asset = item.asset,
-                                    onTap = {
-                                        if (!deletionState.isBusy) {
-                                            if (state.selecting) viewModel.toggle(item.key) else cloudViewer = item.asset
-                                        }
-                                    },
-                                    onFavorite = {},
-                                    onAddToVault = {},
-                                    onLongPress = { if (!deletionState.isBusy) viewModel.startSelecting(item.key) },
                                     selecting = state.selecting,
                                     selected = item.key in state.selected,
                                 )
@@ -763,8 +778,6 @@ private fun GalleryCell(
     selected: Boolean,
     cloudStatus: MediaCloudStatus?,
     onAppear: () -> Unit,
-    onTap: () -> Unit,
-    onLongPress: () -> Unit,
 ) {
     LaunchedEffect(media.id) { onAppear() }
     val badgeScale by androidx.compose.animation.core.animateFloatAsState(
@@ -778,8 +791,7 @@ private fun GalleryCell(
         label = "selectOverlayAlpha",
     )
     Box(
-        modifier = Modifier.aspectRatio(1f).padding(1.dp).clip(MaterialTheme.shapes.small)
-            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+        modifier = Modifier.aspectRatio(1f).padding(1.dp).clip(MaterialTheme.shapes.small),
     ) {
         MediaThumb(
             model = media.uri,

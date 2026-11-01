@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChanges
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
@@ -53,6 +54,10 @@ class MediaGridViewModel(
             app.uploadQueue.recentJobs.collectLatest { jobs ->
                 if (jobs.any { it.phase == UploadPhase.COMPLETED && observedCompleted.add(it.id) }) reload()
             }
+        }
+        // Удаления на других экранах (корзина, альбом, устройство) обновляют и эту страницу.
+        viewModelScope.launch {
+            CloudLibraryChanges.events.collect { reload() }
         }
     }
 
