@@ -3,34 +3,44 @@ package com.barkfluff.BarkCloud.data.upload
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.barkfluff.BarkCloud.MainActivity
 import com.barkfluff.BarkCloud.R
 
 object UploadNotification {
+    /** Foreground-уведомление прохода; живёт до выхода воркера. */
     const val ID = 4201
+
+    /** Итог успешного прохода. Отдельный ID: иначе WorkManager снимет его вместе с foreground-уведомлением. */
+    const val FINISHED_ID = 4202
+
     private const val CHANNEL_ID = "barkcloud_uploads"
+    private const val REQUEST_OPEN = 0
+    private const val REQUEST_DISMISS = 1
 
-    fun build(context: Context, done: Int, total: Int, title: String, percent: Int? = null): Notification {
+    /** Android 16 (API 36): только там система показывает promoted ongoing и chip. */
+    private const val PROMOTION_MIN_SDK = 36
+
+    fun foreground(context: Context, tally: UploadRunTally): Notification {
         ensureChannel(context)
-        val max = total.coerceAtLeast(1)
-        val progress = done.coerceIn(0, max)
-        val builder = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(context.getString(R.string.upload_notification_progress, done, total))
-            .setOngoing(done < total)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_barkcloud)
+            .setContentTitle(context.getString(R.string.upload_notification_title))
+            .setContentText(context.getString(R.string.upload_notification_progress, tally.done, tally.total))
+            .setContentIntent(openAppIntent(context))
+            .setDeleteIntent(dismissIntent(context))
+            .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setProgress(max, progress, false)
-
-        if (Build.VERSION.SDK_INT >= 36) {
-            val stylePercent = (percent ?: ((progress * 100) / max)).coerceIn(0, 100)
-            builder.setStyle(
-                Notification.ProgressStyle()
-                    .setProgress(stylePercent)
-                    .setStyledByProgress(true)
-            )
+            .setProgress(tally.total, tally.done, false)
+        if (Build.VERSION.SDK_INT >= PROMOTION_MIN_SDK) {
+            builder
+                .setRequestPromotedOngoing(true)
+                .setShortCriticalText(tally.chipText())
+                .setStyle(NotificationCompat.ProgressStyle().setProgress(tally.percent).setStyledByProgress(true))
         }
         return builder.build()
     }
@@ -45,6 +55,20 @@ object UploadNotification {
             .build()
     }
 
+    private fun openAppIntent(context: Context): PendingIntent = PendingIntent.getActivity(
+        context,
+        REQUEST_OPEN,
+        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private fun dismissIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        REQUEST_DISMISS,
+        Intent(context, UploadNotificationDismissReceiver::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -54,5 +78,23 @@ object UploadNotification {
             NotificationManager.IMPORTANCE_LOW,
         )
         manager.createNotificationChannel(channel)
+    }
+}
+
+/**
+ * Пользователь смахнул foreground-уведомление прохода. До следующего прохода воркер не переписывает
+ * уведомление, иначе `setForeground` вернёт чип на экран.
+ */
+internal object UploadNotificationDismissal {
+    @Volatile private var dismissed = false
+
+    val isDismissed: Boolean get() = dismissed
+
+    fun reset() {
+        dismissed = false
+    }
+
+    fun markDismissed() {
+        dismissed = true
     }
 }

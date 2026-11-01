@@ -45,6 +45,7 @@ Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend
 
 ## Ограничения и важные детали
 
+- Foreground-уведомление прохода (`UploadNotification.ID`) показывает `done/total` по всей eligible-очереди (`UploadRunTally`, Room-запрос `UploadDao.runTally`), а не только по захваченным задачам. Backup, заблокированный политикой сети, в счёт не входит. Ошибки учитываются только те, что возникли в текущем проходе (`UploadRunProgress`). Итог на отдельном `FINISHED_ID` показывается только при полном успехе. На API 36+ уведомление получает `requestPromotedOngoing` и chip; на API 36.0 разрешения `POST_PROMOTED_NOTIFICATIONS` нет, и уведомление остаётся обычным ongoing. Смахивание обрабатывает `UploadNotificationDismissReceiver`, до следующего прохода уведомление не переписывается.
 - Состояния Room отражают фазы `QUEUED → HASHING → CREATING_SESSION → UPLOADING → COMPLETING → PROCESSING → ATTACHING → COMPLETED`; ошибки, отмена и `PAUSED` для backup — отдельные состояния.
 - Для восстановления используются сохранённые idempotency key и session ID, затем серверный список принятых частей. Локальный `bytesSent` нужен для отображения прогресса; upload-token хранится только в памяти worker и заново выдаётся при resume.
 - Если ответ на завершение потерян, worker сверяет серверное состояние перед повтором; если готовый файл не привязался, повтор не передаёт байты заново.
