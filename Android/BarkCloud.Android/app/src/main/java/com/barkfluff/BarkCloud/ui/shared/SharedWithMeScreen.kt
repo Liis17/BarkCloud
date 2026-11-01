@@ -65,14 +65,6 @@ fun SharedWithMeScreen(
         assets = viewerAssets,
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
-        onPlayVideo = { asset ->
-            state.items.firstOrNull { it.asset.viewerId == asset.viewerId }?.let { entry ->
-                viewModel.download(entry) { file ->
-                    val shareFile = FileShareHelper.prepareLocalFile(context, file, entry.asset.fileName)
-                    context.startActivity(FileShareHelper.buildOpenIntent(context, shareFile, MimeIcon.mimeFor(entry.asset.fileName)))
-                }
-            }
-        },
         infoEnabled = false,
         onPageNearEnd = { viewModel.loadMore() },
     )

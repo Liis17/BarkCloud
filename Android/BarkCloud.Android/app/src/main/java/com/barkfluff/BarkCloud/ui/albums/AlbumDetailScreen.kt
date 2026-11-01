@@ -58,7 +58,6 @@ import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +74,6 @@ fun AlbumDetailScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
-    val openRemote = rememberRemoteOpener()
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(),
@@ -163,7 +161,6 @@ fun AlbumDetailScreen(
             assets = state.items,
             selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             onDelete = { item -> viewModel.deleteFile(item.id) },
             onPageNearEnd = { viewModel.loadMore() },
         )

@@ -47,7 +47,6 @@ import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +58,6 @@ fun FavoritesScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val gridState = rememberLazyGridState()
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
-    val openRemote = rememberRemoteOpener()
 
     LaunchedEffect(Unit) { viewModel.loadIfNeeded() }
     LaunchedEffect(state.snackbar) {
@@ -123,7 +121,6 @@ fun FavoritesScreen(
             assets = state.items,
             selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             onDelete = { item -> viewModel.deleteFile(item.id) },
             onPageNearEnd = { viewModel.loadMore() },
         )

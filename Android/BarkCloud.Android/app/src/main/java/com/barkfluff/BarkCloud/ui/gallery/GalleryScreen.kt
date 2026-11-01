@@ -2,7 +2,6 @@ package com.barkfluff.BarkCloud.ui.gallery
 
 import android.Manifest
 import android.app.Activity
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
@@ -101,7 +100,6 @@ import com.barkfluff.BarkCloud.ui.components.contentSurfaceTopPx
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 import com.barkfluff.BarkCloud.ui.media.MediaCell
 import com.barkfluff.BarkCloud.ui.media.MediaGridViewModel
 import com.barkfluff.BarkCloud.ui.theme.BarkMotion
@@ -182,7 +180,6 @@ fun GalleryScreen(
     var refreshQueued by remember { mutableStateOf(false) }
     var selectionToolbarHeightPx by remember { mutableStateOf(0) }
 
-    val openRemote = rememberRemoteOpener()
     val timeline = remember(cloudPhotos.items, cloudVideos.items) {
         (cloudPhotos.items + cloudVideos.items).map { PhotoTimelineItem.Cloud(it) }
             .sortedByDescending { it.dateMillis }
@@ -614,9 +611,6 @@ fun GalleryScreen(
         assets = cloudAssets,
         selectedAsset = cloudViewer,
         onDismiss = { cloudViewer = null },
-        onPlayVideo = { item -> openRemote(item.id, item.fileName) { message ->
-                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
-        } },
         onDelete = { item ->
             if (!viewModel.deleteCloudFromViewer(item.id)) throw IllegalStateException()
         },
@@ -630,12 +624,6 @@ fun GalleryScreen(
         items = listOfNotNull(viewer),
         selected = viewer,
         onDismiss = { viewer = null },
-        onPlayVideo = { media ->
-            val intent = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(media.uri, "video/*")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            runCatching { context.startActivity(intent) }
-        },
     )
 }
 

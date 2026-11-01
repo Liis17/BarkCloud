@@ -39,7 +39,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -49,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -72,11 +72,14 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -94,6 +97,8 @@ import com.barkfluff.BarkCloud.data.cache.withCloudOriginal
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaOrigin
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.data.cloud.VideoPlaybackResolver
+import com.barkfluff.BarkCloud.net.InsecureHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -125,7 +130,7 @@ internal fun CloudMediaViewerLayer(
     isZoomed: Boolean,
     onDismiss: () -> Unit,
     onPanelExpanded: (Boolean) -> Unit,
-    photoContent: @Composable (infoExpanded: Boolean, onPhotoTap: () -> Unit) -> Unit,
+    photoContent: @Composable (infoExpanded: Boolean, controlsVisible: Boolean, onPhotoTap: () -> Unit) -> Unit,
     overlayContent: @Composable (visible: Boolean, onInfo: () -> Unit) -> Unit,
     infoContent: @Composable () -> Unit,
 ) {
@@ -242,7 +247,7 @@ internal fun CloudMediaViewerLayer(
                         enabled = !isZoomed,
                     ),
             ) {
-                photoContent(infoExpanded) {
+                photoContent(infoExpanded, overlayVisible && !isZoomed && !infoExpanded) {
                     if (infoExpanded) {
                         scope.launch { panelState.animateTo(CloudMediaPanelAnchor.Collapsed, spring()) }
                     } else {
@@ -308,7 +313,6 @@ fun CloudMediaViewer(
     assets: List<MediaAsset>,
     selectedAsset: MediaAsset?,
     onDismiss: () -> Unit,
-    onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean = true,
     onDelete: (suspend (MediaAsset) -> Unit)? = null,
     onPageNearEnd: (() -> Unit)? = null,
@@ -354,7 +358,6 @@ fun CloudMediaViewer(
                             initialIndex = initialIndex,
                             isOpen = selectedAsset?.viewerId == asset.viewerId,
                             onDismiss = onDismiss,
-                            onPlayVideo = onPlayVideo,
                             infoEnabled = infoEnabled,
                             onDelete = onDelete,
                             onPageNearEnd = onPageNearEnd,
@@ -373,7 +376,6 @@ private fun CloudMediaViewerContent(
     initialIndex: Int,
     isOpen: Boolean,
     onDismiss: () -> Unit,
-    onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean,
     onDelete: (suspend (MediaAsset) -> Unit)?,
     onPageNearEnd: (() -> Unit)?,
@@ -384,6 +386,42 @@ private fun CloudMediaViewerContent(
     val assetIds = remember(assets) { assets.map { it.viewerId } }
     val scope = rememberCoroutineScope()
     var panelExpanded by remember { mutableStateOf(false) }
+    // Плеер создаётся при первом видео: фото-просмотр не держит декодер.
+    val currentAssets by rememberUpdatedState(assets)
+    val videoSession = remember {
+        lazy {
+            val engine = ExoVideoPlaybackEngine(context.applicationContext, InsecureHttp.streaming)
+            val resolver = VideoPlaybackResolver(app.fileCache, app.fileTransfer) { fileId ->
+                app.sharedRepository.getSharedFileDownloadUrl(fileId)
+            }
+            ViewerVideoSession(
+                engine = engine,
+                controller = ViewerVideoController(engine, scope, app.appScope) { id ->
+                    resolver.resolve(currentAssets.firstOrNull { it.viewerId == id } ?: throw IOException("Видео не найдено"))
+                },
+            )
+        }
+    }
+    val appLocked by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        // Фон останавливает звук сразу; после возврата воспроизведение запускает только действие пользователя.
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP && videoSession.isInitialized()) videoSession.value.controller.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (videoSession.isInitialized()) videoSession.value.close()
+        }
+    }
+    LaunchedEffect(appLocked) {
+        if (appLocked) {
+            if (videoSession.isInitialized()) videoSession.value.controller.stop()
+            onDismiss()
+        }
+    }
+
     val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
     val zoomStates = remember { mutableMapOf<String, ZoomableImageState>() }
     val activeZoomState = remember { mutableStateOf<ZoomableImageState?>(null) }
@@ -480,6 +518,16 @@ private fun CloudMediaViewerContent(
         }
     }
 
+    // Автозапуск со звуком только для видео текущей страницы, когда пейджер устоялся и просмотр открыт.
+    val videoAutoplay = isOpen && currentAsset.isVideo && !appLocked && !pagerState.isScrollInProgress
+    LaunchedEffect(videoAutoplay, currentAsset.viewerId) {
+        if (videoAutoplay) {
+            videoSession.value.controller.open(currentAsset.viewerId, playWhenReady = true)
+        } else if (videoSession.isInitialized()) {
+            videoSession.value.controller.stop()
+        }
+    }
+
     LaunchedEffect(panelExpanded, currentAsset.id, isOpen) {
         if (panelExpanded && isOpen) infoViewModel.load(currentAsset.id)
     }
@@ -490,7 +538,7 @@ private fun CloudMediaViewerContent(
         isZoomed = isZoomed,
         onDismiss = onDismiss,
         onPanelExpanded = { panelExpanded = it },
-        photoContent = { infoExpanded, onPhotoTap ->
+        photoContent = { infoExpanded, controlsVisible, onPhotoTap ->
             val zoomGestures = when {
                 infoExpanded -> EnabledZoomGestures.None
                 isZoomed -> EnabledZoomGestures.ZoomAndPan
@@ -614,12 +662,15 @@ private fun CloudMediaViewerContent(
                                 Text(stringResource(R.string.viewer_retry_original))
                             }
                         }
-                        if (asset.isVideo) {
-                            Icon(
-                                imageVector = Icons.Filled.PlayCircle,
-                                contentDescription = stringResource(R.string.viewer_play_video),
-                                tint = Color.White,
-                                modifier = Modifier.size(72.dp).clickable { onPlayVideo(asset) },
+                        if (isCurrentPage && asset.isVideo) {
+                            val session = videoSession.value
+                            ViewerVideoPlayer(
+                                controller = session.controller,
+                                engine = session.engine,
+                                itemId = asset.viewerId,
+                                controlsVisible = controlsVisible,
+                                onTap = onPhotoTap,
+                                controlsBottomPadding = 104.dp,
                             )
                         }
                     }
