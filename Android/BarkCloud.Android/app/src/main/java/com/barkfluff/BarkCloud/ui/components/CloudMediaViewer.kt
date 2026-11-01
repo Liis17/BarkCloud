@@ -78,8 +78,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -392,8 +390,10 @@ private fun CloudMediaViewerContent(
     var panelExpanded by remember { mutableStateOf(false) }
     // Плеер создаётся при первом видео: фото-просмотр не держит декодер.
     val currentAssets by rememberUpdatedState(assets)
-    // Гейт общий для просмотрщика: фон закрывает его синхронно, даже если плеер ещё не создан.
-    val playbackGate = remember { ViewerPlaybackGate() }
+    // Гейт общий для просмотрщика и инициализирован по реальному состоянию жизненного цикла, а не значением по умолчанию.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val playbackGate = remember(lifecycleOwner) { viewerPlaybackGateFor(lifecycleOwner.lifecycle) }
+    var lifecycleStarted by remember(playbackGate) { mutableStateOf(playbackGate.started) }
     val sharedDownloadUrl: suspend (String) -> String = { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) }
     val videoSession = remember {
         lazy {
@@ -408,19 +408,13 @@ private fun CloudMediaViewerContent(
         }
     }
     val appLocked by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        // Фон закрывает гейт синхронно и останавливает звук; после возврата любой старт ждёт действия пользователя.
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_STOP -> {
-                    playbackGate.onBackground()
-                    if (videoSession.isInitialized()) videoSession.value.controller.stop()
-                }
-                Lifecycle.Event.ON_START -> playbackGate.onForeground()
-                else -> Unit
-            }
-        }
+        // ON_STOP синхронно закрывает гейт и останавливает звук; после возврата любой старт ждёт действия пользователя.
+        val observer = ViewerLifecycleObserver(
+            gate = playbackGate,
+            onStopped = { if (videoSession.isInitialized()) videoSession.value.controller.stop() },
+            onChanged = { lifecycleStarted = playbackGate.started },
+        )
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -536,7 +530,8 @@ private fun CloudMediaViewerContent(
     // Автозапуск со звуком только для видео текущей страницы, когда пейджер устоялся и просмотр открыт.
     // Гейт фона проверяется внутри controller.open в момент запуска, а не при постановке эффекта.
     val videoAutoplay = isOpen && currentAsset.isVideo && !appLocked && !pagerState.isScrollInProgress
-    LaunchedEffect(videoAutoplay, currentAsset.viewerId) {
+    // lifecycleStarted — ключ: первый ON_START после создания в CREATED должен перепроверить автозапуск.
+    LaunchedEffect(videoAutoplay, currentAsset.viewerId, lifecycleStarted) {
         if (videoAutoplay) {
             videoSession.value.controller.open(currentAsset.viewerId, playWhenReady = true)
         } else if (videoSession.isInitialized()) {

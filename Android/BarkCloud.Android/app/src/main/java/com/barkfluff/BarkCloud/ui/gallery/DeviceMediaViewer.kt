@@ -47,8 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
@@ -58,7 +56,8 @@ import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.net.InsecureHttp
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewerLayer
 import com.barkfluff.BarkCloud.ui.components.ExoVideoPlaybackEngine
-import com.barkfluff.BarkCloud.ui.components.ViewerPlaybackGate
+import com.barkfluff.BarkCloud.ui.components.ViewerLifecycleObserver
+import com.barkfluff.BarkCloud.ui.components.viewerPlaybackGateFor
 import com.barkfluff.BarkCloud.ui.components.ViewerVideoController
 import com.barkfluff.BarkCloud.ui.components.ViewerVideoPlayer
 import com.barkfluff.BarkCloud.ui.components.ViewerVideoSession
@@ -150,7 +149,9 @@ private fun DeviceMediaPager(
 
     // Плеер создаётся при первом видео; источник — URI устройства, без сети и кеша.
     val currentItems by rememberUpdatedState(items)
-    val playbackGate = remember { ViewerPlaybackGate() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val playbackGate = remember(lifecycleOwner) { viewerPlaybackGateFor(lifecycleOwner.lifecycle) }
+    var lifecycleStarted by remember(playbackGate) { mutableStateOf(playbackGate.started) }
     val videoSession = remember {
         lazy {
             val engine = ExoVideoPlaybackEngine(context.applicationContext, InsecureHttp.streaming)
@@ -164,18 +165,13 @@ private fun DeviceMediaPager(
         }
     }
     val appLocked by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_STOP -> {
-                    playbackGate.onBackground()
-                    if (videoSession.isInitialized()) videoSession.value.controller.stop()
-                }
-                Lifecycle.Event.ON_START -> playbackGate.onForeground()
-                else -> Unit
-            }
-        }
+        // ON_STOP синхронно закрывает гейт и останавливает звук; после возврата любой старт ждёт действия пользователя.
+        val observer = ViewerLifecycleObserver(
+            gate = playbackGate,
+            onStopped = { if (videoSession.isInitialized()) videoSession.value.controller.stop() },
+            onChanged = { lifecycleStarted = playbackGate.started },
+        )
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -190,7 +186,8 @@ private fun DeviceMediaPager(
     }
 
     val videoAutoplay = isOpen && currentMedia?.isVideo == true && !appLocked && !pagerState.isScrollInProgress
-    LaunchedEffect(videoAutoplay, currentMedia?.mediaKey) {
+    // lifecycleStarted — ключ: первый ON_START после создания в CREATED должен перепроверить автозапуск.
+    LaunchedEffect(videoAutoplay, currentMedia?.mediaKey, lifecycleStarted) {
         val media = currentMedia ?: return@LaunchedEffect
         if (videoAutoplay) {
             videoSession.value.controller.open(media.mediaKey, playWhenReady = true)

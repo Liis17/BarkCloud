@@ -26,7 +26,28 @@ class ViewerVideoSeekAndFitTest {
         seek = seek.finishDrag()
 
         assertNull(seek.dragTarget())
-        assertEquals(10_300L, seek.displayPositionMs)
+        assertEquals(55_000L, seek.displayPositionMs)
+        // После отпускания живые тики снова обновляют позицию.
+        assertEquals(56_000L, seek.withLivePosition(56_000L).displayPositionMs)
+    }
+
+    @Test
+    fun pausedSeekKeepsTheReleasedTargetOnScreenWithoutTicks() {
+        // Пауза: тиков нет. Перемотка на 40 с из 10 с должна остаться на 40 с после отпускания.
+        val seek = VideoSeekState(livePositionMs = 10_000L)
+            .dragTo(40_000L)
+            .finishDrag()
+
+        assertEquals(40_000L, seek.displayPositionMs)
+        assertEquals(40_000L, seek.livePositionMs)
+        assertNull(seek.dragTarget())
+    }
+
+    @Test
+    fun finishingWithoutDragDoesNotMoveThePosition() {
+        val seek = VideoSeekState(livePositionMs = 10_000L).finishDrag()
+
+        assertEquals(10_000L, seek.displayPositionMs)
     }
 
     @Test
