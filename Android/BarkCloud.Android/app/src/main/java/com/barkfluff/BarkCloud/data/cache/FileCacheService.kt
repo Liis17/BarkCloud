@@ -475,6 +475,9 @@ class FileCacheService(
     suspend fun invalidateOriginal(fileId: String) =
         invalidate(FileCacheKey.original(currentScope(), fileId))
 
+    suspend fun invalidateSharedOriginal(fileId: String) =
+        invalidate(FileCacheKey.sharedOriginal(currentScope(), fileId))
+
     suspend fun invalidateJpegView(fileId: String, jpegViewFileId: String? = null) =
         invalidate(FileCacheKey.jpegView(currentScope(), fileId, jpegViewFileId))
 

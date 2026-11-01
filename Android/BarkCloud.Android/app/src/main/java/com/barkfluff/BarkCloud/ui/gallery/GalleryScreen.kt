@@ -620,20 +620,23 @@ fun GalleryScreen(
         onDelete = { item ->
             if (!viewModel.deleteCloudFromViewer(item.id)) throw IllegalStateException()
         },
+        onPageNearEnd = {
+            if (cloudPhotos.canLoadMore && !cloudPhotos.isLoadingMore) photos.loadMore()
+            if (cloudVideos.canLoadMore && !cloudVideos.isLoadingMore) videos.loadMore()
+        },
     )
     }
-    viewer?.let { media ->
-        DeviceMediaViewer(
-            media = media,
-            onDismiss = { viewer = null },
-            onPlayVideo = {
-                val intent = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(media.uri, "video/*")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                runCatching { context.startActivity(intent) }
-            },
-        )
-    }
+    DeviceMediaViewer(
+        items = listOfNotNull(viewer),
+        selected = viewer,
+        onDismiss = { viewer = null },
+        onPlayVideo = { media ->
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(media.uri, "video/*")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            runCatching { context.startActivity(intent) }
+        },
+    )
 }
 
 @Composable

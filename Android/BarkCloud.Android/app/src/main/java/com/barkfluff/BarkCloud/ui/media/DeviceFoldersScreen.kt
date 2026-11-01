@@ -193,10 +193,13 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
             }
         }
     }
-    viewer?.let { media ->
-        DeviceMediaViewer(media, onDismiss = { viewer = null }, onPlayVideo = {
+    DeviceMediaViewer(
+        items = selected?.media.orEmpty(),
+        selected = viewer,
+        onDismiss = { viewer = null },
+        onPlayVideo = { media ->
             val intent = Intent(Intent.ACTION_VIEW).setDataAndType(media.uri, "video/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             runCatching { context.startActivity(intent) }
-        })
-    }
+        },
+    )
 }

@@ -89,7 +89,10 @@ import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.CacheInvalidatedException
 import com.barkfluff.BarkCloud.data.cache.CloudImageModel
+import com.barkfluff.BarkCloud.data.cache.invalidateCloudOriginal
+import com.barkfluff.BarkCloud.data.cache.withCloudOriginal
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
+import com.barkfluff.BarkCloud.data.cloud.CloudMediaOrigin
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
@@ -308,10 +311,11 @@ fun CloudMediaViewer(
     onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean = true,
     onDelete: (suspend (MediaAsset) -> Unit)? = null,
+    onPageNearEnd: (() -> Unit)? = null,
 ) {
     val visibility = remember { MutableTransitionState(false) }
     var retainedAsset by remember { mutableStateOf<MediaAsset?>(null) }
-    var listWasEmptyAtOpen by remember(selectedAsset?.id) {
+    var listWasEmptyAtOpen by remember(selectedAsset?.viewerId) {
         mutableStateOf(selectedAsset != null && assets.isEmpty())
     }
 
@@ -340,19 +344,20 @@ fun CloudMediaViewer(
             val asset = retainedAsset ?: selectedAsset
             if (asset != null) {
                 if (assets.isEmpty() && !listWasEmptyAtOpen) {
-                    LaunchedEffect(asset.id) { onDismiss() }
+                    LaunchedEffect(asset.viewerId) { onDismiss() }
                 } else {
-                    val viewerAssets = if (assets.isEmpty()) listOf(asset) else assets
-                    val initialIndex = viewerAssets.indexOfFirst { it.id == asset.id }.coerceAtLeast(0)
-                    key(asset.id) {
+                    val viewerAssets = if (assets.isEmpty()) listOf(asset) else distinctViewerAssets(assets)
+                    val initialIndex = viewerAssets.indexOfFirst { it.viewerId == asset.viewerId }.coerceAtLeast(0)
+                    key(asset.viewerId) {
                         CloudMediaViewerContent(
                             assets = viewerAssets,
                             initialIndex = initialIndex,
-                            isOpen = selectedAsset?.id == asset.id,
+                            isOpen = selectedAsset?.viewerId == asset.viewerId,
                             onDismiss = onDismiss,
                             onPlayVideo = onPlayVideo,
                             infoEnabled = infoEnabled,
                             onDelete = onDelete,
+                            onPageNearEnd = onPageNearEnd,
                         )
                     }
                 }
@@ -371,11 +376,12 @@ private fun CloudMediaViewerContent(
     onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean,
     onDelete: (suspend (MediaAsset) -> Unit)?,
+    onPageNearEnd: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
     val pagerState = rememberPagerState(initialPage = initialIndex) { assets.size }
-    val assetIds = remember(assets) { assets.map { it.id } }
+    val assetIds = remember(assets) { assets.map { it.viewerId } }
     val scope = rememberCoroutineScope()
     var panelExpanded by remember { mutableStateOf(false) }
     val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
@@ -419,23 +425,27 @@ private fun CloudMediaViewerContent(
     }
     val infoState by infoViewModel.state.collectAsStateWithLifecycle()
     val jpegViewModel = currentAsset.jpegViewModel()
-    var useJpegView by remember(currentAsset.id) {
+    var useJpegView by remember(currentAsset.viewerId) {
         mutableStateOf(requiresJpegView(currentAsset.fileName, jpegViewModel != null))
     }
-    var retryCount by remember(currentAsset.id) { mutableIntStateOf(0) }
-    var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
-    var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
+    var retryCount by remember(currentAsset.viewerId) { mutableIntStateOf(0) }
+    var imageState by remember(currentAsset.viewerId) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
+    var failedDecodeCache by remember(currentAsset.viewerId) { mutableStateOf<ViewerCacheKind?>(null) }
 
     LaunchedEffect(pagerState.settledPage, assetIds) {
         val settledAsset = assets.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
         val previousAssetId = previousSettledAssetId
-        if (previousAssetId != null && previousAssetId != settledAsset.id) {
+        if (previousAssetId != null && previousAssetId != settledAsset.viewerId) {
             zoomStates.remove(previousAssetId)?.zoomableState?.resetZoom()
         }
-        previousSettledAssetId = settledAsset.id
+        previousSettledAssetId = settledAsset.viewerId
     }
 
-    LaunchedEffect(isOpen, currentAsset.id, retryCount, useJpegView) {
+    LaunchedEffect(pagerState.settledPage, assets.size) {
+        if (shouldLoadMoreAtPagerEdge(pagerState.settledPage, assets.size)) onPageNearEnd?.invoke()
+    }
+
+    LaunchedEffect(isOpen, currentAsset.viewerId, retryCount, useJpegView) {
         if (!isOpen || currentAsset.kind != CloudMediaKind.PHOTO) return@LaunchedEffect
         try {
             if (useJpegView) {
@@ -450,7 +460,11 @@ private fun CloudMediaViewerContent(
                 }
             } else {
                 imageState = ViewerImageState.Loading
-                app.fileCache.withLoadedPinnedOriginal(currentAsset.id, currentAsset.fileName) { file ->
+                withCloudOriginal(
+                    asset = currentAsset,
+                    cache = app.fileCache,
+                    sharedDownloadUrl = { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) },
+                ) { file ->
                     imageState = ViewerImageState.Original(file)
                     awaitCancellation()
                 }
@@ -471,7 +485,7 @@ private fun CloudMediaViewerContent(
     }
 
     CloudMediaViewerLayer(
-        infoEnabled = infoEnabled,
+        infoEnabled = infoEnabled && currentAsset.origin == CloudMediaOrigin.OWN,
         isOpen = isOpen,
         isZoomed = isZoomed,
         onDismiss = onDismiss,
@@ -485,14 +499,14 @@ private fun CloudMediaViewerContent(
             Box(Modifier.fillMaxSize()) {
                 HorizontalPager(
                     state = pagerState,
-                    key = { page -> assets[page].id },
+                    key = { page -> assets[page].viewerId },
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val asset = assets.getOrNull(page) ?: return@HorizontalPager
                     val isCurrentPage = page == pagerState.currentPage
                     val zoomableImageState = rememberZoomableImageState()
                     SideEffect {
-                        zoomStates[asset.id] = zoomableImageState
+                        zoomStates[asset.viewerId] = zoomableImageState
                         if (isCurrentPage) activeZoomState.value = zoomableImageState
                     }
                     val pageImageState = if (isCurrentPage) imageState else ViewerImageState.Preview
@@ -523,7 +537,7 @@ private fun CloudMediaViewerContent(
                                                         failedDecodeCache = null
                                                         scope.launch {
                                                             invalidateViewerCacheSafely {
-                                                                app.fileCache.invalidateOriginal(asset.id)
+                                                                app.fileCache.invalidateCloudOriginal(asset)
                                                             }
                                                         }
                                                         imageState = ViewerImageState.Loading
@@ -578,7 +592,7 @@ private fun CloudMediaViewerContent(
                                     scope.launch {
                                         invalidateViewerCacheSafely {
                                             when (failedDecodeCache) {
-                                                ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateOriginal(asset.id)
+                                                ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateCloudOriginal(asset)
                                                 ViewerCacheKind.JPEG_VIEW -> app.fileCache.invalidateJpegView(
                                                     asset.id,
                                                     jpegViewModel?.previewFileId,
