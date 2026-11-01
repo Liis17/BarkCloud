@@ -76,6 +76,6 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 
 ## Ограничения и важные детали
 
-- `CheckFileHash` и `CheckFileHashes` — read-only проверки SHA-256 для UX дубликатов; ответ включает `exists` и `existing_locations`. Совпадающее содержимое не объединяет блобы, и отдельная загрузка создаст отдельный файл.
+- `CheckFileHash` и `CheckFileHashes` — read-only проверки SHA-256 для UX дубликатов; ответ включает `exists` и `existing_locations`. `CheckFileHashes` дополнительно отдаёт `file_ids` по каждому хешу (пригодные ID владельца); клиент выбирает наименьший, а при `exists=true` без ID действие по хешу не выполняет. Совпадающее содержимое не объединяет блобы, и отдельная загрузка создаст отдельный файл.
 - `FileNotReadyException` означает, что обработка ещё не завершена; повторите чтение состояния сессии. `FileAlreadyAttachedException` означает, что у владельца уже есть живая запись этого файла в дереве.
 - Обновление критериев и получение содержимого умных папок описаны в [[Backend/DynamicFolders]].
