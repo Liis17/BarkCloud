@@ -4,6 +4,7 @@ import com.barkfluff.BarkCloud.data.cache.CacheScope
 import com.barkfluff.BarkCloud.data.cloud.CloudCopy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -25,12 +26,19 @@ class DeviceDeleteExecutorTest {
         var state: CloudCopy? = CloudCopy.Absent
         var stateAvailable = true
         val deleted = mutableListOf<String>()
+        val checkedHashes = mutableListOf<String>()
+        var beforeAccess: (() -> Unit)? = null
         var failFor = emptySet<String>()
         var throwCancellationFor: String? = null
 
-        override suspend fun copyState(hash: String): CloudCopy? = if (stateAvailable) state else null
+        override suspend fun copyState(hash: String): CloudCopy? {
+            beforeAccess?.invoke()
+            checkedHashes += hash
+            return if (stateAvailable) state else null
+        }
 
         override suspend fun deleteFile(fileId: String) {
+            beforeAccess?.invoke()
             if (fileId == throwCancellationFor) throw CancellationException("screen gone")
             if (fileId in failFor) throw IOException("network")
             deleted += fileId
@@ -40,12 +48,20 @@ class DeviceDeleteExecutorTest {
     private class FakeDevice(var cancelError: Throwable? = null) : DeviceCopyPort {
         val cancelled = mutableListOf<String>()
         val forgotten = mutableListOf<String>()
+        val cancelAttempts = mutableListOf<String>()
+        val forgetAttempts = mutableListOf<String>()
+        var failForgetFor: String? = null
+        var afterCancel: ((String) -> Unit)? = null
         override suspend fun cancelLiveJobs(mediaKey: String) {
+            cancelAttempts += mediaKey
             cancelError?.let { throw it }
             cancelled += mediaKey
+            afterCancel?.invoke(mediaKey)
         }
 
         override suspend fun forget(mediaKey: String) {
+            forgetAttempts += mediaKey
+            if (mediaKey == failForgetFor) throw IOException("media state unavailable")
             forgotten += mediaKey
         }
     }
@@ -76,6 +92,8 @@ class DeviceDeleteExecutorTest {
             currentScope = { scope },
             hiddenUnlocked = { unlocked },
         )
+
+        fun store() = DeviceDeleteOperationStore(storeFile)
     }
 
     private fun env(cloud: FakeCloud = FakeCloud(), scope: CacheScope? = accountA, vault: FakeVault = FakeVault(), device: FakeDevice = FakeDevice()) =
@@ -84,6 +102,14 @@ class DeviceDeleteExecutorTest {
     private fun plan(ids: List<String>) = planDeviceDelete(
         DeviceDeleteMode.EVERYWHERE,
         listOf(DeviceDeleteItem(key, CloudCopy.Present(ids.first(), ids))),
+    )
+
+    private fun twoPhotoPlan() = planDeviceDelete(
+        DeviceDeleteMode.EVERYWHERE,
+        listOf(
+            DeviceDeleteItem(key, CloudCopy.Present("a", listOf("a"))),
+            DeviceDeleteItem("image:2", CloudCopy.Absent),
+        ),
     )
 
     @Test
@@ -114,6 +140,120 @@ class DeviceDeleteExecutorTest {
 
         assertTrue(failed)
         assertEquals(DeleteOpPhase.APPROVED, e.executor().pendingFor(accountA).single().phase)
+    }
+
+    @Test
+    fun restartedApprovedLegacyOperationFinishesDeviceCleanupBeforeCloudDelete() = runTest {
+        val cloud = FakeCloud().apply { state = CloudCopy.Present("a", listOf("a")) }
+        val device = FakeDevice()
+        val e = env(cloud = cloud, device = device)
+        val op = e.executor().create(accountA, twoPhotoPlan(), mapOf(key to hash), emptySet())
+        e.store().put(op.copy(phase = DeleteOpPhase.APPROVED))
+
+        // Симулируем старую запись без checkpoint: процесс завершился сразу после сохранения APPROVED.
+        val records = JSONArray(e.storeFile.readText())
+        records.getJSONObject(0).remove("cancelledDevicePhotos")
+        records.getJSONObject(0).remove("forgottenDevicePhotos")
+        e.storeFile.writeText(records.toString())
+
+        cloud.beforeAccess = {
+            assertEquals(listOf(key, "image:2"), device.cancelled)
+            assertEquals(listOf(key, "image:2"), device.forgotten)
+        }
+        val resumed = e.executor()
+        assertEquals(emptyList<String>(), device.cancelled)
+
+        val result = resumed.runCloud(op.id, allowHidden = false) as CloudRunResult.Finished
+
+        assertEquals(listOf(key, "image:2"), device.cancelled)
+        assertEquals(listOf(key, "image:2"), device.forgotten)
+        assertEquals(listOf("a"), cloud.deleted)
+        assertEquals(1, result.deleted)
+    }
+
+    @Test
+    fun resumedApprovedOperationContinuesAtInterruptedDeviceCleanupCheckpoint() = runTest {
+        val cloud = FakeCloud().apply { state = CloudCopy.Present("a", listOf("a")) }
+        val device = FakeDevice().apply { failForgetFor = "image:2" }
+        val e = env(cloud = cloud, device = device)
+        val op = e.executor().create(accountA, twoPhotoPlan(), mapOf(key to hash), emptySet())
+
+        var failed = false
+        try {
+            e.executor().approve(op.id)
+        } catch (_: IOException) {
+            failed = true
+        }
+
+        assertTrue(failed)
+        assertEquals(emptyList<String>(), cloud.checkedHashes)
+        assertEquals(listOf(key, "image:2"), device.cancelled)
+        assertEquals(listOf(key), device.forgotten)
+        device.failForgetFor = null
+        cloud.beforeAccess = {
+            assertEquals(listOf(key, "image:2"), device.cancelled)
+            assertEquals(listOf(key, "image:2"), device.forgotten)
+        }
+
+        val result = e.executor().runCloud(op.id, allowHidden = false) as CloudRunResult.Finished
+
+        assertEquals(1, device.cancelAttempts.count { it == key })
+        assertEquals(1, device.cancelAttempts.count { it == "image:2" })
+        assertEquals(1, device.forgetAttempts.count { it == key })
+        assertEquals(2, device.forgetAttempts.count { it == "image:2" })
+        assertEquals(listOf("a"), cloud.deleted)
+        assertEquals(1, result.deleted)
+    }
+
+    @Test
+    fun approvedOperationWithoutCloudTargetsStillCleansDeviceAfterRestart() = runTest {
+        val e = env()
+        val noCloudTarget = planDeviceDelete(
+            DeviceDeleteMode.EVERYWHERE,
+            listOf(DeviceDeleteItem(key, CloudCopy.Absent)),
+        )
+        val op = e.executor().create(accountA, noCloudTarget, emptyMap(), emptySet())
+        e.store().put(op.copy(phase = DeleteOpPhase.APPROVED))
+
+        val result = e.executor().runCloud(op.id, allowHidden = false) as CloudRunResult.Finished
+
+        assertEquals(emptyList<String>(), e.cloud.checkedHashes)
+        assertEquals(listOf(key), e.device.cancelled)
+        assertEquals(listOf(key), e.device.forgotten)
+        assertEquals(0, result.remaining)
+        assertEquals(emptyList<DeleteOperation>(), e.executor().pendingFor(accountA))
+    }
+
+    @Test
+    fun keepCloudModeStillCleansDeviceAfterRestartWithoutCloudCalls() = runTest {
+        val e = env()
+        val keepCloud = planDeviceDelete(
+            DeviceDeleteMode.KEEP_CLOUD,
+            listOf(DeviceDeleteItem(key, CloudCopy.Present("a", listOf("a")))),
+        )
+        val op = e.executor().create(accountA, keepCloud, emptyMap(), emptySet())
+        e.store().put(op.copy(phase = DeleteOpPhase.APPROVED))
+
+        val result = e.executor().runCloud(op.id, allowHidden = false) as CloudRunResult.Finished
+
+        assertEquals(emptyList<String>(), e.cloud.checkedHashes)
+        assertEquals(emptyList<String>(), e.cloud.deleted)
+        assertEquals(listOf(key), e.device.cancelled)
+        assertEquals(listOf(key), e.device.forgotten)
+        assertEquals(0, result.remaining)
+    }
+
+    @Test
+    fun scopeChangeDuringDeviceCleanupStopsBeforeTheNextSideEffect() = runTest {
+        val e = env()
+        val op = e.executor().create(accountA, twoPhotoPlan(), mapOf(key to hash), emptySet())
+        e.device.afterCancel = { e.scope = accountB }
+
+        assertEquals(null, e.executor().approve(op.id))
+        assertEquals(listOf(key), e.device.cancelled)
+        assertEquals(emptyList<String>(), e.device.forgotten)
+        assertEquals(CloudRunResult.ScopeChanged, e.executor().runCloud(op.id, allowHidden = false))
+        assertEquals(emptyList<String>(), e.cloud.checkedHashes)
     }
 
     @Test
