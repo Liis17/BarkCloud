@@ -487,9 +487,10 @@ private fun CloudMediaViewerContent(
         previousSettledAssetId = settledAsset.viewerId
     }
 
-    // Пейджер перепроверяет запрос при каждом изменении источника: загрузка завершилась, страница пришла.
+    // Эффект перепроверяется при изменении прогресса источника (pagesCompleted) и позиции; решение о повторе — в трекере.
+    val pageRequests = remember { ViewerPageRequestTracker() }
     LaunchedEffect(pagerState.settledPage, assets.size, pagination) {
-        if (shouldRequestNextPage(pagerState.settledPage, assets.size, pagination)) onPageNearEnd?.invoke()
+        if (pageRequests.shouldRequest(pagerState.settledPage, assets.size, pagination)) onPageNearEnd?.invoke()
     }
 
     LaunchedEffect(isOpen, currentAsset.viewerId, retryCount, representation) {

@@ -614,6 +614,7 @@ fun GalleryScreen(
         onDismiss = { cloudViewer = null },
         pagination = ViewerPagination(
             hasMore = cloudPhotos.canLoadMore || cloudVideos.canLoadMore,
+            pagesCompleted = cloudPhotos.pagesCompleted + cloudVideos.pagesCompleted,
             isLoading = cloudPhotos.isLoadingMore || cloudVideos.isLoadingMore,
         ),
         onDelete = { item ->

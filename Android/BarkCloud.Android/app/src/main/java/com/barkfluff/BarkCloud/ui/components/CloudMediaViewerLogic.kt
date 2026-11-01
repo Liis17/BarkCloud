@@ -98,25 +98,40 @@ internal fun requiresJpegView(fileName: String, hasJpegView: Boolean): Boolean {
     return extension in jpegViewRequiredExtensions
 }
 
-/** Состояние пагинации источника, которым кормится просмотрщик: есть ли следующая страница и идёт ли загрузка. */
-data class ViewerPagination(val hasMore: Boolean, val isLoading: Boolean) {
+/**
+ * Состояние пагинации источника. [pagesCompleted] — монотонный счётчик успешно завершённых страниц: растёт и для
+ * страницы без новых медиа (документы, дубликаты) и не растёт при сбое. Это устойчивый сигнал прогресса, а не булев
+ * флаг загрузки: быстрые переходы false→true→false между наблюдениями не схлопываются в ту же пару значений.
+ */
+data class ViewerPagination(val hasMore: Boolean, val isLoading: Boolean, val pagesCompleted: Int = 0) {
     companion object {
-        val NONE = ViewerPagination(hasMore = false, isLoading = false)
+        val NONE = ViewerPagination(hasMore = false, isLoading = false, pagesCompleted = 0)
     }
 }
 
+/** Последний запрос следующей страницы: позиция, с которой он сделан, и прогресс источника на момент запроса. */
+internal data class ViewerPageRequest(val settledIndex: Int, val pagesCompleted: Int)
+
 /**
- * Нужна ли следующая страница. Решение зависит от позиции и состояния источника, а не от числа медиа:
- * страница из одних документов или дубликатов не меняет размер списка, но всё равно должна продолжить подгрузку.
- * Запрос, пришедший во время загрузки, повторяется после её окончания (значения пересчитываются).
+ * Решение эффекта подгрузки просмотрщика (состояние держит composable между запусками эффекта).
+ * Автоматический повтор возможен только после успешно завершённой страницы (рост [ViewerPagination.pagesCompleted]).
+ * Сбой прогресс не меняет, поэтому повторов без участия пользователя нет. Навигация на другую страницу у края —
+ * явный повтор пользователя: новый запрос допустим, даже если прогресс не менялся.
  */
-internal fun shouldRequestNextPage(
-    settledIndex: Int,
-    itemCount: Int,
-    pagination: ViewerPagination,
-    prefetchDistance: Int = 3,
-): Boolean = pagination.hasMore && !pagination.isLoading &&
-    shouldLoadMoreAtPagerEdge(settledIndex, itemCount, prefetchDistance)
+internal class ViewerPageRequestTracker(private val prefetchDistance: Int = 3) {
+    private var last: ViewerPageRequest? = null
+
+    fun shouldRequest(settledIndex: Int, itemCount: Int, pagination: ViewerPagination): Boolean {
+        if (!pagination.hasMore || pagination.isLoading) return false
+        if (!shouldLoadMoreAtPagerEdge(settledIndex, itemCount, prefetchDistance)) return false
+        val previous = last
+        val allowed = previous == null ||
+            previous.pagesCompleted != pagination.pagesCompleted ||
+            previous.settledIndex != settledIndex
+        if (allowed) last = ViewerPageRequest(settledIndex, pagination.pagesCompleted)
+        return allowed
+    }
+}
 
 /** Представление фото, которое грузится в просмотрщике: полноразмерный оригинал или JPEG-вид. */
 internal enum class ViewerRepresentation { ORIGINAL, JPEG_VIEW }

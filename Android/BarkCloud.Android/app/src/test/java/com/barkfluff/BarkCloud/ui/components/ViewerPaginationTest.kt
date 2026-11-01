@@ -5,41 +5,87 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Эффект подгрузки в composable перезапускается по ключам (позиция, число медиа, ViewerPagination) и
+ * передаёт состояние трекеру. Тесты проводят последовательности таких наблюдений, а не отдельные предикаты.
+ */
 class ViewerPaginationTest {
+    private val edge = 98          // у края: до конца 100 элементов меньше трёх страниц
+    private val size = 100
+
     @Test
-    fun documentsOnlyPageKeepsTheSameSizeButStillContinuesLoading() {
-        var pagination = ViewerPagination(hasMore = true, isLoading = false)
-        assertTrue(shouldRequestNextPage(settledIndex = 97, itemCount = 100, pagination = pagination))
+    fun fastEmptyDocumentPageContinuesPagingEvenWhenLoadingFlagIsConflated() {
+        val tracker = ViewerPageRequestTracker()
+        assertTrue(tracker.shouldRequest(edge, size, ViewerPagination(hasMore = true, isLoading = false, pagesCompleted = 0)))
 
-        pagination = pagination.copy(isLoading = true)
-        assertFalse(shouldRequestNextPage(97, 100, pagination))
-
-        // Загруженная страница из документов не меняет число медиа (100), но запрос должен повториться.
-        pagination = pagination.copy(isLoading = false)
-        assertTrue(shouldRequestNextPage(97, 100, pagination))
+        // Страница из одних документов завершилась очень быстро: наблюдатель видит только итоговое состояние.
+        // Число медиа не менялось, но прогресс вырос, поэтому подгрузка продолжается.
+        assertTrue(tracker.shouldRequest(edge, size, ViewerPagination(hasMore = true, isLoading = false, pagesCompleted = 1)))
     }
 
     @Test
-    fun duplicateOnlyPageIsReevaluatedAfterCompletion() {
-        val before = listOf("a", "b", "c")
-        assertEquals(3, before.distinct().size)
-        var pagination = ViewerPagination(hasMore = true, isLoading = true)
-        assertFalse(shouldRequestNextPage(settledIndex = 1, itemCount = 3, pagination = pagination))
+    fun duplicateOnlyPageAlsoContinuesPaging() {
+        val tracker = ViewerPageRequestTracker()
+        tracker.shouldRequest(edge, size, ViewerPagination(true, false, 0))
 
-        // Дубликаты не добавляют элементов; после окончания загрузки запрос снова допустим.
-        pagination = pagination.copy(isLoading = false)
-        assertTrue(shouldRequestNextPage(settledIndex = 1, itemCount = 3, pagination = pagination))
+        // Дубликаты не добавляют элементов; успешная страница всё равно двигает прогресс.
+        assertTrue(tracker.shouldRequest(edge, size, ViewerPagination(true, false, 1)))
+        assertFalse(tracker.shouldRequest(edge, size, ViewerPagination(true, false, 1)))
     }
 
     @Test
-    fun requestBlockedWhileInitialLoadIsBusyIsSentOnceItCompletes() {
-        assertFalse(shouldRequestNextPage(settledIndex = 98, itemCount = 100, pagination = ViewerPagination(true, true)))
-        assertTrue(shouldRequestNextPage(settledIndex = 98, itemCount = 100, pagination = ViewerPagination(true, false)))
+    fun repeatedFailuresDoNotRetryAutomatically() {
+        val tracker = ViewerPageRequestTracker()
+        var requests = 0
+        if (tracker.shouldRequest(edge, size, ViewerPagination(true, false, 0))) requests++
+
+        // Запрос провалился: загрузка сбросилась (isLoading=false), прогресс не изменился, курсор тот же.
+        // Каждое наблюдение эффекта — без автоматического повтора.
+        repeat(5) {
+            assertFalse(tracker.shouldRequest(edge, size, ViewerPagination(true, true, 0)))
+            if (tracker.shouldRequest(edge, size, ViewerPagination(true, false, 0))) requests++
+        }
+
+        assertEquals(1, requests)
     }
 
     @Test
-    fun exhaustedSourceNeverRequestsAndEmptyListNeverRequests() {
-        assertFalse(shouldRequestNextPage(settledIndex = 99, itemCount = 100, pagination = ViewerPagination(false, false)))
-        assertFalse(shouldRequestNextPage(settledIndex = 0, itemCount = 0, pagination = ViewerPagination(true, false)))
+    fun explicitUserNavigationAfterFailureRetriesOnce() {
+        val tracker = ViewerPageRequestTracker()
+        assertTrue(tracker.shouldRequest(edge, size, ViewerPagination(true, false, 0)))
+        assertFalse(tracker.shouldRequest(edge, size, ViewerPagination(true, false, 0)))
+
+        // Пользователь листает на соседнюю страницу у края: это явный повтор.
+        assertTrue(tracker.shouldRequest(edge - 1, size, ViewerPagination(true, false, 0)))
+        assertFalse(tracker.shouldRequest(edge - 1, size, ViewerPagination(true, false, 0)))
+    }
+
+    @Test
+    fun initiallyBusyLoadIsRequestedOnceItCompletes() {
+        val tracker = ViewerPageRequestTracker()
+        assertFalse(tracker.shouldRequest(edge, size, ViewerPagination(true, isLoading = true, pagesCompleted = 0)))
+        assertTrue(tracker.shouldRequest(edge, size, ViewerPagination(true, isLoading = false, pagesCompleted = 1)))
+    }
+
+    @Test
+    fun paginationStopsWhenSourceIsExhaustedOrAwayFromTheEdge() {
+        val tracker = ViewerPageRequestTracker()
+        assertFalse(tracker.shouldRequest(edge, size, ViewerPagination(hasMore = false, isLoading = false, pagesCompleted = 3)))
+        assertFalse(tracker.shouldRequest(0, size, ViewerPagination(hasMore = true, isLoading = false, pagesCompleted = 3)))
+        assertFalse(tracker.shouldRequest(edge, 0, ViewerPagination(hasMore = true, isLoading = false, pagesCompleted = 3)))
+    }
+
+    @Test
+    fun successfulPagesContinueUntilTheSourceIsExhausted() {
+        val tracker = ViewerPageRequestTracker()
+        var progress = 0
+        var requests = 0
+        // Каждая страница успешна и приносит новые элементы; на четвёртой источник исчерпан.
+        for (page in 1..4) {
+            val hasMore = page < 4
+            if (tracker.shouldRequest(edge, size, ViewerPagination(hasMore, false, progress))) requests++
+            progress++
+        }
+        assertEquals(3, requests)
     }
 }

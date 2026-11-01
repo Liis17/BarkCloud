@@ -70,7 +70,11 @@ fun SearchScreen(
         assets = viewerAssets,
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
-        pagination = ViewerPagination(hasMore = viewerSectionResult?.hasMore == true, isLoading = state.isLoading),
+        pagination = ViewerPagination(
+            hasMore = viewerSectionResult?.hasMore == true,
+            isLoading = state.isLoading,
+            pagesCompleted = viewerSection?.let { state.pagesCompleted[it] } ?: 0,
+        ),
         onPageNearEnd = {
             state.sections.firstOrNull { it.section == viewerSection }?.let { viewModel.loadMore(it) }
         },

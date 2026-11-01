@@ -67,7 +67,7 @@ fun SharedWithMeScreen(
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
         infoEnabled = false,
-        pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore),
+        pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore, pagesCompleted = state.pagesCompleted),
         onPageNearEnd = { viewModel.loadMore() },
     )
 

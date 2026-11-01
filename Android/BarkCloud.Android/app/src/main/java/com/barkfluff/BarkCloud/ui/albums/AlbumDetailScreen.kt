@@ -163,7 +163,7 @@ fun AlbumDetailScreen(
             selectedAsset = viewer,
             onDismiss = { viewer = null },
             onDelete = { item -> viewModel.deleteFile(item.id) },
-            pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore),
+            pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore, pagesCompleted = state.pagesCompleted),
             onPageNearEnd = { viewModel.loadMore() },
         )
     }
