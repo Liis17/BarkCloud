@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 fun interface AndroidReleaseFetcher {
-    suspend fun fetchLatest(): AndroidReleaseMetadata
+    suspend fun fetchLatest(includePrerelease: Boolean): AndroidReleaseMetadata
 }
 
 class GitHubReleaseClient(
@@ -22,10 +22,18 @@ class GitHubReleaseClient(
         .build(),
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val apiUrl: String = LATEST_RELEASE_URL,
+    private val newestApiUrl: String = NEWEST_RELEASE_URL,
 ) : AndroidReleaseFetcher {
-    override suspend fun fetchLatest(): AndroidReleaseMetadata = withContext(Dispatchers.IO) {
-        val apiBytes = getBytes(apiUrl, AndroidReleaseParser.MAX_JSON_BYTES)
-        val release = AndroidReleaseParser.parseLatest(apiBytes.toString(Charsets.UTF_8))
+    override suspend fun fetchLatest(includePrerelease: Boolean): AndroidReleaseMetadata = withContext(Dispatchers.IO) {
+        val json = getBytes(
+            if (includePrerelease) newestApiUrl else apiUrl,
+            AndroidReleaseParser.MAX_JSON_BYTES,
+        ).toString(Charsets.UTF_8)
+        val release = if (includePrerelease) {
+            AndroidReleaseParser.parseNewest(json)
+        } else {
+            AndroidReleaseParser.parseLatest(json)
+        }
         if (release.assets.none { it.name == AndroidReleaseParser.MANIFEST_NAME }) {
             throw MissingUpdaterMetadataException(release.tag)
         }
@@ -85,6 +93,7 @@ class GitHubReleaseClient(
 
     companion object {
         const val LATEST_RELEASE_URL = "https://api.github.com/repos/Liis17/BarkCloud/releases/latest"
+        const val NEWEST_RELEASE_URL = "https://api.github.com/repos/Liis17/BarkCloud/releases?per_page=1"
         private const val FALLBACK_RATE_LIMIT_MILLIS = 60L * 60 * 1000
     }
 }

@@ -23,6 +23,10 @@ class AndroidUpdatesViewModel(private val repository: AndroidUpdateRepository) :
     }
 
     fun manualRefresh() = runAction { repository.checkForPage(force = true) }
+    fun setBetaChannel(enabled: Boolean) = runAction {
+        repository.setBetaChannel(enabled)
+        repository.checkForPage(force = true)
+    }
     fun download() = runAction { repository.startDownload() }
     fun cancelDownload() = runAction { repository.cancelDownload() }
     fun deleteDownloadedUpdate() = runAction { repository.deleteDownloadedUpdate() }
