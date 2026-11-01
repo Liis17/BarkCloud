@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.barkfluff.BarkCloud.data.upload.UploadJob
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
+import com.barkfluff.BarkCloud.data.upload.UploadRunTally
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -31,6 +32,23 @@ interface UploadDao {
 
     @Query("SELECT COUNT(*) FROM upload_jobs WHERE source != 'BACKUP' AND phase IN ('QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'ATTACHING')")
     suspend fun activeNonBackupCount(): Int
+
+    /**
+     * Счёт прохода одним запросом (один снимок БД). Backup исключается, когда политика сети его
+     * блокирует; `failed` считается только для [failedIds] — ошибок этого прохода.
+     */
+    @Query(
+        """
+        SELECT
+            COUNT(CASE WHEN phase = 'COMPLETED' AND completedAtMillis >= :sinceMillis THEN 1 END) AS done,
+            COUNT(CASE WHEN (:includeBackup = 1 OR source != 'BACKUP')
+                AND phase IN ('QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'ATTACHING') THEN 1 END) AS remaining,
+            COUNT(CASE WHEN (:includeBackup = 1 OR source != 'BACKUP')
+                AND phase IN ('FAILED', 'UPLOADED_NOT_ATTACHED') AND id IN (:failedIds) THEN 1 END) AS failed
+        FROM upload_jobs
+        """
+    )
+    suspend fun runTally(sinceMillis: Long, includeBackup: Boolean, failedIds: List<String>): UploadRunTally
 
     @Query("SELECT COUNT(*) FROM upload_jobs WHERE source = 'BACKUP' AND stagedFilePath IS NOT NULL AND phase NOT IN ('COMPLETED', 'CANCELLED')")
     suspend fun stagedBackupCount(): Int
