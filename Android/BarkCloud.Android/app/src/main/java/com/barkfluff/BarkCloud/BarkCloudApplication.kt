@@ -20,6 +20,7 @@ import com.barkfluff.BarkCloud.data.AuthFlowRepository
 import com.barkfluff.BarkCloud.data.PendingRegistrationStore
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.SessionManager
+import com.barkfluff.BarkCloud.data.SessionForegroundObserver
 import com.barkfluff.BarkCloud.data.cache.FileCacheService
 import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.data.cache.CacheScope
@@ -195,6 +196,10 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         appLockManager = AppLockManager(appLockStore)
         androidUpdateRepository = AndroidUpdateRepository(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(SessionForegroundObserver(appScope) {
+            grpcManager.validAccessToken()
+            Unit
+        })
         appScope.launch {
             fileCache.runStartupSweepIfNeeded()
             observeUploadStartupForSession(
