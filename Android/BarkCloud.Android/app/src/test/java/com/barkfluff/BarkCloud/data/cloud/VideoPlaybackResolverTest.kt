@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 
 class VideoPlaybackResolverTest {
     private val asset = MediaAsset(
@@ -30,7 +31,7 @@ class VideoPlaybackResolverTest {
     fun ownVideoWithoutCacheStreamsFreshTempUrl() = runBlocking {
         val cache = mockk<FileCacheService>()
         val transfer = mockk<FileTransferService>()
-        coEvery { cache.pinCachedOriginal("video-1", false) } returns null
+        coEvery { cache.pinCachedOriginal("video-1", false, any()) } returns null
         coEvery { transfer.tempDownloadUrls(listOf("video-1")) } returns mapOf("video-1" to "https://temp.example/v")
         var sharedCalls = 0
         val resolver = VideoPlaybackResolver(cache, transfer) { sharedCalls++; "unused" }
@@ -46,7 +47,7 @@ class VideoPlaybackResolverTest {
         val cache = mockk<FileCacheService>()
         val transfer = mockk<FileTransferService>()
         val file = File("cached-video.mp4")
-        coEvery { cache.pinCachedOriginal("video-1", false) } returns PinnedFile(file, FileCachePin(1L))
+        coEvery { cache.pinCachedOriginal("video-1", false, any()) } returns PinnedFile(file, FileCachePin(1L))
 
         val resolved = VideoPlaybackResolver(cache, transfer) { error("shared RPC must not run for own files") }.resolve(asset)
 
@@ -60,7 +61,7 @@ class VideoPlaybackResolverTest {
         val transfer = mockk<FileTransferService>()
         val order = mutableListOf<String>()
         val shared = asset.copy(origin = CloudMediaOrigin.SHARED)
-        coEvery { cache.pinCachedOriginal("video-1", true) } answers {
+        coEvery { cache.pinCachedOriginal("video-1", true, any()) } answers {
             order += "pin"
             null
         }
@@ -87,6 +88,25 @@ class VideoPlaybackResolverTest {
                 VideoPlaybackResolver(cache, transfer) { throw IOException("revoked") }.resolve(shared)
             }
         }
-        coVerify(exactly = 0) { cache.pinCachedOriginal(any(), any()) }
+        coVerify(exactly = 0) { cache.pinCachedOriginal(any(), any(), any()) }
+    }
+
+    @Test
+    fun cancellationBetweenAcquireAndReturnReleasesTheOwnedPin() {
+        val cache = mockk<FileCacheService>()
+        val transfer = mockk<FileTransferService>()
+        val pin = FileCachePin(7L)
+        coEvery { cache.pinCachedOriginal("video-1", false, any()) } coAnswers {
+            thirdArg<(FileCachePin) -> Unit>().invoke(pin)
+            throw CancellationException("cancelled after the pin was acquired")
+        }
+        coEvery { cache.unpin(pin) } returns Unit
+
+        assertThrows(CancellationException::class.java) {
+            runBlocking { VideoPlaybackResolver(cache, transfer) { error("unused") }.resolve(asset) }
+        }
+
+        coVerify(exactly = 1) { cache.unpin(pin) }
+        coVerify(exactly = 0) { transfer.tempDownloadUrls(any()) }
     }
 }
