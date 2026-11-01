@@ -16,7 +16,14 @@ import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudState
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteExecutor
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteItem
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
 import com.barkfluff.BarkCloud.data.gallery.MediaHasher
+import com.barkfluff.BarkCloud.data.gallery.planDeviceDelete
+import com.barkfluff.BarkCloud.data.gallery.resolveCloudCopies
+import com.barkfluff.BarkCloud.data.cloud.CloudCopy
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.MediaCloudStateDao
 import com.barkfluff.BarkCloud.data.upload.UploadDestination
@@ -77,6 +84,10 @@ class GalleryViewModel(
         presence = { hashes -> cloudRepository.checkFileHashesDetailed(hashes) },
     )
     private val mediaLoadMutex = Mutex()
+    private var pendingPlan: DeviceDeletePlan? = null
+    private var pendingHashes: Map<String, String> = emptyMap()
+    private val deviceDeleteExecutor: DeviceDeleteExecutor
+        get() = (appContext as BarkCloudApplication).deviceDeleteExecutor
 
     init {
         _state.update {
@@ -213,22 +224,35 @@ class GalleryViewModel(
         presence.request(media)
     }
 
-    /** Revalidates every candidate before Android shows its destructive system dialog. */
+    /**
+     * Перед системным диалогом очистки устройства: подтверждённая (пригодная для действия) облачная
+     * копия по хешу. Фото без такой копии не удаляются: «удалить с устройства» сохраняет облако.
+     */
     suspend fun prepareDeviceCopyDeletion(): List<DeviceMedia> {
         val localItems = DeviceMediaStore.query(appContext)
         _state.update { it.copy(items = localItems) }
         val items = localItems.filter { _state.value.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
-        val states = mediaDao.all().associateBy { it.mediaKey }
-        val hashes = items.mapNotNull { states[it.mediaKey]?.hash }.distinct()
-        if (hashes.isEmpty()) return emptyList()
-        val presence = cloudRepository.checkFileHashes(hashes)
-        return items.filter { media ->
-            val state = states[media.mediaKey]
-            val exists = state?.hash?.let { presence[it] } == true &&
-                state.sizeBytes == media.sizeBytes && state.dateModifiedSeconds == media.dateModifiedSeconds
-            if (!exists && state != null) mediaDao.upsert(state.copy(status = MediaCloudStatus.NOT_IN_CLOUD))
-            exists
-        }
+        val copies = resolveCloudCopies(items, hashOf = presence::hashOf, presence = cloudRepository::checkFileHashesDetailed)
+        return items.filter { copies[it.mediaKey] is CloudCopy.Present }
+    }
+
+    /**
+     * План удаления выбранных фото: [DeviceDeleteMode.KEEP_CLOUD] — только с подтверждённой копией,
+     * [DeviceDeleteMode.EVERYWHERE] — с устройства и все живые облачные копии. Хеши и состояния
+     * перепроверяются здесь же, сразу перед системным подтверждением.
+     */
+    internal suspend fun prepareDeviceDelete(mode: DeviceDeleteMode, mediaKeys: List<String>): DeviceDeletePlan {
+        val targets = selectedDeviceTargets(mediaKeys)
+        val copies = resolveCloudCopies(targets, hashOf = presence::hashOf, presence = cloudRepository::checkFileHashesDetailed)
+        val plan = planDeviceDelete(mode, targets.map { DeviceDeleteItem(it.mediaKey, copies[it.mediaKey] ?: CloudCopy.Unknown) })
+        pendingPlan = plan
+        pendingHashes = targets.mapNotNull { item -> presence.hashOf(item)?.let { item.mediaKey to it } }.toMap()
+        return plan
+    }
+
+    fun clearPendingDevicePlan() {
+        pendingPlan = null
+        pendingHashes = emptyMap()
     }
 
     internal fun selectedDeviceTargets(mediaKeys: List<String>): List<DeviceMedia> {
@@ -246,7 +270,12 @@ class GalleryViewModel(
                 selected = selection.keys,
             )
         }
-        viewModelScope.launch { mediaKeys.forEach { mediaDao.delete(it) } }
+        viewModelScope.launch {
+            mediaKeys.forEach {
+                mediaDao.delete(it)
+                (appContext as BarkCloudApplication).uploadQueue.cancelLiveForMediaKey(it)
+            }
+        }
     }
 
     suspend fun addFavorites(fileIds: List<String>): Set<String> {
@@ -270,8 +299,20 @@ class GalleryViewModel(
 
     internal fun abortSystemDelete() = deletionCoordinator.abortSystemConfirmation()
 
-    internal fun completeSystemDelete(pending: PendingPhotoDelete, approved: Boolean) =
+    /**
+     * Ответ системы. Облачные копии удаляются только после подтверждения и только для плана,
+     * которому соответствует запрос; отказ оставляет облако нетронутым.
+     */
+    internal fun completeSystemDelete(pending: PendingPhotoDelete, approved: Boolean) {
+        val plan = pendingPlan?.takeIf { it.devicePhotos == pending.deviceMediaKeys }
+        pendingPlan = null
+        val hashes = pendingHashes
+        pendingHashes = emptyMap()
+        if (approved && plan != null) {
+            viewModelScope.launch { deviceDeleteExecutor.finish(plan, hashes) }
+        }
         deletionCoordinator.completeSystemConfirmation(pending, approved)
+    }
 
     internal fun deleteCloudOnly(fileIds: List<String>, totalCount: Int = fileIds.size): Boolean {
         if (_state.value.isQueueing) return false
