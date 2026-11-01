@@ -494,4 +494,13 @@
     <string name="device_confirm_everywhere">Удалить %1$d фото с устройства и %2$d облачных копий? Облачные копии уйдут в корзину.</string>
     <string name="device_confirm_skipped">Пропущено (нет подтверждённого состояния облака): %1$d</string>
     <string name="device_staging_cancel">Остановить</string>
+    <string name="device_op_result">Удалено с устройства и облака: %1$d, сверено: %2$d, новых копий (нужно подтверждение): %3$d, не удалось: %4$d</string>
+    <string name="device_op_needs_unlock">Нужна разблокировка Vault для скрытых копий</string>
+    <string name="device_op_scope_changed">Аккаунт изменился: операция приостановлена</string>
+    <string name="device_op_awaiting">Удаление не подтверждено системой: отмените операцию или подтвердите заново</string>
+    <string name="device_op_login">Войдите в аккаунт, чтобы выполнить удаление</string>
+    <string name="device_delete_cancelled">Удаление отменено, облако не тронуто</string>
+    <string name="device_op_title">Незавершённое удаление: %1$d фото</string>
+    <string name="device_op_resume">Продолжить</string>
+    <string name="device_op_discard">Отменить</string>
 </resources>

@@ -20,6 +20,7 @@ import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteExecutor
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteItem
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
+import com.barkfluff.BarkCloud.data.gallery.HiddenDeviceSession
 import com.barkfluff.BarkCloud.data.gallery.MediaHasher
 import com.barkfluff.BarkCloud.data.gallery.planDeviceDelete
 import com.barkfluff.BarkCloud.data.gallery.resolveCloudCopies
@@ -84,8 +85,6 @@ class GalleryViewModel(
         presence = { hashes -> cloudRepository.checkFileHashesDetailed(hashes) },
     )
     private val mediaLoadMutex = Mutex()
-    private var pendingPlan: DeviceDeletePlan? = null
-    private var pendingHashes: Map<String, String> = emptyMap()
     private val deviceDeleteExecutor: DeviceDeleteExecutor
         get() = (appContext as BarkCloudApplication).deviceDeleteExecutor
 
@@ -241,18 +240,22 @@ class GalleryViewModel(
      * [DeviceDeleteMode.EVERYWHERE] — с устройства и все живые облачные копии. Хеши и состояния
      * перепроверяются здесь же, сразу перед системным подтверждением.
      */
-    internal suspend fun prepareDeviceDelete(mode: DeviceDeleteMode, mediaKeys: List<String>): DeviceDeletePlan {
+    internal suspend fun prepareDeviceDelete(mode: DeviceDeleteMode, mediaKeys: List<String>): PreparedDeviceDelete {
         val targets = selectedDeviceTargets(mediaKeys)
         val copies = resolveCloudCopies(targets, hashOf = presence::hashOf, presence = cloudRepository::checkFileHashesDetailed)
         val plan = planDeviceDelete(mode, targets.map { DeviceDeleteItem(it.mediaKey, copies[it.mediaKey] ?: CloudCopy.Unknown) })
-        pendingPlan = plan
-        pendingHashes = targets.mapNotNull { item -> presence.hashOf(item)?.let { item.mediaKey to it } }.toMap()
-        return plan
+        val hashes = targets.mapNotNull { item -> presence.hashOf(item)?.let { item.mediaKey to it } }.toMap()
+        return PreparedDeviceDelete(plan, hashes)
     }
 
-    fun clearPendingDevicePlan() {
-        pendingPlan = null
-        pendingHashes = emptyMap()
+    /** Операция фиксируется до системного диалога. Без входа в аккаунт не создаётся (возвращает null). */
+    internal suspend fun createDeviceDeleteOperation(prepared: PreparedDeviceDelete): String? {
+        val app = appContext as BarkCloudApplication
+        val scope = app.currentOperationScope() ?: return null
+        val vaultIds = app.vaultStore.items().map { it.fileId }.toSet()
+        return withContext(Dispatchers.IO) {
+            deviceDeleteExecutor.create(scope, prepared.plan, prepared.hashes, vaultIds).id
+        }
     }
 
     internal fun selectedDeviceTargets(mediaKeys: List<String>): List<DeviceMedia> {
@@ -312,12 +315,19 @@ class GalleryViewModel(
      * которому соответствует запрос; отказ оставляет облако нетронутым.
      */
     internal fun completeSystemDelete(pending: PendingPhotoDelete, approved: Boolean) {
-        val plan = pendingPlan?.takeIf { it.devicePhotos == pending.deviceMediaKeys }
-        pendingPlan = null
-        val hashes = pendingHashes
-        pendingHashes = emptyMap()
-        if (approved && plan != null) {
-            viewModelScope.launch { deviceDeleteExecutor.finish(plan, hashes) }
+        val operationId = pending.operationId
+        if (operationId != null) {
+            // Операция записана до диалога; одобрение фиксируется до облачных вызовов, отказ снимает её.
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    if (approved) {
+                        deviceDeleteExecutor.approve(operationId)
+                        deviceDeleteExecutor.runCloud(operationId, allowHidden = HiddenDeviceSession.unlocked)
+                    } else {
+                        deviceDeleteExecutor.deny(operationId)
+                    }
+                }
+            }
         }
         deletionCoordinator.completeSystemConfirmation(pending, approved)
     }
@@ -389,3 +399,6 @@ class GalleryViewModel(
         }
     }
 }
+
+/** Подготовленное удаление фото устройства: план и хеши, без состояния в полях ViewModel. */
+internal data class PreparedDeviceDelete(val plan: DeviceDeletePlan, val hashes: Map<String, String>)

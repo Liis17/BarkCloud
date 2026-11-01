@@ -43,7 +43,11 @@ import com.barkfluff.BarkCloud.data.upload.observeUploadStartupForSession
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.data.update.AndroidUpdateRepository
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteExecutor
-import com.barkfluff.BarkCloud.data.gallery.PendingCloudCleanupStore
+import com.barkfluff.BarkCloud.data.gallery.CloudDeleteAdapter
+import com.barkfluff.BarkCloud.data.gallery.DeviceCopyAdapter
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteOperationStore
+import com.barkfluff.BarkCloud.data.gallery.HiddenDeviceSession
+import com.barkfluff.BarkCloud.data.gallery.VaultAdapter
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.RoomFileCacheIndex
 import com.barkfluff.BarkCloud.data.vault.VaultStore
@@ -124,6 +128,8 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
 
     lateinit var vaultStore: VaultStore
 
+    internal lateinit var deviceDeleteStore: DeviceDeleteOperationStore
+
     internal lateinit var deviceDeleteExecutor: DeviceDeleteExecutor
         private set
 
@@ -165,11 +171,14 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         vaultStore = VaultStore(this)
+        deviceDeleteStore = DeviceDeleteOperationStore(File(filesDir, "device_delete_ops.json"))
         deviceDeleteExecutor = DeviceDeleteExecutor(
-            cloudRepository,
-            uploadQueue,
-            BarkCloudDatabase.get(this).mediaCloudStateDao(),
-            PendingCloudCleanupStore(this),
+            cloud = CloudDeleteAdapter(cloudRepository),
+            device = DeviceCopyAdapter(uploadQueue, BarkCloudDatabase.get(this).mediaCloudStateDao()),
+            vault = VaultAdapter(vaultStore),
+            store = deviceDeleteStore,
+            currentScope = ::currentOperationScope,
+            hiddenUnlocked = { HiddenDeviceSession.unlocked },
         )
         appScope.launch {
             // Удалённый из облака файл больше не присутствует на устройстве (для всех экранов разом).
@@ -248,6 +257,12 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         serverKey = ServerSettings.serverKey,
         accountId = globalParam.userId ?: CacheScope.UNKNOWN_ACCOUNT,
     )
+
+    /** Канонический сервер и аккаунт для durable-операций; без входа операции недоступны. */
+    internal fun currentOperationScope(): CacheScope? {
+        val accountId = globalParam.userId?.takeIf { it.isNotBlank() } ?: return null
+        return CacheScope(serverKey = ServerSettings.serverKey, accountId = accountId)
+    }
 
     private companion object {
         const val PREVIEW_CACHE_MAX_BYTES = 256L * 1024L * 1024L

@@ -109,8 +109,10 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { revision++ }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { revision++; backupRevision++ }
 
+    // Идентификатор операции, ожидающей системного ответа: читается в момент результата.
+    val awaitingOperationId by rememberUpdatedState(state.awaitingSystemOperationId)
     val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        viewModel.onSystemDeleteResult(result.resultCode == Activity.RESULT_OK)
+        awaitingOperationId?.let { viewModel.onSystemDeleteResult(it, result.resultCode == Activity.RESULT_OK) }
     }
 
     suspend fun reload() {
@@ -132,7 +134,6 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
         }
     }
     LaunchedEffect(revision) { reload() }
-    LaunchedEffect(hasAccess) { if (hasAccess) viewModel.retryPendingCloudCleanup() }
     LaunchedEffect(state.snackbar) {
         val message = state.snackbar ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
@@ -143,7 +144,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
     val selected = folders.firstOrNull { it.key == selectedKey }
     val selecting = state.selected.isNotEmpty()
     val back = { if (selectedKey != null) selectedKey = null else onNavigateUp() }
-    BackHandler(enabled = state.busy || state.staging != null) { /* операция выполняется: навигация заблокирована */ }
+    BackHandler(enabled = state.busy || state.staging != null || state.awaitingSystemOperationId != null) { /* операция выполняется или ждёт системы: навигация заблокирована */ }
     BackHandler(enabled = selecting && !state.busy) { viewModel.clearSelection() }
     BackHandler(enabled = selectedKey != null && !selecting && !state.busy) { selectedKey = null }
 
@@ -158,26 +159,29 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
     )
 
     // Удаление локальных копий: системное подтверждение; отказ не трогает облако.
-    LaunchedEffect(state.systemDeleteUris) {
-        val uris = state.systemDeleteUris ?: return@LaunchedEffect
+    // Системный запрос на удаление локальных копий: операция уже записана до показа диалога.
+    LaunchedEffect(state.systemDelete) {
+        val request = state.systemDelete ?: return@LaunchedEffect
         viewModel.systemDeleteRequested()
         try {
-            val request = MediaStore.createDeleteRequest(context.contentResolver, uris)
-            deleteLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
+            val intent = MediaStore.createDeleteRequest(context.contentResolver, request.uris)
+            deleteLauncher.launch(IntentSenderRequest.Builder(intent.intentSender).build())
         } catch (e: Exception) {
-            viewModel.onSystemDeleteResult(false)
+            viewModel.onSystemDeleteResult(request.operationId, approved = false)
             snackbarHostState.showSnackbar(e.message ?: context.getString(R.string.common_error_generic))
         }
     }
-    // Разблокировка vault для действий над скрытыми копиями.
-    LaunchedEffect(state.unlockRequired) {
-        if (!state.unlockRequired || activity == null) {
-            if (state.unlockRequired) viewModel.onUnlockResult(false)
+    // Разблокировка Vault для скрытых копий: результат применяется к отложенному действию.
+    LaunchedEffect(state.unlockFor) {
+        if (state.unlockFor == null) return@LaunchedEffect
+        if (activity == null) {
+            viewModel.onUnlockResult(false)
             return@LaunchedEffect
         }
         val granted = BiometricGate.authenticate(activity, context.getString(R.string.vault_unlock_button))
         viewModel.onUnlockResult(granted)
     }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onScreenStopped() }
 
     Box(Modifier.fillMaxSize()) {
     RefreshableContentSurface(
@@ -305,6 +309,18 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                items(
+                    state.operations,
+                    key = { "operation-${it.id}" },
+                    span = { GridItemSpan(maxLineSpan) },
+                ) { operation ->
+                    OperationBanner(
+                        operation = operation,
+                        enabled = !state.busy,
+                        onResume = { viewModel.resumeOperation(operation.id) },
+                        onDiscard = { viewModel.discardOperation(operation.id) },
+                    )
+                }
                 items(folders, key = { it.key }) { folder ->
                     ElevatedCard(Modifier.fillMaxWidth().clickable { selectedKey = folder.key }) {
                         AsyncImage(folder.media.first().localPreviewModel(512), folder.name, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop)
@@ -403,6 +419,32 @@ private fun DeviceMediaCell(
                 tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
                 modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp),
             )
+        }
+    }
+}
+
+/**
+ * Незавершённое удаление после перезапуска или блокировки. Подтверждённую операцию можно продолжить;
+ * неподтверждённую системой — только отменить (облако при этом не трогается).
+ */
+@Composable
+private fun OperationBanner(
+    operation: OperationSummary,
+    enabled: Boolean,
+    onResume: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.device_op_title, operation.photos), style = MaterialTheme.typography.titleSmall)
+            if (operation.hidden) Text(stringResource(R.string.device_op_needs_unlock), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                if (operation.phase == com.barkfluff.BarkCloud.data.gallery.DeleteOpPhase.APPROVED) {
+                    TextButton(onClick = onResume, enabled = enabled) { Text(stringResource(R.string.device_op_resume)) }
+                } else {
+                    TextButton(onClick = onDiscard, enabled = enabled) { Text(stringResource(R.string.device_op_discard)) }
+                }
+            }
         }
     }
 }

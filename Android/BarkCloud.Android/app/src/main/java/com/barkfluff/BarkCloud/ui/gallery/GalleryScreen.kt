@@ -403,13 +403,14 @@ fun GalleryScreen(
     /** План проверяется сейчас (хеши и облако), число копий показывается до системного диалога. */
     fun beginDeviceDelete(mode: DeviceDeleteMode, deviceMediaKeys: List<String>, cloudIds: List<String>) {
         scope.launch {
-            val plan = viewModel.prepareDeviceDelete(mode, deviceMediaKeys)
+            val prepared = viewModel.prepareDeviceDelete(mode, deviceMediaKeys)
+            val plan = prepared.plan
             if (plan.devicePhotos.isEmpty()) {
-                viewModel.clearPendingDevicePlan()
+
                 snackbarHostState.showSnackbar(context.getString(R.string.device_delete_nothing))
                 return@launch
             }
-            deviceConfirm = DeviceDeleteConfirm(plan, cloudIds)
+            deviceConfirm = DeviceDeleteConfirm(prepared, cloudIds)
         }
     }
 
@@ -595,9 +596,9 @@ fun GalleryScreen(
     }
 
     deviceConfirm?.let { confirm ->
-        val plan = confirm.plan
+        val plan = confirm.prepared.plan
         AlertDialog(
-            onDismissRequest = { deviceConfirm = null; viewModel.clearPendingDevicePlan() },
+            onDismissRequest = { deviceConfirm = null },
             title = { Text(stringResource(R.string.gallery_delete_selected_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -614,19 +615,27 @@ fun GalleryScreen(
             confirmButton = {
                 TextButton(onClick = {
                     deviceConfirm = null
-                    val targets = viewModel.selectedDeviceTargets(plan.devicePhotos)
-                    launchSystemDelete(
-                        PendingPhotoDelete(
-                            deviceMediaKeys = plan.devicePhotos,
-                            cloudFileIds = confirm.cloudIds,
-                            totalCount = plan.devicePhotos.size + confirm.cloudIds.size,
-                        ),
-                        targets.map { it.uri },
-                    )
+                    scope.launch {
+                        val operationId = viewModel.createDeviceDeleteOperation(confirm.prepared)
+                        if (operationId == null) {
+                            snackbarHostState.showSnackbar(context.getString(R.string.device_op_login))
+                            return@launch
+                        }
+                        val targets = viewModel.selectedDeviceTargets(plan.devicePhotos)
+                        launchSystemDelete(
+                            PendingPhotoDelete(
+                                deviceMediaKeys = plan.devicePhotos,
+                                cloudFileIds = confirm.cloudIds,
+                                totalCount = plan.devicePhotos.size + confirm.cloudIds.size,
+                                operationId = operationId,
+                            ),
+                            targets.map { it.uri },
+                        )
+                    }
                 }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { deviceConfirm = null; viewModel.clearPendingDevicePlan() }) {
+                TextButton(onClick = { deviceConfirm = null }) {
                     Text(stringResource(R.string.common_cancel))
                 }
             },
@@ -916,4 +925,4 @@ private fun GalleryCell(
 }
 
 /** Подтверждаемый план удаления фото устройства и выбранные облачные элементы. */
-private data class DeviceDeleteConfirm(val plan: DeviceDeletePlan, val cloudIds: List<String>)
+private data class DeviceDeleteConfirm(val prepared: PreparedDeviceDelete, val cloudIds: List<String>)
