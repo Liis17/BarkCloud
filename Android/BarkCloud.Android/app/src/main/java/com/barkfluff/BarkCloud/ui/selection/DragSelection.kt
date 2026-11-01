@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
+import com.barkfluff.BarkCloud.ui.components.SelectionHaptics
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
@@ -208,6 +209,7 @@ internal fun <K> rememberDragSelection(
     onDragActiveChange: (Boolean) -> Unit,
 ): DragSelectController<K> {
     val scope = rememberCoroutineScope()
+    SelectionHaptics(selected)
     val density = LocalDensity.current
     val edgePx = with(density) { AUTO_SCROLL_EDGE.toPx() }
     val maxStepPx = with(density) { AUTO_SCROLL_MAX_STEP.toPx() }

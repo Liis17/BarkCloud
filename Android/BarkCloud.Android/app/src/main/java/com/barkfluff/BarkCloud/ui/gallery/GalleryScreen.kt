@@ -51,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.barkfluff.BarkCloud.ui.components.PullRefreshHaptics
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -448,6 +449,7 @@ fun GalleryScreen(
             },
         )
 
+        PullRefreshHaptics(pullToRefreshState, refreshing)
         PullToRefreshBox(
             state = pullToRefreshState,
             isRefreshing = refreshing,

@@ -116,6 +116,7 @@ internal fun RefreshableContentSurface(
     val thresholdPx = with(LocalDensity.current) { PullToRefreshDefaults.PositionalThreshold.toPx() }
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
+    PullRefreshHaptics(state, refreshing)
     // Индикатор проявляется вместе с оттягиванием и держится полностью видимым во время обновления;
     // заголовок уходит ровно на обратную величину, поэтому переход идёт без скачков.
     val indicatorAlpha = { if (refreshing) 1f else state.distanceFraction.coerceIn(0f, 1f) }
