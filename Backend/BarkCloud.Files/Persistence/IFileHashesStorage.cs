@@ -2,8 +2,8 @@ using BarkCloud.Files.Domain;
 
 namespace BarkCloud.Files.Persistence;
 
-/// <summary>Живая запись владельца с хешем: блоб и признак его готовности (READY).</summary>
-public sealed record OwnerHashMatch(string Hash, Guid FileId, bool IsReady);
+/// <summary>Живая запись владельца с хешем: блоб и признак, что его можно действием использовать (READY и владелец — в Uploaders).</summary>
+public sealed record OwnerHashMatch(string Hash, Guid FileId, bool IsActionable);
 
 public interface IFileHashesStorage
 {

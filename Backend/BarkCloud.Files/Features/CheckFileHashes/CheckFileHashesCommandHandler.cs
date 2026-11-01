@@ -68,7 +68,7 @@ public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHa
             {
                 // Только READY-блобы; порядок фиксирован, чтобы клиент детерминированно выбирал ID.
                 result.FileIds.AddRange(hashMatches
-                    .Where(m => m.IsReady)
+                    .Where(m => m.IsActionable)
                     .Select(m => m.FileId.ToString())
                     .Distinct()
                     .Order(StringComparer.Ordinal));

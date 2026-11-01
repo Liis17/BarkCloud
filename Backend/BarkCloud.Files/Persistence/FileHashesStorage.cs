@@ -68,7 +68,7 @@ public class FileHashesStorage : IFileHashesStorage
     /// <summary>
     /// Пакетная проверка, ограниченная файлами ТЕКУЩЕГО пользователя: возвращает совпадения хешей с
     /// живыми (не в корзине) записями владельца в облаке. Блобы, не READY, тоже возвращаются —
-    /// признак <see cref="OwnerHashMatch.IsReady"/> отделяет «есть, но не готов» от действуемых ID.
+    /// признак <see cref="OwnerHashMatch.IsActionable"/> отделяет «есть, но не годится для действий» от пригодных ID.
     /// Так дедуп-подсказка не раскрывает наличие файлов других пользователей. Ожидает нормализованные (lowercase) хеши.
     /// </summary>
     public async Task<List<OwnerHashMatch>> GetLiveHashMatchesForOwner(long ownerId, IReadOnlyCollection<string> hashes, CancellationToken cancellationToken = default)
@@ -83,7 +83,7 @@ public class FileHashesStorage : IFileHashesStorage
             .Select(h => new OwnerHashMatch(
                 h.Hash,
                 h.FileId,
-                _context.UploadedFiles.WhereReady().Any(f => f.Id == h.FileId)))
+                _context.UploadedFiles.WhereReady().Any(f => f.Id == h.FileId && f.Uploaders.Contains(ownerId))))
             .ToListAsync(cancellationToken);
     }
 
