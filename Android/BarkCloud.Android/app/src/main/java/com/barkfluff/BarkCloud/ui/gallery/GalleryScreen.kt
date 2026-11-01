@@ -93,6 +93,7 @@ import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.RefreshContentSurface
 import com.barkfluff.BarkCloud.ui.components.RefreshIndicator
@@ -611,6 +612,10 @@ fun GalleryScreen(
         assets = cloudAssets,
         selectedAsset = cloudViewer,
         onDismiss = { cloudViewer = null },
+        pagination = ViewerPagination(
+            hasMore = cloudPhotos.canLoadMore || cloudVideos.canLoadMore,
+            isLoading = cloudPhotos.isLoadingMore || cloudVideos.isLoadingMore,
+        ),
         onDelete = { item ->
             if (!viewModel.deleteCloudFromViewer(item.id)) throw IllegalStateException()
         },

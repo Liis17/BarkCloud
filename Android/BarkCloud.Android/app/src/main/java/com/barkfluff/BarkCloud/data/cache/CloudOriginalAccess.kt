@@ -30,3 +30,18 @@ internal suspend fun FileCacheService.invalidateCloudOriginal(asset: MediaAsset)
         CloudMediaOrigin.SHARED -> invalidateSharedOriginal(asset.id)
     }
 }
+
+/**
+ * JPEG-вид облачного фото. Для общего файла авторизация через shared RPC выполняется до любого чтения кеша:
+ * отозванный доступ не должен отдать закешированную полноразмерную копию.
+ */
+internal suspend fun <T> withCloudJpegView(
+    asset: MediaAsset,
+    cache: FileCacheService,
+    sharedDownloadUrl: suspend (fileId: String) -> String,
+    model: CloudImageModel,
+    action: suspend (File) -> T,
+): T {
+    if (asset.origin == CloudMediaOrigin.SHARED) sharedDownloadUrl(asset.id)
+    return cache.withLoadedPinnedJpegView(asset.id, model.url, model.previewFileId, action)
+}

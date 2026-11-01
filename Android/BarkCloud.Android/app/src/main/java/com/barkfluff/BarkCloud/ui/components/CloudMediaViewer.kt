@@ -93,6 +93,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.CacheInvalidatedException
 import com.barkfluff.BarkCloud.data.cache.CloudImageModel
 import com.barkfluff.BarkCloud.data.cache.invalidateCloudOriginal
+import com.barkfluff.BarkCloud.data.cache.withCloudJpegView
 import com.barkfluff.BarkCloud.data.cache.withCloudOriginal
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaOrigin
@@ -315,6 +316,7 @@ fun CloudMediaViewer(
     onDismiss: () -> Unit,
     infoEnabled: Boolean = true,
     onDelete: (suspend (MediaAsset) -> Unit)? = null,
+    pagination: ViewerPagination = ViewerPagination.NONE,
     onPageNearEnd: (() -> Unit)? = null,
 ) {
     val visibility = remember { MutableTransitionState(false) }
@@ -360,6 +362,7 @@ fun CloudMediaViewer(
                             onDismiss = onDismiss,
                             infoEnabled = infoEnabled,
                             onDelete = onDelete,
+                            pagination = pagination,
                             onPageNearEnd = onPageNearEnd,
                         )
                     }
@@ -378,6 +381,7 @@ private fun CloudMediaViewerContent(
     onDismiss: () -> Unit,
     infoEnabled: Boolean,
     onDelete: (suspend (MediaAsset) -> Unit)?,
+    pagination: ViewerPagination,
     onPageNearEnd: (() -> Unit)?,
 ) {
     val context = LocalContext.current
@@ -388,15 +392,16 @@ private fun CloudMediaViewerContent(
     var panelExpanded by remember { mutableStateOf(false) }
     // Плеер создаётся при первом видео: фото-просмотр не держит декодер.
     val currentAssets by rememberUpdatedState(assets)
+    // Гейт общий для просмотрщика: фон закрывает его синхронно, даже если плеер ещё не создан.
+    val playbackGate = remember { ViewerPlaybackGate() }
+    val sharedDownloadUrl: suspend (String) -> String = { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) }
     val videoSession = remember {
         lazy {
             val engine = ExoVideoPlaybackEngine(context.applicationContext, InsecureHttp.streaming)
-            val resolver = VideoPlaybackResolver(app.fileCache, app.fileTransfer) { fileId ->
-                app.sharedRepository.getSharedFileDownloadUrl(fileId)
-            }
+            val resolver = VideoPlaybackResolver(app.fileCache, app.fileTransfer, sharedDownloadUrl)
             ViewerVideoSession(
                 engine = engine,
-                controller = ViewerVideoController(engine, scope, app.appScope) { id ->
+                controller = ViewerVideoController(engine, scope, app.appScope, playbackGate) { id ->
                     resolver.resolve(currentAssets.firstOrNull { it.viewerId == id } ?: throw IOException("Видео не найдено"))
                 },
             )
@@ -405,9 +410,16 @@ private fun CloudMediaViewerContent(
     val appLocked by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        // Фон останавливает звук сразу; после возврата воспроизведение запускает только действие пользователя.
+        // Фон закрывает гейт синхронно и останавливает звук; после возврата любой старт ждёт действия пользователя.
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && videoSession.isInitialized()) videoSession.value.controller.stop()
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    playbackGate.onBackground()
+                    if (videoSession.isInitialized()) videoSession.value.controller.stop()
+                }
+                Lifecycle.Event.ON_START -> playbackGate.onForeground()
+                else -> Unit
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
@@ -479,8 +491,9 @@ private fun CloudMediaViewerContent(
         previousSettledAssetId = settledAsset.viewerId
     }
 
-    LaunchedEffect(pagerState.settledPage, assets.size) {
-        if (shouldLoadMoreAtPagerEdge(pagerState.settledPage, assets.size)) onPageNearEnd?.invoke()
+    // Пейджер перепроверяет запрос при каждом изменении источника: загрузка завершилась, страница пришла.
+    LaunchedEffect(pagerState.settledPage, assets.size, pagination) {
+        if (shouldRequestNextPage(pagerState.settledPage, assets.size, pagination)) onPageNearEnd?.invoke()
     }
 
     LaunchedEffect(isOpen, currentAsset.viewerId, retryCount, useJpegView) {
@@ -492,17 +505,14 @@ private fun CloudMediaViewerContent(
                     return@LaunchedEffect
                 }
                 imageState = ViewerImageState.Loading
-                app.fileCache.withLoadedPinnedJpegView(currentAsset.id, model.url, model.previewFileId) {
+                // Общий файл авторизуется раньше любого чтения кеша (отзыв доступа закрывает и JPEG-вид).
+                withCloudJpegView(currentAsset, app.fileCache, sharedDownloadUrl, model) {
                     imageState = ViewerImageState.JpegView(model)
                     awaitCancellation()
                 }
             } else {
                 imageState = ViewerImageState.Loading
-                withCloudOriginal(
-                    asset = currentAsset,
-                    cache = app.fileCache,
-                    sharedDownloadUrl = { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) },
-                ) { file ->
+                withCloudOriginal(currentAsset, app.fileCache, sharedDownloadUrl) { file ->
                     imageState = ViewerImageState.Original(file)
                     awaitCancellation()
                 }
@@ -512,13 +522,19 @@ private fun CloudMediaViewerContent(
         } catch (_: CacheInvalidatedException) {
             imageState = ViewerImageState.Error
         } catch (_: IOException) {
-            imageState = ViewerImageState.Error
+            // Протухшая JPEG-ссылка заменяется авторизованным оригиналом, а не повтором того же URL.
+            if (viewerRecoveryAfterLoadFailure(useJpegView) == ViewerLoadRecovery.FALLBACK_TO_ORIGINAL) {
+                useJpegView = false
+            } else {
+                imageState = ViewerImageState.Error
+            }
         } catch (_: Exception) {
             imageState = ViewerImageState.Error
         }
     }
 
     // Автозапуск со звуком только для видео текущей страницы, когда пейджер устоялся и просмотр открыт.
+    // Гейт фона проверяется внутри controller.open в момент запуска, а не при постановке эффекта.
     val videoAutoplay = isOpen && currentAsset.isVideo && !appLocked && !pagerState.isScrollInProgress
     LaunchedEffect(videoAutoplay, currentAsset.viewerId) {
         if (videoAutoplay) {
@@ -528,8 +544,10 @@ private fun CloudMediaViewerContent(
         }
     }
 
-    LaunchedEffect(panelExpanded, currentAsset.id, isOpen) {
-        if (panelExpanded && isOpen) infoViewModel.load(currentAsset.id)
+    // Инвариант источника: панель свойств открывается только для собственных файлов с включённым info.
+    val infoAvailable = infoEnabled && currentAsset.origin == CloudMediaOrigin.OWN
+    LaunchedEffect(panelExpanded, currentAsset.id, isOpen, infoAvailable) {
+        if (panelExpanded && isOpen && infoAvailable) infoViewModel.load(currentAsset.id)
     }
 
     CloudMediaViewerLayer(

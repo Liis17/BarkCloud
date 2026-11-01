@@ -44,6 +44,7 @@ import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.data.MimeIcon
 import com.barkfluff.BarkCloud.files.ui.formatDate
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -66,6 +67,7 @@ fun SharedWithMeScreen(
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
         infoEnabled = false,
+        pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore),
         onPageNearEnd = { viewModel.loadMore() },
     )
 
