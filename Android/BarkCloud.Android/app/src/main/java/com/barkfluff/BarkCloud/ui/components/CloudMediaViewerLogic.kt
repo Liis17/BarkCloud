@@ -1,5 +1,7 @@
 package com.barkfluff.BarkCloud.ui.components
 
+import com.barkfluff.BarkCloud.data.cloud.CloudMediaOrigin
+import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import kotlinx.coroutines.CancellationException
 import java.util.Locale
 
@@ -19,19 +21,35 @@ internal data class CloudMediaActionVisibility(
     val download: Boolean,
     val info: Boolean,
     val delete: Boolean,
+    val album: Boolean,
+    val favorite: Boolean,
 )
 
+/** Общий файл не вызывает собственные info/delete/album/favorite API, даже если панель свойств открыта. */
 internal fun cloudMediaActionVisibility(
     isVideo: Boolean,
     infoEnabled: Boolean,
     canDelete: Boolean,
-): CloudMediaActionVisibility = CloudMediaActionVisibility(
-    share = true,
-    copy = !isVideo,
-    download = true,
-    info = infoEnabled,
-    delete = canDelete,
-)
+    origin: CloudMediaOrigin = CloudMediaOrigin.OWN,
+): CloudMediaActionVisibility {
+    val own = origin == CloudMediaOrigin.OWN
+    return CloudMediaActionVisibility(
+        share = true,
+        copy = !isVideo,
+        download = true,
+        info = own && infoEnabled,
+        delete = own && canDelete,
+        album = own,
+        favorite = own,
+    )
+}
+
+/** Один и тот же общий файл из нескольких источников показывается в пейджере один раз. */
+internal fun distinctViewerAssets(assets: List<MediaAsset>): List<MediaAsset> = assets.distinctBy { it.viewerId }
+
+/** Запрос следующей страницы, когда пользователь подходит к концу уже загруженного списка. */
+internal fun shouldLoadMoreAtPagerEdge(settledIndex: Int, itemCount: Int, prefetchDistance: Int = 3): Boolean =
+    itemCount > 0 && settledIndex >= itemCount - prefetchDistance
 
 internal enum class CloudMediaStoreCollection {
     IMAGES,
