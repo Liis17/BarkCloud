@@ -16,3 +16,19 @@ data class MediaCloudState(
     val status: MediaCloudStatus,
     val cloudFileId: String?,
 )
+
+internal fun cloudStateOf(
+    media: DeviceMedia,
+    hash: String?,
+    status: MediaCloudStatus,
+    cloudFileId: String? = null,
+): MediaCloudState = MediaCloudState(
+    mediaKey = media.mediaKey,
+    mediaId = media.id,
+    isVideo = media.isVideo,
+    dateModifiedSeconds = media.dateModifiedSeconds,
+    sizeBytes = media.sizeBytes,
+    hash = hash,
+    status = status,
+    cloudFileId = cloudFileId,
+)

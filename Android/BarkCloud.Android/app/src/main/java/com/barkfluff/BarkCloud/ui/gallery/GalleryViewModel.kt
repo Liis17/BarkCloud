@@ -11,6 +11,7 @@ import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
+import com.barkfluff.BarkCloud.data.gallery.CloudPresenceChecker
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudState
@@ -23,8 +24,6 @@ import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +33,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 data class GalleryUiState(
     val permissionGranted: Boolean = false,
@@ -72,11 +70,13 @@ class GalleryViewModel(
     )
     internal val deletionState: StateFlow<GalleryDeletionState> = deletionCoordinator.state
 
-    private val idToHash = ConcurrentHashMap<String, String>()
-    private val hashPresence = ConcurrentHashMap<String, Boolean>()
-    private val pendingHashes = LinkedHashSet<String>()
+    private val presence = CloudPresenceChecker(
+        scope = viewModelScope,
+        mediaDao = mediaDao,
+        hashFile = { media -> withContext(Dispatchers.IO) { MediaHasher.sha256(appContext, media.uri) } },
+        presence = { hashes -> cloudRepository.checkFileHashesDetailed(hashes) },
+    )
     private val mediaLoadMutex = Mutex()
-    private var flushJob: Job? = null
 
     init {
         _state.update {
@@ -88,7 +88,6 @@ class GalleryViewModel(
         viewModelScope.launch {
             mediaDao.observeAll().collectLatest { states ->
                 val byId = states.associate { it.mediaKey to it.status }
-                states.forEach { state -> state.hash?.let { hashPresence[it] = state.status == MediaCloudStatus.IN_CLOUD } }
                 _state.update { it.copy(cloudStates = byId) }
             }
         }
@@ -156,8 +155,7 @@ class GalleryViewModel(
             val app = appContext as BarkCloudApplication
             var failures = 0
             for (media in targets) {
-                val hash = idToHash[media.mediaKey]
-                    ?: withContext(Dispatchers.IO) { MediaHasher.sha256(appContext, media.uri) }?.also { idToHash[media.mediaKey] = it }
+                val hash = presence.hashOf(media)
                 runCatching {
                     app.uploadQueue.enqueue(
                         uri = media.uri,
@@ -212,23 +210,7 @@ class GalleryViewModel(
     }
 
     fun observeCloudPresence(media: DeviceMedia) {
-        viewModelScope.launch {
-            val existing = mediaDao.byKey(media.mediaKey)
-            if (existing != null &&
-                existing.dateModifiedSeconds == media.dateModifiedSeconds &&
-                existing.sizeBytes == media.sizeBytes &&
-                existing.status in setOf(MediaCloudStatus.QUEUED, MediaCloudStatus.UPLOADING, MediaCloudStatus.IN_CLOUD)
-            ) return@launch
-            val hash = idToHash[media.mediaKey]
-                ?: withContext(Dispatchers.IO) { MediaHasher.sha256(appContext, media.uri) }?.also { idToHash[media.mediaKey] = it }
-                ?: return@launch
-            hashPresence[hash]?.let { exists ->
-                mediaDao.upsert(mediaState(media, hash, if (exists) MediaCloudStatus.IN_CLOUD else MediaCloudStatus.NOT_IN_CLOUD))
-                return@launch
-            }
-            mediaDao.upsert(mediaState(media, hash, MediaCloudStatus.CHECKING))
-            enqueueHash(hash)
-        }
+        presence.request(media)
     }
 
     /** Revalidates every candidate before Android shows its destructive system dialog. */
@@ -325,30 +307,6 @@ class GalleryViewModel(
         _state.update {
             val selection = PhotoSelection(it.selected).remove(setOf(key))
             it.copy(selecting = selection.isSelecting, selected = selection.keys)
-        }
-    }
-
-    private fun enqueueHash(hash: String) {
-        synchronized(pendingHashes) { pendingHashes.add(hash) }
-        flushJob?.cancel()
-        flushJob = viewModelScope.launch {
-            delay(400)
-            flushPresence()
-        }
-    }
-
-    private suspend fun flushPresence() {
-        val hashes = synchronized(pendingHashes) { pendingHashes.toList().also { pendingHashes.clear() } }
-        if (hashes.isEmpty()) return
-        hashes.chunked(500).forEach { chunk ->
-            val result = runCatching { cloudRepository.checkFileHashes(chunk) }.getOrNull() ?: return@forEach
-            result.forEach { (hash, exists) -> hashPresence[hash] = exists }
-            _state.value.items.forEach { media ->
-                val hash = idToHash[media.mediaKey] ?: return@forEach
-                result[hash]?.let { exists ->
-                    mediaDao.upsert(mediaState(media, hash, if (exists) MediaCloudStatus.IN_CLOUD else MediaCloudStatus.NOT_IN_CLOUD))
-                }
-            }
         }
     }
 

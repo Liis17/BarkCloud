@@ -114,9 +114,35 @@ interface UploadDao {
     @Query("UPDATE upload_jobs SET phase = 'FAILED', stagedFilePath = NULL, sessionId = NULL, idempotencyKey = NULL, preparedFileId = NULL, errorMessage = :errorMessage WHERE id = :id AND source = 'BACKUP' AND phase NOT IN ('CANCELLED', 'COMPLETED', 'PAUSED')")
     suspend fun failBackupAndDropStage(id: String, errorMessage: String?): Int
 
+    /** Незавершённые задачи по файлу устройства из любого источника (ручной, галерея, фон). */
+    @Query("SELECT * FROM upload_jobs WHERE mediaKey = :mediaKey AND phase IN ($LIVE_PHASES_SQL) ORDER BY createdAtMillis, id")
+    suspend fun liveByMediaKey(mediaKey: String): List<UploadJob>
+
+    /**
+     * Ожидающее добавление в альбом. Принимается только до фазы ATTACHING: тогда worker читает
+     * albumId уже после установки фазы и не теряет его. Второй альбом не заменяет первый.
+     */
+    @Query(
+        "UPDATE upload_jobs SET albumId = :albumId WHERE id = :id AND (albumId IS NULL OR albumId = :albumId) " +
+            "AND phase IN ('QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'PAUSED')",
+    )
+    suspend fun setAlbumIfPreAttach(id: String, albumId: String): Int
+
+    /** Завершение дедупликации без загрузки: не проходит, если альбом изменился после чтения. */
+    @Query(
+        "UPDATE upload_jobs SET phase = 'COMPLETED', completedAtMillis = :completedAtMillis, errorMessage = NULL " +
+            "WHERE id = :id AND albumId IS :expectedAlbumId AND phase NOT IN ('CANCELLED', 'COMPLETED', 'PAUSED')",
+    )
+    suspend fun completeDeduplicatedIfAlbum(id: String, expectedAlbumId: String?, completedAtMillis: Long): Int
+
     @Query("DELETE FROM upload_jobs WHERE phase = 'COMPLETED' AND completedAtMillis < :beforeMillis")
     suspend fun deleteCompletedBefore(beforeMillis: Long)
 
     @Query("DELETE FROM upload_jobs")
     suspend fun deleteAll()
+
+    companion object {
+        const val LIVE_PHASES_SQL =
+            "'QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'ATTACHING', 'PAUSED', 'UPLOADED_NOT_ATTACHED'"
+    }
 }
