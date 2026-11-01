@@ -10,8 +10,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.barkfluff.BarkCloud.MainActivity
 import com.barkfluff.BarkCloud.R
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.util.UUID
+import kotlin.coroutines.CoroutineContext
 
 object UploadNotification {
     /** Foreground-уведомление прохода; живёт до выхода воркера. */
@@ -20,6 +21,9 @@ object UploadNotification {
     /** Итог успешного прохода. Отдельный ID: иначе WorkManager снимет его вместе с foreground-уведомлением. */
     const val FINISHED_ID = 4202
 
+    /** Токен прохода в extras `deleteIntent`: смахивание учитывается только для своего прохода. */
+    const val EXTRA_RUN_TOKEN = "com.barkfluff.BarkCloud.upload.RUN_TOKEN"
+
     private const val CHANNEL_ID = "barkcloud_uploads"
     private const val REQUEST_OPEN = 0
     private const val REQUEST_DISMISS = 1
@@ -27,14 +31,14 @@ object UploadNotification {
     /** Android 16 (API 36): только там система показывает promoted ongoing и chip. */
     private const val PROMOTION_MIN_SDK = 36
 
-    fun foreground(context: Context, tally: UploadRunTally): Notification {
+    fun foreground(context: Context, tally: UploadRunTally, runToken: String): Notification {
         ensureChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_barkcloud)
             .setContentTitle(context.getString(R.string.upload_notification_title))
             .setContentText(context.getString(R.string.upload_notification_progress, tally.done, tally.total))
             .setContentIntent(openAppIntent(context))
-            .setDeleteIntent(dismissIntent(context))
+            .setDeleteIntent(dismissIntent(context, runToken))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setProgress(tally.total, tally.done, false)
@@ -45,6 +49,15 @@ object UploadNotification {
                 .setStyle(NotificationCompat.ProgressStyle().setProgress(tally.percent).setStyledByProgress(true))
         }
         return builder.build()
+    }
+
+    /**
+     * Обновление уже зарегистрированного foreground-уведомления тем же ID. Идёт напрямую через
+     * NotificationManager, а не через `setForeground`: очередь WorkManager публикует позже вызова,
+     * и смахнутое уведомление могло бы вернуться. Вызывать только через [UploadRefreshPublisher].
+     */
+    fun update(context: Context, tally: UploadRunTally, runToken: String) {
+        context.getSystemService(NotificationManager::class.java).notify(ID, foreground(context, tally, runToken))
     }
 
     fun finished(context: Context, total: Int): Notification {
@@ -64,10 +77,10 @@ object UploadNotification {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun dismissIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+    private fun dismissIntent(context: Context, runToken: String): PendingIntent = PendingIntent.getBroadcast(
         context,
         REQUEST_DISMISS,
-        Intent(context, UploadNotificationDismissReceiver::class.java),
+        Intent(context, UploadNotificationDismissReceiver::class.java).putExtra(EXTRA_RUN_TOKEN, runToken),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
@@ -84,44 +97,46 @@ object UploadNotification {
 }
 
 /**
- * Смахивание foreground-уведомления прохода. [markDismissed] вызывается из BroadcastReceiver:
- * это только volatile-запись, без suspend и без блокировок. До следующего прохода уведомление
- * не переписывается, иначе `setForeground` снова вернёт чип на экран.
+ * Смахивание foreground-уведомления прохода. Токен прохода задаёт, чьё смахивание учитывается:
+ * уведомление прошлого прохода на текущий не влияет. Новый проход сбрасывает прошлое смахивание.
  */
 internal object UploadNotificationDismissal {
-    val gate = UploadForegroundGate()
+    @Volatile private var activeRun: String? = null
+    @Volatile private var dismissedRun: String? = null
 
-    fun reset() = gate.reset()
+    fun beginRun(): String {
+        val token = UUID.randomUUID().toString()
+        dismissedRun = null
+        activeRun = token
+        return token
+    }
 
-    fun markDismissed() = gate.markDismissed()
+    /** Вызывается из BroadcastReceiver на главном потоке: только volatile-записи, без блокировок и suspend. */
+    fun markDismissed(runToken: String?) {
+        if (runToken != null && runToken == activeRun) dismissedRun = runToken
+    }
+
+    fun isDismissed(runToken: String): Boolean = dismissedRun == runToken
 }
 
 /**
- * Публикация foreground-уведомления с защитой от смахивания. Снимок счёта считается без блокировки,
- * затем под корутинным [Mutex] (не JVM-монитором) проверяется флаг и выполняется `post`.
- * Смахивание, пришедшее во время подсчёта или в очереди за блокировкой, отменяет публикацию.
- * Уже начатый `post` отменить нельзя: окно ограничено временем вызова `setForeground`.
+ * Обновление счёта прохода без WorkManager. [snapshot] (запрос к Room) выполняется вне главного
+ * потока. Проверка смахивания и [notify] идут синхронно на [mainContext] без приостановки между
+ * ними. BroadcastReceiver работает на главном потоке, поэтому смахивание либо учтено до проверки,
+ * либо приходит после возврата из [notify], когда уже видна новая версия.
  */
-internal class UploadForegroundGate {
-    private val mutex = Mutex()
-
-    @Volatile private var dismissed = false
-
-    fun reset() {
-        dismissed = false
-    }
-
-    fun markDismissed() {
-        dismissed = true
-    }
-
+internal class UploadRefreshPublisher(
+    private val mainContext: CoroutineContext,
+    private val isDismissed: () -> Boolean,
+    private val notify: (UploadRunTally) -> Unit,
+) {
     /** `null` из [snapshot] означает пустой счёт: публиковать нечего. */
-    suspend fun publish(snapshot: suspend () -> UploadRunTally?, post: suspend (UploadRunTally) -> Unit) {
-        if (dismissed) return
+    suspend fun publish(snapshot: suspend () -> UploadRunTally?) {
+        if (isDismissed()) return
         val tally = snapshot() ?: return
-        mutex.withLock {
-            if (dismissed) return
-            post(tally)
+        withContext(mainContext) {
+            if (isDismissed()) return@withContext
+            notify(tally)
         }
     }
 }

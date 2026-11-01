@@ -22,13 +22,17 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class UploadNotificationLiveUpdateTest {
+    private companion object {
+        const val RUN_TOKEN = "live-update-test-run"
+    }
+
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
     fun foregroundNotificationHasLiveUpdateShape() {
         assumeTrue("Live Update доступен с Android 16", Build.VERSION.SDK_INT >= 36)
 
-        val notification = UploadNotification.foreground(context, UploadRunTally(done = 2, remaining = 6, failed = 0))
+        val notification = UploadNotification.foreground(context, UploadRunTally(done = 2, remaining = 6, failed = 0), RUN_TOKEN)
 
         assertTrue(NotificationCompat.isRequestPromotedOngoing(notification))
         assertEquals("2/8", NotificationCompat.getShortCriticalText(notification))
@@ -50,7 +54,7 @@ class UploadNotificationLiveUpdateTest {
     fun foregroundNotificationIsPromotableWhereSystemDefinesPromotion() {
         assumeTrue("Платформа не объявляет POST_PROMOTED_NOTIFICATIONS", platformDefinesPromotion())
 
-        val notification = UploadNotification.foreground(context, UploadRunTally(done = 2, remaining = 6, failed = 0))
+        val notification = UploadNotification.foreground(context, UploadRunTally(done = 2, remaining = 6, failed = 0), RUN_TOKEN)
 
         assertTrue(notification.hasPromotableCharacteristics())
     }
