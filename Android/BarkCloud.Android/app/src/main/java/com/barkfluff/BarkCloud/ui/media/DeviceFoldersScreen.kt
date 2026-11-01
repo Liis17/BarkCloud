@@ -1,7 +1,6 @@
 package com.barkfluff.BarkCloud.ui.media
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -193,10 +192,9 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
             }
         }
     }
-    viewer?.let { media ->
-        DeviceMediaViewer(media, onDismiss = { viewer = null }, onPlayVideo = {
-            val intent = Intent(Intent.ACTION_VIEW).setDataAndType(media.uri, "video/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            runCatching { context.startActivity(intent) }
-        })
-    }
+    DeviceMediaViewer(
+        items = selected?.media.orEmpty(),
+        selected = viewer,
+        onDismiss = { viewer = null },
+    )
 }

@@ -42,6 +42,7 @@ data class AndroidUpdateUiState(
     val totalBytes: Long = 0,
     val message: String? = null,
     val retryAtMillis: Long? = null,
+    val betaChannel: Boolean = false,
 )
 
 enum class UpdateVerificationResult { VERIFIED, NOT_READY, OBSOLETE }
@@ -124,6 +125,11 @@ class AndroidUpdateRepository internal constructor(
         if (latest != null) return@withLock promptCandidate(day)
         if (preferences.metadataUnavailableTag() != null) return@withLock null
         cachedCandidate
+    }
+
+    suspend fun setBetaChannel(enabled: Boolean) = mutex.withLock {
+        preferences.setBetaChannelEnabled(enabled)
+        _state.value = _state.value.copy(betaChannel = enabled)
     }
 
     suspend fun reconcile() = mutex.withLock {
@@ -247,7 +253,7 @@ class AndroidUpdateRepository internal constructor(
         val previous = preferences.cachedRelease()
         _state.value = stateFor(previous, AndroidUpdatePhase.CHECKING)
         return try {
-            val latest = releaseClient.fetchLatest()
+            val latest = releaseClient.fetchLatest(preferences.betaChannelEnabled())
             preferences.cacheRelease(latest)
             preferences.attempt()?.let { attempt ->
                 if (AndroidUpdatePolicy.shouldInvalidateReadyFile(attempt.metadata, latest)) {
@@ -467,7 +473,7 @@ class AndroidUpdateRepository internal constructor(
     private fun validAttempt(attempt: UpdateDownloadAttempt): Boolean = runCatching {
         UUID_PATTERN.matches(attempt.attemptId) &&
             attempt.fileName == "${attempt.metadata.tag}-${attempt.attemptId}.apk" &&
-            AndroidReleaseParser.versionCode(attempt.metadata.tag) == attempt.metadata.versionCode
+            AndroidReleaseParser.isAcceptedVersionCode(attempt.metadata.tag, attempt.metadata.versionCode)
     }.getOrDefault(false)
 
     private fun promptCandidate(day: LocalDate): AndroidReleaseMetadata? {
@@ -509,6 +515,7 @@ class AndroidUpdateRepository internal constructor(
         retryAtMillis = preferences.rateLimitUntilMillis().takeIf {
             AndroidUpdatePolicy.isRateLimitActive(clock(), it)
         },
+        betaChannel = preferences.betaChannelEnabled(),
     )
 
     private fun publishCached(

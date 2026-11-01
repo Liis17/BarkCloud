@@ -22,8 +22,10 @@ data class DeviceMedia(
     val folderName: String = "",
     val mimeType: String? = null,
     val generationModified: Long = 0L,
+    /** Полный стабильный ключ для источников вне MediaStore (например, файл из браузера); null — ключ по [id]. */
+    val stableKey: String? = null,
 ) {
-    val mediaKey: String get() = "${if (isVideo) "video" else "image"}:$id"
+    val mediaKey: String get() = stableKey ?: "${if (isVideo) "video" else "image"}:$id"
 }
 
 /** Чтение медиатеки устройства через MediaStore (фото + видео, от новых к старым). */

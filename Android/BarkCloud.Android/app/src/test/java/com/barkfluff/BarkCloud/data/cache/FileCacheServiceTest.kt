@@ -9,6 +9,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -527,6 +528,35 @@ class FileCacheServiceTest {
             root.deleteRecursively()
         }
     }
+    @Test
+    fun pinOwnershipSurvivesCancellationBetweenAcquireAndReturn() = runTest {
+        val root = Files.createTempDirectory("file-cache-pin-cancel-").toFile()
+        try {
+            val scope = CacheScope("server", "user")
+            val policy = TestPolicy(maxCacheBytes = 3L)
+            val cache = cache(root, RecordingLoader { _, destination -> destination.writeBytes(ByteArray(3)) }, scope, policy)
+            val pinnedKey = FileCacheKey.original(scope, "pinned")
+            val pinned = cache.load(pinnedKey, "pinned.bin")
+            var acquired: FileCachePin? = null
+            lateinit var owner: Job
+            owner = launch {
+                cache.pinCachedOriginal("pinned", shared = false) { pin ->
+                    acquired = pin
+                    owner.cancel()
+                }
+            }
+            owner.join()
+
+            val pin = requireNotNull(acquired)
+            cache.load(FileCacheKey.original(scope, "latest"), "latest.bin")
+            assertTrue(pinned.exists())
+            cache.unpin(pin)
+            assertFalse(pinned.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 
     @Test
     fun cancelledOwnerCleansUpAfterStateMutexBecomesAvailable() = runTest {

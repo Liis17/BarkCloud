@@ -156,6 +156,8 @@
     <string name="gallery_selection_mode">Режим выбора</string>
     <string name="viewer_play_video">Воспроизвести видео</string>
     <string name="viewer_retry_original">Повторить</string>
+    <string name="viewer_mute">Выключить звук</string>
+    <string name="viewer_unmute">Включить звук</string>
     <string name="viewer_back">Назад</string>
     <string name="viewer_action_share">Поделиться</string>
     <string name="viewer_action_copy">Копировать</string>
@@ -455,6 +457,8 @@
     <string name="android_updates_progress">Загружено %1$s из %2$s</string>
     <string name="android_updates_retry_after">Следующая проверка доступна: %1$s</string>
     <string name="android_updates_download">Скачать обновление</string>
+    <string name="android_updates_beta_title">Бета-обновления</string>
+    <string name="android_updates_beta_description">Предлагать dev-сборки из ветки dev. Они могут быть нестабильными.</string>
     <string name="android_updates_cancel">Отменить загрузку</string>
     <string name="android_updates_install">Установить</string>
     <string name="android_updates_delete">Удалить APK</string>

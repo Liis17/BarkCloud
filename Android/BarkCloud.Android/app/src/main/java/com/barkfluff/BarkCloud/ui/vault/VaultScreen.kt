@@ -55,7 +55,6 @@ import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -68,16 +67,23 @@ fun VaultScreen(
     val activity = context as? FragmentActivity
     val unlockTitle = stringResource(R.string.vault_unlock_button)
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
-    val openRemote = rememberRemoteOpener()
     val vaultAssets = remember(state.items) { state.items.map { it.toMediaAsset() } }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) viewModel.relock()
+            if (event == Lifecycle.Event.ON_STOP) {
+                // Синхронно: просмотр Vault не должен пережить уход в фон, даже в fade-out.
+                viewer = null
+                viewModel.relock()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(state.lockState) {
+        viewer = vaultViewerSelection(state.lockState, viewer)
     }
 
     LaunchedEffect(state.lockState, activity) {
@@ -137,14 +143,16 @@ fun VaultScreen(
         }
     }
 
-        CloudMediaViewer(
-            assets = vaultAssets,
-            selectedAsset = viewer,
-            onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
-            infoEnabled = false,
-            onDelete = { item -> viewModel.deleteFile(item.id) },
-        )
+        // Вне UNLOCKED вьюер убирается из композиции сразу, без fade: полное фото не остаётся над экраном авторизации.
+        if (state.lockState == VaultLockState.UNLOCKED) {
+            CloudMediaViewer(
+                assets = vaultAssets,
+                selectedAsset = vaultViewerSelection(state.lockState, viewer),
+                onDismiss = { viewer = null },
+                infoEnabled = false,
+                onDelete = { item -> viewModel.deleteFile(item.id) },
+            )
+        }
     }
 }
 
