@@ -65,7 +65,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.CloudFileEntry
+import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
+import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.files.data.MimeIcon
+import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
@@ -88,6 +91,16 @@ fun CloudBrowserScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val openRemote = rememberRemoteOpener()
+    var viewerAsset by remember { mutableStateOf<MediaAsset?>(null) }
+    val viewerAssets = remember(state.files) {
+        state.files.map { it.asset }.filter { it.kind == CloudMediaKind.PHOTO || it.isVideo }
+    }
+    CloudMediaViewer(
+        assets = viewerAssets,
+        selectedAsset = viewerAsset,
+        onDismiss = { viewerAsset = null },
+        onPageNearEnd = { viewModel.loadMore() },
+    )
     val listState = rememberLazyListState()
 
     var fabMenu by remember { mutableStateOf(false) }
@@ -189,7 +202,13 @@ fun CloudBrowserScreen(
                     items(state.files, key = { "f-${it.id}" }) { file ->
                         FileRow(
                             file = file,
-                            onOpen = { openRemote(file.fileId, file.name) { } },
+                            onOpen = {
+                                if (file.asset.kind == CloudMediaKind.PHOTO || file.asset.isVideo) {
+                                    viewerAsset = file.asset
+                                } else {
+                                    openRemote(file.fileId, file.name) { }
+                                }
+                            },
                             onRename = { renameTarget = CloudTarget.File(file.id, file.name) },
                             onMove = { moveTarget = CloudTarget.File(file.id, file.name) },
                             onDelete = { deleteTarget = CloudTarget.File(file.id, file.name) },
