@@ -60,7 +60,8 @@ import okio.Path.Companion.toOkioPath
 
 class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** Общий scope для работ, которые должны завершиться после ухода экрана (например, снятие пина кеша). */
+    internal val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var mediaChangeJob: Job? = null
     private var mediaObserver: ContentObserver? = null
 

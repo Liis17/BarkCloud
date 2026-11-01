@@ -156,6 +156,8 @@
     <string name="gallery_selection_mode">Режим выбора</string>
     <string name="viewer_play_video">Воспроизвести видео</string>
     <string name="viewer_retry_original">Повторить</string>
+    <string name="viewer_mute">Выключить звук</string>
+    <string name="viewer_unmute">Включить звук</string>
     <string name="viewer_back">Назад</string>
     <string name="viewer_action_share">Поделиться</string>
     <string name="viewer_action_copy">Копировать</string>
