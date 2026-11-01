@@ -32,6 +32,7 @@ import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -54,7 +55,7 @@ class UploadWorker(
 
     override suspend fun doWork(): Result {
         val runStart = System.currentTimeMillis()
-        UploadNotificationDismissal.reset()
+        val runToken = UploadNotificationDismissal.beginRun()
         val queue = UploadQueueStore(applicationContext)
         queue.initialize()
 
@@ -88,11 +89,12 @@ class UploadWorker(
             val pending = mutableListOf<PendingRetry>()
             val stopClaiming = AtomicBoolean(false)
             val stagingBudget = BackupStagingBudget(queue.stagedBackupCount())
-            setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, initialTally)))
+            // Единственный setForeground на проход: регистрирует FGS. Дальше уведомление обновляется напрямую.
+            setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, initialTally, runToken)))
 
             coroutineScope {
                 val notificationConsumer = launch {
-                    consumeUploadNotifications(notifyChannel) { refreshForeground(progress) }
+                    consumeUploadNotifications(notifyChannel) { refreshForeground(progress, runToken) }
                 }
                 // Задачи могут добавиться извне (discovery), поэтому счёт пересчитывается и по таймеру.
                 val periodicRefresh = launch {
@@ -622,12 +624,16 @@ class UploadWorker(
         }
     }
 
-    /** После смахивания уведомление не переписываем: `setForeground` снова показал бы чип. */
-    private suspend fun refreshForeground(progress: UploadRunProgress) {
-        UploadNotificationDismissal.gate.publish(
-            snapshot = { progress.tally().takeIf { it.total > 0 } },
-            post = { tally -> setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, tally))) },
-        )
+    /**
+     * Обновление счёта через NotificationManager на главном потоке, без очереди WorkManager. Смахнутое
+     * уведомление не переписывается до следующего прохода.
+     */
+    private suspend fun refreshForeground(progress: UploadRunProgress, runToken: String) {
+        UploadRefreshPublisher(
+            mainContext = Dispatchers.Main.immediate,
+            isDismissed = { UploadNotificationDismissal.isDismissed(runToken) },
+            notify = { tally -> UploadNotification.update(applicationContext, tally, runToken) },
+        ).publish { progress.tally().takeIf { it.total > 0 } }
     }
 
     private fun foregroundInfo(notification: Notification): ForegroundInfo =
