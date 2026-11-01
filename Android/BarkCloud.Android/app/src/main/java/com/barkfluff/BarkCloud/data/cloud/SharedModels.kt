@@ -153,7 +153,7 @@ data class SharedWithMeEntry(
     companion object {
         fun from(e: ProtoSharedWithMeEntry): SharedWithMeEntry = SharedWithMeEntry(
             grantId = e.grantId,
-            asset = MediaAsset.from(e.file),
+            asset = MediaAsset.from(e.file).copy(origin = CloudMediaOrigin.SHARED),
             ownerUserId = e.ownerUserId,
             sharedAtMillis = if (e.hasSharedAt()) e.sharedAt.toEpochMillis() else 0L,
         )

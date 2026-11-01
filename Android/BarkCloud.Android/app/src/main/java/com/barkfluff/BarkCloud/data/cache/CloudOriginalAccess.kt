@@ -1,0 +1,24 @@
+package com.barkfluff.BarkCloud.data.cache
+
+import com.barkfluff.BarkCloud.data.cloud.CloudMediaOrigin
+import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import java.io.File
+
+/**
+ * Единая точка загрузки оригинала облачного файла для просмотра и действий.
+ * Собственный файл использует own-ключ кеша и own `tempDownloadUrls`.
+ * Общий файл сначала получает URL через shared RPC (авторизация всегда, даже при попадании в кеш),
+ * затем использует отдельный shared-original ключ; own API не вызывается.
+ */
+internal suspend fun <T> withCloudOriginal(
+    asset: MediaAsset,
+    cache: FileCacheService,
+    sharedDownloadUrl: suspend (fileId: String) -> String,
+    action: suspend (File) -> T,
+): T = when (asset.origin) {
+    CloudMediaOrigin.OWN -> cache.withLoadedPinnedOriginal(asset.id, asset.fileName, action)
+    CloudMediaOrigin.SHARED -> {
+        val url = sharedDownloadUrl(asset.id)
+        cache.withLoadedPinnedSharedOriginal(asset.id, asset.fileName, url, action)
+    }
+}
