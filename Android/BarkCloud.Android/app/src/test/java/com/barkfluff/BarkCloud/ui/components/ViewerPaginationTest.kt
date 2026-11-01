@@ -42,10 +42,4 @@ class ViewerPaginationTest {
         assertFalse(shouldRequestNextPage(settledIndex = 99, itemCount = 100, pagination = ViewerPagination(false, false)))
         assertFalse(shouldRequestNextPage(settledIndex = 0, itemCount = 0, pagination = ViewerPagination(true, false)))
     }
-
-    @Test
-    fun expiredJpegViewFallsBackToTheAuthorizedOriginalButOriginalFailureIsAnError() {
-        assertEquals(ViewerLoadRecovery.FALLBACK_TO_ORIGINAL, viewerRecoveryAfterLoadFailure(useJpegView = true))
-        assertEquals(ViewerLoadRecovery.ERROR, viewerRecoveryAfterLoadFailure(useJpegView = false))
-    }
 }

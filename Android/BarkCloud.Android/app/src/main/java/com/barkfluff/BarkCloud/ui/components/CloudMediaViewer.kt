@@ -469,12 +469,14 @@ private fun CloudMediaViewerContent(
     }
     val infoState by infoViewModel.state.collectAsStateWithLifecycle()
     val jpegViewModel = currentAsset.jpegViewModel()
-    var useJpegView by remember(currentAsset.viewerId) {
-        mutableStateOf(requiresJpegView(currentAsset.fileName, jpegViewModel != null))
-    }
+    val requiresJpeg = requiresJpegView(currentAsset.fileName, jpegViewModel != null)
     var retryCount by remember(currentAsset.viewerId) { mutableIntStateOf(0) }
+    // Генерация начинается при смене элемента и при явном Retry: каждое представление пробуется не более одного раза.
+    var recovery by remember(currentAsset.viewerId, retryCount) {
+        mutableStateOf(photoRecoveryFor(requiresJpeg, jpegViewModel != null))
+    }
+    val representation = recovery.current
     var imageState by remember(currentAsset.viewerId) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
-    var failedDecodeCache by remember(currentAsset.viewerId) { mutableStateOf<ViewerCacheKind?>(null) }
 
     LaunchedEffect(pagerState.settledPage, assetIds) {
         val settledAsset = assets.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
@@ -490,40 +492,40 @@ private fun CloudMediaViewerContent(
         if (shouldRequestNextPage(pagerState.settledPage, assets.size, pagination)) onPageNearEnd?.invoke()
     }
 
-    LaunchedEffect(isOpen, currentAsset.viewerId, retryCount, useJpegView) {
+    LaunchedEffect(isOpen, currentAsset.viewerId, retryCount, representation) {
         if (!isOpen || currentAsset.kind != CloudMediaKind.PHOTO) return@LaunchedEffect
+        // Оба представления провалены в этой генерации: терминальная ошибка, превью остаётся до явного Retry.
+        val attempt = representation ?: run {
+            imageState = ViewerImageState.Error
+            return@LaunchedEffect
+        }
         try {
-            if (useJpegView) {
-                val model = jpegViewModel ?: run {
-                    imageState = ViewerImageState.Error
-                    return@LaunchedEffect
+            when (attempt) {
+                ViewerRepresentation.JPEG_VIEW -> {
+                    val model = jpegViewModel ?: run {
+                        imageState = ViewerImageState.Error
+                        return@LaunchedEffect
+                    }
+                    imageState = ViewerImageState.Loading
+                    // Общий файл авторизуется раньше любого чтения кеша (отзыв доступа закрывает и JPEG-вид).
+                    withCloudJpegView(currentAsset, app.fileCache, sharedDownloadUrl, model) {
+                        imageState = ViewerImageState.JpegView(model)
+                        awaitCancellation()
+                    }
                 }
-                imageState = ViewerImageState.Loading
-                // Общий файл авторизуется раньше любого чтения кеша (отзыв доступа закрывает и JPEG-вид).
-                withCloudJpegView(currentAsset, app.fileCache, sharedDownloadUrl, model) {
-                    imageState = ViewerImageState.JpegView(model)
-                    awaitCancellation()
-                }
-            } else {
-                imageState = ViewerImageState.Loading
-                withCloudOriginal(currentAsset, app.fileCache, sharedDownloadUrl) { file ->
-                    imageState = ViewerImageState.Original(file)
-                    awaitCancellation()
+                ViewerRepresentation.ORIGINAL -> {
+                    imageState = ViewerImageState.Loading
+                    withCloudOriginal(currentAsset, app.fileCache, sharedDownloadUrl) { file ->
+                        imageState = ViewerImageState.Original(file)
+                        awaitCancellation()
+                    }
                 }
             }
         } catch (error: CancellationException) {
             throw error
-        } catch (_: CacheInvalidatedException) {
-            imageState = ViewerImageState.Error
-        } catch (_: IOException) {
-            // Протухшая JPEG-ссылка заменяется авторизованным оригиналом, а не повтором того же URL.
-            if (viewerRecoveryAfterLoadFailure(useJpegView) == ViewerLoadRecovery.FALLBACK_TO_ORIGINAL) {
-                useJpegView = false
-            } else {
-                imageState = ViewerImageState.Error
-            }
         } catch (_: Exception) {
-            imageState = ViewerImageState.Error
+            // Сетевой сбой, протухшая ссылка или сбой кеша: это представление проваливается и больше не повторяется.
+            recovery = recovery.afterFailure(attempt)
         }
     }
 
@@ -590,23 +592,17 @@ private fun CloudMediaViewerContent(
                             ) { image ->
                                 when (image) {
                                     is ViewerImageState.Original -> {
-                                        val request = remember(image.file, asset.id, useJpegView) {
+                                        val request = remember(image.file, asset.id, representation) {
                                             ImageRequest.Builder(context)
                                                 .data(image.file)
                                                 .listener(onError = { _, _ ->
-                                                    if (!useJpegView && jpegViewModel != null) {
-                                                        failedDecodeCache = null
-                                                        scope.launch {
-                                                            invalidateViewerCacheSafely {
-                                                                app.fileCache.invalidateCloudOriginal(asset)
-                                                            }
+                                                    // Декодирование не удалось: оригинал инвалидируется и помечается проваленным, без возврата к нему.
+                                                    scope.launch {
+                                                        invalidateViewerCacheSafely {
+                                                            app.fileCache.invalidateCloudOriginal(asset)
                                                         }
-                                                        imageState = ViewerImageState.Loading
-                                                        useJpegView = true
-                                                    } else {
-                                                        failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView)
-                                                        imageState = ViewerImageState.Error
                                                     }
+                                                    recovery = recovery.afterFailure(ViewerRepresentation.ORIGINAL)
                                                 })
                                                 .build()
                                         }
@@ -621,12 +617,16 @@ private fun CloudMediaViewerContent(
                                         )
                                     }
                                     is ViewerImageState.JpegView -> {
-                                        val request = remember(image.model, asset.id) {
+                                        val request = remember(image.model, asset.id, representation) {
                                             ImageRequest.Builder(context)
                                                 .data(image.model)
                                                 .listener(onError = { _, _ ->
-                                                    failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView = true)
-                                                    imageState = ViewerImageState.Error
+                                                    scope.launch {
+                                                        invalidateViewerCacheSafely {
+                                                            app.fileCache.invalidateJpegView(asset.id, image.model.previewFileId)
+                                                        }
+                                                    }
+                                                    recovery = recovery.afterFailure(ViewerRepresentation.JPEG_VIEW)
                                                 })
                                                 .build()
                                         }
@@ -650,22 +650,9 @@ private fun CloudMediaViewerContent(
                         if (isCurrentPage && pageImageState == ViewerImageState.Error) {
                             Button(
                                 onClick = {
-                                    scope.launch {
-                                        invalidateViewerCacheSafely {
-                                            when (failedDecodeCache) {
-                                                ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateCloudOriginal(asset)
-                                                ViewerCacheKind.JPEG_VIEW -> app.fileCache.invalidateJpegView(
-                                                    asset.id,
-                                                    jpegViewModel?.previewFileId,
-                                                )
-                                                null -> Unit
-                                            }
-                                        }
-                                        failedDecodeCache = null
-                                        imageState = ViewerImageState.Preview
-                                        useJpegView = requiresJpegView(asset.fileName, jpegViewModel != null)
-                                        retryCount++
-                                    }
+                                    // Явный Retry начинает новую генерацию (retryCount сбрасывает состояние восстановления).
+                                    imageState = ViewerImageState.Preview
+                                    retryCount++
                                 },
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
