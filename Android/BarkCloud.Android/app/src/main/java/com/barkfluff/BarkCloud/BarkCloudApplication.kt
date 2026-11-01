@@ -42,6 +42,8 @@ import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.observeUploadStartupForSession
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.data.update.AndroidUpdateRepository
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteExecutor
+import com.barkfluff.BarkCloud.data.gallery.PendingCloudCleanupStore
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.RoomFileCacheIndex
 import com.barkfluff.BarkCloud.data.vault.VaultStore
@@ -121,6 +123,8 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         private set
 
     lateinit var vaultStore: VaultStore
+
+    internal lateinit var deviceDeleteExecutor: DeviceDeleteExecutor
         private set
 
     lateinit var androidUpdateRepository: AndroidUpdateRepository
@@ -161,6 +165,12 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         vaultStore = VaultStore(this)
+        deviceDeleteExecutor = DeviceDeleteExecutor(
+            cloudRepository,
+            uploadQueue,
+            BarkCloudDatabase.get(this).mediaCloudStateDao(),
+            PendingCloudCleanupStore(this),
+        )
         appScope.launch {
             // Удалённый из облака файл больше не присутствует на устройстве (для всех экранов разом).
             CloudLibraryChanges.events.collect { change ->

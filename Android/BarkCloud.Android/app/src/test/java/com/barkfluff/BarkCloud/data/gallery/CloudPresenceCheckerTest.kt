@@ -25,7 +25,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun cachedHashIsReusedWhenMetadataMatches() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(1)
         dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.NOT_IN_CLOUD)
         var hashed = 0
@@ -43,7 +43,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun changedMetadataInvalidatesCachedHashOfSettledRow() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(2, size = 200)
         dao.rows[media.mediaKey] = cloudStateOf(media.copy(sizeBytes = 100), hashA, MediaCloudStatus.IN_CLOUD)
         val checker = checker(this, dao, hashFile = { hashB }, presence = { chunk ->
@@ -61,7 +61,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun changedMetadataDoesNotTouchQueuedUpload() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(8, size = 200)
         dao.rows[media.mediaKey] = cloudStateOf(media.copy(sizeBytes = 100), hashA, MediaCloudStatus.QUEUED)
         val checker = checker(this, dao, hashFile = { hashB }, presence = { chunk ->
@@ -80,7 +80,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun lateAbsentAnswerDoesNotDowngradeInCloud() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(3)
         dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.IN_CLOUD)
         val checker = checker(this, dao, hashFile = { hashA }, presence = { chunk ->
@@ -95,7 +95,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun missingServerAnswerLeavesStateUnchanged() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(4)
         dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.NOT_IN_CLOUD)
         val checker = checker(this, dao, hashFile = { hashA }, presence = { emptyMap() })
@@ -109,7 +109,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun exists_withoutIds_marksPresentWithoutFileId() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(5)
         dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.NOT_IN_CLOUD)
         val checker = checker(this, dao, hashFile = { hashA }, presence = { chunk ->
@@ -126,7 +126,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun largeLibraryIsCheckedInServerSizedBatches() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val medias = (0 until CHECK_HASHES_BATCH + 10).map { media(100L + it) }
         val batches = mutableListOf<Int>()
         val checker = checker(this, dao, hashFile = { item -> "%064x".format(item.id) }, presence = { chunk ->
@@ -143,7 +143,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun cancelledCheckLeavesNoPersistentCheckingState() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(6)
         val checker = checker(this, dao, hashFile = { hashA }, presence = { throw CancellationException("stop") })
 
@@ -163,7 +163,7 @@ class CloudPresenceCheckerTest {
 
     @Test
     fun recentlyCheckedItemIsThrottledUnlessForced() = runTest {
-        val dao = FakeMediaDao()
+        val dao = FakeMediaCloudStateDao()
         val media = media(7)
         var calls = 0
         val checker = checker(this, dao, hashFile = { hashA }, presence = { chunk ->
@@ -207,65 +207,4 @@ class CloudPresenceCheckerTest {
         dateModifiedSeconds = 10L,
         sizeBytes = size,
     )
-
-    /** In-memory стенд для таблицы media_cloud_states с теми же условиями, что у SQL-запросов DAO. */
-    private class FakeMediaDao : MediaCloudStateDao {
-        val rows = HashMap<String, MediaCloudState>()
-        private val flow = MutableStateFlow<List<MediaCloudState>>(emptyList())
-
-        override suspend fun upsert(state: MediaCloudState) {
-            rows[state.mediaKey] = state
-        }
-
-        override fun observeAll(): Flow<List<MediaCloudState>> = flow
-
-        override suspend fun all(): List<MediaCloudState> = rows.values.toList()
-
-        override suspend fun byKey(mediaKey: String): MediaCloudState? = rows[mediaKey]
-
-        override suspend fun insertIfAbsent(state: MediaCloudState): Long {
-            if (rows.containsKey(state.mediaKey)) return -1L
-            rows[state.mediaKey] = state
-            return 1L
-        }
-
-        override suspend fun markInCloud(
-            mediaKey: String,
-            dateModifiedSeconds: Long,
-            sizeBytes: Long,
-            hash: String,
-            cloudFileId: String?,
-        ): Int {
-            val row = rows[mediaKey] ?: return 0
-            if (row.dateModifiedSeconds != dateModifiedSeconds || row.sizeBytes != sizeBytes) return 0
-            if (row.status == MediaCloudStatus.QUEUED || row.status == MediaCloudStatus.UPLOADING) return 0
-            rows[mediaKey] = row.copy(status = MediaCloudStatus.IN_CLOUD, hash = hash, cloudFileId = cloudFileId)
-            return 1
-        }
-
-        override suspend fun markAbsent(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String): Int {
-            val row = rows[mediaKey] ?: return 0
-            if (row.dateModifiedSeconds != dateModifiedSeconds || row.sizeBytes != sizeBytes) return 0
-            if (row.status in setOf(MediaCloudStatus.QUEUED, MediaCloudStatus.UPLOADING, MediaCloudStatus.IN_CLOUD)) return 0
-            rows[mediaKey] = row.copy(status = MediaCloudStatus.NOT_IN_CLOUD, hash = hash, cloudFileId = null)
-            return 1
-        }
-
-        override suspend fun setHash(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String): Int {
-            val row = rows[mediaKey] ?: return 0
-            if (row.dateModifiedSeconds != dateModifiedSeconds || row.sizeBytes != sizeBytes) return 0
-            rows[mediaKey] = row.copy(hash = hash)
-            return 1
-        }
-
-        override suspend fun markCloudFileRemoved(cloudFileId: String): Int = 0
-
-        override suspend fun delete(mediaKey: String) {
-            rows.remove(mediaKey)
-        }
-
-        override suspend fun deleteAll() {
-            rows.clear()
-        }
-    }
 }
