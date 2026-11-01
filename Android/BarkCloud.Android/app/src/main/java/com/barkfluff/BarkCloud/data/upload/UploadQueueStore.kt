@@ -395,17 +395,26 @@ class UploadQueueStore(
         }
     }
 
+    /** Состояние задачи для дедупликации без загрузки. */
+    suspend fun dedupRead(id: String): DedupRead {
+        val job = dao.byId(id) ?: return DedupRead.Inactive
+        return if (job.phase in DEDUP_INACTIVE_PHASES) DedupRead.Inactive else DedupRead.Live(job.albumId)
+    }
+
     /**
-     * Дедупликация без загрузки (файл уже в облаке). Возвращает false, если альбом задачи успел
-     * измениться: тогда вызывающий перечитывает albumId, добавляет его и повторяет.
+     * Условное завершение дедупликации. [DedupCas.Retry] — альбом задачи изменился; [DedupCas.Inactive] —
+     * задача отменена, приостановлена или завершена: статус облака при этом не публикуется.
      */
-    suspend fun completeDeduplicated(id: String, expectedAlbumId: String?): Boolean {
-        val current = dao.byId(id) ?: return true
-        if (dao.completeDeduplicatedIfAlbum(id, expectedAlbumId, System.currentTimeMillis()) == 0) return false
-        if (current.source == UploadSource.BACKUP) deleteBackupOwnedFiles(current.id, current.stagedFilePath)
-        else current.stagedFilePath?.let(::deleteQueueFile)
-        CloudLibraryChanges.publish(CloudLibraryChange.Changed)
-        return true
+    suspend fun completeDeduplicated(id: String, expectedAlbumId: String?): DedupCas {
+        val current = dao.byId(id) ?: return DedupCas.Inactive
+        if (dao.completeDeduplicatedIfAlbum(id, expectedAlbumId, System.currentTimeMillis()) > 0) {
+            if (current.source == UploadSource.BACKUP) deleteBackupOwnedFiles(current.id, current.stagedFilePath)
+            else current.stagedFilePath?.let(::deleteQueueFile)
+            CloudLibraryChanges.publish(CloudLibraryChange.Changed)
+            return DedupCas.Done
+        }
+        val after = dao.byId(id) ?: return DedupCas.Inactive
+        return if (after.phase in DEDUP_INACTIVE_PHASES) DedupCas.Inactive else DedupCas.Retry
     }
 
     /** Bytes are remote; release only the app-private staged copy. */
@@ -682,6 +691,7 @@ class UploadQueueStore(
         const val STAGE_RELEASE_BATCH_SIZE = 32
         val BACKUP_JOB_ID = Regex("backup-[0-9a-f]{64}")
         val BACKUP_JOB_LOCKS = Array(32) { Mutex() }
+        val DEDUP_INACTIVE_PHASES = setOf(UploadPhase.CANCELLED, UploadPhase.PAUSED, UploadPhase.COMPLETED)
         val ACTIVE_PHASES = setOf(
             UploadPhase.QUEUED,
             UploadPhase.HASHING,
