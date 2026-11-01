@@ -11,11 +11,20 @@ import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
+import com.barkfluff.BarkCloud.data.gallery.CloudPresenceChecker
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudState
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteExecutor
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteItem
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
+import com.barkfluff.BarkCloud.data.gallery.HiddenDeviceSession
 import com.barkfluff.BarkCloud.data.gallery.MediaHasher
+import com.barkfluff.BarkCloud.data.gallery.planDeviceDelete
+import com.barkfluff.BarkCloud.data.gallery.resolveCloudCopies
+import com.barkfluff.BarkCloud.data.cloud.CloudCopy
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.persistence.MediaCloudStateDao
 import com.barkfluff.BarkCloud.data.upload.UploadDestination
@@ -23,8 +32,6 @@ import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +41,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 data class GalleryUiState(
     val permissionGranted: Boolean = false,
@@ -72,11 +78,15 @@ class GalleryViewModel(
     )
     internal val deletionState: StateFlow<GalleryDeletionState> = deletionCoordinator.state
 
-    private val idToHash = ConcurrentHashMap<String, String>()
-    private val hashPresence = ConcurrentHashMap<String, Boolean>()
-    private val pendingHashes = LinkedHashSet<String>()
+    private val presence = CloudPresenceChecker(
+        scope = viewModelScope,
+        mediaDao = mediaDao,
+        hashFile = { media -> withContext(Dispatchers.IO) { MediaHasher.sha256(appContext, media.uri) } },
+        presence = { hashes -> cloudRepository.checkFileHashesDetailed(hashes) },
+    )
     private val mediaLoadMutex = Mutex()
-    private var flushJob: Job? = null
+    private val deviceDeleteExecutor: DeviceDeleteExecutor
+        get() = (appContext as BarkCloudApplication).deviceDeleteExecutor
 
     init {
         _state.update {
@@ -88,7 +98,6 @@ class GalleryViewModel(
         viewModelScope.launch {
             mediaDao.observeAll().collectLatest { states ->
                 val byId = states.associate { it.mediaKey to it.status }
-                states.forEach { state -> state.hash?.let { hashPresence[it] = state.status == MediaCloudStatus.IN_CLOUD } }
                 _state.update { it.copy(cloudStates = byId) }
             }
         }
@@ -120,10 +129,10 @@ class GalleryViewModel(
 
     fun toggleSelecting() = clearSelection()
 
-    fun startSelecting(key: String) = _state.update {
+    /** Полный выбор, вычисленный жестом диапазона; пустой набор выключает режим выбора. */
+    fun setSelection(keys: Set<String>) = _state.update {
         if (deletionState.value.isBusy) return@update it
-        val selection = PhotoSelection(it.selected).start(key)
-        it.copy(selecting = selection.isSelecting, selected = selection.keys)
+        it.copy(selecting = keys.isNotEmpty(), selected = keys)
     }
 
     fun toggle(key: String) = _state.update {
@@ -156,8 +165,7 @@ class GalleryViewModel(
             val app = appContext as BarkCloudApplication
             var failures = 0
             for (media in targets) {
-                val hash = idToHash[media.mediaKey]
-                    ?: withContext(Dispatchers.IO) { MediaHasher.sha256(appContext, media.uri) }?.also { idToHash[media.mediaKey] = it }
+                val hash = presence.hashOf(media)
                 runCatching {
                     app.uploadQueue.enqueue(
                         uri = media.uri,
@@ -212,40 +220,41 @@ class GalleryViewModel(
     }
 
     fun observeCloudPresence(media: DeviceMedia) {
-        viewModelScope.launch {
-            val existing = mediaDao.byKey(media.mediaKey)
-            if (existing != null &&
-                existing.dateModifiedSeconds == media.dateModifiedSeconds &&
-                existing.sizeBytes == media.sizeBytes &&
-                existing.status in setOf(MediaCloudStatus.QUEUED, MediaCloudStatus.UPLOADING, MediaCloudStatus.IN_CLOUD)
-            ) return@launch
-            val hash = idToHash[media.mediaKey]
-                ?: withContext(Dispatchers.IO) { MediaHasher.sha256(appContext, media.uri) }?.also { idToHash[media.mediaKey] = it }
-                ?: return@launch
-            hashPresence[hash]?.let { exists ->
-                mediaDao.upsert(mediaState(media, hash, if (exists) MediaCloudStatus.IN_CLOUD else MediaCloudStatus.NOT_IN_CLOUD))
-                return@launch
-            }
-            mediaDao.upsert(mediaState(media, hash, MediaCloudStatus.CHECKING))
-            enqueueHash(hash)
-        }
+        presence.request(media)
     }
 
-    /** Revalidates every candidate before Android shows its destructive system dialog. */
+    /**
+     * Перед системным диалогом очистки устройства: подтверждённая (пригодная для действия) облачная
+     * копия по хешу. Фото без такой копии не удаляются: «удалить с устройства» сохраняет облако.
+     */
     suspend fun prepareDeviceCopyDeletion(): List<DeviceMedia> {
         val localItems = DeviceMediaStore.query(appContext)
         _state.update { it.copy(items = localItems) }
         val items = localItems.filter { _state.value.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
-        val states = mediaDao.all().associateBy { it.mediaKey }
-        val hashes = items.mapNotNull { states[it.mediaKey]?.hash }.distinct()
-        if (hashes.isEmpty()) return emptyList()
-        val presence = cloudRepository.checkFileHashes(hashes)
-        return items.filter { media ->
-            val state = states[media.mediaKey]
-            val exists = state?.hash?.let { presence[it] } == true &&
-                state.sizeBytes == media.sizeBytes && state.dateModifiedSeconds == media.dateModifiedSeconds
-            if (!exists && state != null) mediaDao.upsert(state.copy(status = MediaCloudStatus.NOT_IN_CLOUD))
-            exists
+        val copies = resolveCloudCopies(items, hashOf = presence::hashOf, presence = cloudRepository::checkFileHashesDetailed)
+        return items.filter { copies[it.mediaKey] is CloudCopy.Present }
+    }
+
+    /**
+     * План удаления выбранных фото: [DeviceDeleteMode.KEEP_CLOUD] — только с подтверждённой копией,
+     * [DeviceDeleteMode.EVERYWHERE] — с устройства и все живые облачные копии. Хеши и состояния
+     * перепроверяются здесь же, сразу перед системным подтверждением.
+     */
+    internal suspend fun prepareDeviceDelete(mode: DeviceDeleteMode, mediaKeys: List<String>): PreparedDeviceDelete {
+        val targets = selectedDeviceTargets(mediaKeys)
+        val copies = resolveCloudCopies(targets, hashOf = presence::hashOf, presence = cloudRepository::checkFileHashesDetailed)
+        val plan = planDeviceDelete(mode, targets.map { DeviceDeleteItem(it.mediaKey, copies[it.mediaKey] ?: CloudCopy.Unknown) })
+        val hashes = targets.mapNotNull { item -> presence.hashOf(item)?.let { item.mediaKey to it } }.toMap()
+        return PreparedDeviceDelete(plan, hashes)
+    }
+
+    /** Операция фиксируется до системного диалога. Без входа в аккаунт не создаётся (возвращает null). */
+    internal suspend fun createDeviceDeleteOperation(prepared: PreparedDeviceDelete): String? {
+        val app = appContext as BarkCloudApplication
+        val scope = app.currentOperationScope() ?: return null
+        val vaultIds = app.vaultStore.items().map { it.fileId }.toSet()
+        return withContext(Dispatchers.IO) {
+            deviceDeleteExecutor.create(scope, prepared.plan, prepared.hashes, vaultIds).id
         }
     }
 
@@ -264,7 +273,20 @@ class GalleryViewModel(
                 selected = selection.keys,
             )
         }
-        viewModelScope.launch { mediaKeys.forEach { mediaDao.delete(it) } }
+        viewModelScope.launch {
+            mediaKeys.forEach {
+                mediaDao.delete(it)
+                (appContext as BarkCloudApplication).uploadQueue.cancelLiveForMediaKey(it)
+            }
+        }
+    }
+
+    /** Добавляет выбранные облачные элементы в альбом; возвращает число переданных. */
+    suspend fun addCloudSelectionToAlbum(albumId: String, fileIds: List<String>): Int {
+        if (deletionState.value.isBusy || fileIds.isEmpty()) return 0
+        (appContext as BarkCloudApplication).albumRepository.addItems(albumId, fileIds)
+        _state.update { it.copy(selected = emptySet(), selecting = false) }
+        return fileIds.size
     }
 
     suspend fun addFavorites(fileIds: List<String>): Set<String> {
@@ -288,8 +310,27 @@ class GalleryViewModel(
 
     internal fun abortSystemDelete() = deletionCoordinator.abortSystemConfirmation()
 
-    internal fun completeSystemDelete(pending: PendingPhotoDelete, approved: Boolean) =
+    /**
+     * Ответ системы. Облачные копии удаляются только после подтверждения и только для плана,
+     * которому соответствует запрос; отказ оставляет облако нетронутым.
+     */
+    internal fun completeSystemDelete(pending: PendingPhotoDelete, approved: Boolean) {
+        val operationId = pending.operationId
+        if (operationId != null) {
+            // Операция записана до диалога; одобрение фиксируется до облачных вызовов, отказ снимает её.
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    if (approved) {
+                        deviceDeleteExecutor.approve(operationId)
+                        deviceDeleteExecutor.runCloud(operationId, allowHidden = HiddenDeviceSession.unlocked)
+                    } else {
+                        deviceDeleteExecutor.deny(operationId)
+                    }
+                }
+            }
+        }
         deletionCoordinator.completeSystemConfirmation(pending, approved)
+    }
 
     internal fun deleteCloudOnly(fileIds: List<String>, totalCount: Int = fileIds.size): Boolean {
         if (_state.value.isQueueing) return false
@@ -328,30 +369,6 @@ class GalleryViewModel(
         }
     }
 
-    private fun enqueueHash(hash: String) {
-        synchronized(pendingHashes) { pendingHashes.add(hash) }
-        flushJob?.cancel()
-        flushJob = viewModelScope.launch {
-            delay(400)
-            flushPresence()
-        }
-    }
-
-    private suspend fun flushPresence() {
-        val hashes = synchronized(pendingHashes) { pendingHashes.toList().also { pendingHashes.clear() } }
-        if (hashes.isEmpty()) return
-        hashes.chunked(500).forEach { chunk ->
-            val result = runCatching { cloudRepository.checkFileHashes(chunk) }.getOrNull() ?: return@forEach
-            result.forEach { (hash, exists) -> hashPresence[hash] = exists }
-            _state.value.items.forEach { media ->
-                val hash = idToHash[media.mediaKey] ?: return@forEach
-                result[hash]?.let { exists ->
-                    mediaDao.upsert(mediaState(media, hash, if (exists) MediaCloudStatus.IN_CLOUD else MediaCloudStatus.NOT_IN_CLOUD))
-                }
-            }
-        }
-    }
-
     private fun mediaState(media: DeviceMedia, hash: String?, status: MediaCloudStatus): MediaCloudState =
         MediaCloudState(
             mediaKey = media.mediaKey,
@@ -382,3 +399,6 @@ class GalleryViewModel(
         }
     }
 }
+
+/** Подготовленное удаление фото устройства: план и хеши, без состояния в полях ViewModel. */
+internal data class PreparedDeviceDelete(val plan: DeviceDeletePlan, val hashes: Map<String, String>)

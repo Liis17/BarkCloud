@@ -66,23 +66,25 @@ public class FileHashesStorage : IFileHashesStorage
     }
 
     /// <summary>
-    /// Пакетная проверка, ограниченная файлами ТЕКУЩЕГО пользователя: из набора хешей возвращает те,
-    /// для которых у владельца есть живая (не в корзине) запись в облаке. Так дедуп-подсказка не
-    /// раскрывает наличие файлов других пользователей. Ожидает нормализованные (lowercase) хеши.
+    /// Пакетная проверка, ограниченная файлами ТЕКУЩЕГО пользователя: возвращает совпадения хешей с
+    /// живыми (не в корзине) записями владельца в облаке. Блобы, не READY, тоже возвращаются —
+    /// признак <see cref="OwnerHashMatch.IsActionable"/> отделяет «есть, но не годится для действий» от пригодных ID.
+    /// Так дедуп-подсказка не раскрывает наличие файлов других пользователей. Ожидает нормализованные (lowercase) хеши.
     /// </summary>
-    public async Task<HashSet<string>> GetExistingHashesForOwner(long ownerId, IReadOnlyCollection<string> hashes, CancellationToken cancellationToken = default)
+    public async Task<List<OwnerHashMatch>> GetLiveHashMatchesForOwner(long ownerId, IReadOnlyCollection<string> hashes, CancellationToken cancellationToken = default)
     {
         if (hashes.Count == 0)
-            return new HashSet<string>();
+            return [];
 
-        var found = await _context.FileHashes
+        return await _context.FileHashes
             .AsNoTracking()
             .Where(h => hashes.Contains(h.Hash)
                         && _context.CloudFileEntries.Any(e => e.OwnerId == ownerId && e.FileId == h.FileId && !e.IsDeleted))
-            .Select(h => h.Hash)
+            .Select(h => new OwnerHashMatch(
+                h.Hash,
+                h.FileId,
+                _context.UploadedFiles.WhereReady().Any(f => f.Id == h.FileId && f.Uploaders.Contains(ownerId))))
             .ToListAsync(cancellationToken);
-
-        return found.ToHashSet();
     }
 
     /// <summary>

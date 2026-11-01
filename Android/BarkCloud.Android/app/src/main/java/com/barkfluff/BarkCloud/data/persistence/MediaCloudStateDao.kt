@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudState
+import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -20,6 +21,50 @@ interface MediaCloudStateDao {
 
     @Query("SELECT * FROM media_cloud_states WHERE mediaKey = :mediaKey LIMIT 1")
     suspend fun byKey(mediaKey: String): MediaCloudState?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(state: MediaCloudState): Long
+
+    /**
+     * Присутствие в облаке подтверждено. Условия защищают от гонок: строка должна описывать
+     * тот же снимок файла, а идущая загрузка (QUEUED/UPLOADING) не перезаписывается.
+     */
+    @Query(
+        "UPDATE media_cloud_states SET status = 'IN_CLOUD', hash = :hash, cloudFileId = :cloudFileId " +
+            "WHERE mediaKey = :mediaKey AND dateModifiedSeconds = :dateModifiedSeconds AND sizeBytes = :sizeBytes " +
+            "AND status NOT IN ('QUEUED', 'UPLOADING')",
+    )
+    suspend fun markInCloud(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String, cloudFileId: String?): Int
+
+    /**
+     * Авторитетное «облачной копии нет» с поколением: применяется, только если строка всё ещё в том
+     * состоянии, которое было снято до запроса присутствия ([expectedStatus], [expectedCloudFileId]).
+     * Так устаревший ответ не затирает новую загрузку, а удалённый в облаке файл снимает значок.
+     */
+    @Query(
+        "UPDATE media_cloud_states SET status = 'NOT_IN_CLOUD', hash = :hash, cloudFileId = NULL " +
+            "WHERE mediaKey = :mediaKey AND dateModifiedSeconds = :dateModifiedSeconds AND sizeBytes = :sizeBytes " +
+            "AND status = :expectedStatus AND cloudFileId IS :expectedCloudFileId " +
+            "AND status NOT IN ('QUEUED', 'UPLOADING')",
+    )
+    suspend fun markAbsent(
+        mediaKey: String,
+        dateModifiedSeconds: Long,
+        sizeBytes: Long,
+        hash: String,
+        expectedStatus: MediaCloudStatus,
+        expectedCloudFileId: String?,
+    ): Int
+
+    @Query(
+        "UPDATE media_cloud_states SET hash = :hash WHERE mediaKey = :mediaKey " +
+            "AND dateModifiedSeconds = :dateModifiedSeconds AND sizeBytes = :sizeBytes",
+    )
+    suspend fun setHash(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String): Int
+
+    /** Файл удалён из облака: строки, ссылавшиеся на него, больше не считаются присутствующими. */
+    @Query("UPDATE media_cloud_states SET status = 'NOT_IN_CLOUD', cloudFileId = NULL WHERE cloudFileId = :cloudFileId")
+    suspend fun markCloudFileRemoved(cloudFileId: String): Int
 
     @Query("DELETE FROM media_cloud_states WHERE mediaKey = :mediaKey")
     suspend fun delete(mediaKey: String)

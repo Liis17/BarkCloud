@@ -13,6 +13,8 @@ internal data class PendingPhotoDelete(
     val cloudFileIds: List<String>,
     val totalCount: Int,
     val accountReclaim: Boolean = false,
+    /** Durable-операция удаления фото устройства, записанная до системного диалога. */
+    val operationId: String? = null,
 )
 
 internal data class GalleryDeleteResult(

@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,11 +89,16 @@ import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.net.FileTransferService
+import com.barkfluff.BarkCloud.data.cloud.AlbumCard
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
+import com.barkfluff.BarkCloud.ui.components.CloudAlbumPickerDialog
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.RefreshContentSurface
@@ -102,6 +108,10 @@ import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
 import com.barkfluff.BarkCloud.ui.media.MediaCell
+import com.barkfluff.BarkCloud.ui.selection.dragSelection
+import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
+import com.barkfluff.BarkCloud.ui.selection.viewportBounds
+import com.barkfluff.BarkCloud.ui.selection.visibleCells
 import com.barkfluff.BarkCloud.ui.media.MediaGridViewModel
 import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueUiState
@@ -169,6 +179,8 @@ fun GalleryScreen(
     var viewer by remember { mutableStateOf<DeviceMedia?>(null) }
     var cloudViewer by remember { mutableStateOf<MediaAsset?>(null) }
     var deleteDialogOpen by remember { mutableStateOf(false) }
+    var deviceConfirm by remember { mutableStateOf<DeviceDeleteConfirm?>(null) }
+    var albumPick by remember { mutableStateOf<List<AlbumCard>?>(null) }
     var pendingDelete by rememberSaveable(stateSaver = pendingPhotoDeleteSaver) {
         mutableStateOf<PendingPhotoDelete?>(null)
     }
@@ -179,6 +191,7 @@ fun GalleryScreen(
     var storageLoading by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var refreshQueued by remember { mutableStateOf(false) }
+    var dragSelecting by remember { mutableStateOf(false) }
     var selectionToolbarHeightPx by remember { mutableStateOf(0) }
 
     val timeline = remember(cloudPhotos.items, cloudVideos.items) {
@@ -194,8 +207,20 @@ fun GalleryScreen(
         .filter { it.startsWith(CLOUD_SELECTION_PREFIX) }
         .map { it.removePrefix(CLOUD_SELECTION_PREFIX) }
 
+    val selectableKeys = remember(dateSections) { dateSections.flatMap { section -> section.items.map { it.key } } }
+    val timelineByKey = remember(timeline) { timeline.associateBy { it.key } }
+    val dragController = rememberDragSelection(
+        orderedKeys = selectableKeys,
+        selected = state.selected,
+        onSelectionChange = viewModel::setSelection,
+        visibleCells = { gridState.visibleCells() },
+        viewport = { gridState.viewportBounds(bottomInsetPx = selectionToolbarHeightPx.toFloat()) },
+        scrollBy = { gridState.scrollBy(it) },
+        onDragActiveChange = { dragSelecting = it },
+    )
+
     fun requestRefresh() {
-        if (deletionState.isBusy) return
+        if (deletionState.isBusy || dragSelecting) return
         if (refreshing) {
             refreshQueued = true
             return
@@ -373,15 +398,18 @@ fun GalleryScreen(
         }
     }
 
-    fun beginDeviceDelete(deviceMediaKeys: List<String>, cloudIds: List<String>) {
-        val targets = viewModel.selectedDeviceTargets(deviceMediaKeys)
-        if (targets.isEmpty()) return
-        val pending = PendingPhotoDelete(
-            deviceMediaKeys = targets.map { it.mediaKey },
-            cloudFileIds = cloudIds,
-            totalCount = targets.size + cloudIds.size,
-        )
-        launchSystemDelete(pending, targets.map { it.uri })
+    /** План проверяется сейчас (хеши и облако), число копий показывается до системного диалога. */
+    fun beginDeviceDelete(mode: DeviceDeleteMode, deviceMediaKeys: List<String>, cloudIds: List<String>) {
+        scope.launch {
+            val prepared = viewModel.prepareDeviceDelete(mode, deviceMediaKeys)
+            val plan = prepared.plan
+            if (plan.devicePhotos.isEmpty()) {
+
+                snackbarHostState.showSnackbar(context.getString(R.string.device_delete_nothing))
+                return@launch
+            }
+            deviceConfirm = DeviceDeleteConfirm(prepared, cloudIds)
+        }
     }
 
     fun deleteCloudOnly(fileIds: List<String>) {
@@ -449,8 +477,19 @@ fun GalleryScreen(
             ) {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 120.dp),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().dragSelection(dragController) { key ->
+                        if (!deletionState.isBusy) {
+                            if (state.selecting) {
+                                viewModel.toggle(key)
+                            } else when (val item = timelineByKey[key]) {
+                                is PhotoTimelineItem.Device -> viewer = item.media
+                                is PhotoTimelineItem.Cloud -> cloudViewer = item.asset
+                                null -> Unit
+                            }
+                        }
+                    },
                     state = gridState,
+                    userScrollEnabled = !dragSelecting,
                     contentPadding = PaddingValues(
                         bottom = 20.dp + if (state.selecting) with(density) { selectionToolbarHeightPx.toDp() } else 0.dp,
                     ),
@@ -478,23 +517,9 @@ fun GalleryScreen(
                                     selected = item.key in state.selected,
                                     cloudStatus = state.cloudStates[item.media.mediaKey],
                                     onAppear = { viewModel.observeCloudPresence(item.media) },
-                                    onTap = {
-                                        if (!deletionState.isBusy) {
-                                            if (state.selecting) viewModel.toggle(item.key) else viewer = item.media
-                                        }
-                                    },
-                                    onLongPress = { if (!deletionState.isBusy) viewModel.startSelecting(item.key) },
                                 )
                                 is PhotoTimelineItem.Cloud -> MediaCell(
                                     asset = item.asset,
-                                    onTap = {
-                                        if (!deletionState.isBusy) {
-                                            if (state.selecting) viewModel.toggle(item.key) else cloudViewer = item.asset
-                                        }
-                                    },
-                                    onFavorite = {},
-                                    onAddToVault = {},
-                                    onLongPress = { if (!deletionState.isBusy) viewModel.startSelecting(item.key) },
                                     selecting = state.selecting,
                                     selected = item.key in state.selected,
                                 )
@@ -518,6 +543,9 @@ fun GalleryScreen(
                 isBusy = deletionState.isBusy || state.isQueueing,
                 isQueueing = state.isQueueing,
                 onUpload = viewModel::uploadSelected,
+                onAlbum = {
+                    scope.launch { albumPick = loadAllAlbums(app.albumRepository) }
+                },
                 onFavorite = {
                     scope.launch {
                         val added = viewModel.addFavorites(selectedCloudIds)
@@ -550,6 +578,68 @@ fun GalleryScreen(
         SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 
+    albumPick?.let { choices ->
+        CloudAlbumPickerDialog(
+            albums = choices,
+            enabled = !deletionState.isBusy,
+            onPick = { album ->
+                albumPick = null
+                scope.launch {
+                    val added = viewModel.addCloudSelectionToAlbum(album.id, selectedCloudIds)
+                    if (added > 0) snackbarHostState.showSnackbar(context.getString(R.string.viewer_album_added))
+                }
+            },
+            onDismiss = { albumPick = null },
+        )
+    }
+
+    deviceConfirm?.let { confirm ->
+        val plan = confirm.prepared.plan
+        AlertDialog(
+            onDismissRequest = { deviceConfirm = null },
+            title = { Text(stringResource(R.string.gallery_delete_selected_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (plan.mode == DeviceDeleteMode.KEEP_CLOUD) {
+                            stringResource(R.string.device_confirm_keep_cloud, plan.devicePhotos.size)
+                        } else {
+                            stringResource(R.string.device_confirm_everywhere, plan.devicePhotos.size, plan.cloudCopyCount)
+                        },
+                    )
+                    if (plan.skipped.isNotEmpty()) Text(stringResource(R.string.device_confirm_skipped, plan.skipped.size))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    deviceConfirm = null
+                    scope.launch {
+                        val operationId = viewModel.createDeviceDeleteOperation(confirm.prepared)
+                        if (operationId == null) {
+                            snackbarHostState.showSnackbar(context.getString(R.string.device_op_login))
+                            return@launch
+                        }
+                        val targets = viewModel.selectedDeviceTargets(plan.devicePhotos)
+                        launchSystemDelete(
+                            PendingPhotoDelete(
+                                deviceMediaKeys = plan.devicePhotos,
+                                cloudFileIds = confirm.cloudIds,
+                                totalCount = plan.devicePhotos.size + confirm.cloudIds.size,
+                                operationId = operationId,
+                            ),
+                            targets.map { it.uri },
+                        )
+                    }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceConfirm = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
     if (deleteDialogOpen) {
         AlertDialog(
             onDismissRequest = { deleteDialogOpen = false },
@@ -564,11 +654,13 @@ fun GalleryScreen(
                                 deleteDialogOpen = false
                                 when (action) {
                                     PhotoDeleteAction.DEVICE -> beginDeviceDelete(
+                                        DeviceDeleteMode.KEEP_CLOUD,
                                         selectedDeviceMediaKeys,
                                         emptyList(),
                                     )
                                     PhotoDeleteAction.CLOUD -> deleteCloudOnly(selectedCloudIds)
                                     PhotoDeleteAction.BOTH -> beginDeviceDelete(
+                                        DeviceDeleteMode.EVERYWHERE,
                                         selectedDeviceMediaKeys,
                                         selectedCloudIds,
                                     )
@@ -703,6 +795,7 @@ internal fun GallerySelectionToolbar(
     isQueueing: Boolean,
     onUpload: () -> Unit,
     onFavorite: () -> Unit,
+    onAlbum: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Box(
@@ -726,6 +819,15 @@ internal fun GallerySelectionToolbar(
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                         ) {
                             Text(stringResource(R.string.gallery_upload_selected, actions.uploadCount))
+                        }
+                    }
+                    if (actions.cloudCount > 0) {
+                        TextButton(
+                            onClick = onAlbum,
+                            enabled = !isBusy,
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                        ) {
+                            Text(stringResource(R.string.album_add_selected, actions.cloudCount))
                         }
                     }
                     if (actions.favoriteCount > 0) {
@@ -760,8 +862,6 @@ private fun GalleryCell(
     selected: Boolean,
     cloudStatus: MediaCloudStatus?,
     onAppear: () -> Unit,
-    onTap: () -> Unit,
-    onLongPress: () -> Unit,
 ) {
     LaunchedEffect(media.id) { onAppear() }
     val badgeScale by androidx.compose.animation.core.animateFloatAsState(
@@ -775,8 +875,7 @@ private fun GalleryCell(
         label = "selectOverlayAlpha",
     )
     Box(
-        modifier = Modifier.aspectRatio(1f).padding(1.dp).clip(MaterialTheme.shapes.small)
-            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
+        modifier = Modifier.aspectRatio(1f).padding(1.dp).clip(MaterialTheme.shapes.small),
     ) {
         MediaThumb(
             model = media.uri,
@@ -821,3 +920,6 @@ private fun GalleryCell(
         }
     }
 }
+
+/** Подтверждаемый план удаления фото устройства и выбранные облачные элементы. */
+private data class DeviceDeleteConfirm(val prepared: PreparedDeviceDelete, val cloudIds: List<String>)
