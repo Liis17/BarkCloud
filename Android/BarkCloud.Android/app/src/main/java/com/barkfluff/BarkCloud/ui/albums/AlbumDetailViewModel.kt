@@ -12,7 +12,9 @@ import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
+import com.barkfluff.BarkCloud.ui.selection.runCloudBatch
 import com.barkfluff.BarkCloud.net.queryFileName
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,8 @@ data class AlbumDetailUiState(
     val pagesCompleted: Int = 0,
     val isRefreshing: Boolean = false,
     val isUploading: Boolean = false,
+    val selected: Set<String> = emptySet(),
+    val busy: Boolean = false,
     val snackbar: String? = null,
 )
 
@@ -131,21 +135,63 @@ class AlbumDetailViewModel(
         }
     }
 
+    /** Выбор элементов альбома (переживает пересоздание экрана). Во время операции не меняется. */
+    fun setSelection(keys: Set<String>) = _state.update { if (it.busy) it else it.copy(selected = keys) }
+
+    fun clearSelection() = _state.update { if (it.busy) it else it.copy(selected = emptySet()) }
+
+    /** Убирает выбранные из этого альбома одним запросом; файлы остаются в облаке. */
+    fun removeSelectedFromAlbum() = runBatch {
+        val ids = _state.value.selected.toList()
+        albumRepository.removeItems(albumId, ids)
+        _state.update { it.copy(items = it.items.filterNot { asset -> asset.id in ids }, selected = emptySet()) }
+    }
+
+    /** Добавляет выбранные в другой альбом. */
+    fun addSelectedToAlbum(targetAlbumId: String) = runBatch {
+        albumRepository.addItems(targetAlbumId, _state.value.selected.toList())
+        _state.update { it.copy(selected = emptySet()) }
+    }
+
+    /** Файлы уходят в корзину по одному; неудачные остаются выбранными для повтора. */
+    fun deleteSelected() = runBatch {
+        val outcome = runCloudBatch(_state.value.selected) { cloudRepository.deleteUserMedia(it) }
+        _state.update {
+            it.copy(
+                items = it.items.filterNot { asset -> asset.id in outcome.succeeded },
+                selected = it.selected - outcome.succeeded,
+                snackbar = if (outcome.failed > 0) appContext.getString(R.string.batch_failed_count, outcome.failed) else it.snackbar,
+            )
+        }
+    }
+
+    /** Обложка только для одного выбранного элемента. */
+    fun setCoverFromSelection() {
+        val fileId = _state.value.selected.singleOrNull() ?: return
+        setCover(fileId)
+        clearSelection()
+    }
+
+    private fun runBatch(block: suspend () -> Unit) {
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true) }
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(snackbar = e.message) }
+            } finally {
+                _state.update { it.copy(busy = false) }
+            }
+        }
+    }
+
     fun setCover(fileId: String) {
         viewModelScope.launch {
             runCatching { albumRepository.updateAlbum(albumId, coverFileId = fileId) }
                 .onFailure { e -> _state.update { it.copy(snackbar = e.message) } }
-        }
-    }
-
-    fun removeItem(fileId: String) {
-        viewModelScope.launch {
-            try {
-                albumRepository.removeItems(albumId, listOf(fileId))
-                _state.update { it.copy(items = it.items.filterNot { a -> a.id == fileId }) }
-            } catch (e: Exception) {
-                _state.update { it.copy(snackbar = e.message) }
-            }
         }
     }
 

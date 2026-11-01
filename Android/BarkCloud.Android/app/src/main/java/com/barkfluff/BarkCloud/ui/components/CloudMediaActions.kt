@@ -132,14 +132,7 @@ internal fun CloudMediaActions(
         if (!overflowOnly && actions.album) {
             CloudMediaActionButton(Icons.Outlined.PhotoAlbum, stringResource(R.string.viewer_action_album), runningAction == null, onClick = {
                 runAction(CloudMediaAction.ALBUM) {
-                    val result = mutableListOf<AlbumCard>()
-                    var page = app.albumRepository.listAlbums()
-                    result.addAll(page.albums)
-                    while (page.hasMore) {
-                        page = app.albumRepository.listAlbums(cursorUpdatedAtMillis = page.nextCursorUpdatedAtMillis, cursorAlbumId = page.nextCursorAlbumId)
-                        result.addAll(page.albums)
-                    }
-                    albums = result
+                    albums = loadAllAlbums(app.albumRepository)
                 }
             })
         }
@@ -243,23 +236,16 @@ internal fun CloudMediaActions(
         HorizontalFloatingToolbar(expanded = true, modifier = modifier) { actionContent() }
     }
     albums?.let { choices ->
-        AlertDialog(
-            onDismissRequest = { albums = null },
-            title = { Text(stringResource(R.string.viewer_action_album)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    if (choices.isEmpty()) Text(stringResource(R.string.viewer_albums_empty))
-                    choices.forEach { album ->
-                        TextButton(enabled = runningAction == null, onClick = {
-                            runAction(CloudMediaAction.ALBUM, R.string.viewer_album_added) {
-                                app.albumRepository.addItems(album.id, listOf(asset.id))
-                                albums = null
-                            }
-                        }) { Text(album.name) }
-                    }
+        CloudAlbumPickerDialog(
+            albums = choices,
+            enabled = runningAction == null,
+            onPick = { album ->
+                runAction(CloudMediaAction.ALBUM, R.string.viewer_album_added) {
+                    app.albumRepository.addItems(album.id, listOf(asset.id))
+                    albums = null
                 }
             },
-            confirmButton = { TextButton(onClick = { albums = null }) { Text(stringResource(R.string.viewer_action_cancel)) } },
+            onDismiss = { albums = null },
         )
     }
 

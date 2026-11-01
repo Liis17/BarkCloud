@@ -14,6 +14,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.GlobalParam
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
+import com.barkfluff.BarkCloud.data.cloud.HashPresence
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
@@ -257,11 +258,9 @@ class UploadWorker(
         // Backups retain the existing cloud-hash dedupe, now after lazy staging.
         if (job.source == UploadSource.BACKUP && job.sessionId == null && job.preparedFileId == null) {
             val hash = requireNotNull(job.mediaHash)
-            if (cloud.checkFileHashes(listOf(hash))[hash] == true) {
-                queue.complete(job)
-                job.mediaKey?.let { key ->
-                    mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(hash = hash, status = MediaCloudStatus.IN_CLOUD, cloudFileId = null)) }
-                }
+            val presence = cloud.checkFileHashesDetailed(listOf(hash))[hash]
+            if (presence?.exists == true) {
+                completeDeduplicated(job, hash, presence, queue, albums, mediaDao)
                 return
             }
         }
@@ -498,10 +497,48 @@ class UploadWorker(
         } catch (error: StatusRuntimeException) {
             if (error.errorCode() != UploadErrorCodes.FILE_ALREADY_ATTACHED) throw AttachFailedException(error)
         }
-        job.albumId?.let { albums.addItems(it, listOf(fileId)) }
+        // Фаза ATTACHING уже выставлена: запросы альбома к этой задаче больше не принимаются, поэтому
+        // читаем итоговый albumId из БД и не теряем его.
+        queue.byId(job.id)?.albumId?.let { albums.addItems(it, listOf(fileId)) }
         queue.complete(job)
         job.mediaKey?.let { key ->
             mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(status = MediaCloudStatus.IN_CLOUD, cloudFileId = fileId)) }
+        }
+    }
+
+    /**
+     * Файл уже есть в облаке: загрузка не нужна. Ожидающий альбом получает детерминированный
+     * (наименьший) пригодный ID. Без пригодного ID при альбоме задача ломается с понятным текстом,
+     * а не завершается молча и не загружает повторно.
+     */
+    private suspend fun completeDeduplicated(
+        job: UploadJob,
+        hash: String,
+        presence: HashPresence,
+        queue: UploadQueueStore,
+        albums: AlbumRepository,
+        mediaDao: MediaCloudStateDao,
+    ) {
+        val fileId = presence.fileIds.minOrNull()
+        when (
+            val outcome = completeDeduplicatedWithAlbum(
+                fileId = fileId,
+                read = { queue.dedupRead(job.id) },
+                addToAlbum = { album, id -> albums.addItems(album, listOf(id)) },
+                completeIfAlbum = { album -> queue.completeDeduplicated(job.id, album) },
+            )
+        ) {
+            is DedupOutcome.Completed -> job.mediaKey?.let { key ->
+                mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(hash = hash, status = MediaCloudStatus.IN_CLOUD, cloudFileId = fileId)) }
+            }
+            // Отменена/приостановлена/завершена между чтением и CAS: статус облака не публикуем.
+            DedupOutcome.Inactive -> Unit
+            DedupOutcome.MissingFileId -> throw UploadTerminalException(
+                "Сервер не вернул ID существующей копии для альбома. Обновите сервер и повторите",
+            )
+            DedupOutcome.Exhausted -> throw IllegalStateException(
+                "Альбом задачи менялся слишком часто; повтор выполнится позже",
+            )
         }
     }
 

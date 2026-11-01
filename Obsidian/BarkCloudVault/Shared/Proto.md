@@ -30,6 +30,8 @@ Parent: [[Index]] · See also: [[Architecture]], [[Backend/GrpcServer]]
 
 `FilesApi.CreateUploadSessionRequest.file_type` — optional enum на поле 6: без него сервер выбирает `CLOUD_FILE`; явные `CLOUD_FILE` и `USER_AVATAR` поддержаны, `UNKNOWN` и неизвестные значения отклоняются. Для аватара действует лимит 20 MiB.
 
+`FilesApi.HashCheckResult.file_ids` (поле 3, additive repeated string): READY-файлы владельца с живыми записями в облаке, отсортированы по возрастанию. Старые клиенты и серверы поле игнорируют; Mac-генерация без него совместима. Клиент Android по отсутствию пригодных ID для `exists=true` считает состояние неизвестным, а не отсутствующим.
+
 ## Генерация и взаимодействия
 
 `Shared/BarkCloud.Proto/BarkCloud.Proto.csproj` не перечисляет `.proto` для генерации. Backend и Web подключают исходные файлы в собственных `.csproj` с нужным `GrpcServices` режимом. `Backend/BarkCloud.GrpcServer/BarkCloud.GrpcServer.csproj` генерирует `configuration_api.proto` и `session_revocation_api.proto` с `Both`; Identity, Users, Files, Torrent и Web компилируют клиентские/серверные стороны используемых ими API.

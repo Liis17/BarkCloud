@@ -221,6 +221,7 @@ class GalleryLayoutUiTest {
                     onUpload = {},
                     onFavorite = {},
                     onDelete = {},
+                    onAlbum = {},
                 )
                 GalleryHeader(
                     modifier = Modifier.align(Alignment.TopCenter),

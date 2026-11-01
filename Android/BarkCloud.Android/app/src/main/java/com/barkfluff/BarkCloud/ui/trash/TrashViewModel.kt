@@ -4,9 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import android.content.Context
 import com.barkfluff.BarkCloud.BarkCloudApplication
+import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.TrashItem
+import com.barkfluff.BarkCloud.ui.selection.BatchOutcome
+import com.barkfluff.BarkCloud.ui.selection.runCloudBatch
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,12 +26,14 @@ data class TrashUiState(
     val canLoadMore: Boolean = true,
     val isRefreshing: Boolean = false,
     val isProcessing: Boolean = false,
+    val selected: Set<String> = emptySet(),
     val snackbar: String? = null,
 ) {
     val isEmpty: Boolean get() = !isLoading && items.isEmpty()
 }
 
 class TrashViewModel(
+    private val appContext: Context,
     private val cloudRepository: CloudRepository,
 ) : ViewModel() {
 
@@ -112,6 +119,49 @@ class TrashViewModel(
         }
     }
 
+    /** Выбор записей корзины (переживает пересоздание экрана). Во время операции не меняется. */
+    fun setSelection(keys: Set<String>) = _state.update { if (it.isProcessing) it else it.copy(selected = keys) }
+
+    fun clearSelection() = _state.update { if (it.isProcessing) it else it.copy(selected = emptySet()) }
+
+    /** Восстанавливает выбранные; неудачные остаются выбранными. */
+    fun restoreSelected() = runBatch {
+        val outcome = runCloudBatch(_state.value.selected) { cloudRepository.restoreFromTrash(it) }
+        applyOutcome(outcome)
+    }
+
+    /** Удаляет выбранные навсегда; вызывающий экран подтверждает действие заранее. */
+    fun deleteSelectedForever() = runBatch {
+        val outcome = runCloudBatch(_state.value.selected) { cloudRepository.deleteFromTrash(it) }
+        applyOutcome(outcome)
+    }
+
+    private fun applyOutcome(outcome: BatchOutcome) {
+        _state.update {
+            it.copy(
+                items = it.items.filterNot { item -> item.id in outcome.succeeded },
+                selected = it.selected - outcome.succeeded,
+                snackbar = if (outcome.failed > 0) appContext.getString(R.string.batch_failed_count, outcome.failed) else it.snackbar,
+            )
+        }
+    }
+
+    private fun runBatch(block: suspend () -> Unit) {
+        if (_state.value.isProcessing) return
+        _state.update { it.copy(isProcessing = true) }
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(snackbar = e.message) }
+            } finally {
+                _state.update { it.copy(isProcessing = false) }
+            }
+        }
+    }
+
     fun snackbarShown() = _state.update { it.copy(snackbar = null) }
 
     companion object {
@@ -120,7 +170,7 @@ class TrashViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as BarkCloudApplication
-                return TrashViewModel(app.cloudRepository) as T
+                return TrashViewModel(app, app.cloudRepository) as T
             }
         }
     }
