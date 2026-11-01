@@ -58,6 +58,7 @@ import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.net.InsecureHttp
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewerLayer
 import com.barkfluff.BarkCloud.ui.components.ExoVideoPlaybackEngine
+import com.barkfluff.BarkCloud.ui.components.ViewerPlaybackGate
 import com.barkfluff.BarkCloud.ui.components.ViewerVideoController
 import com.barkfluff.BarkCloud.ui.components.ViewerVideoPlayer
 import com.barkfluff.BarkCloud.ui.components.ViewerVideoSession
@@ -149,12 +150,13 @@ private fun DeviceMediaPager(
 
     // Плеер создаётся при первом видео; источник — URI устройства, без сети и кеша.
     val currentItems by rememberUpdatedState(items)
+    val playbackGate = remember { ViewerPlaybackGate() }
     val videoSession = remember {
         lazy {
             val engine = ExoVideoPlaybackEngine(context.applicationContext, InsecureHttp.streaming)
             ViewerVideoSession(
                 engine = engine,
-                controller = ViewerVideoController(engine, scope, app.appScope) { id ->
+                controller = ViewerVideoController(engine, scope, app.appScope, playbackGate) { id ->
                     val media = currentItems.firstOrNull { it.mediaKey == id } ?: throw IllegalStateException("Видео не найдено")
                     ResolvedPlayback(PlaybackSource.Local(media.uri.toString())) {}
                 },
@@ -165,7 +167,14 @@ private fun DeviceMediaPager(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && videoSession.isInitialized()) videoSession.value.controller.stop()
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    playbackGate.onBackground()
+                    if (videoSession.isInitialized()) videoSession.value.controller.stop()
+                }
+                Lifecycle.Event.ON_START -> playbackGate.onForeground()
+                else -> Unit
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
