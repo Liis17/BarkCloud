@@ -8,16 +8,18 @@ import kotlinx.coroutines.CancellationException
  */
 internal data class BatchOutcome(
     val succeeded: Set<String>,
-    val failed: Int,
+    val failedIds: Set<String>,
     val remaining: Set<String> = emptySet(),
 ) {
-    val total: Int get() = succeeded.size + failed + remaining.size
+    val failed: Int get() = failedIds.size
+    val retryIds: Set<String> get() = failedIds + remaining
+    val total: Int get() = succeeded.size + retryIds.size
 }
 
 /**
  * Последовательно выполняет [action] для каждого id. Перед каждым элементом проверяется
  * [shouldContinue]: при `false` пакет останавливается, оставшиеся ID возвращаются в [BatchOutcome.remaining].
- * Ошибка одного элемента не прерывает пакет и считается в [BatchOutcome.failed]; отмена
+ * Ошибка одного элемента не прерывает пакет и сохраняет его ID в [BatchOutcome.failedIds]; отмена
  * корутины пробрасывается без проглатывания.
  */
 internal suspend fun runCloudBatch(
@@ -26,11 +28,11 @@ internal suspend fun runCloudBatch(
     action: suspend (String) -> Unit,
 ): BatchOutcome {
     val succeeded = LinkedHashSet<String>()
-    var failed = 0
+    val failedIds = LinkedHashSet<String>()
     val queue = ids.toList()
     for ((index, id) in queue.withIndex()) {
         if (!shouldContinue()) {
-            return BatchOutcome(succeeded, failed, remaining = queue.drop(index).toSet())
+            return BatchOutcome(succeeded, failedIds, remaining = queue.drop(index).toSet())
         }
         try {
             action(id)
@@ -38,8 +40,8 @@ internal suspend fun runCloudBatch(
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
-            failed++
+            failedIds += id
         }
     }
-    return BatchOutcome(succeeded, failed)
+    return BatchOutcome(succeeded, failedIds)
 }
