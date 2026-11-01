@@ -102,21 +102,14 @@ internal class DeviceDeleteExecutor(
         return true
     }
 
-    /**
-     * Системное одобрение. Фиксируется до отмены загрузок: если отмена упадёт, одобрение уже сохранено
-     * и операция продолжится, а не потеряется.
-     */
+    /** Одобрение и каждый шаг локальной очистки сохраняются до перехода к облачной части. */
     suspend fun approve(opId: String): DeleteOperation? {
         val op = store.get(opId) ?: return null
         if (currentScope() != op.scope) return null
-        if (op.phase == DeleteOpPhase.APPROVED) return op
-        val approved = op.copy(phase = DeleteOpPhase.APPROVED)
-        store.put(approved)
-        for (mediaKey in approved.devicePhotos) {
-            device.cancelLiveJobs(mediaKey)
-            device.forget(mediaKey)
+        if (op.phase != DeleteOpPhase.APPROVED) {
+            store.put(op.copy(phase = DeleteOpPhase.APPROVED))
         }
-        return approved
+        return finishDeviceCleanup(opId)
     }
 
     /**
@@ -128,9 +121,14 @@ internal class DeviceDeleteExecutor(
         var reconciled = 0
         var newCopies = 0
         var failed = 0
-        val initial = store.get(opId) ?: return CloudRunResult.NotFound
-        if (initial.phase != DeleteOpPhase.APPROVED) return CloudRunResult.NotApproved
-        if (currentScope() != initial.scope) return CloudRunResult.ScopeChanged
+        val stored = store.get(opId) ?: return CloudRunResult.NotFound
+        if (stored.phase != DeleteOpPhase.APPROVED) return CloudRunResult.NotApproved
+        if (currentScope() != stored.scope) return CloudRunResult.ScopeChanged
+        val initial = finishDeviceCleanup(opId) ?: return when {
+            store.get(opId) == null -> CloudRunResult.NotFound
+            currentScope() != stored.scope -> CloudRunResult.ScopeChanged
+            else -> CloudRunResult.NotApproved
+        }
 
         for (mediaKey in initial.photos.map { it.mediaKey }) {
             val op = store.get(opId) ?: return CloudRunResult.NotFound
@@ -187,4 +185,43 @@ internal class DeviceDeleteExecutor(
     }
 
     private fun remainingCount(opId: String): Int = store.get(opId)?.remainingCount ?: 0
+
+    /** Replays only incomplete, idempotent local steps and verifies scope at every side-effect boundary. */
+    private suspend fun finishDeviceCleanup(opId: String): DeleteOperation? {
+        var operation = store.get(opId) ?: return null
+        if (operation.phase != DeleteOpPhase.APPROVED || currentScope() != operation.scope) return null
+
+        for (mediaKey in operation.devicePhotos) {
+            operation = store.get(opId) ?: return null
+            if (operation.phase != DeleteOpPhase.APPROVED || currentScope() != operation.scope) return null
+
+            if (mediaKey !in operation.cancelledDevicePhotos) {
+                if (currentScope() != operation.scope) return null
+                device.cancelLiveJobs(mediaKey)
+                if (currentScope() != operation.scope) return null
+                operation = store.get(opId) ?: return null
+                if (operation.phase != DeleteOpPhase.APPROVED || currentScope() != operation.scope) return null
+                operation = operation.copy(cancelledDevicePhotos = operation.cancelledDevicePhotos + mediaKey)
+                store.put(operation)
+            }
+
+            operation = store.get(opId) ?: return null
+            if (operation.phase != DeleteOpPhase.APPROVED || currentScope() != operation.scope) return null
+            if (mediaKey !in operation.forgottenDevicePhotos) {
+                if (currentScope() != operation.scope) return null
+                device.forget(mediaKey)
+                if (currentScope() != operation.scope) return null
+                operation = store.get(opId) ?: return null
+                if (operation.phase != DeleteOpPhase.APPROVED || currentScope() != operation.scope) return null
+                operation = operation.copy(forgottenDevicePhotos = operation.forgottenDevicePhotos + mediaKey)
+                store.put(operation)
+            }
+        }
+
+        return store.get(opId)?.takeIf { operation ->
+            operation.phase == DeleteOpPhase.APPROVED &&
+                currentScope() == operation.scope &&
+                operation.devicePhotos.all { it in operation.cancelledDevicePhotos && it in operation.forgottenDevicePhotos }
+        }
+    }
 }

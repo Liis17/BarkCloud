@@ -37,6 +37,9 @@ internal data class DeleteOperation(
     val phase: DeleteOpPhase,
     val devicePhotos: List<String>,
     val photos: List<OpPhoto>,
+    /** Per-photo checkpoints; missing fields in older JSON mean that each step still needs to run. */
+    val cancelledDevicePhotos: List<String> = emptyList(),
+    val forgottenDevicePhotos: List<String> = emptyList(),
 ) {
     val remainingCount: Int get() = photos.sumOf { it.remainingIds.size }
     val hasHiddenRemaining: Boolean get() = photos.any { photo -> photo.remainingIds.any { it in photo.hiddenIds } }
@@ -89,6 +92,8 @@ internal class DeviceDeleteOperationStore(private val file: File) {
         .put("mode", op.mode.name)
         .put("phase", op.phase.name)
         .put("devicePhotos", JSONArray(op.devicePhotos))
+        .put("cancelledDevicePhotos", JSONArray(op.cancelledDevicePhotos))
+        .put("forgottenDevicePhotos", JSONArray(op.forgottenDevicePhotos))
         .put(
             "photos",
             JSONArray().also { photos ->
@@ -111,6 +116,8 @@ internal class DeviceDeleteOperationStore(private val file: File) {
         mode = DeviceDeleteMode.valueOf(json.getString("mode")),
         phase = DeleteOpPhase.valueOf(json.getString("phase")),
         devicePhotos = json.getJSONArray("devicePhotos").strings(),
+        cancelledDevicePhotos = json.optJSONArray("cancelledDevicePhotos")?.strings().orEmpty(),
+        forgottenDevicePhotos = json.optJSONArray("forgottenDevicePhotos")?.strings().orEmpty(),
         photos = json.getJSONArray("photos").let { array ->
             (0 until array.length()).map { index ->
                 val photo = array.getJSONObject(index)
