@@ -153,7 +153,7 @@ data class SharedWithMeEntry(
     companion object {
         fun from(e: ProtoSharedWithMeEntry): SharedWithMeEntry = SharedWithMeEntry(
             grantId = e.grantId,
-            asset = MediaAsset.from(e.file),
+            asset = MediaAsset.from(e.file).copy(origin = CloudMediaOrigin.SHARED),
             ownerUserId = e.ownerUserId,
             sharedAtMillis = if (e.hasSharedAt()) e.sharedAt.toEpochMillis() else 0L,
         )
@@ -221,6 +221,22 @@ data class PublicFile(
         )
     }
 }
+
+/** Фото и видео общего файла открываются в просмотрщике; документы — только скачиванием. */
+val PublicFile.isViewerMedia: Boolean get() = kind == CloudMediaKind.PHOTO || kind == CloudMediaKind.VIDEO
+
+/** Файл общей папки как элемент просмотрщика; оригинал всё равно берётся через shared RPC. */
+fun PublicFile.toViewerAsset(): MediaAsset = MediaAsset(
+    id = id,
+    fileName = name,
+    fileSize = fileSize,
+    kind = kind,
+    previews = previewUrl?.let { listOf(MediaPreview(it, width = PREVIEW_WIDTH_PX)) }.orEmpty(),
+    createdAtMillis = 0L,
+    origin = CloudMediaOrigin.SHARED,
+)
+
+private const val PREVIEW_WIDTH_PX = 1024
 
 data class SharedDirListing(
     val found: Boolean,

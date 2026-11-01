@@ -29,8 +29,8 @@ data class SharedFolderUiState(
 
 /**
  * Read-only навигация по доступной мне чужой папке (`ListSharedDirectory`) — без
- * rename/move/delete/create, зеркалит iOS SharedFolderBrowserScreen. Файлы скачиваются
- * напрямую по `download_url` из ответа — доп. RPC не нужен.
+ * rename/move/delete/create, зеркалит iOS SharedFolderBrowserScreen. `download_url` из листинга
+ * может устареть, поэтому перед скачиванием запрашивается свежий URL через `GetSharedFileDownloadUrl`.
  */
 class SharedFolderBrowserViewModel(
     private val repo: SharedRepository,
@@ -77,7 +77,8 @@ class SharedFolderBrowserViewModel(
         _state.update { it.copy(downloadingFileId = file.id) }
         viewModelScope.launch {
             try {
-                val downloaded = fileCache.loadSharedOriginal(file.id, file.name, file.downloadUrl)
+                val url = repo.getSharedFileDownloadUrl(file.id)
+                val downloaded = fileCache.loadSharedOriginal(file.id, file.name, url)
                 _state.update { it.copy(downloadingFileId = null) }
                 onDownloaded(downloaded)
             } catch (e: Exception) {

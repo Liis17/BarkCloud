@@ -24,6 +24,7 @@ data class FavoritesUiState(
     val items: List<MediaAsset> = emptyList(),
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = true,
+    val pagesCompleted: Int = 0,
     val isRefreshing: Boolean = false,
     val snackbar: String? = null,
     val selected: Set<String> = emptySet(),
@@ -68,6 +69,7 @@ class FavoritesViewModel(
                         isLoading = false,
                         isRefreshing = false,
                         items = page.items.map { f -> f.asset },
+                        pagesCompleted = it.pagesCompleted + 1,
                         canLoadMore = page.hasMore,
                     )
                 }
@@ -94,6 +96,7 @@ class FavoritesViewModel(
                     it.copy(
                         isLoadingMore = false,
                         items = it.items + page.items.map { f -> f.asset },
+                        pagesCompleted = it.pagesCompleted + 1,
                         canLoadMore = page.hasMore,
                     )
                 }
