@@ -41,6 +41,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -60,6 +61,7 @@ private const val POSITION_TICK_MS = 250L
  * Потоковые запросы идут через [streamingCallFactory] без общего таймаута вызова.
  * Ошибка 404 распознаётся по цепочке причин и отдаётся как [VideoFailure.NOT_FOUND].
  */
+@OptIn(UnstableApi::class)
 internal class ExoVideoPlaybackEngine(
     context: Context,
     streamingCallFactory: Call.Factory,
