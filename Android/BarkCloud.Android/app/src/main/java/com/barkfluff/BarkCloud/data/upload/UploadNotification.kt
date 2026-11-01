@@ -10,6 +10,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.barkfluff.BarkCloud.MainActivity
 import com.barkfluff.BarkCloud.R
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 object UploadNotification {
     /** Foreground-уведомление прохода; живёт до выхода воркера. */
@@ -82,13 +84,28 @@ object UploadNotification {
 }
 
 /**
- * Пользователь смахнул foreground-уведомление прохода. До следующего прохода воркер не переписывает
- * уведомление, иначе `setForeground` вернёт чип на экран.
+ * Смахивание foreground-уведомления прохода. [markDismissed] вызывается из BroadcastReceiver:
+ * это только volatile-запись, без suspend и без блокировок. До следующего прохода уведомление
+ * не переписывается, иначе `setForeground` снова вернёт чип на экран.
  */
 internal object UploadNotificationDismissal {
-    @Volatile private var dismissed = false
+    val gate = UploadForegroundGate()
 
-    val isDismissed: Boolean get() = dismissed
+    fun reset() = gate.reset()
+
+    fun markDismissed() = gate.markDismissed()
+}
+
+/**
+ * Публикация foreground-уведомления с защитой от смахивания. Снимок счёта считается без блокировки,
+ * затем под корутинным [Mutex] (не JVM-монитором) проверяется флаг и выполняется `post`.
+ * Смахивание, пришедшее во время подсчёта или в очереди за блокировкой, отменяет публикацию.
+ * Уже начатый `post` отменить нельзя: окно ограничено временем вызова `setForeground`.
+ */
+internal class UploadForegroundGate {
+    private val mutex = Mutex()
+
+    @Volatile private var dismissed = false
 
     fun reset() {
         dismissed = false
@@ -96,5 +113,15 @@ internal object UploadNotificationDismissal {
 
     fun markDismissed() {
         dismissed = true
+    }
+
+    /** `null` из [snapshot] означает пустой счёт: публиковать нечего. */
+    suspend fun publish(snapshot: suspend () -> UploadRunTally?, post: suspend (UploadRunTally) -> Unit) {
+        if (dismissed) return
+        val tally = snapshot() ?: return
+        mutex.withLock {
+            if (dismissed) return
+            post(tally)
+        }
     }
 }

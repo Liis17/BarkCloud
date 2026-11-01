@@ -34,8 +34,9 @@ interface UploadDao {
     suspend fun activeNonBackupCount(): Int
 
     /**
-     * Счёт прохода одним запросом (один снимок БД). Backup исключается, когда политика сети его
-     * блокирует; `failed` считается только для [failedIds] — ошибок этого прохода.
+     * Счёт прохода одним запросом (один снимок БД). Политика сети ограничивает только `remaining`:
+     * backup, заблокированный сетью, не ждёт в счёте. `failed` не зависит от политики: ошибка этого
+     * прохода остаётся в счёте, пока задача не повторена, не поставлена на паузу и не отменена.
      */
     @Query(
         """
@@ -43,8 +44,7 @@ interface UploadDao {
             COUNT(CASE WHEN phase = 'COMPLETED' AND completedAtMillis >= :sinceMillis THEN 1 END) AS done,
             COUNT(CASE WHEN (:includeBackup = 1 OR source != 'BACKUP')
                 AND phase IN ('QUEUED', 'HASHING', 'CREATING_SESSION', 'UPLOADING', 'COMPLETING', 'PROCESSING', 'ATTACHING') THEN 1 END) AS remaining,
-            COUNT(CASE WHEN (:includeBackup = 1 OR source != 'BACKUP')
-                AND phase IN ('FAILED', 'UPLOADED_NOT_ATTACHED') AND id IN (:failedIds) THEN 1 END) AS failed
+            COUNT(CASE WHEN phase IN ('FAILED', 'UPLOADED_NOT_ATTACHED') AND id IN (:failedIds) THEN 1 END) AS failed
         FROM upload_jobs
         """
     )
