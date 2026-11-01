@@ -118,8 +118,29 @@ internal fun shouldRequestNextPage(
 ): Boolean = pagination.hasMore && !pagination.isLoading &&
     shouldLoadMoreAtPagerEdge(settledIndex, itemCount, prefetchDistance)
 
-/** После ошибки JPEG-вида (часто протухшая ссылка) повтор идёт через авторизованный оригинал, а не тем же URL. */
-internal enum class ViewerLoadRecovery { FALLBACK_TO_ORIGINAL, ERROR }
+/** Представление фото, которое грузится в просмотрщике: полноразмерный оригинал или JPEG-вид. */
+internal enum class ViewerRepresentation { ORIGINAL, JPEG_VIEW }
 
-internal fun viewerRecoveryAfterLoadFailure(useJpegView: Boolean): ViewerLoadRecovery =
-    if (useJpegView) ViewerLoadRecovery.FALLBACK_TO_ORIGINAL else ViewerLoadRecovery.ERROR
+/**
+ * Автомат восстановления загрузки фото в одной генерации (до явного Retry).
+ * Каждое представление пробуется не более одного раза: сетевой сбой и ошибка декодирования одинаково
+ * помечают его проваленным. Когда все кандидаты провалены, [current] = null — терминальная ошибка, превью остаётся.
+ * Автоматического возврата к уже проваленному представлению нет; новая генерация начинается только через Retry.
+ */
+internal data class PhotoRecovery(
+    val candidates: List<ViewerRepresentation>,
+    val failed: Set<ViewerRepresentation> = emptySet(),
+) {
+    val current: ViewerRepresentation? get() = candidates.firstOrNull { it !in failed }
+
+    fun afterFailure(representation: ViewerRepresentation): PhotoRecovery = copy(failed = failed + representation)
+}
+
+/** Порядок: JPEG первым только для форматов, которые без JPEG-вида не показать; иначе оригинал первым. */
+internal fun photoRecoveryFor(requiresJpegView: Boolean, hasJpegView: Boolean): PhotoRecovery = PhotoRecovery(
+    candidates = when {
+        !hasJpegView -> listOf(ViewerRepresentation.ORIGINAL)
+        requiresJpegView -> listOf(ViewerRepresentation.JPEG_VIEW, ViewerRepresentation.ORIGINAL)
+        else -> listOf(ViewerRepresentation.ORIGINAL, ViewerRepresentation.JPEG_VIEW)
+    },
+)
