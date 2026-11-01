@@ -8,34 +8,35 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cache.CacheScope
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
-
 import com.barkfluff.BarkCloud.data.cloud.CloudCopy
 import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChange
 import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChanges
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
-
 import com.barkfluff.BarkCloud.data.gallery.CloudPresenceChecker
+import com.barkfluff.BarkCloud.data.gallery.CloudRunResult
+import com.barkfluff.BarkCloud.data.gallery.DeleteOpPhase
+import com.barkfluff.BarkCloud.data.gallery.DeleteOperation
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteExecutor
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteItem
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
+import com.barkfluff.BarkCloud.data.gallery.HiddenDeviceSession
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.data.gallery.MediaHasher
 import com.barkfluff.BarkCloud.data.gallery.cloudStateOf
-import com.barkfluff.BarkCloud.data.gallery.resolveCloudCopies
 import com.barkfluff.BarkCloud.data.gallery.hiddenCopyIds
 import com.barkfluff.BarkCloud.data.gallery.planDeviceDelete
-import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
+import com.barkfluff.BarkCloud.data.gallery.resolveCloudCopies
 import com.barkfluff.BarkCloud.data.persistence.MediaCloudStateDao
 import com.barkfluff.BarkCloud.data.upload.LiveAlbumRequest
 import com.barkfluff.BarkCloud.data.upload.UploadDestination
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.upload.UploadScheduler
 import com.barkfluff.BarkCloud.data.upload.UploadSource
-import com.barkfluff.BarkCloud.data.vault.VaultStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,31 +47,51 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-/** Прогресс постановки ручной загрузки в очередь (копирование файлов); отмена останавливает новые постановки. */
-internal data class StagingProgress(val done: Int, val total: Int)
+/** Прогресс постановки ручной загрузки в очередь; отмена останавливает только новые постановки. */
+internal data class StagingProgress(val done: Int, val total: Int, val cancelled: Boolean = false)
 
-/** Подтверждаемое удаление: режим и план, из которого видно число облачных копий. */
-internal data class DeleteConfirmation(val mode: DeviceDeleteMode, val plan: DeviceDeletePlan)
+/** Подтверждаемое удаление: режим, план (облачные ID подтверждены) и хеши фото. */
+internal data class DeleteConfirmation(val mode: DeviceDeleteMode, val plan: DeviceDeletePlan, val hashes: Map<String, String>)
+
+/** Действие, ожидающее разблокировки Vault. */
+internal sealed interface UnlockReason {
+    data class ConfirmDelete(val confirmation: DeleteConfirmation) : UnlockReason
+    data class AddAlbum(val albumId: String) : UnlockReason
+    data class ResumeOperation(val operationId: String) : UnlockReason
+}
+
+/** Запрос системного подтверждения удаления локальных копий для уже записанной операции. */
+internal data class SystemDeleteRequest(val operationId: String, val uris: List<Uri>)
+
+/** Сводка незавершённой операции для баннера экрана (без содержимого ID). */
+internal data class OperationSummary(
+    val id: String,
+    val phase: DeleteOpPhase,
+    val photos: Int,
+    val remaining: Int,
+    val hidden: Boolean,
+)
 
 internal data class DeviceFoldersUiState(
     val folders: List<DeviceFolder> = emptyList(),
-    /** Статусы облака из Room; BADGE «в облаке» показывается по IN_CLOUD. */
+    /** Статусы облака из Room; значок «в облаке» — по IN_CLOUD. */
     val cloudStates: Map<String, MediaCloudStatus> = emptyMap(),
     val selected: Set<String> = emptySet(),
     val busy: Boolean = false,
     val staging: StagingProgress? = null,
     val confirmation: DeleteConfirmation? = null,
-    /** Среди целей есть скрытые копии: до действия нужна разблокировка vault. */
-    val unlockRequired: Boolean = false,
-    /** Запрос системного подтверждения удаления локальных копий (очищается после показа). */
-    val systemDeleteUris: List<Uri>? = null,
+    val unlockFor: UnlockReason? = null,
+    val systemDelete: SystemDeleteRequest? = null,
+    /** Операция, ожидающая ответа системы: навигация заблокирована, пока ответа нет. */
+    val awaitingSystemOperationId: String? = null,
+    val operations: List<OperationSummary> = emptyList(),
     val snackbar: String? = null,
 )
 
 /**
- * Операции над фото устройства из папок: ручная загрузка, добавление в альбом и два вида удаления.
- * Настройки автозагрузки папок не меняются. Облачные копии определяются по хешу непосредственно
- * перед действием; «неизвестно» блокирует только связанное действие.
+ * Операции над фото устройства из папок. Ожидающие удаления живут в [DeviceFoldersUiState] и в
+ * durable-хранилище операций ([DeviceDeleteExecutor]); обычных изменяемых полей с операцией нет.
+ * Облачные копии определяются по хешу непосредственно перед действием. Настройки автозагрузки не меняются.
  */
 internal class DeviceFoldersViewModel(
     private val appContext: Context,
@@ -78,8 +99,9 @@ internal class DeviceFoldersViewModel(
     private val albums: AlbumRepository,
     private val queue: UploadQueueStore,
     private val mediaDao: MediaCloudStateDao,
-    private val vault: VaultStore,
+    private val vaultIds: () -> Set<String>,
     private val executor: DeviceDeleteExecutor,
+    private val scopeProvider: () -> CacheScope?,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DeviceFoldersUiState())
@@ -94,18 +116,13 @@ internal class DeviceFoldersViewModel(
 
     private var media: List<DeviceMedia> = emptyList()
 
-    /** Ожидающие действия переживают пересоздание экрана (живут в ViewModel). */
-    private var pendingPlan: DeviceDeletePlan? = null
-    private var pendingHashes: Map<String, String> = emptyMap()
-    private var pendingAlbumId: String? = null
-    private var stagingCancelled = false
-
     init {
         viewModelScope.launch {
             mediaDao.observeAll().collect { rows ->
                 _state.update { it.copy(cloudStates = rows.associate { row -> row.mediaKey to row.status }) }
             }
         }
+        viewModelScope.launch { recoverOperations() }
     }
 
     /** Перечитывает локальные папки; выбранные, которых больше нет, снимаются. */
@@ -116,25 +133,21 @@ internal class DeviceFoldersViewModel(
         _state.update { it.copy(folders = deviceFolders(items), selected = it.selected.filter { key -> key in keys }.toSet()) }
     }
 
-    /** Проверка присутствия видимой ячейки; [force] — ревалидация при открытии или обновлении. */
     fun requestPresence(item: DeviceMedia, force: Boolean) = presence.request(item, force)
 
     fun setSelection(keys: Set<String>) = _state.update { if (it.busy || it.staging != null) it else it.copy(selected = keys) }
 
     fun clearSelection() = _state.update { if (it.busy) it else it.copy(selected = emptySet()) }
 
-    /** Ручная загрузка. Уже существующие в облаке копии не загружаются повторно. */
+    /** Ручная загрузка. Существующие в облаке копии не загружаются повторно. */
     fun uploadSelected() = runOperation {
         val targets = selectedMedia()
         val cloudByKey = resolveCloud(targets)
         val toUpload = targets.filter { cloudByKey[it.mediaKey] == CloudCopy.Absent }
         val inCloud = targets.count { cloudByKey[it.mediaKey] is CloudCopy.Present }
-        val unknown = targets.size - toUpload.size - inCloud
         var queued = 0
-        var notQueued = 0
-        stagingCancelled = false
         for ((index, item) in toUpload.withIndex()) {
-            if (stagingCancelled) break
+            if (_state.value.staging?.cancelled == true) break
             _state.update { it.copy(staging = StagingProgress(index, toUpload.size)) }
             try {
                 val hash = presence.hashOf(item)
@@ -156,31 +169,29 @@ internal class DeviceFoldersViewModel(
             }
         }
         _state.update { it.copy(staging = null) }
-        notQueued = toUpload.size - queued
         if (queued > 0) UploadScheduler.enqueue(appContext)
+        val unknown = targets.size - toUpload.size - inCloud
+        val notQueued = unknown + (toUpload.size - queued)
         _state.update {
             it.copy(
                 selected = emptySet(),
-                snackbar = appContext.getString(R.string.device_upload_result, queued, inCloud, unknown + notQueued),
+                snackbar = appContext.getString(R.string.device_upload_result, queued, inCloud, notQueued),
             )
         }
     }
 
-    fun cancelStaging() {
-        stagingCancelled = true
-    }
+    fun cancelStaging() = _state.update { it.copy(staging = it.staging?.copy(cancelled = true)) }
 
     /**
-     * Добавление в альбом. Живая задача получает альбом; иначе существующая копия добавляется
-     * по детерминированному ID; без копии ставится загрузка с альбомом.
+     * Добавление в альбом. Живая задача получает альбом; иначе существующая копия добавляется по
+     * детерминированному ID; без копии ставится загрузка с альбомом. Скрытые копии требуют разблокировки.
      */
-    fun addSelectedToAlbum(albumId: String, unlocked: Boolean = false) = runOperation {
+    fun addSelectedToAlbum(albumId: String) = runOperation {
         val targets = selectedMedia()
         val cloudByKey = resolveCloud(targets)
         val hidden = cloudByKey.values.flatMap { (it as? CloudCopy.Present)?.fileIds.orEmpty() }.any { it in vaultIds() }
-        if (hidden && !unlocked) {
-            pendingAlbumId = albumId
-            _state.update { it.copy(unlockRequired = true) }
+        if (hidden && !HiddenDeviceSession.unlocked) {
+            _state.update { it.copy(unlockFor = UnlockReason.AddAlbum(albumId)) }
             return@runOperation
         }
         var added = 0
@@ -236,112 +247,201 @@ internal class DeviceFoldersViewModel(
         }
     }
 
-    /** Подготовка удаления: состояния облака перепроверяются сейчас, затем подтверждение с числом копий. */
-    fun prepareDelete(mode: DeviceDeleteMode, unlocked: Boolean = false) = runOperation {
+    /**
+     * Подготовка удаления: состояния облака перепроверяются сейчас, подтверждение показывает число копий.
+     * Если среди подтверждаемых копий есть скрытые, сначала нужна разблокировка.
+     */
+    fun prepareDelete(mode: DeviceDeleteMode) = runOperation {
         val targets = selectedMedia()
         val cloudByKey = resolveCloud(targets)
         val plan = planDeviceDelete(mode, targets.map { DeviceDeleteItem(it.mediaKey, cloudByKey[it.mediaKey] ?: CloudCopy.Unknown) })
-        val hidden = plan.hiddenCopyIds(vaultIds())
-        pendingPlan = plan
-        pendingHashes = targets.mapNotNull { item -> presence.hashOf(item)?.let { item.mediaKey to it } }.toMap()
-        if (hidden.isNotEmpty() && !unlocked) {
-            _state.update { it.copy(unlockRequired = true) }
+        val hashes = targets.mapNotNull { item -> presence.hashOf(item)?.let { item.mediaKey to it } }.toMap()
+        val confirmation = DeleteConfirmation(mode, plan, hashes)
+        if (plan.hiddenCopyIds(vaultIds()).isNotEmpty() && !HiddenDeviceSession.unlocked) {
+            _state.update { it.copy(unlockFor = UnlockReason.ConfirmDelete(confirmation)) }
             return@runOperation
         }
-        _state.update { it.copy(confirmation = DeleteConfirmation(mode, plan)) }
+        _state.update { it.copy(confirmation = confirmation) }
     }
 
-    fun cancelDelete() {
-        pendingPlan = null
-        pendingHashes = emptyMap()
-        _state.update { it.copy(confirmation = null) }
-    }
+    fun cancelDelete() = _state.update { it.copy(confirmation = null) }
 
-    /** Подтверждение пользователем: дальше системный запрос на удаление локальных копий. */
+    /**
+     * Подтверждение пользователем: операция сохраняется ДО системного диалога. Без входа в аккаунт
+     * операция не создаётся.
+     */
     fun confirmDelete() {
-        val plan = pendingPlan ?: return
-        val uris = plan.devicePhotos.mapNotNull { key -> media.firstOrNull { it.mediaKey == key }?.uri }
-        _state.update { it.copy(confirmation = null, systemDeleteUris = uris.takeIf { it.isNotEmpty() }) }
+        val confirmation = _state.value.confirmation ?: return
+        val scope = scopeProvider()
+        if (scope == null) {
+            _state.update { it.copy(confirmation = null, snackbar = appContext.getString(R.string.device_op_login)) }
+            return
+        }
+        val uris = confirmation.plan.devicePhotos.mapNotNull { key -> media.firstOrNull { it.mediaKey == key }?.uri }
         if (uris.isEmpty()) {
-            pendingPlan = null
-            _state.update { it.copy(snackbar = appContext.getString(R.string.device_delete_nothing)) }
+            _state.update { it.copy(confirmation = null, snackbar = appContext.getString(R.string.device_delete_nothing)) }
+            return
+        }
+        viewModelScope.launch {
+            val operation = withContext(Dispatchers.IO) {
+                executor.create(scope, confirmation.plan, confirmation.hashes, vaultIds())
+            }
+            _state.update {
+                it.copy(
+                    confirmation = null,
+                    awaitingSystemOperationId = operation.id,
+                    systemDelete = SystemDeleteRequest(operation.id, uris),
+                )
+            }
+            refreshOperations()
         }
     }
 
     /** Системный запрос показан; повторно не запускаем. */
-    fun systemDeleteRequested() = _state.update { it.copy(systemDeleteUris = null) }
+    fun systemDeleteRequested() = _state.update { it.copy(systemDelete = null) }
 
     /**
-     * Ответ системного подтверждения. Отказ не трогает облако. Одобренное удаление выполняется
-     * всегда, даже если другая операция идёт: нельзя оставить локальные копии удалёнными без облака.
+     * Ответ системы для операции [operationId]. Отказ снимает операцию, облако не трогается. Одобрение
+     * фиксируется и выполняется в отдельной корутине, не занимая busy-гейт: одобрение нельзя потерять.
      */
-    fun onSystemDeleteResult(approved: Boolean) {
-        val plan = pendingPlan
-        val hashes = pendingHashes
-        pendingPlan = null
-        pendingHashes = emptyMap()
-        if (!approved || plan == null) return
-        _state.update { it.copy(busy = true) }
+    fun onSystemDeleteResult(operationId: String, approved: Boolean) {
+        _state.update { it.copy(awaitingSystemOperationId = null, systemDelete = null) }
         viewModelScope.launch {
+            if (!approved) {
+                withContext(Dispatchers.IO) { executor.deny(operationId) }
+                _state.update { it.copy(snackbar = appContext.getString(R.string.device_delete_cancelled)) }
+                refreshOperations()
+                return@launch
+            }
             try {
-                val report = executor.finish(plan, hashes)
-                media = media.filterNot { it.mediaKey in plan.devicePhotos }
-                _state.update {
-                    it.copy(
-                        folders = deviceFolders(media),
-                        selected = emptySet(),
-                        snackbar = appContext.getString(
-                            R.string.device_delete_result,
-                            report.devicePhotos,
-                            report.cloudCopiesDeleted,
-                            report.failedPhotos,
-                        ),
-                    )
+                // Локальные фото, которые система только что удалила, берём до того, как операция снимется.
+                val (devicePhotos, result) = withContext(Dispatchers.IO) {
+                    val photos = executor.pendingFor(scopeProvider() ?: return@withContext emptySet<String>() to CloudRunResult.ScopeChanged)
+                        .firstOrNull { it.id == operationId }?.devicePhotos.orEmpty().toSet()
+                    executor.approve(operationId)
+                    photos to executor.runCloud(operationId, allowHidden = true)
                 }
+                reportResult(result)
+                media = media.filterNot { current -> current.mediaKey in devicePhotos }
+                _state.update { it.copy(folders = deviceFolders(media), selected = emptySet()) }
                 CloudLibraryChanges.publish(CloudLibraryChange.Changed)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(snackbar = e.message) }
             } finally {
-                _state.update { it.copy(busy = false) }
+                refreshOperations()
             }
         }
     }
 
-    /** Повтор облачных очисток, оставшихся после частичных ошибок. */
-    fun retryPendingCloudCleanup() = runOperation {
-        val failed = executor.retryPending()
-        _state.update {
-            it.copy(snackbar = if (failed == 0) appContext.getString(R.string.device_cleanup_done) else appContext.getString(R.string.device_cleanup_pending, failed))
+    /** Продолжение незавершённой операции (после прерывания): скрытые цели — только после разблокировки. */
+    fun resumeOperation(operationId: String) {
+        viewModelScope.launch {
+            val operation = withContext(Dispatchers.IO) { findOperation(operationId) } ?: return@launch
+            if (operation.phase == DeleteOpPhase.AWAITING_SYSTEM) {
+                _state.update { it.copy(snackbar = appContext.getString(R.string.device_op_awaiting)) }
+                return@launch
+            }
+            if (operation.hasHiddenRemaining && !HiddenDeviceSession.unlocked) {
+                _state.update { it.copy(unlockFor = UnlockReason.ResumeOperation(operationId)) }
+                return@launch
+            }
+            runOperation { runCloudOperation(operationId) }
         }
     }
 
-    /** Итог разблокировки vault: при успехе продолжается отложенное действие, при отказе сбрасывается. */
+    /** Отмена операции, ещё не подтверждённой системой. Подтверждённые операции не отменяются. */
+    fun discardOperation(operationId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { executor.deny(operationId) }
+            refreshOperations()
+        }
+    }
+
+    /** Итог разблокировки Vault: при успехе продолжается отложенное действие, при отказе сбрасывается. */
     fun onUnlockResult(granted: Boolean) {
-        _state.update { it.copy(unlockRequired = false) }
-        val album = pendingAlbumId
-        pendingAlbumId = null
-        if (!granted) {
-            pendingPlan = null
-            pendingHashes = emptyMap()
-            return
+        val reason = _state.value.unlockFor
+        _state.update { it.copy(unlockFor = null) }
+        if (!granted || reason == null) return
+        HiddenDeviceSession.unlocked = true
+        when (reason) {
+            is UnlockReason.ConfirmDelete -> _state.update { it.copy(confirmation = reason.confirmation) }
+            is UnlockReason.AddAlbum -> addSelectedToAlbum(reason.albumId)
+            is UnlockReason.ResumeOperation -> runOperation { runCloudOperation(reason.operationId) }
         }
-        if (album != null) {
-            addSelectedToAlbum(album, unlocked = true)
-        } else if (pendingPlan != null) {
-            pendingPlan?.let { plan -> _state.update { it.copy(confirmation = DeleteConfirmation(plan.mode, plan)) } }
-        }
+    }
+
+    /** Экран ушёл с переднего плана: разблокировка скрытых копий в памяти сбрасывается. */
+    fun onScreenStopped() {
+        HiddenDeviceSession.unlocked = false
     }
 
     fun snackbarShown() = _state.update { it.copy(snackbar = null) }
+
+    private fun findOperation(operationId: String): DeleteOperation? =
+        scopeProvider()?.let { scope -> executor.pendingFor(scope).firstOrNull { it.id == operationId } }
+
+    /** Выполняет облачную часть подтверждённой операции (busy-гейт уже занят вызывающим). */
+    private suspend fun runCloudOperation(operationId: String) {
+        val result = withContext(Dispatchers.IO) { executor.runCloud(operationId, allowHidden = true) }
+        reportResult(result)
+    }
+
+    private fun reportResult(result: CloudRunResult) {
+        val message = when (result) {
+            is CloudRunResult.Finished -> appContext.getString(
+                R.string.device_op_result,
+                result.deleted,
+                result.reconciled,
+                result.newCopies,
+                result.failed,
+            )
+            is CloudRunResult.NeedsUnlock -> appContext.getString(R.string.device_op_needs_unlock)
+            CloudRunResult.ScopeChanged -> appContext.getString(R.string.device_op_scope_changed)
+            CloudRunResult.NotApproved -> appContext.getString(R.string.device_op_awaiting)
+            CloudRunResult.NotFound -> null
+        }
+        _state.update { it.copy(snackbar = message) }
+    }
+
+    /**
+     * Восстановление после перезапуска: незавершённые операции показываются; подтверждённые без скрытых
+     * целей продолжаются автоматически. Неподтверждённые системой не выполняются — только явный выбор.
+     */
+    private suspend fun recoverOperations() {
+        refreshOperations()
+        val scope = scopeProvider() ?: return
+        val approved = withContext(Dispatchers.IO) { executor.pendingFor(scope) }
+            .filter { it.phase == DeleteOpPhase.APPROVED && !it.hasHiddenRemaining }
+        for (operation in approved) {
+            runOperation { runCloudOperation(operation.id) }
+        }
+        refreshOperations()
+    }
+
+    private suspend fun refreshOperations() {
+        val scope = scopeProvider()
+        val summaries = if (scope == null) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) { executor.pendingFor(scope) }.map { op ->
+                OperationSummary(
+                    id = op.id,
+                    phase = op.phase,
+                    photos = op.photos.size,
+                    remaining = op.remainingCount,
+                    hidden = op.hasHiddenRemaining,
+                )
+            }
+        }
+        _state.update { it.copy(operations = summaries) }
+    }
 
     private fun selectedMedia(): List<DeviceMedia> {
         val keys = _state.value.selected
         return media.filter { it.mediaKey in keys }
     }
-
-    private fun vaultIds(): Set<String> = vault.items().map { it.fileId }.toSet()
 
     /** Облачное состояние каждого фото: хеш из кеша/вычисления, затем пакетная проверка. */
     private suspend fun resolveCloud(items: List<DeviceMedia>): Map<String, CloudCopy> =
@@ -374,9 +474,10 @@ internal class DeviceFoldersViewModel(
                     cloud = app.cloudRepository,
                     albums = app.albumRepository,
                     queue = app.uploadQueue,
-                    mediaDao = BarkCloudDatabase.get(app).mediaCloudStateDao(),
-                    vault = app.vaultStore,
+                    mediaDao = com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase.get(app).mediaCloudStateDao(),
+                    vaultIds = { app.vaultStore.items().map { it.fileId }.toSet() },
                     executor = app.deviceDeleteExecutor,
+                    scopeProvider = app::currentOperationScope,
                 ) as T
             }
         }
