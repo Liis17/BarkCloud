@@ -1,7 +1,9 @@
 package com.barkfluff.BarkCloud.data.gallery
 
 import com.barkfluff.BarkCloud.data.cloud.CHECK_HASHES_BATCH
+import com.barkfluff.BarkCloud.data.cloud.CloudCopy
 import com.barkfluff.BarkCloud.data.cloud.HashPresence
+import com.barkfluff.BarkCloud.data.cloud.checkPresenceBatched
 import com.barkfluff.BarkCloud.data.persistence.MediaCloudStateDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -93,5 +95,22 @@ internal class CloudPresenceChecker(
         } else {
             mediaDao.markAbsent(media.mediaKey, media.dateModifiedSeconds, media.sizeBytes, hash)
         }
+    }
+}
+
+/**
+ * Состояние облачной копии каждого фото по хешу (хеш из кеша или вычисляется), затем пакетная
+ * проверка. Фото без хеша (нечитаемый файл) получает [CloudCopy.Unknown].
+ */
+internal suspend fun resolveCloudCopies(
+    items: List<DeviceMedia>,
+    hashOf: suspend (DeviceMedia) -> String?,
+    presence: suspend (List<String>) -> Map<String, HashPresence>,
+): Map<String, CloudCopy> {
+    val hashByKey = items.mapNotNull { item -> hashOf(item)?.let { item.mediaKey to it } }.toMap()
+    val answers = checkPresenceBatched(hashByKey.values.toList()) { chunk -> presence(chunk) }
+    return items.associate { item ->
+        val hash = hashByKey[item.mediaKey]
+        item.mediaKey to if (hash == null) CloudCopy.Unknown else CloudCopy.of(answers[hash])
     }
 }
