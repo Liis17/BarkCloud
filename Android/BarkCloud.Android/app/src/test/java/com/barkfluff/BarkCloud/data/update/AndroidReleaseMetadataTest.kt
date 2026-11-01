@@ -11,8 +11,8 @@ import org.junit.Test
 class AndroidReleaseMetadataTest {
     @Test
     fun versionCodeUsesTagAndKeepsLegacyVersionNamesIrrelevant() {
-        assertEquals(1_000_004L, AndroidReleaseParser.versionCode("v1.0.4"))
-        assertEquals(2_017_999L, AndroidReleaseParser.versionCode("v2.17.999"))
+        assertEquals(1_000_004_999L, AndroidReleaseParser.versionCode("v1.0.4"))
+        assertEquals(2_017_999_999L, AndroidReleaseParser.versionCode("v2.17.999"))
         assertTrue(AndroidUpdatePolicy.shouldPrompt(
             metadata("v1.0.4"),
             installedVersionCode = 2,
@@ -22,8 +22,27 @@ class AndroidReleaseMetadataTest {
     }
 
     @Test
+    fun devBuildsAreOrderedByRunNumberAndStayBelowNextStableRelease() {
+        val devOld = AndroidReleaseParser.versionCode("v1.0.6-dev.12.1+abcdef1")
+        val devNew = AndroidReleaseParser.versionCode("v1.0.6-dev.13.1+abcdef2")
+        assertEquals(1_000_006_012L, devOld)
+        assertTrue(devNew > devOld)
+        assertTrue(devNew < AndroidReleaseParser.versionCode("v1.0.6"))
+        assertTrue(AndroidReleaseParser.versionCode("v1.0.6") > AndroidReleaseParser.versionCode("v1.0.5"))
+    }
+
+    @Test
+    fun acceptsLegacyStableCodeOnlyForStableTags() {
+        assertTrue(AndroidReleaseParser.isAcceptedVersionCode("v1.0.5", 1_000_005L))
+        assertFalse(AndroidReleaseParser.isAcceptedVersionCode("v1.0.6-dev.12.1+abcdef1", 1_000_006L))
+    }
+
+    @Test
     fun rejectsInvalidSemverComponentsAndAndroidOverflow() {
-        listOf("v1.1000.0", "v1.0.1000", "v2148.0.0", "v01.0.0", "v1.0.1-rc.1").forEach { tag ->
+        listOf(
+            "v1.1000.0", "v1.0.1000", "v2148.0.0", "v01.0.0", "v1.0.1-rc.1",
+            "v1.0.6-dev.0.1+abcdef1", "v1.0.6-dev.999.1+abcdef1", "v1.0.6-dev.12.1+ABCDEF1",
+        ).forEach { tag ->
             expectThrows<InvalidReleaseMetadataException> { AndroidReleaseParser.versionCode(tag) }
         }
     }
@@ -96,6 +115,21 @@ class AndroidReleaseMetadataTest {
     }
 
     @Test
+    fun newestReleaseMayBeDevPrereleaseAndUsesItsBuildCode() {
+        val tag = "v1.0.6-dev.12.1+abcdef1"
+        val manifest = manifest(tag = tag, code = 1_000_006_012L)
+        val json = JSONArray()
+            .put(JSONObject(apiRelease(tag = tag, manifestSize = manifest.size.toLong()).replace("\"prerelease\":false", "\"prerelease\":true")))
+            .toString()
+
+        val parsed = AndroidReleaseParser.parseManifest(manifest, AndroidReleaseParser.parseNewest(json))
+
+        assertEquals(1_000_006_012L, parsed.versionCode)
+        assertEquals("BarkCloud.Android-$tag.apk", parsed.apkFileName)
+        expectThrows<InvalidReleaseMetadataException> { AndroidReleaseParser.parseNewest("[]") }
+    }
+
+    @Test
     fun rejectsDraftPrereleaseAndOversizedJson() {
         expectThrows<InvalidReleaseMetadataException> {
             AndroidReleaseParser.parseLatest(apiRelease(manifestSize = 10).replace("\"draft\":false", "\"draft\":true"))
@@ -131,15 +165,15 @@ class AndroidReleaseMetadataTest {
         notes = "",
     )
 
-    private fun manifest(): ByteArray = JSONObject()
+    private fun manifest(tag: String = "v1.0.5", code: Long = 1_000_005L): ByteArray = JSONObject()
         .put("schemaVersion", 1)
-        .put("tag", "v1.0.5")
-        .put("versionName", "1.0.5")
-        .put("versionCode", 1_000_005)
+        .put("tag", tag)
+        .put("versionName", tag.removePrefix("v"))
+        .put("versionCode", code)
         .put(
             "apk",
             JSONObject()
-                .put("fileName", "BarkCloud.Android-v1.0.5.apk")
+                .put("fileName", "BarkCloud.Android-$tag.apk")
                 .put("size", 128)
                 .put("sha256", "ab".repeat(32)),
         )
