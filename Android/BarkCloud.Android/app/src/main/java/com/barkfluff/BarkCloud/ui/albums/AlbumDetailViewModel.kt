@@ -30,6 +30,7 @@ data class AlbumDetailUiState(
     val items: List<MediaAsset> = emptyList(),
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = true,
+    val pagesCompleted: Int = 0,
     val isRefreshing: Boolean = false,
     val isUploading: Boolean = false,
     val selected: Set<String> = emptySet(),
@@ -73,7 +74,7 @@ class AlbumDetailViewModel(
                 cursorAddedAt = page.nextCursorAddedAtMillis
                 cursorFileId = page.nextCursorFileId
                 _state.update {
-                    it.copy(isLoading = false, isRefreshing = false, items = page.items, canLoadMore = page.hasMore)
+                    it.copy(isLoading = false, isRefreshing = false, items = page.items, canLoadMore = page.hasMore, pagesCompleted = it.pagesCompleted + 1)
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, isRefreshing = false, snackbar = e.message) }
@@ -99,7 +100,7 @@ class AlbumDetailViewModel(
                 cursorAddedAt = page.nextCursorAddedAtMillis
                 cursorFileId = page.nextCursorFileId
                 _state.update {
-                    it.copy(isLoadingMore = false, items = it.items + page.items, canLoadMore = page.hasMore)
+                    it.copy(isLoadingMore = false, items = it.items + page.items, canLoadMore = page.hasMore, pagesCompleted = it.pagesCompleted + 1)
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoadingMore = false, snackbar = e.message) }

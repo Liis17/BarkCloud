@@ -23,7 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,11 +36,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import barkcloud.users.UsersApiOuterClass.User
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
+import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.cloud.SharedFolderEntry
 import com.barkfluff.BarkCloud.data.cloud.SharedWithMeEntry
 import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.data.MimeIcon
 import com.barkfluff.BarkCloud.files.ui.formatDate
+import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -51,6 +57,19 @@ fun SharedWithMeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    var viewerAsset by remember { mutableStateOf<MediaAsset?>(null) }
+    val viewerAssets = remember(state.items) {
+        state.items.filter { it.asset.kind == CloudMediaKind.PHOTO || it.asset.isVideo }.map { it.asset }
+    }
+
+    CloudMediaViewer(
+        assets = viewerAssets,
+        selectedAsset = viewerAsset,
+        onDismiss = { viewerAsset = null },
+        infoEnabled = false,
+        pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore, pagesCompleted = state.pagesCompleted),
+        onPageNearEnd = { viewModel.loadMore() },
+    )
 
     LaunchedEffect(Unit) { viewModel.loadIfNeeded() }
     LaunchedEffect(state.snackbar) {
@@ -71,6 +90,7 @@ fun SharedWithMeScreen(
                     entry = entry,
                     owner = state.owners[entry.ownerUserId],
                     isDownloading = state.downloadingFileId == entry.asset.id,
+                    onOpen = if (entry.asset.kind == CloudMediaKind.PHOTO || entry.asset.isVideo) ({ viewerAsset = entry.asset }) else null,
                     onDownload = {
                         viewModel.download(entry) { file ->
                             val mime = MimeIcon.mimeFor(entry.asset.fileName)
@@ -109,11 +129,13 @@ private fun SharedFileRow(
     entry: SharedWithMeEntry,
     owner: User?,
     isDownloading: Boolean,
+    onOpen: (() -> Unit)?,
     onDownload: () -> Unit,
 ) {
     val hasPreview = entry.asset.previews.isNotEmpty()
     ListItem(
         headlineContent = { Text(entry.asset.fileName, maxLines = 1) },
+        modifier = if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier,
         supportingContent = {
             Text(
                 displayName(owner, entry.ownerUserId) + " · " + formatDate(entry.sharedAtMillis),

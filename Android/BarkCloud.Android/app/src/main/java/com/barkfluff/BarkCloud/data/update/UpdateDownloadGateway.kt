@@ -115,6 +115,8 @@ internal interface AndroidUpdateStore {
     fun attempt(): UpdateDownloadAttempt?
     fun saveAttempt(attempt: UpdateDownloadAttempt)
     fun clearAttempt()
+    fun betaChannelEnabled(): Boolean
+    fun setBetaChannelEnabled(enabled: Boolean)
 }
 
 internal class AndroidUpdatePreferences(context: Context) : AndroidUpdateStore {
@@ -204,6 +206,14 @@ internal class AndroidUpdatePreferences(context: Context) : AndroidUpdateStore {
         fun nullableLong(key: String): Long? = if (json.isNull(key)) null else json.getLong(key)
     }
 
+    override fun betaChannelEnabled(): Boolean = prefs.getBoolean(KEY_BETA_CHANNEL, false)
+
+    override fun setBetaChannelEnabled(enabled: Boolean) {
+        check(prefs.edit().putBoolean(KEY_BETA_CHANNEL, enabled).commit()) {
+            "Не удалось сохранить настройку бета-обновлений."
+        }
+    }
+
     private fun promptedDayKey(tag: String): String = "prompted_day_${tag.replace('.', '_')}"
 
     companion object {
@@ -214,5 +224,6 @@ internal class AndroidUpdatePreferences(context: Context) : AndroidUpdateStore {
         private const val KEY_RATE_LIMIT_UNTIL = "rate_limit_until"
         private const val KEY_METADATA_UNAVAILABLE_TAG = "metadata_unavailable_tag"
         private const val KEY_ATTEMPT = "attempt"
+        private const val KEY_BETA_CHANNEL = "beta_channel"
     }
 }

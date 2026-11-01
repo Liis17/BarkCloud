@@ -27,6 +27,7 @@ data class CloudBrowserUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = false,
+    val pagesCompleted: Int = 0,
     val crumbs: List<PathCrumb> = emptyList(),
     val subdirs: List<CloudDirectory> = emptyList(),
     val files: List<CloudFileEntry> = emptyList(),
@@ -94,6 +95,7 @@ class CloudBrowserViewModel(
                     it.copy(
                         isLoading = false,
                         isLoadingMore = false,
+                        pagesCompleted = it.pagesCompleted + 1,
                         canLoadMore = listing.hasMore,
                         subdirs = listing.subdirs,
                         files = listing.files,
@@ -130,6 +132,7 @@ class CloudBrowserViewModel(
                     it.copy(
                         isLoadingMore = false,
                         files = it.files + page.files,
+                        pagesCompleted = it.pagesCompleted + 1,
                         canLoadMore = page.hasMore,
                     )
                 }

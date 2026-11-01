@@ -66,7 +66,6 @@ import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 import com.barkfluff.BarkCloud.ui.selection.SelectionAction
 import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
 import com.barkfluff.BarkCloud.ui.selection.dragSelection
@@ -96,7 +95,6 @@ fun VaultScreen(
     var showDeleteSelected by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     var actionBarHeightPx by remember { mutableIntStateOf(0) }
-    val openRemote = rememberRemoteOpener()
     val vaultAssets = remember(state.items) { state.items.map { it.toMediaAsset() } }
     val selecting = state.selected.isNotEmpty()
     BackHandler(enabled = selecting || state.busy) { if (!state.busy) viewModel.clearSelection() }
@@ -113,10 +111,18 @@ fun VaultScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) viewModel.relock()
+            if (event == Lifecycle.Event.ON_STOP) {
+                // Синхронно: просмотр Vault не должен пережить уход в фон, даже в fade-out.
+                viewer = null
+                viewModel.relock()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(state.lockState) {
+        viewer = vaultViewerSelection(state.lockState, viewer)
     }
 
     LaunchedEffect(state.lockState, activity) {
@@ -210,14 +216,16 @@ fun VaultScreen(
         }
     }
 
-        CloudMediaViewer(
-            assets = vaultAssets,
-            selectedAsset = viewer,
-            onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
-            infoEnabled = false,
-            onDelete = { item -> viewModel.deleteFile(item.id) },
-        )
+        // Вне UNLOCKED вьюер убирается из композиции сразу, без fade: полное фото не остаётся над экраном авторизации.
+        if (state.lockState == VaultLockState.UNLOCKED) {
+            CloudMediaViewer(
+                assets = vaultAssets,
+                selectedAsset = vaultViewerSelection(state.lockState, viewer),
+                onDismiss = { viewer = null },
+                infoEnabled = false,
+                onDelete = { item -> viewModel.deleteFile(item.id) },
+            )
+        }
     }
 
     pickAlbums?.let { choices ->

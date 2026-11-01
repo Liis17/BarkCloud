@@ -175,3 +175,10 @@ class VaultViewModel(
         }
     }
 }
+
+/**
+ * Просмотрщик Vault доступен только в разблокированном состоянии, независимо от глобальной блокировки приложения.
+ * При любом другом состоянии выбор сбрасывается, чтобы просмотр не воскрес после повторной разблокировки.
+ */
+internal fun <T> vaultViewerSelection(lockState: VaultLockState, selected: T?): T? =
+    selected.takeIf { lockState == VaultLockState.UNLOCKED }

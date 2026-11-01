@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.LocalShareFileCache
+import com.barkfluff.BarkCloud.data.cache.withCloudOriginal
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.files.data.FileShareHelper
 import com.barkfluff.BarkCloud.files.data.MimeIcon
@@ -85,6 +86,7 @@ internal fun CloudMediaActions(
         isVideo = asset.isVideo,
         infoEnabled = infoEnabled,
         canDelete = onDelete != null,
+        origin = asset.origin,
     )
     var runningAction by remember(asset.id) { mutableStateOf<CloudMediaAction?>(null) }
     var menuOpen by remember(asset.id) { mutableStateOf(false) }
@@ -118,7 +120,7 @@ internal fun CloudMediaActions(
     }
 
     suspend fun withExportCopy(action: suspend (File) -> Unit) {
-        app.fileCache.withLoadedPinnedOriginal(asset.id, asset.fileName) { original ->
+        withCloudOriginal(asset, app.fileCache, { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) }) { original ->
             val exportCopy = withContext(Dispatchers.IO) {
                 LocalShareFileCache.prepare(context.cacheDir, original, displayName = asset.fileName)
             }
@@ -127,12 +129,14 @@ internal fun CloudMediaActions(
     }
 
     val actionContent: @Composable () -> Unit = {
-        if (!overflowOnly) {
+        if (!overflowOnly && actions.album) {
             CloudMediaActionButton(Icons.Outlined.PhotoAlbum, stringResource(R.string.viewer_action_album), runningAction == null, onClick = {
                 runAction(CloudMediaAction.ALBUM) {
                     albums = loadAllAlbums(app.albumRepository)
                 }
             })
+        }
+        if (!overflowOnly && actions.favorite) {
             CloudMediaActionButton(Icons.Outlined.FavoriteBorder, stringResource(R.string.media_add_favorite), runningAction == null, onClick = {
                 runAction(CloudMediaAction.FAVORITE, R.string.viewer_favorite_added) { app.cloudRepository.addFavorite(asset.id) }
             })
@@ -194,7 +198,7 @@ internal fun CloudMediaActions(
                 onClick = {
                     runAction(CloudMediaAction.DOWNLOAD, R.string.viewer_action_download_complete) {
                         val target = cloudMediaStoreTarget(asset.isVideo, MimeIcon.mimeFor(asset.fileName))
-                        app.fileCache.withLoadedPinnedOriginal(asset.id, asset.fileName) { original ->
+                        withCloudOriginal(asset, app.fileCache, { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) }) { original ->
                             saveToMediaStore(context, original, asset.fileName, target)
                         }
                     }

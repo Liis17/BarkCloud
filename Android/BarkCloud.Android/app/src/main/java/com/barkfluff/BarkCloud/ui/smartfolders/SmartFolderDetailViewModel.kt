@@ -25,6 +25,7 @@ data class SmartFolderDetailUiState(
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = true,
+    val pagesCompleted: Int = 0,
     val items: List<MediaAsset> = emptyList(),
     val snackbar: String? = null,
     val selected: Set<String> = emptySet(),
@@ -70,6 +71,7 @@ class SmartFolderDetailViewModel(
                             isLoading = false,
                             isRefreshing = false,
                             items = page.items,
+                            pagesCompleted = it.pagesCompleted + 1,
                             canLoadMore = page.hasMore,
                         )
                     }
@@ -150,6 +152,7 @@ class SmartFolderDetailViewModel(
                         it.copy(
                             isLoadingMore = false,
                             items = it.items + page.items,
+                            pagesCompleted = it.pagesCompleted + 1,
                             canLoadMore = page.hasMore,
                         )
                     }

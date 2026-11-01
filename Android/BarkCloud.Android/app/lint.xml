@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Media3 помечает ExoPlayer/DataSource API как UnstableApi; плеер просмотрщика использует их осознанно. -->
+<lint>
+    <issue id="UnsafeOptInUsageError">
+        <option name="opt-in" value="androidx.media3.common.util.UnstableApi" />
+    </issue>
+</lint>

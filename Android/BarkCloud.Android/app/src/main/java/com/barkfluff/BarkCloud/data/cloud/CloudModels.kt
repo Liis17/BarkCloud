@@ -37,6 +37,9 @@ enum class CloudMediaKind {
     }
 }
 
+/** Откуда пришёл облачный файл: собственная библиотека или входящий общий доступ. */
+enum class CloudMediaOrigin { OWN, SHARED }
+
 /** Превью определённой ширины. */
 data class MediaPreview(val url: String, val width: Int, val previewFileId: String? = null)
 
@@ -53,8 +56,12 @@ data class MediaAsset(
     val createdAtMillis: Long,
     val jpegViewFileId: String? = null,
     val jpegViewUrl: String? = null,
+    val origin: CloudMediaOrigin = CloudMediaOrigin.OWN,
 ) {
     val isVideo: Boolean get() = kind.isVideo
+
+    /** Стабильный ключ элемента в просмотрщике: один и тот же file_id у своего и общего файла различается. */
+    val viewerId: String get() = "${origin.name}:$id"
 
     /** Превью ближайшее к нужной ширине (или максимальное доступное). */
     fun previewUrl(preferredWidth: Int): String? {

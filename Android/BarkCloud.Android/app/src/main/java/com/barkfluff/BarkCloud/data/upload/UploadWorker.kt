@@ -1,12 +1,12 @@
 package com.barkfluff.BarkCloud.data.upload
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.os.SystemClock
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -33,6 +33,7 @@ import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -54,6 +55,14 @@ class UploadWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
+        val runStart = System.currentTimeMillis()
+        val runToken = UploadNotificationDismissal.beginRun()
+        val refreshPublisher = UploadRefreshPublisher(
+            mainContext = Dispatchers.Main.immediate,
+            isDismissed = { UploadNotificationDismissal.isDismissed(runToken) },
+            isRegistered = { UploadNotification.isForegroundRegistered(applicationContext, runToken) },
+            notify = { tally -> UploadNotification.update(applicationContext, tally, runToken) },
+        )
         val queue = UploadQueueStore(applicationContext)
         queue.initialize()
 
@@ -77,18 +86,31 @@ class UploadWorker(
                 queue.clearSession(cancelled.id)
             }
 
-            if (queue.activeCount() == 0) return Result.success()
+            // Счёт по всей eligible-очереди, а не только по захваченным задачам. Пустой проход без чипа.
+            val progress = UploadRunProgress(queue, runStart) {
+                shouldUploadBackup(autoUploadSettings.policy, isUnmeteredNetwork())
+            }
+            val initialTally = progress.tally()
+            if (initialTally.remaining == 0) return Result.success()
 
-            val tracker = ProgressTracker { notifyChannel.trySend(Unit) }
             val pending = mutableListOf<PendingRetry>()
             val stopClaiming = AtomicBoolean(false)
             val stagingBudget = BackupStagingBudget(queue.stagedBackupCount())
-            setForeground(progressInfo(tracker.snapshot()))
+            // Единственный setForeground на проход. WorkManager ставит в очередь две асинхронные команды сервиса,
+            // публикация не подтверждается; дальше обновления идут напрямую и только при видимой регистрации.
+            setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, initialTally, runToken)))
 
             coroutineScope {
                 val notificationConsumer = launch {
                     consumeUploadNotifications(notifyChannel) {
-                        setForeground(progressInfo(tracker.snapshot()))
+                        refreshPublisher.publish { progress.tally().takeIf { it.total > 0 } }
+                    }
+                }
+                // Задачи могут добавиться извне (discovery), поэтому счёт пересчитывается и по таймеру.
+                val periodicRefresh = launch {
+                    while (true) {
+                        delay(NOTIFICATION_REFRESH_MILLIS)
+                        notifyChannel.trySend(Unit)
                     }
                 }
                 try {
@@ -100,7 +122,6 @@ class UploadWorker(
                             shouldProcessUploadJob(job, autoUploadSettings.policy, isUnmeteredNetwork())
                         },
                     ) { job ->
-                        tracker.register(job.id, job.bytesTotal, job.fileName)
                         val hadStagedFile = job.source == UploadSource.BACKUP && job.stagedFilePath != null
                         val reservedStage = AtomicBoolean(false)
                         try {
@@ -111,29 +132,29 @@ class UploadWorker(
                                 cloud,
                                 albums,
                                 mediaDao,
-                                tracker,
                                 stagingBudget,
                             ) { reservedStage.set(true) }
-                            tracker.finish(job.id)
                         } catch (deferred: BackupStageDeferredException) {
-                            tracker.remove(job.id)
+                            // Staging отложен бюджетом: задача остаётся в очереди.
                         } catch (paused: JobPausedException) {
-                            tracker.remove(job.id)
+                            // Пауза не считается ошибкой и не попадает в счёт.
                         } catch (cancelled: JobCancelledException) {
-                            tracker.remove(job.id)
                             runCatching { job.sessionId?.let { transfer.cancelUploadSession(it) } }
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Throwable) {
-                            tracker.finish(job.id)
                             handleFailure(job, error, queue, transfer, mediaDao, pending, stopClaiming)
                         } finally {
                             if (job.source == UploadSource.BACKUP && (hadStagedFile || reservedStage.get())) {
                                 if (queue.byId(job.id)?.stagedFilePath == null) stagingBudget.release()
                             }
+                            // Итог берётся из статуса в БД, а не из исхода `try`: complete мог не сработать.
+                            progress.noteEnded(job.id)
+                            notifyChannel.trySend(Unit)
                         }
                     }
                 } finally {
+                    periodicRefresh.cancel()
                     notifyChannel.close()
                     notificationConsumer.cancelAndJoin()
                 }
@@ -141,11 +162,12 @@ class UploadWorker(
 
             val retryable = pending.filter { it.retryable }
             if (retryable.isNotEmpty() && runAttemptCount < MAX_RETRY_ATTEMPTS) {
-                applicationContext.getSystemService(NotificationManager::class.java)
-                    .notify(UploadNotification.ID, UploadNotification.finished(applicationContext, tracker.doneTotal))
                 Result.retry()
             } else {
-                retryable.forEach { finalizeExhausted(it, queue, mediaDao) }
+                retryable.forEach { pendingRetry ->
+                    finalizeExhausted(pendingRetry, queue, mediaDao)
+                    progress.noteEnded(pendingRetry.jobId)
+                }
                 val activeJobs = if (shouldUploadBackup(autoUploadSettings.policy, isUnmeteredNetwork())) {
                     queue.activeCount()
                 } else {
@@ -160,8 +182,11 @@ class UploadWorker(
                 ) {
                     UploadScheduler.enqueue(applicationContext, userInitiated = false)
                 }
-                applicationContext.getSystemService(NotificationManager::class.java)
-                    .notify(UploadNotification.ID, UploadNotification.finished(applicationContext, tracker.doneTotal))
+                val finalTally = progress.tally()
+                if (finalTally.isGenuineSuccess) {
+                    applicationContext.getSystemService(NotificationManager::class.java)
+                        .notify(UploadNotification.FINISHED_ID, UploadNotification.finished(applicationContext, finalTally.done))
+                }
                 Result.success()
             }
         } finally {
@@ -178,7 +203,6 @@ class UploadWorker(
         cloud: CloudRepository,
         albums: AlbumRepository,
         mediaDao: MediaCloudStateDao,
-        tracker: ProgressTracker,
         stagingBudget: BackupStagingBudget,
         onStageReserved: () -> Unit,
     ) {
@@ -249,8 +273,8 @@ class UploadWorker(
                     attachReady(job.copy(preparedFileId = info.fileId), queue, cloud, albums, mediaDao)
                     return
                 }
-                UploadSessionState.PROCESSING -> info = pollProcessing(job, info, queue, transfer, tracker)
-                UploadSessionState.UPLOADING -> info = uploadPartsAndComplete(job, info, staged, queue, transfer, tracker, mediaDao)
+                UploadSessionState.PROCESSING -> info = pollProcessing(job, info, queue, transfer)
+                UploadSessionState.UPLOADING -> info = uploadPartsAndComplete(job, info, staged, queue, transfer, mediaDao)
                 else -> throw UploadTerminalException(info.errorMessage ?: "Сессия ${info.state}")
             }
         }
@@ -348,7 +372,6 @@ class UploadWorker(
         staged: File,
         queue: UploadQueueStore,
         transfer: FileTransferService,
-        tracker: ProgressTracker,
         mediaDao: MediaCloudStateDao,
     ): UploadSessionInfo {
         if (session.partSize <= 0L) throw UploadTerminalException("Сервер вернул некорректный размер части")
@@ -367,7 +390,7 @@ class UploadWorker(
             }.uploadToken
             ?: throw UploadTerminalException("Сервер не выдал upload-token")
 
-        uploadMissingParts(job, active, token, staged, queue, transfer, tracker)
+        uploadMissingParts(job, active, token, staged, queue, transfer)
 
         queue.setPhase(job.id, UploadPhase.COMPLETING)
         try {
@@ -385,7 +408,7 @@ class UploadWorker(
             // Один recovery-цикл: resume → дослать отсутствующие части → повторить Complete.
             val resumed = transfer.resumeUploadSession(active.sessionId)
             if (resumed.state != UploadSessionState.UPLOADING) return resumed
-            uploadMissingParts(job, resumed, requireNotNull(resumed.uploadToken), staged, queue, transfer, tracker)
+            uploadMissingParts(job, resumed, requireNotNull(resumed.uploadToken), staged, queue, transfer)
             return transfer.completeUploadSession(active.sessionId)
         }
     }
@@ -397,21 +420,17 @@ class UploadWorker(
         staged: File,
         queue: UploadQueueStore,
         transfer: FileTransferService,
-        tracker: ProgressTracker,
     ) {
         val total = job.bytesTotal
         val partSize = session.partSize
         var confirmedBytes = UploadPartMath.confirmedBytes(session.uploadedParts, total, partSize)
         queue.setProgress(job.id, confirmedBytes, total, UploadPhase.UPLOADING)
-        tracker.progress(job.id, confirmedBytes)
 
         for (partNumber in UploadPartMath.missingPartNumbers(session.uploadedParts, total, partSize)) {
             ensureActive(job.id, queue)
             val offset = UploadPartMath.partOffset(partNumber, partSize)
             val size = UploadPartMath.partLength(partNumber, total, partSize)
-            uploadPartWithRetry(transfer, session.sessionId, partNumber, token, staged, offset, size, total) { sentInPart ->
-                tracker.progress(job.id, confirmedBytes + sentInPart)
-            }
+            uploadPartWithRetry(transfer, session.sessionId, partNumber, token, staged, offset, size, total)
             confirmedBytes += size
             queue.setProgress(job.id, confirmedBytes, total, UploadPhase.UPLOADING)
         }
@@ -426,12 +445,11 @@ class UploadWorker(
         offset: Long,
         size: Long,
         total: Long,
-        onProgress: (Long) -> Unit,
     ) {
         var attempt = 0
         while (true) {
             try {
-                transfer.uploadSessionPart(sessionId, partNumber, token, staged, offset, size, total, onProgress)
+                transfer.uploadSessionPart(sessionId, partNumber, token, staged, offset, size, total)
                 return
             } catch (error: UploadPartHttpException) {
                 if (!error.retryable || attempt >= MAX_PART_ATTEMPTS - 1) throw error
@@ -448,11 +466,9 @@ class UploadWorker(
         info: UploadSessionInfo,
         queue: UploadQueueStore,
         transfer: FileTransferService,
-        tracker: ProgressTracker,
     ): UploadSessionInfo {
         queue.setPhase(job.id, UploadPhase.PROCESSING)
         queue.setProgress(job.id, job.bytesTotal, job.bytesTotal, UploadPhase.PROCESSING)
-        tracker.progress(job.id, job.bytesTotal)
         while (true) {
             ensureActive(job.id, queue)
             delay(PROCESSING_POLL_MILLIS)
@@ -654,15 +670,12 @@ class UploadWorker(
         }
     }
 
-    private fun progressInfo(snapshot: ProgressTracker.Snapshot): ForegroundInfo {
-        val title = snapshot.title ?: applicationContext.getString(R.string.upload_notification_title)
-        val notification = UploadNotification.build(applicationContext, snapshot.done, snapshot.total, title, snapshot.percent)
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    private fun foregroundInfo(notification: Notification): ForegroundInfo =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ForegroundInfo(UploadNotification.ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
             ForegroundInfo(UploadNotification.ID, notification)
         }
-    }
 
     // MARK: Вспомогательные типы
 
@@ -677,63 +690,6 @@ class UploadWorker(
 
     private class PendingRetry(val jobId: String, val retryable: Boolean)
 
-    /**
-     * Агрегированный прогресс всех активных задач. `notify` дёргается не чаще раза в
-     * [EMIT_INTERVAL_MILLIS] (события из OkHttp-потоков — только флаг, setForeground
-     * делает потребитель канала).
-     */
-    private class ProgressTracker(private val notify: () -> Unit) {
-        class Entry(val total: Long, val name: String, @Volatile var sent: Long = 0L)
-
-        data class Snapshot(val done: Int, val total: Int, val title: String?, val percent: Int)
-
-        private val lock = Any()
-        private val entries = LinkedHashMap<String, Entry>()
-        private var doneCount = 0
-        private var doneBytes = 0L
-        private var lastName: String? = null
-        private var lastEmit = 0L
-
-        fun register(id: String, total: Long, name: String) = synchronized(lock) {
-            entries[id] = Entry(total, name)
-            lastName = name
-            emit(force = true)
-        }
-
-        fun progress(id: String, sent: Long) = synchronized(lock) {
-            entries[id]?.sent = sent
-            emit(force = false)
-        }
-
-        fun finish(id: String) = synchronized(lock) {
-            entries.remove(id)?.let { doneBytes += it.sent }
-            doneCount++
-            emit(force = true)
-        }
-
-        fun remove(id: String) = synchronized(lock) {
-            entries.remove(id)
-            emit(force = true)
-        }
-
-        val doneTotal: Int get() = synchronized(lock) { doneCount }
-
-        fun snapshot(): Snapshot = synchronized(lock) {
-            val active = entries.values.toList()
-            val totalBytes = doneBytes + active.sumOf { it.total }
-            val sentBytes = doneBytes + active.sumOf { it.sent }
-            val percent = if (totalBytes > 0) ((sentBytes * 100) / totalBytes).toInt() else 0
-            Snapshot(done = doneCount, total = doneCount + active.size, title = lastName, percent = percent)
-        }
-
-        private fun emit(force: Boolean) {
-            val now = SystemClock.elapsedRealtime()
-            if (!force && now - lastEmit < EMIT_INTERVAL_MILLIS) return
-            lastEmit = now
-            notify()
-        }
-    }
-
     private val notifyChannel = Channel<Unit>(Channel.CONFLATED)
 
     private companion object {
@@ -742,7 +698,7 @@ class UploadWorker(
         const val MAX_PART_ATTEMPTS = 3
         const val PART_RETRY_BASE_MILLIS = 500L
         const val PROCESSING_POLL_MILLIS = 2_000L
-        const val EMIT_INTERVAL_MILLIS = 250L
+        const val NOTIFICATION_REFRESH_MILLIS = 5_000L
     }
 }
 

@@ -46,4 +46,17 @@ class ServerHttpClientsTest {
             assertEquals(0, external.requestCount)
         } }
     }
+    @Test fun `streaming client keeps trust policy and drops only the whole-call timeout`() {
+        server().use { server ->
+            var config = ServerConfig("https://localhost", allowSelfSigned = true)
+            val client = ServerHttpClients { config }
+            val request = Request.Builder().url(localUrl(server)).build()
+            assertEquals(0, client.clientFor(request, streaming = true).callTimeoutMillis)
+            assertEquals(600_000, client.clientFor(request, streaming = false).callTimeoutMillis)
+            server.enqueue(MockResponse().setBody("stream"))
+            client.streaming.newCall(request).execute().use { assertEquals("stream", it.body!!.string()) }
+            config = ServerConfig("https://localhost", allowSelfSigned = false)
+            assertThrows(IOException::class.java) { client.streaming.newCall(request).execute().close() }
+        }
+    }
 }
