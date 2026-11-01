@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -128,6 +129,7 @@ class DragSelectionUiTest {
         val sizeAtEdge = selection.size
         // The autoscroll delay uses the live coroutine scope, so wait for the observed state change.
         rule.waitUntil(5_000L) {
+            rule.mainClock.advanceTimeByFrame()
             grid.firstVisibleItemIndex < firstBefore && selection.size > sizeAtEdge
         }
         rule.onNodeWithTag("grid").performTouchInput { up() }
@@ -167,6 +169,7 @@ class DragSelectionUiTest {
         }
         val sizeAtEdge = selection.size
         rule.waitUntil(5_000L) {
+            rule.mainClock.advanceTimeByFrame()
             grid.firstVisibleItemIndex > firstBefore && selection.size > sizeAtEdge
         }
         rule.onNodeWithTag("grid").performTouchInput { up() }
@@ -195,6 +198,7 @@ private fun SelectionGrid(
     onGridState: (LazyGridState) -> Unit,
 ) {
     val grid = rememberLazyGridState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
+    var dragging by remember { mutableStateOf(false) }
     SideEffect { onGridState(grid) }
     val controller = rememberDragSelection(
         orderedKeys = keys,
@@ -203,11 +207,15 @@ private fun SelectionGrid(
         visibleCells = { grid.visibleCells() },
         viewport = { grid.viewportBounds(bottomInsetPx = 0f) },
         scrollBy = { grid.scrollBy(it) },
-        onDragActiveChange = onDragActiveChange,
+        onDragActiveChange = {
+            dragging = it
+            onDragActiveChange(it)
+        },
     )
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         state = grid,
+        userScrollEnabled = !dragging,
         modifier = Modifier.size(width = 300.dp, height = 600.dp).testTag("grid").dragSelection(controller) {},
     ) {
         items(keys, key = { it }) { Box(Modifier.aspectRatio(1f).testTag(it)) }
