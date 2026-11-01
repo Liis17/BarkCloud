@@ -407,7 +407,10 @@ private val FsEntry.File.isViewerMedia: Boolean
     get() = (mimeType.startsWith("image/") && mimeType != "image/svg+xml") || mimeType.startsWith("video/")
 
 /** Файл как элемент просмотрщика: URI `file://` без копирования; шаринг копирует файл через [LocalBrowserViewModel.shareFiles]. */
-private fun FsEntry.File.toDeviceMedia(): DeviceMedia = DeviceMedia(
+/** Ключ просмотрщика для файла локального браузера: полный путь, а не хэш (коллизии Aa.jpg/BB.jpg). */
+internal fun localViewerStableKey(entry: FsEntry.File): String = "file:${entry.path}"
+
+internal fun FsEntry.File.toDeviceMedia(): DeviceMedia = DeviceMedia(
     id = path.hashCode().toLong(),
     uri = Uri.fromFile(File(path)),
     isVideo = mimeType.startsWith("video/"),
@@ -416,6 +419,8 @@ private fun FsEntry.File.toDeviceMedia(): DeviceMedia = DeviceMedia(
     dateModifiedSeconds = lastModified / 1000,
     sizeBytes = sizeBytes,
     mimeType = mimeType,
+    // Идентичность — полный путь: хэш путей коллидирует (например, "Aa.jpg" и "BB.jpg" в одной папке).
+    stableKey = localViewerStableKey(this),
 )
 
 private fun sortOptions(): List<Pair<FsSort, Int>> = listOf(
