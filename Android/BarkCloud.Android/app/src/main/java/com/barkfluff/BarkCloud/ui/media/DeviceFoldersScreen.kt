@@ -255,7 +255,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                             selecting = selecting,
                             selected = media.mediaKey in state.selected,
                             refreshToken = revision,
-                            onAppear = { viewModel.requestPresence(media, force = false) },
+                            onAppear = { viewModel.requestPresence(media, force = true) },
                         )
                     }
                 }
@@ -328,8 +328,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                                 Text(folder.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                                 Text(formatChildCount(context, folder.media.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            // Значок — по фактическим облачным копиям фото папки, не по настройке автозагрузки.
-                            if (folder.media.any { state.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }) Icon(
+                            if (syncEnabled(folder.key)) Icon(
                                 Icons.Outlined.CloudDone,
                                 stringResource(R.string.device_folder_sync_enabled),
                                 tint = MaterialTheme.colorScheme.primary,
