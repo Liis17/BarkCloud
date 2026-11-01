@@ -97,3 +97,29 @@ internal fun requiresJpegView(fileName: String, hasJpegView: Boolean): Boolean {
     val extension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)
     return extension in jpegViewRequiredExtensions
 }
+
+/** Состояние пагинации источника, которым кормится просмотрщик: есть ли следующая страница и идёт ли загрузка. */
+data class ViewerPagination(val hasMore: Boolean, val isLoading: Boolean) {
+    companion object {
+        val NONE = ViewerPagination(hasMore = false, isLoading = false)
+    }
+}
+
+/**
+ * Нужна ли следующая страница. Решение зависит от позиции и состояния источника, а не от числа медиа:
+ * страница из одних документов или дубликатов не меняет размер списка, но всё равно должна продолжить подгрузку.
+ * Запрос, пришедший во время загрузки, повторяется после её окончания (значения пересчитываются).
+ */
+internal fun shouldRequestNextPage(
+    settledIndex: Int,
+    itemCount: Int,
+    pagination: ViewerPagination,
+    prefetchDistance: Int = 3,
+): Boolean = pagination.hasMore && !pagination.isLoading &&
+    shouldLoadMoreAtPagerEdge(settledIndex, itemCount, prefetchDistance)
+
+/** После ошибки JPEG-вида (часто протухшая ссылка) повтор идёт через авторизованный оригинал, а не тем же URL. */
+internal enum class ViewerLoadRecovery { FALLBACK_TO_ORIGINAL, ERROR }
+
+internal fun viewerRecoveryAfterLoadFailure(useJpegView: Boolean): ViewerLoadRecovery =
+    if (useJpegView) ViewerLoadRecovery.FALLBACK_TO_ORIGINAL else ViewerLoadRecovery.ERROR

@@ -40,6 +40,7 @@ import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.data.cloud.MediaPreview
 import com.barkfluff.BarkCloud.data.cloud.toEpochMillis
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 import kotlinx.coroutines.launch
@@ -64,10 +65,12 @@ fun SearchScreen(
             .filter(SearchHit::isViewerMediaHit)
             .map(SearchHit::toViewerAsset)
     }
+    val viewerSectionResult = state.sections.firstOrNull { it.section == viewerSection }
     CloudMediaViewer(
         assets = viewerAssets,
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
+        pagination = ViewerPagination(hasMore = viewerSectionResult?.hasMore == true, isLoading = state.isLoading),
         onPageNearEnd = {
             state.sections.firstOrNull { it.section == viewerSection }?.let { viewModel.loadMore(it) }
         },

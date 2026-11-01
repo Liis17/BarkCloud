@@ -43,6 +43,7 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
@@ -122,6 +123,7 @@ fun FavoritesScreen(
             selectedAsset = viewer,
             onDismiss = { viewer = null },
             onDelete = { item -> viewModel.deleteFile(item.id) },
+            pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore),
             onPageNearEnd = { viewModel.loadMore() },
         )
     }
