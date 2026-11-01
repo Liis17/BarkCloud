@@ -72,10 +72,18 @@ fun VaultScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) viewModel.relock()
+            if (event == Lifecycle.Event.ON_STOP) {
+                // Синхронно: просмотр Vault не должен пережить уход в фон, даже в fade-out.
+                viewer = null
+                viewModel.relock()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(state.lockState) {
+        viewer = vaultViewerSelection(state.lockState, viewer)
     }
 
     LaunchedEffect(state.lockState, activity) {
@@ -135,13 +143,16 @@ fun VaultScreen(
         }
     }
 
-        CloudMediaViewer(
-            assets = vaultAssets,
-            selectedAsset = viewer,
-            onDismiss = { viewer = null },
-            infoEnabled = false,
-            onDelete = { item -> viewModel.deleteFile(item.id) },
-        )
+        // Вне UNLOCKED вьюер убирается из композиции сразу, без fade: полное фото не остаётся над экраном авторизации.
+        if (state.lockState == VaultLockState.UNLOCKED) {
+            CloudMediaViewer(
+                assets = vaultAssets,
+                selectedAsset = vaultViewerSelection(state.lockState, viewer),
+                onDismiss = { viewer = null },
+                infoEnabled = false,
+                onDelete = { item -> viewModel.deleteFile(item.id) },
+            )
+        }
     }
 }
 
