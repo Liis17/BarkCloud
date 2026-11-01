@@ -119,10 +119,10 @@ class GalleryViewModel(
 
     fun toggleSelecting() = clearSelection()
 
-    fun startSelecting(key: String) = _state.update {
+    /** Полный выбор, вычисленный жестом диапазона; пустой набор выключает режим выбора. */
+    fun setSelection(keys: Set<String>) = _state.update {
         if (deletionState.value.isBusy) return@update it
-        val selection = PhotoSelection(it.selected).start(key)
-        it.copy(selecting = selection.isSelecting, selected = selection.keys)
+        it.copy(selecting = keys.isNotEmpty(), selected = keys)
     }
 
     fun toggle(key: String) = _state.update {
