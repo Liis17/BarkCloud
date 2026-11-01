@@ -78,6 +78,7 @@ fun DeviceMediaViewer(
     selected: DeviceMedia?,
     onDismiss: () -> Unit,
     onDelete: ((DeviceMedia) -> Unit)? = null,
+    onShare: ((DeviceMedia) -> Unit)? = null,
 ) {
     val visibility = remember { MutableTransitionState(false) }
     var retained by remember { mutableStateOf<DeviceMedia?>(null) }
@@ -113,6 +114,7 @@ fun DeviceMediaViewer(
                     isOpen = selected?.mediaKey == shown.mediaKey,
                     onDismiss = onDismiss,
                     onDelete = onDelete,
+                    onShare = onShare,
                 )
             }
         }
@@ -126,6 +128,7 @@ private fun DeviceMediaPager(
     isOpen: Boolean,
     onDismiss: () -> Unit,
     onDelete: ((DeviceMedia) -> Unit)?,
+    onShare: ((DeviceMedia) -> Unit)?,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
@@ -257,7 +260,9 @@ private fun DeviceMediaPager(
                             .navigationBarsPadding()
                             .padding(bottom = 16.dp),
                     ) {
-                        IconButton(onClick = { shareLocalMedia(context, currentMedia) }) {
+                        IconButton(onClick = {
+                            if (onShare != null) onShare(currentMedia) else shareLocalMedia(context, currentMedia)
+                        }) {
                             Icon(
                                 imageVector = Icons.Outlined.Share,
                                 contentDescription = stringResource(R.string.viewer_action_share),
