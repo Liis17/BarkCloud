@@ -102,7 +102,7 @@ class CloudRepository(
         grpc.cloudStub().deleteUserMedia(
             DeleteUserMediaRequest.newBuilder().setFileId(fileId).build(),
         )
-        CloudLibraryChanges.notifyChanged()
+        CloudLibraryChanges.publish(CloudLibraryChange.FileDeleted(fileId))
     }
 
     /** Пакетная проверка наличия файлов в облаке по SHA256-хешам. хеш → есть ли в облаке. */

@@ -1,19 +1,27 @@
 package com.barkfluff.BarkCloud.data.cloud
 
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
+/** Что изменилось в облачной библиотеке: для перечитывания страниц и сброса присутствия. */
+sealed interface CloudLibraryChange {
+    /** Загрузка завершена или дедуплицирована: страницы облака нужно перечитать. */
+    data object Changed : CloudLibraryChange
+
+    /** Файл удалён из облака (в корзину): device-состояния, ссылавшиеся на него, больше не валидны. */
+    data class FileDeleted(val fileId: String) : CloudLibraryChange
+}
+
 /**
- * Сигнал «облачная библиотека изменилась» (загрузка завершена, файлы удалены). Экраны облака
- * перечитывают свои страницы; состояние присутствия передаётся через Room (media_cloud_states).
+ * Межэкранный сигнал о библиотеке. Состояние присутствия передаётся через Room (media_cloud_states);
+ * этот поток лишь говорит экранам облака перечитаться.
  */
 object CloudLibraryChanges {
-    private val _events = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    val events: SharedFlow<Unit> = _events.asSharedFlow()
+    private val _events = MutableSharedFlow<CloudLibraryChange>(extraBufferCapacity = 64)
+    val events: SharedFlow<CloudLibraryChange> = _events.asSharedFlow()
 
-    fun notifyChanged() {
-        _events.tryEmit(Unit)
+    suspend fun publish(change: CloudLibraryChange) {
+        _events.emit(change)
     }
 }

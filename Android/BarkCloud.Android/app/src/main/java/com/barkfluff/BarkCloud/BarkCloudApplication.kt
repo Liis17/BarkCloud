@@ -30,6 +30,8 @@ import com.barkfluff.BarkCloud.data.cache.LocalMediaImageFetcherFactory
 import com.barkfluff.BarkCloud.data.cache.LocalMediaImageKeyer
 import com.barkfluff.BarkCloud.data.cache.FileTransferCacheLoader
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
+import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChange
+import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChanges
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.cloud.DynamicFolderRepository
 import com.barkfluff.BarkCloud.data.cloud.SharedRepository
@@ -159,6 +161,15 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         autoUploadSettings = AutoUploadSettings(this)
         uploadQueue = UploadQueueStore(this)
         vaultStore = VaultStore(this)
+        appScope.launch {
+            // Удалённый из облака файл больше не присутствует на устройстве (для всех экранов разом).
+            CloudLibraryChanges.events.collect { change ->
+                if (change is CloudLibraryChange.FileDeleted) {
+                    vaultStore.remove(change.fileId)
+                    BarkCloudDatabase.get(this@BarkCloudApplication).mediaCloudStateDao().markCloudFileRemoved(change.fileId)
+                }
+            }
+        }
         sessionManager = SessionManager(this, authRepository, globalParam, grpcManager, fileCache, uploadQueue, vaultStore)
         appLockStore = AppLockStore(this)
         appLockManager = AppLockManager(appLockStore)

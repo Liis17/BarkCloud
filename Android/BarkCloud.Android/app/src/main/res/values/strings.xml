@@ -471,4 +471,14 @@
     <string name="viewer_album_added">Добавлено в альбом</string>
     <string name="viewer_albums_empty">Создайте альбом в разделе «Подборки»</string>
     <string name="viewer_favorite_added">Добавлено в избранное</string>
+    <string name="album_remove_selected">Убрать из альбома (%1$d)</string>
+    <string name="album_add_selected">В альбом (%1$d)</string>
+    <string name="album_delete_selected_message">Удалить %1$d файлов из облака? Они попадут в корзину.</string>
+    <string name="batch_failed_count">Не удалось обработать: %1$d</string>
+    <string name="favorites_remove_selected">Убрать из избранного (%1$d)</string>
+    <string name="vault_remove_selected">Убрать из vault (%1$d)</string>
+    <string name="trash_restore_selected">Восстановить (%1$d)</string>
+    <string name="trash_delete_selected">Удалить навсегда (%1$d)</string>
+    <string name="trash_delete_selected_title">Удалить навсегда?</string>
+    <string name="trash_delete_selected_message">Удалить %1$d элементов из корзины без возможности восстановления?</string>
 </resources>

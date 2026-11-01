@@ -43,3 +43,6 @@ internal fun autoScrollStep(pointerY: Float, top: Float, bottom: Float, edgePx: 
         else -> 0f
     }
 }
+
+/** Переключает ключ в выборе: выбранный снимается, невыбранный добавляется. */
+internal fun <K> Set<K>.toggled(key: K): Set<K> = if (key in this) this - key else this + key

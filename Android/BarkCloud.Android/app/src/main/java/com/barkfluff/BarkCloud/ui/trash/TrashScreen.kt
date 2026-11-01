@@ -1,7 +1,9 @@
 package com.barkfluff.BarkCloud.ui.trash
 
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +39,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +49,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -55,6 +61,13 @@ import com.barkfluff.BarkCloud.data.cloud.TrashItem
 import com.barkfluff.BarkCloud.files.ui.formatDate
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
+import com.barkfluff.BarkCloud.ui.selection.SelectionAction
+import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
+import com.barkfluff.BarkCloud.ui.selection.dragSelection
+import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
+import com.barkfluff.BarkCloud.ui.selection.toggled
+import com.barkfluff.BarkCloud.ui.selection.viewportBounds
+import com.barkfluff.BarkCloud.ui.selection.visibleRows
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -66,6 +79,20 @@ fun TrashScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var showEmptyConfirm by remember { mutableStateOf(false) }
+    var showDeleteSelected by remember { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
+    var actionBarHeightPx by remember { mutableIntStateOf(0) }
+    val selecting = state.selected.isNotEmpty()
+    BackHandler(enabled = selecting || state.isProcessing) { if (!state.isProcessing) viewModel.clearSelection() }
+    val dragController = rememberDragSelection(
+        orderedKeys = state.items.map { it.id },
+        selected = state.selected,
+        onSelectionChange = viewModel::setSelection,
+        visibleCells = { listState.visibleRows() },
+        viewport = { listState.viewportBounds(bottomInsetPx = actionBarHeightPx.toFloat()) },
+        scrollBy = { listState.scrollBy(it) },
+        onDragActiveChange = { dragging = it },
+    )
 
     LaunchedEffect(Unit) { viewModel.loadIfNeeded() }
     LaunchedEffect(state.snackbar) {
@@ -108,10 +135,18 @@ fun TrashScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                LazyColumn(Modifier.fillMaxSize(), state = listState) {
+                LazyColumn(
+                    Modifier.fillMaxSize().dragSelection(dragController) { id ->
+                        if (selecting && !state.isProcessing) viewModel.setSelection(state.selected.toggled(id))
+                    },
+                    state = listState,
+                    userScrollEnabled = !dragging,
+                ) {
                     items(state.items, key = { it.id }) { item ->
                         TrashRow(
                             item = item,
+                            selecting = selecting,
+                            selected = item.id in state.selected,
                             onRestore = { viewModel.restore(item.id) },
                             onDelete = { viewModel.deleteForever(item.id) },
                         )
@@ -132,7 +167,41 @@ fun TrashScreen(
                     contentAlignment = Alignment.Center,
                 ) { LoadingIndicator() }
             }
+            if (selecting) {
+                val count = state.selected.size
+                SelectionActionBar(
+                    modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
+                    actions = buildList {
+                        add(SelectionAction(stringResource(R.string.trash_restore_selected, count), enabled = !state.isProcessing) {
+                            viewModel.restoreSelected()
+                        })
+                        add(SelectionAction(stringResource(R.string.trash_delete_selected, count), enabled = !state.isProcessing) {
+                            showDeleteSelected = true
+                        })
+                        add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.isProcessing) {
+                            viewModel.clearSelection()
+                        })
+                    },
+                )
+            }
         }
+    }
+
+    if (showDeleteSelected) {
+        val count = state.selected.size
+        AlertDialog(
+            onDismissRequest = { showDeleteSelected = false },
+            title = { Text(stringResource(R.string.trash_delete_selected_title)) },
+            text = { Text(stringResource(R.string.trash_delete_selected_message, count)) },
+            confirmButton = {
+                TextButton(onClick = { showDeleteSelected = false; viewModel.deleteSelectedForever() }) {
+                    Text(stringResource(R.string.trash_delete_selected, count), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelected = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
     }
 
     if (showEmptyConfirm) {
@@ -152,9 +221,28 @@ fun TrashScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * При выборе строка без свайпа: горизонтальный дрейф жеста диапазона не может запустить
+ * восстановление или безвозвратное удаление.
+ */
 @Composable
 private fun TrashRow(
+    item: TrashItem,
+    selecting: Boolean,
+    selected: Boolean,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    if (selecting) {
+        TrashRowContent(item = item, selecting = true, selected = selected)
+    } else {
+        SwipeableTrashRow(item = item, onRestore = onRestore, onDelete = onDelete)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableTrashRow(
     item: TrashItem,
     onRestore: () -> Unit,
     onDelete: () -> Unit,
@@ -185,29 +273,49 @@ private fun TrashRow(
             }
         },
     ) {
-        val hasPreview = item.asset.previews.isNotEmpty()
-        // Фон строки совпадает с подложкой: свайп-фон SwipeToDismissBox рисуется под строкой целиком.
-        ListItem(
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            headlineContent = { Text(item.name, maxLines = 1) },
-            supportingContent = {
-                Text(
-                    text = stringResource(R.string.trash_purge_at, formatDate(item.purgeAtMillis)),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            },
-            leadingContent = {
-                if (hasPreview) {
-                    MediaThumb(
-                        model = item.asset.previewModel(128),
-                        isVideo = item.asset.isVideo,
-                        contentDescription = item.name,
-                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
-                    )
-                } else {
-                    Icon(Icons.Outlined.DeleteForever, contentDescription = null)
-                }
-            },
-        )
+        TrashRowContent(item = item, selecting = false, selected = false)
     }
+}
+
+@Composable
+private fun TrashRowContent(
+    item: TrashItem,
+    selecting: Boolean,
+    selected: Boolean,
+) {
+    val hasPreview = item.asset.previews.isNotEmpty()
+    // Фон строки совпадает с подложкой: свайп-фон SwipeToDismissBox рисуется под строкой целиком.
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        headlineContent = { Text(item.name, maxLines = 1) },
+        supportingContent = {
+            Text(
+                text = stringResource(R.string.trash_purge_at, formatDate(item.purgeAtMillis)),
+                color = MaterialTheme.colorScheme.error,
+            )
+        },
+        leadingContent = {
+            if (hasPreview) {
+                MediaThumb(
+                    model = item.asset.previewModel(128),
+                    isVideo = item.asset.isVideo,
+                    contentDescription = item.name,
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
+                )
+            } else {
+                Icon(Icons.Outlined.DeleteForever, contentDescription = null)
+            }
+        },
+        trailingContent = if (selecting) {
+            {
+                Icon(
+                    if (selected) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = null,
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            null
+        },
+    )
 }
