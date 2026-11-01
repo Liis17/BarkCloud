@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.data.upload
 
 import android.content.Context
 import android.net.Uri
+import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChanges
 import com.barkfluff.BarkCloud.data.gallery.BackupUploadQueue
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
@@ -24,6 +25,13 @@ import java.io.FileNotFoundException
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
+
+/** Итог запроса альбома для файла, у которого уже есть живая задача. */
+sealed interface LiveAlbumRequest {
+    data object NoLiveJob : LiveAlbumRequest
+    data object Attached : LiveAlbumRequest
+    data object Busy : LiveAlbumRequest
+}
 
 internal data class PreparedBackup(val job: UploadJob, val staleSessionId: String?)
 private data class StagedBackupBytes(val file: File, val hash: Pair<String, Long>, val mediaAfter: DeviceMedia)
@@ -89,6 +97,12 @@ class UploadQueueStore(
         mediaKey: String? = null,
         mediaHash: String? = null,
     ): UploadJob = withContext(Dispatchers.IO) {
+        if (mediaKey != null) {
+            dao.liveByMediaKey(mediaKey).firstOrNull()?.let { live ->
+                albumId?.let { dao.setAlbumIfPreAttach(live.id, it) }
+                return@withContext dao.byId(live.id) ?: live
+            }
+        }
         val id = UUID.randomUUID().toString()
         val staged = stage(uri, id, fileName)
         val job = UploadJob(
@@ -113,8 +127,35 @@ class UploadQueueStore(
             createdAtMillis = System.currentTimeMillis(),
             completedAtMillis = null,
         )
-        dao.insert(job)
-        job
+        // Проверка и вставка в одной транзакции: гонка с фоновым поиском не создаст второй живой job.
+        val existing = database.withTransaction {
+            val live = mediaKey?.let { dao.liveByMediaKey(it).firstOrNull() }
+            if (live != null) {
+                albumId?.let { dao.setAlbumIfPreAttach(live.id, it) }
+            } else {
+                dao.insert(job)
+            }
+            live
+        }
+        if (existing == null) return@withContext job
+        staged.delete()
+        dao.byId(existing.id) ?: existing
+    }
+
+    /**
+     * Статус ожидающего добавления в альбом для файла устройства, у которого уже есть живая задача.
+     * [NoLiveJob] — задач нет (или все завершились): вызывающий идёт по облачной проверке.
+     */
+    suspend fun requestAlbumForLive(mediaKey: String, albumId: String): LiveAlbumRequest = withContext(Dispatchers.IO) {
+        val live = dao.liveByMediaKey(mediaKey)
+        if (live.isEmpty()) return@withContext LiveAlbumRequest.NoLiveJob
+        if (live.count { dao.setAlbumIfPreAttach(it.id, albumId) > 0 } > 0) return@withContext LiveAlbumRequest.Attached
+        if (dao.liveByMediaKey(mediaKey).isEmpty()) LiveAlbumRequest.NoLiveJob else LiveAlbumRequest.Busy
+    }
+
+    /** Отменяет все живые задачи по файлу устройства (любой источник) — перед удалением. */
+    suspend fun cancelLiveForMediaKey(mediaKey: String) {
+        dao.liveByMediaKey(mediaKey).forEach { cancel(it.id) }
     }
 
     override suspend fun enqueueBackupIfAbsent(media: DeviceMedia): Boolean = withContext(Dispatchers.IO) {
@@ -124,6 +165,7 @@ class UploadQueueStore(
         var inserted = false
         database.withTransaction {
             val state = mediaDao.byKey(media.mediaKey)
+            if (dao.liveByMediaKey(media.mediaKey).any { it.source != UploadSource.BACKUP }) return@withTransaction
             val id = backupJobId(media.mediaKey)
             val existing = dao.byId(id) ?: dao.backupByMediaKey(media.mediaKey)
             val sameState = state != null && state.dateModifiedSeconds == media.dateModifiedSeconds && state.sizeBytes == media.sizeBytes
@@ -348,7 +390,21 @@ class UploadQueueStore(
         if (dao.markCompleted(job.id, System.currentTimeMillis()) > 0) {
             if (current.source == UploadSource.BACKUP) deleteBackupOwnedFiles(current.id, current.stagedFilePath)
             else current.stagedFilePath?.let(::deleteQueueFile)
+            CloudLibraryChanges.notifyChanged()
         }
+    }
+
+    /**
+     * Дедупликация без загрузки (файл уже в облаке). Возвращает false, если альбом задачи успел
+     * измениться: тогда вызывающий перечитывает albumId, добавляет его и повторяет.
+     */
+    suspend fun completeDeduplicated(id: String, expectedAlbumId: String?): Boolean {
+        val current = dao.byId(id) ?: return true
+        if (dao.completeDeduplicatedIfAlbum(id, expectedAlbumId, System.currentTimeMillis()) == 0) return false
+        if (current.source == UploadSource.BACKUP) deleteBackupOwnedFiles(current.id, current.stagedFilePath)
+        else current.stagedFilePath?.let(::deleteQueueFile)
+        CloudLibraryChanges.notifyChanged()
+        return true
     }
 
     /** Bytes are remote; release only the app-private staged copy. */
@@ -387,6 +443,11 @@ class UploadQueueStore(
         if (dao.cancel(id) > 0) {
             if (job.source == UploadSource.BACKUP) deleteBackupOwnedFiles(job.id, job.stagedFilePath)
             else job.stagedFilePath?.let(::deleteQueueFile)
+            // Отмена не должна оставить «В очереди», которой больше нет в очереди.
+            job.mediaKey?.let { key ->
+                mediaDao.byKey(key)?.takeIf { it.status == MediaCloudStatus.QUEUED }
+                    ?.let { mediaDao.upsert(it.copy(status = MediaCloudStatus.NOT_IN_CLOUD)) }
+            }
         }
     }
 
@@ -551,9 +612,15 @@ class UploadQueueStore(
         queueDir.mkdirs()
         val safeName = name.ifBlank { "file" }.replace(Regex("[\\\\/:*?\"<>|]"), "_")
         val destination = File(queueDir, "$id-$safeName")
-        appContext.contentResolver.openInputStream(uri)?.use { input ->
-            destination.outputStream().use { output -> input.copyTo(output) }
-        } ?: error("Cannot open $uri")
+        try {
+            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                destination.outputStream().use { output -> input.copyTo(output) }
+            } ?: error("Cannot open $uri")
+        } catch (error: Throwable) {
+            // Неполная копия (например, при нехватке места) не должна остаться в очереди.
+            destination.delete()
+            throw error
+        }
         return destination
     }
 

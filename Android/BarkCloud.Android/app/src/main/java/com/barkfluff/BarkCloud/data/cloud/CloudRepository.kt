@@ -105,13 +105,21 @@ class CloudRepository(
     }
 
     /** Пакетная проверка наличия файлов в облаке по SHA256-хешам. хеш → есть ли в облаке. */
-    suspend fun checkFileHashes(hashes: List<String>): Map<String, Boolean> {
-        if (hashes.isEmpty()) return emptyMap()
-        val resp = grpc.filesStub().checkFileHashes(
-            CheckFileHashesRequest.newBuilder().addAllFileHashes(hashes).build()
-        )
-        return resp.resultsList.associate { it.fileHash to it.exists }
-    }
+    suspend fun checkFileHashes(hashes: List<String>): Map<String, Boolean> =
+        checkFileHashesDetailed(hashes).mapValues { it.value.exists }
+
+    /**
+     * Проверка с ID пригодных копий. Хеши нормализуются к нижнему регистру, запросы режутся по
+     * [CHECK_HASHES_BATCH] (лимит сервера). Хеш, которого нет в ответе, в результате отсутствует
+     * (состояние UNKNOWN у вызывающего, а не «нет в облаке»).
+     */
+    suspend fun checkFileHashesDetailed(hashes: List<String>): Map<String, HashPresence> =
+        checkPresenceBatched(hashes) { chunk ->
+            val resp = grpc.filesStub().checkFileHashes(
+                CheckFileHashesRequest.newBuilder().addAllFileHashes(chunk).build(),
+            )
+            resp.resultsList.associate { row -> row.fileHash to HashPresence(row.exists, row.fileIdsList.sorted()) }
+        }
 
     // MARK: Каталоги
 
