@@ -25,6 +25,9 @@ import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.data.cache.CacheScope
 import com.barkfluff.BarkCloud.data.cache.CloudImageFetcherFactory
 import com.barkfluff.BarkCloud.data.cache.CloudImageKeyer
+import com.barkfluff.BarkCloud.data.cache.AndroidLocalMediaThumbnailLoader
+import com.barkfluff.BarkCloud.data.cache.LocalMediaImageFetcherFactory
+import com.barkfluff.BarkCloud.data.cache.LocalMediaImageKeyer
 import com.barkfluff.BarkCloud.data.cache.FileTransferCacheLoader
 import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
@@ -33,6 +36,8 @@ import com.barkfluff.BarkCloud.data.cloud.SharedRepository
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadScheduler
 import com.barkfluff.BarkCloud.data.gallery.AutoUploadSettings
 import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
+import com.barkfluff.BarkCloud.data.upload.UploadScheduler
+import com.barkfluff.BarkCloud.data.upload.observeUploadStartupForSession
 import com.barkfluff.BarkCloud.data.users.UserRepository
 import com.barkfluff.BarkCloud.data.update.AndroidUpdateRepository
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
@@ -161,10 +166,15 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
         appScope.launch {
             fileCache.runStartupSweepIfNeeded()
-            uploadQueue.initialize()
-        }
-        if (autoUploadSettings.enabled) {
-            AutoUploadScheduler.apply(this, autoUploadSettings.policy)
+            observeUploadStartupForSession(
+                sessionActive = globalParam.sessionActive,
+                readPolicy = { autoUploadSettings.policy },
+                initializeQueue = uploadQueue::initialize,
+                activeCount = uploadQueue::activeCount,
+                activeNonBackupCount = uploadQueue::activeNonBackupCount,
+                enqueue = { UploadScheduler.enqueue(this@BarkCloudApplication, userInitiated = false) },
+                applyPolicy = { policy -> AutoUploadScheduler.apply(this@BarkCloudApplication, policy) },
+            )
         }
         observeMediaStoreChanges()
     }
@@ -174,6 +184,8 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
             .components {
                 add(CloudImageKeyer(::currentCacheScope))
                 add(CloudImageFetcherFactory(fileCache, ::currentCacheScope))
+                add(LocalMediaImageKeyer(::currentCacheScope))
+                add(LocalMediaImageFetcherFactory(fileCache, ::currentCacheScope, AndroidLocalMediaThumbnailLoader(this@BarkCloudApplication)))
                 // Превью используют ту же выбранную TLS-политику, что и upload/download.
                 add(OkHttpNetworkFetcherFactory(callFactory = { InsecureHttp.client }))
                 add(VideoFrameDecoder.Factory())

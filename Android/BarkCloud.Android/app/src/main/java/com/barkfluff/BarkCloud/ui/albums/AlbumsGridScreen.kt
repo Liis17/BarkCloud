@@ -139,6 +139,7 @@ private fun AlbumCardItem(album: AlbumCard, onClick: () -> Unit) {
                     url = album.coverPreviewUrl,
                     contentDescription = album.name,
                     modifier = Modifier.fillMaxSize(),
+                    fileId = album.coverFileId,
                 )
             } else {
                 Icon(

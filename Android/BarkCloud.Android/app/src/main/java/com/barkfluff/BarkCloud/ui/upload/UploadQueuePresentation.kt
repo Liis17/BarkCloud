@@ -1,0 +1,135 @@
+package com.barkfluff.BarkCloud.ui.upload
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cache.LocalMediaImageModel
+import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
+import com.barkfluff.BarkCloud.data.gallery.DeviceMediaStore
+import com.barkfluff.BarkCloud.data.upload.UploadJob
+import com.barkfluff.BarkCloud.data.upload.UploadPhase
+import com.barkfluff.BarkCloud.ui.components.localPreviewModel
+import kotlinx.coroutines.CancellationException
+import java.io.File
+
+internal suspend fun loadUploadJobThumbnailModel(
+    mediaKey: String?,
+    fallback: LocalMediaImageModel?,
+    findByKey: suspend (String) -> DeviceMedia?,
+): LocalMediaImageModel? {
+    val media = try {
+        if (mediaKey == null) null else findByKey(mediaKey)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
+    return media?.localPreviewModel(256) ?: fallback
+}
+
+@Composable
+internal fun UploadJobThumbnail(
+    job: UploadJob,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val stagedThumbnailModel = remember(job.stagedFilePath, job.mimeType) {
+        job.stagedFilePath?.let { path ->
+            File(path).localPreviewModel(256, job.mimeType?.startsWith("video/") == true)
+        }
+    }
+    var thumbnailModel by remember(job.mediaKey, job.stagedFilePath, job.mimeType) {
+        mutableStateOf(stagedThumbnailModel)
+    }
+    LaunchedEffect(job.mediaKey, job.stagedFilePath, job.mimeType) {
+        thumbnailModel = loadUploadJobThumbnailModel(job.mediaKey, stagedThumbnailModel) { mediaKey ->
+            DeviceMediaStore.findByKey(context, mediaKey)
+        }
+    }
+    val placeholder = painterResource(R.drawable.ic_upload_media_placeholder)
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        AsyncImage(
+            model = thumbnailModel,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            placeholder = placeholder,
+            error = placeholder,
+            fallback = placeholder,
+            contentScale = ContentScale.Crop,
+        )
+        if (job.mimeType?.startsWith("video/") == true) {
+            Icon(
+                imageVector = Icons.Filled.PlayCircle,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.align(Alignment.BottomEnd).size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun UploadJobProgressIndicator(job: UploadJob) {
+    if (!job.phase.isExecuting()) return
+    if (job.bytesTotal > 0) {
+        LinearProgressIndicator(
+            progress = { (job.bytesSent.toFloat() / job.bytesTotal).coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    } else {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    }
+}
+
+internal fun UploadPhase.isExecuting(): Boolean = when (this) {
+    UploadPhase.HASHING,
+    UploadPhase.CREATING_SESSION,
+    UploadPhase.UPLOADING,
+    UploadPhase.COMPLETING,
+    UploadPhase.PROCESSING,
+    UploadPhase.ATTACHING -> true
+    else -> false
+}
+
+internal fun UploadPhase.label(): String = when (this) {
+    UploadPhase.QUEUED -> "В очереди"
+    UploadPhase.HASHING, UploadPhase.CREATING_SESSION -> "Подготовка"
+    UploadPhase.UPLOADING -> "Отправляется"
+    UploadPhase.COMPLETING, UploadPhase.PROCESSING -> "Обработка на сервере"
+    UploadPhase.UPLOADED, UploadPhase.ATTACHING -> "Размещается в облаке"
+    UploadPhase.UPLOADED_NOT_ATTACHED -> "Ожидает размещения"
+    UploadPhase.PAUSED -> "На паузе"
+    UploadPhase.FAILED -> "Ошибка"
+    UploadPhase.COMPLETED -> "Готово"
+    UploadPhase.CANCELLED -> "Отменено"
+}

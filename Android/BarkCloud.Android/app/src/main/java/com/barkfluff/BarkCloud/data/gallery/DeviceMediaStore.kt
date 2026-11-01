@@ -21,6 +21,7 @@ data class DeviceMedia(
     val folderKey: String = "",
     val folderName: String = "",
     val mimeType: String? = null,
+    val generationModified: Long = 0L,
 ) {
     val mediaKey: String get() = "${if (isVideo) "video" else "image"}:$id"
 }
@@ -33,6 +34,7 @@ object DeviceMediaStore {
         MediaStore.MediaColumns.DISPLAY_NAME,
         MediaStore.MediaColumns.DATE_ADDED,
         MediaStore.MediaColumns.DATE_MODIFIED,
+        MediaStore.MediaColumns.GENERATION_MODIFIED,
         MediaStore.MediaColumns.SIZE,
         MediaStore.MediaColumns.VOLUME_NAME,
         MediaStore.MediaColumns.BUCKET_ID,
@@ -177,6 +179,7 @@ object DeviceMediaStore {
                 cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_ID)),
             folderName = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)).orEmpty(),
             mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)),
+            generationModified = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.GENERATION_MODIFIED)),
         )
     }
 }

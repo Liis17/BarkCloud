@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
+import com.barkfluff.BarkCloud.ui.components.localPreviewModel
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import kotlin.math.roundToInt
 
@@ -63,7 +64,7 @@ private fun CleanupParticleTile(item: DeviceMedia, dissolving: Boolean, progress
         snapshot = if (dissolving) layer.toImageBitmap() else null
     }
     MediaThumb(
-        model = item.uri,
+        model = item.localPreviewModel(512),
         isVideo = item.isVideo,
         contentDescription = null,
         modifier = modifier.drawWithContent {

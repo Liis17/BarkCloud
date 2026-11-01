@@ -139,9 +139,7 @@ internal val pendingPhotoDeleteSaver = listSaver<PendingPhotoDelete?, Any>(
 )
 
 private enum class AccountMenuDestination {
-    PROFILE,
     SETTINGS,
-    TRASH,
     UPLOADS,
     CLEANUP,
 }
@@ -150,9 +148,7 @@ private enum class AccountMenuDestination {
 @Composable
 fun GalleryScreen(
     uploadState: UploadQueueUiState,
-    onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTrash: () -> Unit,
     onOpenUploads: () -> Unit,
     onOpenCleanup: () -> Unit,
     viewModel: GalleryViewModel = viewModel(factory = GalleryViewModel.factory()),
@@ -315,9 +311,7 @@ fun GalleryScreen(
             val destination = pendingNavigation
             pendingNavigation = null
             when (destination) {
-                AccountMenuDestination.PROFILE -> onOpenProfile()
                 AccountMenuDestination.SETTINGS -> onOpenSettings()
-                AccountMenuDestination.TRASH -> onOpenTrash()
                 AccountMenuDestination.UPLOADS -> onOpenUploads()
                 AccountMenuDestination.CLEANUP -> onOpenCleanup()
                 null -> Unit
@@ -611,9 +605,7 @@ fun GalleryScreen(
             reclaimableBytes = state.reclaimableBytes,
             onOpenUploads = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.UPLOADS },
             onFreeDeviceSpace = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.CLEANUP },
-            onOpenProfile = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.PROFILE },
             onOpenSettings = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.SETTINGS },
-            onOpenTrash = { accountDialogOpen = false; pendingNavigation = AccountMenuDestination.TRASH },
             onDismiss = { accountDialogOpen = false },
         )
     }

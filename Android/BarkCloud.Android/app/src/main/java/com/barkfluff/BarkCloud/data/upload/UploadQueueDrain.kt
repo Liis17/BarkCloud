@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.data.upload
 
+import com.barkfluff.BarkCloud.data.gallery.AutoUploadNetworkPolicy
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -13,6 +14,7 @@ internal object UploadQueueDrain {
         source: ActiveUploadPageSource,
         pageSize: Int,
         shouldStop: () -> Boolean,
+        shouldProcess: (UploadJob) -> Boolean = { true },
         process: suspend (UploadJob) -> Unit,
     ) {
         var afterId: String? = null
@@ -21,11 +23,23 @@ internal object UploadQueueDrain {
             if (page.isEmpty()) break
             afterId = page.last().id
             coroutineScope {
-                page.forEach { job -> launch { process(job) } }
+                page.filter(shouldProcess).forEach { job -> launch { process(job) } }
             }
         }
     }
 }
+
+internal fun shouldUploadBackup(policy: AutoUploadNetworkPolicy, isUnmeteredNetwork: Boolean): Boolean = when (policy) {
+    AutoUploadNetworkPolicy.OFF -> false
+    AutoUploadNetworkPolicy.ANY_NETWORK -> true
+    AutoUploadNetworkPolicy.WIFI_ONLY -> isUnmeteredNetwork
+}
+
+internal fun shouldProcessUploadJob(
+    job: UploadJob,
+    policy: AutoUploadNetworkPolicy,
+    isUnmeteredNetwork: Boolean,
+): Boolean = job.source != UploadSource.BACKUP || shouldUploadBackup(policy, isUnmeteredNetwork)
 
 internal fun shouldScheduleUploadContinuation(
     stopClaiming: Boolean,
