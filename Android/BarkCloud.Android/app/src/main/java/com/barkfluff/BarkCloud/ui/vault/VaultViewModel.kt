@@ -1,5 +1,6 @@
 package com.barkfluff.BarkCloud.ui.vault
 
+import android.content.Context
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,8 +13,8 @@ import com.barkfluff.BarkCloud.data.cloud.AlbumRepository
 import com.barkfluff.BarkCloud.data.cloud.CloudRepository
 import com.barkfluff.BarkCloud.data.vault.VaultItem
 import com.barkfluff.BarkCloud.data.vault.VaultStore
+import com.barkfluff.BarkCloud.ui.selection.BatchOutcome
 import com.barkfluff.BarkCloud.ui.selection.runCloudBatch
-import android.content.Context
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,12 +33,10 @@ data class VaultUiState(
 )
 
 /**
- * Per-session блокировка (без grace-period — проще, чем App Lock): релочится
- * при каждом уходе экрана из foreground ([relock], вызывается из [VaultScreen]
- * на ON_STOP), зеркалит iOS scenePhase-поведение VaultViewModel.
- *
- * При блокировке выбор сбрасывается и новые пакетные операции не запускаются; уже идущая
- * операция дописывает результат в состояние (VaultStore согласуется с облаком).
+ * Per-session блокировка. Каждая сессия (поколение) получает номер; [relock] увеличивает его, и всё,
+ * что стартовало в прошлом поколении, больше не может ни поднять [VaultLockState.UNLOCKED], ни запустить
+ * следующий элемент пакета. Невыполненные ID остаются в [retainedIds] (не в состоянии экрана) и
+ * возвращаются в выбор только после новой успешной разблокировки.
  */
 class VaultViewModel(
     private val appContext: Context,
@@ -49,19 +48,47 @@ class VaultViewModel(
     private val _state = MutableStateFlow(VaultUiState())
     val state: StateFlow<VaultUiState> = _state.asStateFlow()
 
+    private var sessionGeneration = 0L
+    private var retainedIds: Set<String> = emptySet()
+
     fun unlock(activity: FragmentActivity, title: String) {
-        if (_state.value.lockState != VaultLockState.LOCKED) return
-        _state.update { it.copy(lockState = VaultLockState.UNLOCKING) }
+        val generation = onUnlockStarted() ?: return
         viewModelScope.launch {
             val ok = BiometricGate.authenticate(activity, title)
-            _state.update {
-                if (ok) it.copy(lockState = VaultLockState.UNLOCKED, items = store.items())
-                else it.copy(lockState = VaultLockState.LOCKED)
-            }
+            onUnlockResult(generation, ok)
+        }
+    }
+
+    /** Начало разблокировки; возвращает поколение или null, если разблокировка уже идёт или открыто. */
+    internal fun onUnlockStarted(): Long? {
+        if (_state.value.lockState != VaultLockState.LOCKED) return null
+        _state.update { it.copy(lockState = VaultLockState.UNLOCKING) }
+        return sessionGeneration
+    }
+
+    /**
+     * Итог биометрии. Результат старого поколения (после блокировки) не открывает Vault: состояние не
+     * меняется, а после успешной новой разблокировки отложенные ID возвращаются в выбор для повтора.
+     */
+    internal fun onUnlockResult(generation: Long, ok: Boolean) {
+        if (generation != sessionGeneration) return
+        if (!ok) {
+            _state.update { if (it.lockState == VaultLockState.UNLOCKING) it.copy(lockState = VaultLockState.LOCKED) else it }
+            return
+        }
+        val restored = retainedIds
+        retainedIds = emptySet()
+        _state.update {
+            it.copy(
+                lockState = VaultLockState.UNLOCKED,
+                items = store.items(),
+                selected = restored.intersect(store.items().map { item -> item.fileId }.toSet()),
+            )
         }
     }
 
     fun relock() {
+        sessionGeneration++
         _state.update { it.copy(lockState = VaultLockState.LOCKED, selected = emptySet()) }
     }
 
@@ -81,14 +108,32 @@ class VaultViewModel(
         _state.update { it.copy(selected = emptySet()) }
     }
 
-    /** Файлы уходят в корзину по одному; неудачные остаются выбранными для повтора. */
-    fun deleteSelected() = runBatch {
-        val outcome = runCloudBatch(_state.value.selected) { cloudRepository.deleteUserMedia(it) }
-        outcome.succeeded.forEach { store.remove(it) }
+    /**
+     * Удаление в облако по одному элементу. Перед каждым элементом проверяется, что поколение сессии
+     * не сменилось и vault открыт; иначе пакет останавливается, а нерассмотренные ID сохраняются для повтора.
+     */
+    fun deleteSelected() {
+        val generation = sessionGeneration
+        runBatch {
+            val outcome = runCloudBatch(
+                _state.value.selected,
+                shouldContinue = { generation == sessionGeneration && _state.value.lockState == VaultLockState.UNLOCKED },
+            ) { fileId ->
+                cloudRepository.deleteUserMedia(fileId)
+                store.remove(fileId) // только после подтверждённого удаления
+            }
+            applyDeleteOutcome(outcome, generation)
+        }
+    }
+
+    private fun applyDeleteOutcome(outcome: BatchOutcome, generation: Long) {
+        // Результаты уже выполненных удалений применяются всегда, даже после блокировки.
+        val stillOpen = generation == sessionGeneration
+        retainedIds = outcome.remaining
         _state.update {
             it.copy(
                 items = it.items.filterNot { item -> item.fileId in outcome.succeeded },
-                selected = it.selected - outcome.succeeded,
+                selected = if (stillOpen) outcome.remaining else emptySet(),
                 snackbar = if (outcome.failed > 0) appContext.getString(R.string.batch_failed_count, outcome.failed) else it.snackbar,
             )
         }
