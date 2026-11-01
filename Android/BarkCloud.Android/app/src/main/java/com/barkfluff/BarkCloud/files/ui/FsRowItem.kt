@@ -66,6 +66,7 @@ fun FsRowItem(
             .combinedClickable(
                 onClick = onPrimaryClick,
                 onLongClick = onLongPress,
+                hapticFeedbackEnabled = false,
             )
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
