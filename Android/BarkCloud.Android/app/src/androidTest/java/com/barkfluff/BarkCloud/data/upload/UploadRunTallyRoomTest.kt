@@ -8,6 +8,8 @@ import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,8 +50,35 @@ class UploadRunTallyRoomTest {
         val withBackup = dao.runTally(RUN_START, includeBackup = true, failedIds = listOf("run-failed", "backup-failed"))
         assertEquals(UploadRunTally(done = 1, remaining = 3, failed = 2), withBackup)
 
+        // Политика сети убирает backup из remaining, но ошибка прохода остаётся в failed.
         val withoutBackup = dao.runTally(RUN_START, includeBackup = false, failedIds = listOf("run-failed", "backup-failed"))
-        assertEquals(UploadRunTally(done = 1, remaining = 2, failed = 1), withoutBackup)
+        assertEquals(UploadRunTally(done = 1, remaining = 2, failed = 2), withoutBackup)
+    }
+
+    @Test
+    fun recordedBackupFailureStaysCountedWhileNetworkBlocksBackup() = runBlocking {
+        val dao = database.uploadDao()
+        dao.insert(job("done-now", UploadPhase.COMPLETED, completedAt = RUN_START + 1))
+        dao.insert(job("backup-failed", UploadPhase.FAILED, UploadSource.BACKUP))
+
+        // Платная сеть: backup не eligible, но упавший в этом проходе backup не должен выглядеть успехом.
+        val blocked = dao.runTally(RUN_START, includeBackup = false, failedIds = listOf("backup-failed"))
+
+        assertEquals(UploadRunTally(done = 1, remaining = 0, failed = 1), blocked)
+        assertFalse(blocked.isGenuineSuccess)
+    }
+
+    @Test
+    fun cancellingRecordedBackupFailureRemovesItFromCount() = runBlocking {
+        val dao = database.uploadDao()
+        dao.insert(job("done-now", UploadPhase.COMPLETED, completedAt = RUN_START + 1))
+        dao.insert(job("backup-failed", UploadPhase.FAILED, UploadSource.BACKUP))
+        assertEquals(1, dao.cancel("backup-failed"))
+
+        val tally = dao.runTally(RUN_START, includeBackup = false, failedIds = listOf("backup-failed"))
+
+        assertEquals(UploadRunTally(done = 1, remaining = 0, failed = 0), tally)
+        assertTrue(tally.isGenuineSuccess)
     }
 
     @Test

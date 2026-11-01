@@ -624,10 +624,10 @@ class UploadWorker(
 
     /** После смахивания уведомление не переписываем: `setForeground` снова показал бы чип. */
     private suspend fun refreshForeground(progress: UploadRunProgress) {
-        if (UploadNotificationDismissal.isDismissed) return
-        val tally = progress.tally()
-        if (tally.total == 0) return
-        setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, tally)))
+        UploadNotificationDismissal.gate.publish(
+            snapshot = { progress.tally().takeIf { it.total > 0 } },
+            post = { tally -> setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, tally))) },
+        )
     }
 
     private fun foregroundInfo(notification: Notification): ForegroundInfo =
