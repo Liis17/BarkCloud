@@ -56,6 +56,12 @@ class UploadWorker(
     override suspend fun doWork(): Result {
         val runStart = System.currentTimeMillis()
         val runToken = UploadNotificationDismissal.beginRun()
+        val refreshPublisher = UploadRefreshPublisher(
+            mainContext = Dispatchers.Main.immediate,
+            isDismissed = { UploadNotificationDismissal.isDismissed(runToken) },
+            isRegistered = { UploadNotification.isForegroundRegistered(applicationContext, runToken) },
+            notify = { tally -> UploadNotification.update(applicationContext, tally, runToken) },
+        )
         val queue = UploadQueueStore(applicationContext)
         queue.initialize()
 
@@ -89,12 +95,15 @@ class UploadWorker(
             val pending = mutableListOf<PendingRetry>()
             val stopClaiming = AtomicBoolean(false)
             val stagingBudget = BackupStagingBudget(queue.stagedBackupCount())
-            // Единственный setForeground на проход: регистрирует FGS. Дальше уведомление обновляется напрямую.
+            // Единственный setForeground на проход. WorkManager ставит в очередь две асинхронные команды сервиса,
+            // публикация не подтверждается; дальше обновления идут напрямую и только при видимой регистрации.
             setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, initialTally, runToken)))
 
             coroutineScope {
                 val notificationConsumer = launch {
-                    consumeUploadNotifications(notifyChannel) { refreshForeground(progress, runToken) }
+                    consumeUploadNotifications(notifyChannel) {
+                        refreshPublisher.publish { progress.tally().takeIf { it.total > 0 } }
+                    }
                 }
                 // Задачи могут добавиться извне (discovery), поэтому счёт пересчитывается и по таймеру.
                 val periodicRefresh = launch {
@@ -622,18 +631,6 @@ class UploadWorker(
             UploadPhase.PAUSED -> throw JobPausedException()
             else -> Unit
         }
-    }
-
-    /**
-     * Обновление счёта через NotificationManager на главном потоке, без очереди WorkManager. Смахнутое
-     * уведомление не переписывается до следующего прохода.
-     */
-    private suspend fun refreshForeground(progress: UploadRunProgress, runToken: String) {
-        UploadRefreshPublisher(
-            mainContext = Dispatchers.Main.immediate,
-            isDismissed = { UploadNotificationDismissal.isDismissed(runToken) },
-            notify = { tally -> UploadNotification.update(applicationContext, tally, runToken) },
-        ).publish { progress.tally().takeIf { it.total > 0 } }
     }
 
     private fun foregroundInfo(notification: Notification): ForegroundInfo =
