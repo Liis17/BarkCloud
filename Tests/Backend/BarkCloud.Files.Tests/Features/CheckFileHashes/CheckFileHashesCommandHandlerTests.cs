@@ -18,8 +18,8 @@ public class CheckFileHashesCommandHandlerTests
     [Fact]
     public async Task Handle_EmptyInput_ReturnsEmptyResults()
     {
-        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HashSet<string>());
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OwnerHashMatch>());
 
         var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = [] }, default);
 
@@ -30,8 +30,8 @@ public class CheckFileHashesCommandHandlerTests
     public async Task Handle_FiltersInvalidHashes()
     {
         var valid = new string('a', 64);
-        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HashSet<string>());
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OwnerHashMatch>());
 
         var response = await CreateSut().Handle(
             new CheckFileHashesCommand { FileHashes = ["", "not-hex", valid, "short"] }, default);
@@ -44,8 +44,8 @@ public class CheckFileHashesCommandHandlerTests
     public async Task Handle_DeduplicatesValidHashes()
     {
         var hash = new string('b', 64);
-        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HashSet<string>());
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OwnerHashMatch>());
 
         var response = await CreateSut().Handle(
             new CheckFileHashesCommand { FileHashes = [hash, hash.ToUpperInvariant(), hash] }, default);
@@ -58,8 +58,8 @@ public class CheckFileHashesCommandHandlerTests
     {
         var hashA = new string('a', 64);
         var hashB = new string('b', 64);
-        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HashSet<string> { hashA });
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new OwnerHashMatch(hashA, Guid.NewGuid(), IsReady: true)]);
 
         var response = await CreateSut().Handle(
             new CheckFileHashesCommand { FileHashes = [hashA, hashB] }, default);
@@ -75,11 +75,48 @@ public class CheckFileHashesCommandHandlerTests
         var input = Enumerable.Range(0, 600)
             .Select(i => i.ToString("x").PadLeft(64, '0'))
             .ToList();
-        _hashes.Setup(s => s.GetExistingHashesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new HashSet<string>());
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OwnerHashMatch>());
 
         var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = input }, default);
 
         response.Results.Should().HaveCount(500);
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsOnlyReadyFileIdsSortedAndDistinct()
+    {
+        var hash = new string('c', 64);
+        var ready1 = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var ready2 = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var pending = Guid.Parse("00000000-0000-0000-0000-000000000000");
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new OwnerHashMatch(hash, ready1, IsReady: true),
+                new OwnerHashMatch(hash, pending, IsReady: false),
+                new OwnerHashMatch(hash, ready2, IsReady: true),
+                new OwnerHashMatch(hash, ready2, IsReady: true),
+            ]);
+
+        var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = [hash] }, default);
+
+        var result = response.Results.Single();
+        result.Exists.Should().BeTrue();
+        result.FileIds.Should().Equal(ready2.ToString(), ready1.ToString());
+    }
+
+    [Fact]
+    public async Task Handle_ExistsWithoutReadyFile_ReturnsExistsAndNoFileIds()
+    {
+        var hash = new string('d', 64);
+        _hashes.Setup(s => s.GetLiveHashMatchesForOwner(It.IsAny<long>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new OwnerHashMatch(hash, Guid.NewGuid(), IsReady: false)]);
+
+        var response = await CreateSut().Handle(new CheckFileHashesCommand { FileHashes = [hash] }, default);
+
+        var result = response.Results.Single();
+        result.Exists.Should().BeTrue();
+        result.FileIds.Should().BeEmpty();
     }
 }
