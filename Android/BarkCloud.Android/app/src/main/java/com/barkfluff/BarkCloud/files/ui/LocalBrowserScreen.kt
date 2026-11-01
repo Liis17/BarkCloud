@@ -1,5 +1,7 @@
 package com.barkfluff.BarkCloud.files.ui
 
+import com.barkfluff.BarkCloud.ui.components.SelectionHaptics
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -81,6 +83,7 @@ fun LocalBrowserScreen(
         factory = LocalBrowserViewModel.factory(initialPath, rootLabel),
     )
     val state by viewModel.state.collectAsState()
+    SelectionHaptics(state.selection)
     val snackbarHost = remember { SnackbarHostState() }
 
     val errorNoApp = stringResource(R.string.files_op_error_no_app)
