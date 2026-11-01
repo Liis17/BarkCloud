@@ -57,16 +57,24 @@ public partial class CheckFileHashesCommandHandler : IRequestHandler<CheckFileHa
             request.FileHashes.Count, normalized.Count);
 
         // Только хеши, файлы которых есть у текущего пользователя — иначе раскрыли бы наличие чужих файлов.
-        var existing = await _hashesStorage.GetExistingHashesForOwner(_userContext.UserId, normalized, cancellationToken);
+        var matches = await _hashesStorage.GetLiveHashMatchesForOwner(_userContext.UserId, normalized, cancellationToken);
+        var matchesByHash = matches.GroupBy(m => m.Hash).ToDictionary(g => g.Key, g => g.ToList());
 
         var response = new CheckFileHashesResponse();
         foreach (var hash in normalized)
         {
-            response.Results.Add(new HashCheckResult
+            var result = new HashCheckResult { FileHash = hash, Exists = matchesByHash.ContainsKey(hash) };
+            if (matchesByHash.TryGetValue(hash, out var hashMatches))
             {
-                FileHash = hash,
-                Exists = existing.Contains(hash)
-            });
+                // Только READY-блобы; порядок фиксирован, чтобы клиент детерминированно выбирал ID.
+                result.FileIds.AddRange(hashMatches
+                    .Where(m => m.IsReady)
+                    .Select(m => m.FileId.ToString())
+                    .Distinct()
+                    .Order(StringComparer.Ordinal));
+            }
+
+            response.Results.Add(result);
         }
 
         return response;

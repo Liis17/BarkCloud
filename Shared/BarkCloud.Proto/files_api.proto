@@ -457,6 +457,7 @@ message CheckFileHashesRequest {
 message HashCheckResult {
   string file_hash = 1; // исходный хеш (нормализован к нижнему регистру)
   bool exists = 2;      // true — файл с таким хешем есть в хранилище
+  repeated string file_ids = 3; // READY-файлы владельца с живыми записями в облаке (по возрастанию); пусто при exists=true — действие по хешу недоступно
 }
 
 message CheckFileHashesResponse {
