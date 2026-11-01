@@ -40,10 +40,18 @@ internal class FakeMediaCloudStateDao : MediaCloudStateDao {
         return 1
     }
 
-    override suspend fun markAbsent(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String): Int {
+    override suspend fun markAbsent(
+        mediaKey: String,
+        dateModifiedSeconds: Long,
+        sizeBytes: Long,
+        hash: String,
+        expectedStatus: MediaCloudStatus,
+        expectedCloudFileId: String?,
+    ): Int {
         val row = rows[mediaKey] ?: return 0
         if (row.dateModifiedSeconds != dateModifiedSeconds || row.sizeBytes != sizeBytes) return 0
-        if (row.status in setOf(MediaCloudStatus.QUEUED, MediaCloudStatus.UPLOADING, MediaCloudStatus.IN_CLOUD)) return 0
+        if (row.status != expectedStatus || row.cloudFileId != expectedCloudFileId) return 0
+        if (row.status in setOf(MediaCloudStatus.QUEUED, MediaCloudStatus.UPLOADING)) return 0
         rows[mediaKey] = row.copy(status = MediaCloudStatus.NOT_IN_CLOUD, hash = hash, cloudFileId = null)
         return 1
     }

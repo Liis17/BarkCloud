@@ -79,18 +79,42 @@ class CloudPresenceCheckerTest {
     }
 
     @Test
-    fun lateAbsentAnswerDoesNotDowngradeInCloud() = runTest {
+    fun authoritativeAbsenceClearsStaleInCloudBadge() = runTest {
+        // Файл удалён в облаке: принудительная проверка обязана снять значок «в облаке».
         val dao = FakeMediaCloudStateDao()
         val media = media(3)
-        dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.IN_CLOUD)
+        dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.IN_CLOUD).copy(cloudFileId = "old-id")
         val checker = checker(this, dao, hashFile = { hashA }, presence = { chunk ->
             chunk.associateWith { HashPresence(false, emptyList()) }
         })
 
-        checker.request(media)
+        checker.request(media, force = true)
         checker.flush()
 
-        assertEquals(MediaCloudStatus.IN_CLOUD, dao.rows.getValue(media.mediaKey).status)
+        assertEquals(MediaCloudStatus.NOT_IN_CLOUD, dao.rows.getValue(media.mediaKey).status)
+        assertNull(dao.rows.getValue(media.mediaKey).cloudFileId)
+    }
+
+    @Test
+    fun staleAbsenceRacingNewerCompletedUploadDoesNotOverwriteIt() = runTest {
+        // Проверка стартовала без копии; пока ждали ответ, загрузка завершилась. Устаревшее «нет» не применяется.
+        val dao = FakeMediaCloudStateDao()
+        val media = media(4)
+        dao.rows[media.mediaKey] = cloudStateOf(media, hashA, MediaCloudStatus.NOT_IN_CLOUD)
+        val checker = checker(this, dao, hashFile = { hashA }, presence = { chunk ->
+            dao.rows[media.mediaKey] = dao.rows.getValue(media.mediaKey).copy(
+                status = MediaCloudStatus.IN_CLOUD,
+                cloudFileId = "new-id",
+            )
+            chunk.associateWith { HashPresence(false, emptyList()) }
+        })
+
+        checker.request(media, force = true)
+        checker.flush()
+
+        val row = dao.rows.getValue(media.mediaKey)
+        assertEquals(MediaCloudStatus.IN_CLOUD, row.status)
+        assertEquals("new-id", row.cloudFileId)
     }
 
     @Test
