@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.data.upload
 
 import android.content.Context
 import android.net.Uri
+import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChange
 import com.barkfluff.BarkCloud.data.cloud.CloudLibraryChanges
 import com.barkfluff.BarkCloud.data.gallery.BackupUploadQueue
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
@@ -390,7 +391,7 @@ class UploadQueueStore(
         if (dao.markCompleted(job.id, System.currentTimeMillis()) > 0) {
             if (current.source == UploadSource.BACKUP) deleteBackupOwnedFiles(current.id, current.stagedFilePath)
             else current.stagedFilePath?.let(::deleteQueueFile)
-            CloudLibraryChanges.notifyChanged()
+            CloudLibraryChanges.publish(CloudLibraryChange.Changed)
         }
     }
 
@@ -403,7 +404,7 @@ class UploadQueueStore(
         if (dao.completeDeduplicatedIfAlbum(id, expectedAlbumId, System.currentTimeMillis()) == 0) return false
         if (current.source == UploadSource.BACKUP) deleteBackupOwnedFiles(current.id, current.stagedFilePath)
         else current.stagedFilePath?.let(::deleteQueueFile)
-        CloudLibraryChanges.notifyChanged()
+        CloudLibraryChanges.publish(CloudLibraryChange.Changed)
         return true
     }
 

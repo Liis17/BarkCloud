@@ -1,10 +1,11 @@
 package com.barkfluff.BarkCloud.ui.albums
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,10 +18,10 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.RemoveCircleOutline
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -39,18 +40,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cloud.AlbumCard
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.ui.components.CloudAlbumPickerDialog
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
@@ -58,7 +67,16 @@ import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
+import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
+import com.barkfluff.BarkCloud.ui.selection.SelectionAction
+import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
+import com.barkfluff.BarkCloud.ui.selection.dragSelection
+import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
+import com.barkfluff.BarkCloud.ui.selection.toggled
+import com.barkfluff.BarkCloud.ui.selection.viewportBounds
+import com.barkfluff.BarkCloud.ui.selection.visibleCells
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +93,24 @@ fun AlbumDetailScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showDeleteSelected by remember { mutableStateOf(false) }
+    var pickAlbums by remember { mutableStateOf<List<AlbumCard>?>(null) }
+    var dragging by remember { mutableStateOf(false) }
+    var actionBarHeightPx by remember { mutableIntStateOf(0) }
     val openRemote = rememberRemoteOpener()
+    val app = LocalContext.current.applicationContext as BarkCloudApplication
+    val scope = rememberCoroutineScope()
+    val selecting = state.selected.isNotEmpty()
+    BackHandler(enabled = selecting || state.busy) { if (!state.busy) viewModel.clearSelection() }
+    val dragController = rememberDragSelection(
+        orderedKeys = state.items.map { it.id },
+        selected = state.selected,
+        onSelectionChange = viewModel::setSelection,
+        visibleCells = { gridState.visibleCells() },
+        viewport = { gridState.viewportBounds(bottomInsetPx = actionBarHeightPx.toFloat()) },
+        scrollBy = { gridState.scrollBy(it) },
+        onDragActiveChange = { dragging = it },
+    )
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(),
@@ -136,26 +171,53 @@ fun AlbumDetailScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 120.dp),
                         state = gridState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().dragSelection(dragController) { id ->
+                            if (state.busy) return@dragSelection
+                            if (selecting) {
+                                viewModel.setSelection(state.selected.toggled(id))
+                            } else {
+                                viewer = state.items.firstOrNull { it.id == id }
+                            }
+                        },
+                        userScrollEnabled = !dragging,
                     ) {
                         items(state.items, key = { it.id }) { asset ->
-                            AlbumItemCell(
-                                asset = asset,
-                                onTap = { viewer = asset },
-                                onSetCover = { viewModel.setCover(asset.id) },
-                                onRemove = { viewModel.removeItem(asset.id) },
-                            )
+                            AlbumItemCell(asset = asset, selecting = selecting, selected = asset.id in state.selected)
                         }
                     }
                 }
 
-                FloatingActionButton(
-                    onClick = {
-                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-                    },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
+                if (selecting) {
+                    val count = state.selected.size
+                    SelectionActionBar(
+                        modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
+                        actions = buildList {
+                            add(SelectionAction(stringResource(R.string.album_remove_selected, count), enabled = !state.busy) {
+                                viewModel.removeSelectedFromAlbum()
+                            })
+                            add(SelectionAction(stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
+                                scope.launch { pickAlbums = loadAllAlbums(app.albumRepository) }
+                            })
+                            if (count == 1) add(SelectionAction(stringResource(R.string.albums_set_cover), enabled = !state.busy) {
+                                viewModel.setCoverFromSelection()
+                            })
+                            add(SelectionAction(stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
+                                showDeleteSelected = true
+                            })
+                            add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.busy) {
+                                viewModel.clearSelection()
+                            })
+                        },
+                    )
+                } else {
+                    FloatingActionButton(
+                        onClick = {
+                            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                        },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    }
                 }
             }
         }
@@ -168,6 +230,33 @@ fun AlbumDetailScreen(
         )
     }
 
+    pickAlbums?.let { choices ->
+        CloudAlbumPickerDialog(
+            albums = choices,
+            enabled = !state.busy,
+            onPick = { album ->
+                pickAlbums = null
+                viewModel.addSelectedToAlbum(album.id)
+            },
+            onDismiss = { pickAlbums = null },
+        )
+    }
+    if (showDeleteSelected) {
+        val count = state.selected.size
+        AlertDialog(
+            onDismissRequest = { showDeleteSelected = false },
+            title = { Text(stringResource(R.string.gallery_delete_selected_title)) },
+            text = { Text(stringResource(R.string.album_delete_selected_message, count)) },
+            confirmButton = {
+                TextButton(onClick = { showDeleteSelected = false; viewModel.deleteSelected() }) {
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelected = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
+    }
     if (showRename) {
         TextInputDialog(
             title = stringResource(R.string.albums_rename),
@@ -195,21 +284,17 @@ fun AlbumDetailScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlbumItemCell(
     asset: MediaAsset,
-    onTap: () -> Unit,
-    onSetCover: () -> Unit,
-    onRemove: () -> Unit,
+    selecting: Boolean,
+    selected: Boolean,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .padding(1.dp)
-            .clip(MaterialTheme.shapes.small)
-            .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true }),
+            .clip(MaterialTheme.shapes.small),
     ) {
         MediaThumb(
             model = asset.previewModel(512),
@@ -220,16 +305,13 @@ private fun AlbumItemCell(
                 visible = LocalCloudMediaViewerAssetId.current != asset.id,
             ),
         )
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.albums_set_cover)) },
-                leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
-                onClick = { menuOpen = false; onSetCover() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.albums_remove_item)) },
-                leadingIcon = { Icon(Icons.Outlined.RemoveCircleOutline, contentDescription = null) },
-                onClick = { menuOpen = false; onRemove() },
+        if (selecting) {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = if (selected) 0.25f else 0f)))
+            Icon(
+                if (selected) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
             )
         }
     }
