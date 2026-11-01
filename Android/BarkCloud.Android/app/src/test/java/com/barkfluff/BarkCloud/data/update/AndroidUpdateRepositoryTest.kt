@@ -272,6 +272,23 @@ class AndroidUpdateRepositoryTest {
     }
 
     @Test
+    fun betaChannelToggleIsPersistedAndRequestsPrereleases() = runBlocking {
+        val store = FakeStore()
+        val fetcher = FakeFetcher { metadata("v1.0.6-dev.12.1+abcdef1") }
+        val repository = repository(store, FakeDownloads(temporaryFolder.newFolder("external")), fetcher = fetcher)
+
+        repository.checkForPage(force = true)
+        assertFalse(fetcher.lastIncludePrerelease)
+
+        repository.setBetaChannel(true)
+        repository.checkForPage(force = true)
+
+        assertTrue(store.beta)
+        assertTrue(repository.state.value.betaChannel)
+        assertTrue(fetcher.lastIncludePrerelease)
+    }
+
+    @Test
     fun rateLimitIsPersistedAndManualChecksDoNotLoop() = runBlocking {
         val store = FakeStore()
         val fetcher = FakeFetcher { throw GitHubRateLimitException(NOW + 60_000, 429) }
@@ -347,8 +364,13 @@ class AndroidUpdateRepositoryTest {
         var lastAttempt = 0L
         var lastStartupAttempt = 0L
         var rateLimitUntil = 0L
+        var beta = false
         val promptDays = mutableMapOf<String, String>()
 
+        override fun betaChannelEnabled() = beta
+        override fun setBetaChannelEnabled(enabled: Boolean) {
+            beta = enabled
+        }
         override fun cachedRelease() = cached
         override fun cacheRelease(metadata: AndroidReleaseMetadata) {
             cached = metadata
@@ -438,8 +460,10 @@ class AndroidUpdateRepositoryTest {
 
     private class FakeFetcher(private val result: suspend () -> AndroidReleaseMetadata) : AndroidReleaseFetcher {
         var calls = 0
-        override suspend fun fetchLatest(): AndroidReleaseMetadata {
+        var lastIncludePrerelease = false
+        override suspend fun fetchLatest(includePrerelease: Boolean): AndroidReleaseMetadata {
             calls++
+            lastIncludePrerelease = includePrerelease
             return result()
         }
     }

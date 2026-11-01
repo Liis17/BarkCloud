@@ -455,6 +455,8 @@
     <string name="android_updates_progress">Загружено %1$s из %2$s</string>
     <string name="android_updates_retry_after">Следующая проверка доступна: %1$s</string>
     <string name="android_updates_download">Скачать обновление</string>
+    <string name="android_updates_beta_title">Бета-обновления</string>
+    <string name="android_updates_beta_description">Предлагать dev-сборки из ветки dev. Они могут быть нестабильными.</string>
     <string name="android_updates_cancel">Отменить загрузку</string>
     <string name="android_updates_install">Установить</string>
     <string name="android_updates_delete">Удалить APK</string>
