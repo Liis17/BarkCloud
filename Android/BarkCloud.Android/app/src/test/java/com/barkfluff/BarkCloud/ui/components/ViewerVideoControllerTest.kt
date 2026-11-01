@@ -54,8 +54,121 @@ class ViewerVideoControllerTest {
         advanceUntilIdle()
         controller.open("a", playWhenReady = true)
         advanceUntilIdle()
+        assertEquals(listOf("resolve:a", "load:https://signed.example/a/1@0:true"), log)
 
+        controller.open("a", playWhenReady = true, userInitiated = true)
+        advanceUntilIdle()
         assertEquals(listOf("resolve:a", "load:https://signed.example/a/1@0:true", "play"), log)
+    }
+
+    @Test
+    fun initialNotFoundWhilePlayingReloadsWithTheRequestedPlayback() = runTest {
+        // Автозапуск запрошен, но Playing ещё не пришёл: 404 не должен отменять намерение.
+        val engine = FakeEngine()
+        val controller = controller(engine)
+        controller.open("a", playWhenReady = true)
+        advanceUntilIdle()
+        log.clear()
+
+        engine.emit(VideoEngineEvent.Failed(VideoFailure.NOT_FOUND))
+        advanceUntilIdle()
+
+        assertEquals(listOf("resolve:a", "load:https://signed.example/a/2@0:true", "unpin:a"), log)
+    }
+
+    @Test
+    fun buffering404KeepsTheRequestedPlaybackAndPosition() = runTest {
+        val engine = FakeEngine()
+        val controller = controller(engine)
+        controller.open("a", playWhenReady = true)
+        advanceUntilIdle()
+        engine.emit(VideoEngineEvent.Ready)
+        engine.emit(VideoEngineEvent.Playing(true))
+        engine.emit(VideoEngineEvent.Buffering(true))
+        engine.positionMs = 7_000L
+        log.clear()
+
+        engine.emit(VideoEngineEvent.Failed(VideoFailure.NOT_FOUND))
+        advanceUntilIdle()
+
+        assertEquals(listOf("resolve:a", "load:https://signed.example/a/2@7000:true", "unpin:a"), log)
+    }
+
+    @Test
+    fun explicitPauseSurvivesTheRefreshAndKeepsThePosition() = runTest {
+        val engine = FakeEngine()
+        val controller = controller(engine)
+        controller.open("a", playWhenReady = true)
+        advanceUntilIdle()
+        engine.emit(VideoEngineEvent.Ready)
+        engine.emit(VideoEngineEvent.Playing(true))
+        controller.togglePlayback()
+        engine.emit(VideoEngineEvent.Playing(false))
+        engine.positionMs = 9_000L
+        log.clear()
+
+        engine.emit(VideoEngineEvent.Failed(VideoFailure.NOT_FOUND))
+        advanceUntilIdle()
+
+        assertEquals(listOf("resolve:a", "load:https://signed.example/a/2@9000:false", "unpin:a"), log)
+        assertEquals(VideoStatus.READY, controller.state.value.status)
+    }
+
+    @Test
+    fun backgroundDuringSettleAndResolveNeverStartsThePlayer() = runTest {
+        val engine = FakeEngine()
+        val gate = CompletableDeferred<Unit>()
+        val controller = controller(engine, gate)
+        controller.open("a", playWhenReady = true)
+        advanceUntilIdle()
+
+        controller.onBackground()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(log.none { it.startsWith("load:") || it == "play" })
+        assertEquals(VideoStatus.IDLE, controller.state.value.status)
+    }
+
+    @Test
+    fun afterReturningAutoplayIsIgnoredUntilTheUserPlays() = runTest {
+        val engine = FakeEngine()
+        val controller = controller(engine)
+        controller.open("a", playWhenReady = true)
+        advanceUntilIdle()
+        controller.onBackground()
+        controller.onForeground()
+        advanceUntilIdle()
+        log.clear()
+
+        controller.open("b", playWhenReady = true)
+        advanceUntilIdle()
+        assertTrue(log.isEmpty())
+
+        controller.open("b", playWhenReady = true, userInitiated = true)
+        advanceUntilIdle()
+        assertEquals(listOf("resolve:b", "load:https://signed.example/b/2@0:true"), log)
+    }
+
+    @Test
+    fun controlsDoNothingWhileBackgroundedAndWorkAgainAfterForeground() = runTest {
+        val engine = FakeEngine()
+        val controller = controller(engine)
+        controller.open("a", playWhenReady = true, userInitiated = true)
+        advanceUntilIdle()
+        controller.onBackground()
+        advanceUntilIdle()
+        log.clear()
+
+        controller.togglePlayback()
+        controller.retry("a")
+        advanceUntilIdle()
+        assertTrue(log.isEmpty())
+
+        controller.onForeground()
+        controller.retry("a")
+        advanceUntilIdle()
+        assertTrue(log.contains("resolve:a"))
     }
 
     @Test

@@ -13,12 +13,16 @@ import kotlinx.coroutines.launch
 
 internal enum class VideoFailure { NOT_FOUND, OTHER }
 
+/** Размер кадра из плеера: [pixelRatio] — пиксельное соотношение сторон, [rotationDegrees] — неприменённый поворот. */
+internal data class VideoSize(val width: Int, val height: Int, val pixelRatio: Float, val rotationDegrees: Int)
+
 internal sealed interface VideoEngineEvent {
     data object Ready : VideoEngineEvent
     data class Buffering(val active: Boolean) : VideoEngineEvent
     data class Playing(val active: Boolean) : VideoEngineEvent
     data object Ended : VideoEngineEvent
     data class Failed(val failure: VideoFailure) : VideoEngineEvent
+    data class SizeChanged(val size: VideoSize) : VideoEngineEvent
 }
 
 /** Граница над плеером: Media3 в [ExoVideoPlaybackEngine], в тестах — фейк. */
@@ -46,18 +50,49 @@ internal data class VideoPlaybackState(
     val buffering: Boolean = false,
     val ended: Boolean = false,
     val muted: Boolean = false,
+    val videoSize: VideoSize? = null,
 )
 
 /**
  * Один плеер на просмотрщик, привязанный к стабильному ID элемента (а не к индексу страницы).
- * При переключении и [stop] источник снимается немедленно (`engine.stop`), затем снимается пин кеша
- * через [releaseScope], чтобы unpin дошёл до конца даже после ухода композиции. Истёкшая ссылка (404) обновляется один раз
- * с сохранением позиции; повторная ошибка переводит в [VideoStatus.ERROR].
+ *
+ * - Намерение воспроизведения ([playbackIntent]) отделено от фактического состояния плеера: после 404 или буферизации
+ *   источник перезагружается с тем же намерением, а явная пауза остаётся паузой.
+ * - При переключении и [stop] источник снимается немедленно (`engine.stop`), затем пин кеша снимается через
+ *   [releaseScope]; плеер освобождается до unpin.
+ * - Истёкшая ссылка (404) обновляется один раз с сохранением позиции; повторная ошибка — [VideoStatus.ERROR].
+ * - [onBackground] синхронно запрещает любые старты до [onForeground]; после возврата автозапуск выключен,
+ *   воспроизведение запускает только действие пользователя ([open] с `userInitiated = true`).
  */
+/**
+ * Общий для просмотрщика шлюз старта. Фон закрывает его синхронно (до создания плеера и любых корутин);
+ * после возврата автозапуск запрещён до действия пользователя.
+ */
+internal class ViewerPlaybackGate {
+    var backgrounded: Boolean = false
+        private set
+    var autoplayAllowed: Boolean = true
+        private set
+
+    fun onBackground() {
+        backgrounded = true
+        autoplayAllowed = false
+    }
+
+    fun onForeground() {
+        backgrounded = false
+    }
+
+    fun onUserAction() {
+        autoplayAllowed = true
+    }
+}
+
 internal class ViewerVideoController(
     private val engine: VideoPlaybackEngine,
     private val scope: CoroutineScope,
     private val releaseScope: CoroutineScope,
+    private val gate: ViewerPlaybackGate = ViewerPlaybackGate(),
     private val resolve: suspend (id: String) -> ResolvedPlayback,
 ) {
     private val _state = MutableStateFlow(VideoPlaybackState())
@@ -68,21 +103,32 @@ internal class ViewerVideoController(
     private var job: Job? = null
     private var refreshedForActive = false
     private var lastPositionMs = 0L
+    private var playbackIntent = false
 
     init {
         engine.onEvent = ::onEngineEvent
     }
 
-    /** Открывает элемент. Повторный вызов для того же ID не перезагружает источник. */
-    fun open(id: String, playWhenReady: Boolean) {
+    /**
+     * Открывает элемент. Повторный вызов для того же ID не перезагружает источник.
+     * Автозапуск ([userInitiated] = false) игнорируется в фоне и после возврата до действия пользователя.
+     */
+    fun open(id: String, playWhenReady: Boolean, userInitiated: Boolean = false) {
+        if (gate.backgrounded) return
+        if (!userInitiated && !gate.autoplayAllowed) return
+        if (userInitiated) gate.onUserAction()
         if (id == activeId) {
-            if (playWhenReady) engine.play()
+            if (userInitiated) {
+                playbackIntent = true
+                engine.play()
+            }
             return
         }
         closeActive()
         activeId = id
         refreshedForActive = false
         lastPositionMs = 0L
+        playbackIntent = playWhenReady
         _state.value = VideoPlaybackState(status = VideoStatus.LOADING, muted = _state.value.muted)
         job = scope.launch {
             val resolved = resolveOrFail(id) ?: return@launch
@@ -91,27 +137,50 @@ internal class ViewerVideoController(
                 return@launch
             }
             activeResolved = resolved
-            engine.load(resolved.source, startPositionMs = 0L, playWhenReady = playWhenReady)
+            engine.load(resolved.source, startPositionMs = 0L, playWhenReady = playbackIntent)
         }
     }
 
-    /** Немедленная остановка: сначала освобождается плеер, затем снимается пин кеша. */
+    /** Немедленная остановка: источник снимается, пин кеша уходит в [releaseScope]. */
     fun stop() {
         closeActive()
+        playbackIntent = false
         _state.value = VideoPlaybackState(muted = _state.value.muted)
+    }
+
+    /** Синхронно вызывается при уходе приложения в фон: любые старты запрещены до [onForeground]. */
+    fun onBackground() {
+        gate.onBackground()
+        stop()
+    }
+
+    fun onForeground() {
+        gate.onForeground()
     }
 
     fun retry(id: String) {
         stop()
-        open(id, playWhenReady = true)
+        open(id, playWhenReady = true, userInitiated = true)
     }
 
     fun togglePlayback() {
+        if (gate.backgrounded) return
+        gate.onUserAction()
         val current = _state.value
         when {
-            current.playing -> engine.pause()
-            current.ended -> { engine.seekTo(0L); engine.play() }
-            else -> engine.play()
+            current.playing -> {
+                playbackIntent = false
+                engine.pause()
+            }
+            current.ended -> {
+                playbackIntent = true
+                engine.seekTo(0L)
+                engine.play()
+            }
+            else -> {
+                playbackIntent = true
+                engine.play()
+            }
         }
     }
 
@@ -156,8 +225,12 @@ internal class ViewerVideoController(
             VideoEngineEvent.Ready -> _state.update { it.copy(status = VideoStatus.READY, buffering = false) }
             is VideoEngineEvent.Buffering -> _state.update { it.copy(buffering = event.active) }
             is VideoEngineEvent.Playing -> _state.update { it.copy(playing = event.active, ended = false) }
-            VideoEngineEvent.Ended -> _state.update { it.copy(playing = false, ended = true) }
+            VideoEngineEvent.Ended -> {
+                playbackIntent = false
+                _state.update { it.copy(playing = false, ended = true) }
+            }
             is VideoEngineEvent.Failed -> onFailure(event.failure)
+            is VideoEngineEvent.SizeChanged -> _state.update { it.copy(videoSize = event.size) }
         }
     }
 
@@ -165,13 +238,13 @@ internal class ViewerVideoController(
         val id = activeId ?: return
         if (failure == VideoFailure.NOT_FOUND && !refreshedForActive) {
             refreshedForActive = true
-            refreshSource(id, positionMs = lastPositionMs, wasPlaying = _state.value.playing)
+            refreshSource(id, positionMs = lastPositionMs)
             return
         }
         _state.update { it.copy(status = VideoStatus.ERROR, playing = false, buffering = false) }
     }
 
-    private fun refreshSource(id: String, positionMs: Long, wasPlaying: Boolean) {
+    private fun refreshSource(id: String, positionMs: Long) {
         job?.cancel()
         job = scope.launch {
             val fresh = resolveOrFail(id) ?: return@launch
@@ -182,7 +255,27 @@ internal class ViewerVideoController(
             val previous = activeResolved
             activeResolved = fresh
             if (previous != null) releaseScope.launch { previous.release() }
-            engine.load(fresh.source, startPositionMs = positionMs, playWhenReady = wasPlaying)
+            engine.load(fresh.source, startPositionMs = positionMs, playWhenReady = playbackIntent)
         }
     }
+}
+
+/**
+ * Состояние ползунка перемотки: живая позиция из тика плеера и позиция, которую пользователь тянет.
+ * Тик не перезаписывает перетаскивание; при окончании перетаскивания возвращается только целевая позиция.
+ */
+internal data class VideoSeekState(
+    val livePositionMs: Long = 0L,
+    val dragPositionMs: Long? = null,
+) {
+    val displayPositionMs: Long get() = dragPositionMs ?: livePositionMs
+
+    fun withLivePosition(positionMs: Long): VideoSeekState = copy(livePositionMs = positionMs)
+
+    fun dragTo(positionMs: Long): VideoSeekState = copy(dragPositionMs = positionMs)
+
+    /** Целевая позиция для одного финального seek; null, если перетаскивания не было. */
+    fun dragTarget(): Long? = dragPositionMs
+
+    fun finishDrag(): VideoSeekState = copy(dragPositionMs = null)
 }
