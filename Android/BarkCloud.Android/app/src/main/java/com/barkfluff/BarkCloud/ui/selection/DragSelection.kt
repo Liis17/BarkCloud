@@ -132,27 +132,31 @@ internal fun <K> hitKeyClamped(cells: List<HitCell<K>>, x: Float, y: Float, top:
  * протягиванием. Долгое нажатие и протягивание не должны прокручивать список параллельно: экран
  * отключает пользовательскую прокрутку на время жеста ([DragSelectController.isDragging]).
  */
+@Composable
 internal fun <K> Modifier.dragSelection(
     controller: DragSelectController<K>,
     onTap: (K) -> Unit,
-): Modifier = this
-    .pointerInput(controller) {
-        detectTapGestures(onTap = { offset ->
-            controller.keyAt(offset.x, offset.y)?.let(onTap)
-        })
-    }
-    .pointerInput(controller) {
-        detectDragGesturesAfterLongPress(
-            onDragStart = { offset -> controller.start(offset.x, offset.y) },
-            onDrag = { change, _ ->
-                change.consume()
-                controller.move(change.position.x, change.position.y)
-            },
-            onDragEnd = { controller.end() },
-            onDragCancel = { controller.end() },
-        )
-    }
-
+): Modifier {
+    // Контроллер стабилен, поэтому жесты читают актуальный onTap на каждом касании, а не первый захваченный.
+    val latestTap by rememberUpdatedState(onTap)
+    return this
+        .pointerInput(controller) {
+            detectTapGestures(onTap = { offset ->
+                controller.keyAt(offset.x, offset.y)?.let { key -> latestTap(key) }
+            })
+        }
+        .pointerInput(controller) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { offset -> controller.start(offset.x, offset.y) },
+                onDrag = { change, _ ->
+                    change.consume()
+                    controller.move(change.position.x, change.position.y)
+                },
+                onDragEnd = { controller.end() },
+                onDragCancel = { controller.end() },
+            )
+        }
+}
 /** Видимые выбираемые ячейки в координатах контейнера. */
 @Suppress("UNCHECKED_CAST")
 internal fun <K> List<VisibleCellInfo>.toHitCells(selectable: Set<K>): List<HitCell<K>> = mapNotNull { info ->
