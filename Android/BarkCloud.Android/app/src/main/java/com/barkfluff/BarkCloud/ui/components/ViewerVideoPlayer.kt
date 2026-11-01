@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.ui.components
 
 import android.content.Context
 import android.view.TextureView
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.AudioAttributes
@@ -162,9 +164,21 @@ internal class ExoVideoPlaybackEngine(
     }
 }
 
+/** Плеер и контроллер одного просмотрщика; создаются при первом видео и освобождаются вместе с ним. */
+internal class ViewerVideoSession(
+    val engine: ExoVideoPlaybackEngine,
+    val controller: ViewerVideoController,
+) {
+    /** Сначала снимает источник и пин кеша, затем освобождает плеер. */
+    fun close() {
+        controller.stop()
+        engine.release()
+    }
+}
+
 /**
- * Видео внутри страницы просмотрщика. [TextureView] не перехватывает касания, поэтому drag и zoom
- * общей оболочки работают поверх него. Экран не гаснет, пока играет видео.
+ * Видео внутри страницы просмотрщика. Тап переключает оверлей (как у фото), drag и zoom общей оболочки
+ * работают поверх [TextureView], который не перехватывает касания. Экран не гаснет, пока играет видео.
  */
 @Composable
 internal fun ViewerVideoPlayer(
@@ -172,6 +186,8 @@ internal fun ViewerVideoPlayer(
     engine: ExoVideoPlaybackEngine,
     itemId: String,
     controlsVisible: Boolean,
+    onTap: () -> Unit,
+    controlsBottomPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
@@ -187,7 +203,7 @@ internal fun ViewerVideoPlayer(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().clickable(onClick = onTap)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context -> TextureView(context).also { engine.attach(it) } },
@@ -231,7 +247,7 @@ internal fun ViewerVideoPlayer(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = controlsBottomPadding),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = controller::togglePlayback) {

@@ -8,26 +8,24 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -35,20 +33,34 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
+import com.barkfluff.BarkCloud.data.cloud.PlaybackSource
+import com.barkfluff.BarkCloud.data.cloud.ResolvedPlayback
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
+import com.barkfluff.BarkCloud.net.InsecureHttp
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewerLayer
+import com.barkfluff.BarkCloud.ui.components.ExoVideoPlaybackEngine
+import com.barkfluff.BarkCloud.ui.components.ViewerVideoController
+import com.barkfluff.BarkCloud.ui.components.ViewerVideoPlayer
+import com.barkfluff.BarkCloud.ui.components.ViewerVideoSession
 import me.saket.telephoto.zoomable.EnabledZoomGestures
 import me.saket.telephoto.zoomable.ZoomableImageState
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
@@ -57,7 +69,7 @@ import me.saket.telephoto.zoomable.rememberZoomableImageState
 /**
  * Полноэкранный просмотр локальных фото и видео. Листание идёт по переданному списку
  * (текущая секция галереи или папка устройства), жесты и закрытие — общая оболочка облачного просмотрщика.
- * Тап переключает оверлей и не закрывает просмотр. Видео пока открывается во внешнем проигрывателе.
+ * Тап переключает оверлей и не закрывает просмотр. Видео играет встроенным плеером из URI устройства.
  * [onDelete] задаётся только там, где уже поддерживается системное удаление MediaStore.
  */
 @Composable
@@ -65,7 +77,6 @@ fun DeviceMediaViewer(
     items: List<DeviceMedia>,
     selected: DeviceMedia?,
     onDismiss: () -> Unit,
-    onPlayVideo: (DeviceMedia) -> Unit,
     onDelete: ((DeviceMedia) -> Unit)? = null,
 ) {
     val visibility = remember { MutableTransitionState(false) }
@@ -101,7 +112,6 @@ fun DeviceMediaViewer(
                     initialIndex = pagerItems.indexOfFirst { it.mediaKey == shown.mediaKey }.coerceAtLeast(0),
                     isOpen = selected?.mediaKey == shown.mediaKey,
                     onDismiss = onDismiss,
-                    onPlayVideo = onPlayVideo,
                     onDelete = onDelete,
                 )
             }
@@ -115,10 +125,11 @@ private fun DeviceMediaPager(
     initialIndex: Int,
     isOpen: Boolean,
     onDismiss: () -> Unit,
-    onPlayVideo: (DeviceMedia) -> Unit,
     onDelete: ((DeviceMedia) -> Unit)?,
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as BarkCloudApplication
+    val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = initialIndex) { items.size }
     val zoomStates = remember { mutableMapOf<String, ZoomableImageState>() }
     val activeZoomState = remember { mutableStateOf<ZoomableImageState?>(null) }
@@ -133,13 +144,56 @@ private fun DeviceMediaPager(
     }
     val currentMedia = items.getOrNull(pagerState.currentPage)
 
+    // Плеер создаётся при первом видео; источник — URI устройства, без сети и кеша.
+    val currentItems by rememberUpdatedState(items)
+    val videoSession = remember {
+        lazy {
+            val engine = ExoVideoPlaybackEngine(context.applicationContext, InsecureHttp.streaming)
+            ViewerVideoSession(
+                engine = engine,
+                controller = ViewerVideoController(engine, scope, app.appScope) { id ->
+                    val media = currentItems.firstOrNull { it.mediaKey == id } ?: throw IllegalStateException("Видео не найдено")
+                    ResolvedPlayback(PlaybackSource.Local(media.uri.toString())) {}
+                },
+            )
+        }
+    }
+    val appLocked by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP && videoSession.isInitialized()) videoSession.value.controller.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (videoSession.isInitialized()) videoSession.value.close()
+        }
+    }
+    LaunchedEffect(appLocked) {
+        if (appLocked) {
+            if (videoSession.isInitialized()) videoSession.value.controller.stop()
+            onDismiss()
+        }
+    }
+
+    val videoAutoplay = isOpen && currentMedia?.isVideo == true && !appLocked && !pagerState.isScrollInProgress
+    LaunchedEffect(videoAutoplay, currentMedia?.mediaKey) {
+        val media = currentMedia ?: return@LaunchedEffect
+        if (videoAutoplay) {
+            videoSession.value.controller.open(media.mediaKey, playWhenReady = true)
+        } else if (videoSession.isInitialized()) {
+            videoSession.value.controller.stop()
+        }
+    }
+
     CloudMediaViewerLayer(
         infoEnabled = false,
         isOpen = isOpen,
         isZoomed = isZoomed,
         onDismiss = onDismiss,
         onPanelExpanded = {},
-        photoContent = { _, onPhotoTap ->
+        photoContent = { _, controlsVisible, onPhotoTap ->
             HorizontalPager(
                 state = pagerState,
                 key = { page -> items[page].mediaKey },
@@ -162,12 +216,15 @@ private fun DeviceMediaPager(
                         gestures = if (isZoomed && isCurrentPage) EnabledZoomGestures.ZoomAndPan else EnabledZoomGestures.ZoomOnly,
                         onClick = { onPhotoTap() },
                     )
-                    if (media.isVideo) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayCircle,
-                            contentDescription = stringResource(R.string.viewer_play_video),
-                            tint = Color.White,
-                            modifier = Modifier.size(72.dp).clickable { onPlayVideo(media) },
+                    if (isCurrentPage && media.isVideo) {
+                        val session = videoSession.value
+                        ViewerVideoPlayer(
+                            controller = session.controller,
+                            engine = session.engine,
+                            itemId = media.mediaKey,
+                            controlsVisible = controlsVisible,
+                            onTap = onPhotoTap,
+                            controlsBottomPadding = 96.dp,
                         )
                     }
                 }

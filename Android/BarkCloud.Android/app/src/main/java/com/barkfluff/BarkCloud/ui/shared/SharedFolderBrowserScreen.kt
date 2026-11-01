@@ -73,14 +73,6 @@ fun SharedFolderBrowserScreen(
         assets = viewerAssets,
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
-        onPlayVideo = { asset ->
-            state.files.firstOrNull { it.id == asset.id }?.let { file ->
-                viewModel.download(file) { downloaded ->
-                    val shareFile = FileShareHelper.prepareLocalFile(context, downloaded, file.name)
-                    context.startActivity(FileShareHelper.buildOpenIntent(context, shareFile, MimeIcon.mimeFor(file.name)))
-                }
-            }
-        },
         infoEnabled = false,
     )
 

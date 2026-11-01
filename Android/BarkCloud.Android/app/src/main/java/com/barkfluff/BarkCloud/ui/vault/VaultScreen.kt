@@ -55,7 +55,6 @@ import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
 import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -68,7 +67,6 @@ fun VaultScreen(
     val activity = context as? FragmentActivity
     val unlockTitle = stringResource(R.string.vault_unlock_button)
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
-    val openRemote = rememberRemoteOpener()
     val vaultAssets = remember(state.items) { state.items.map { it.toMediaAsset() } }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -141,7 +139,6 @@ fun VaultScreen(
             assets = vaultAssets,
             selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             infoEnabled = false,
             onDelete = { item -> viewModel.deleteFile(item.id) },
         )

@@ -27,7 +27,6 @@ class CloudMediaViewerListUpdateTest {
                     assets = assets.value,
                     selectedAsset = assetB,
                     onDismiss = { dismissed.set(true) },
-                    onPlayVideo = {},
                     infoEnabled = false,
                 )
             }
