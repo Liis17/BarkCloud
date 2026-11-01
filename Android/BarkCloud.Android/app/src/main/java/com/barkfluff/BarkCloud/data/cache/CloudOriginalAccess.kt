@@ -22,3 +22,11 @@ internal suspend fun <T> withCloudOriginal(
         cache.withLoadedPinnedSharedOriginal(asset.id, asset.fileName, url, action)
     }
 }
+
+/** Сбрасывает оригинал того же ключа, который использовала [withCloudOriginal]. */
+internal suspend fun FileCacheService.invalidateCloudOriginal(asset: MediaAsset) {
+    when (asset.origin) {
+        CloudMediaOrigin.OWN -> invalidateOriginal(asset.id)
+        CloudMediaOrigin.SHARED -> invalidateSharedOriginal(asset.id)
+    }
+}
