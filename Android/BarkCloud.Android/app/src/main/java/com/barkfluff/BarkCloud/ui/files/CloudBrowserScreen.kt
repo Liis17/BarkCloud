@@ -100,7 +100,7 @@ fun CloudBrowserScreen(
         assets = viewerAssets,
         selectedAsset = viewerAsset,
         onDismiss = { viewerAsset = null },
-        pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore),
+        pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore, pagesCompleted = state.pagesCompleted),
         onPageNearEnd = { viewModel.loadMore() },
     )
     val listState = rememberLazyListState()

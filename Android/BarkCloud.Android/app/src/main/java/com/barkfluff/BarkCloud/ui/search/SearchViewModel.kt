@@ -23,6 +23,8 @@ data class SearchUiState(
     val query: String = "",
     val isLoading: Boolean = false,
     val sections: List<SearchSectionResult> = emptyList(),
+    // Монотонный счётчик успешно загруженных страниц по секции: прогресс для пейджера, без булева флага загрузки.
+    val pagesCompleted: Map<SearchSection, Int> = emptyMap(),
     val error: String? = null,
 )
 
@@ -61,7 +63,12 @@ class SearchViewModel(private val repository: CloudRepository) : ViewModel() {
                         ).build()
                     } ?: previous
                 }
-                state.copy(isLoading = false, sections = merged, error = null)
+                state.copy(
+                    isLoading = false,
+                    sections = merged,
+                    error = null,
+                    pagesCompleted = state.pagesCompleted + result.associate { it.section to (state.pagesCompleted[it.section] ?: 0) + 1 },
+                )
             }
         } catch (e: CancellationException) {
             throw e
