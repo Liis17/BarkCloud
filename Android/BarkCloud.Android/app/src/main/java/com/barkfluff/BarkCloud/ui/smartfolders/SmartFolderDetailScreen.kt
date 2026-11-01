@@ -42,11 +42,11 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -59,7 +59,6 @@ fun SmartFolderDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val gridState = rememberLazyGridState()
-    val openRemote = rememberRemoteOpener()
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
 
     LaunchedEffect(folderId) { viewModel.start(folderId) }
@@ -126,8 +125,9 @@ fun SmartFolderDetailScreen(
             assets = state.items,
             selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             onDelete = { item -> viewModel.deleteFile(item.id) },
+            pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore, pagesCompleted = state.pagesCompleted),
+            onPageNearEnd = { viewModel.loadMore() },
         )
     }
 }

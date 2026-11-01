@@ -39,7 +39,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -49,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -72,6 +72,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
@@ -89,8 +90,14 @@ import com.barkfluff.BarkCloud.BarkCloudApplication
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.CacheInvalidatedException
 import com.barkfluff.BarkCloud.data.cache.CloudImageModel
+import com.barkfluff.BarkCloud.data.cache.invalidateCloudOriginal
+import com.barkfluff.BarkCloud.data.cache.withCloudJpegView
+import com.barkfluff.BarkCloud.data.cache.withCloudOriginal
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
+import com.barkfluff.BarkCloud.data.cloud.CloudMediaOrigin
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.data.cloud.VideoPlaybackResolver
+import com.barkfluff.BarkCloud.net.InsecureHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -122,7 +129,7 @@ internal fun CloudMediaViewerLayer(
     isZoomed: Boolean,
     onDismiss: () -> Unit,
     onPanelExpanded: (Boolean) -> Unit,
-    photoContent: @Composable (infoExpanded: Boolean, onPhotoTap: () -> Unit) -> Unit,
+    photoContent: @Composable (infoExpanded: Boolean, controlsVisible: Boolean, onPhotoTap: () -> Unit) -> Unit,
     overlayContent: @Composable (visible: Boolean, onInfo: () -> Unit) -> Unit,
     infoContent: @Composable () -> Unit,
 ) {
@@ -239,7 +246,7 @@ internal fun CloudMediaViewerLayer(
                         enabled = !isZoomed,
                     ),
             ) {
-                photoContent(infoExpanded) {
+                photoContent(infoExpanded, overlayVisible && !isZoomed && !infoExpanded) {
                     if (infoExpanded) {
                         scope.launch { panelState.animateTo(CloudMediaPanelAnchor.Collapsed, spring()) }
                     } else {
@@ -305,13 +312,14 @@ fun CloudMediaViewer(
     assets: List<MediaAsset>,
     selectedAsset: MediaAsset?,
     onDismiss: () -> Unit,
-    onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean = true,
     onDelete: (suspend (MediaAsset) -> Unit)? = null,
+    pagination: ViewerPagination = ViewerPagination.NONE,
+    onPageNearEnd: (() -> Unit)? = null,
 ) {
     val visibility = remember { MutableTransitionState(false) }
     var retainedAsset by remember { mutableStateOf<MediaAsset?>(null) }
-    var listWasEmptyAtOpen by remember(selectedAsset?.id) {
+    var listWasEmptyAtOpen by remember(selectedAsset?.viewerId) {
         mutableStateOf(selectedAsset != null && assets.isEmpty())
     }
 
@@ -340,19 +348,20 @@ fun CloudMediaViewer(
             val asset = retainedAsset ?: selectedAsset
             if (asset != null) {
                 if (assets.isEmpty() && !listWasEmptyAtOpen) {
-                    LaunchedEffect(asset.id) { onDismiss() }
+                    LaunchedEffect(asset.viewerId) { onDismiss() }
                 } else {
-                    val viewerAssets = if (assets.isEmpty()) listOf(asset) else assets
-                    val initialIndex = viewerAssets.indexOfFirst { it.id == asset.id }.coerceAtLeast(0)
-                    key(asset.id) {
+                    val viewerAssets = if (assets.isEmpty()) listOf(asset) else distinctViewerAssets(assets)
+                    val initialIndex = viewerAssets.indexOfFirst { it.viewerId == asset.viewerId }.coerceAtLeast(0)
+                    key(asset.viewerId) {
                         CloudMediaViewerContent(
                             assets = viewerAssets,
                             initialIndex = initialIndex,
-                            isOpen = selectedAsset?.id == asset.id,
+                            isOpen = selectedAsset?.viewerId == asset.viewerId,
                             onDismiss = onDismiss,
-                            onPlayVideo = onPlayVideo,
                             infoEnabled = infoEnabled,
                             onDelete = onDelete,
+                            pagination = pagination,
+                            onPageNearEnd = onPageNearEnd,
                         )
                     }
                 }
@@ -368,16 +377,57 @@ private fun CloudMediaViewerContent(
     initialIndex: Int,
     isOpen: Boolean,
     onDismiss: () -> Unit,
-    onPlayVideo: (MediaAsset) -> Unit,
     infoEnabled: Boolean,
     onDelete: (suspend (MediaAsset) -> Unit)?,
+    pagination: ViewerPagination,
+    onPageNearEnd: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as BarkCloudApplication
     val pagerState = rememberPagerState(initialPage = initialIndex) { assets.size }
-    val assetIds = remember(assets) { assets.map { it.id } }
+    val assetIds = remember(assets) { assets.map { it.viewerId } }
     val scope = rememberCoroutineScope()
     var panelExpanded by remember { mutableStateOf(false) }
+    // Плеер создаётся при первом видео: фото-просмотр не держит декодер.
+    val currentAssets by rememberUpdatedState(assets)
+    // Гейт общий для просмотрщика и инициализирован по реальному состоянию жизненного цикла, а не значением по умолчанию.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val playbackGate = remember(lifecycleOwner) { viewerPlaybackGateFor(lifecycleOwner.lifecycle) }
+    var lifecycleStarted by remember(playbackGate) { mutableStateOf(playbackGate.started) }
+    val sharedDownloadUrl: suspend (String) -> String = { fileId -> app.sharedRepository.getSharedFileDownloadUrl(fileId) }
+    val videoSession = remember {
+        lazy {
+            val engine = ExoVideoPlaybackEngine(context.applicationContext, InsecureHttp.streaming)
+            val resolver = VideoPlaybackResolver(app.fileCache, app.fileTransfer, sharedDownloadUrl)
+            ViewerVideoSession(
+                engine = engine,
+                controller = ViewerVideoController(engine, scope, app.appScope, playbackGate) { id ->
+                    resolver.resolve(currentAssets.firstOrNull { it.viewerId == id } ?: throw IOException("Видео не найдено"))
+                },
+            )
+        }
+    }
+    val appLocked by app.appLockManager.shouldShowLock.collectAsStateWithLifecycle()
+    DisposableEffect(lifecycleOwner) {
+        // ON_STOP синхронно закрывает гейт и останавливает звук; после возврата любой старт ждёт действия пользователя.
+        val observer = ViewerLifecycleObserver(
+            gate = playbackGate,
+            onStopped = { if (videoSession.isInitialized()) videoSession.value.controller.stop() },
+            onChanged = { lifecycleStarted = playbackGate.started },
+        )
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (videoSession.isInitialized()) videoSession.value.close()
+        }
+    }
+    LaunchedEffect(appLocked) {
+        if (appLocked) {
+            if (videoSession.isInitialized()) videoSession.value.controller.stop()
+            onDismiss()
+        }
+    }
+
     val infoViewModel: CloudMediaInfoViewModel = viewModel(factory = CloudMediaInfoViewModel.factory())
     val zoomStates = remember { mutableMapOf<String, ZoomableImageState>() }
     val activeZoomState = remember { mutableStateOf<ZoomableImageState?>(null) }
@@ -419,64 +469,92 @@ private fun CloudMediaViewerContent(
     }
     val infoState by infoViewModel.state.collectAsStateWithLifecycle()
     val jpegViewModel = currentAsset.jpegViewModel()
-    var useJpegView by remember(currentAsset.id) {
-        mutableStateOf(requiresJpegView(currentAsset.fileName, jpegViewModel != null))
+    val requiresJpeg = requiresJpegView(currentAsset.fileName, jpegViewModel != null)
+    var retryCount by remember(currentAsset.viewerId) { mutableIntStateOf(0) }
+    // Генерация начинается при смене элемента и при явном Retry: каждое представление пробуется не более одного раза.
+    var recovery by remember(currentAsset.viewerId, retryCount) {
+        mutableStateOf(photoRecoveryFor(requiresJpeg, jpegViewModel != null))
     }
-    var retryCount by remember(currentAsset.id) { mutableIntStateOf(0) }
-    var imageState by remember(currentAsset.id) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
-    var failedDecodeCache by remember(currentAsset.id) { mutableStateOf<ViewerCacheKind?>(null) }
+    val representation = recovery.current
+    var imageState by remember(currentAsset.viewerId) { mutableStateOf<ViewerImageState>(ViewerImageState.Preview) }
 
     LaunchedEffect(pagerState.settledPage, assetIds) {
         val settledAsset = assets.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
         val previousAssetId = previousSettledAssetId
-        if (previousAssetId != null && previousAssetId != settledAsset.id) {
+        if (previousAssetId != null && previousAssetId != settledAsset.viewerId) {
             zoomStates.remove(previousAssetId)?.zoomableState?.resetZoom()
         }
-        previousSettledAssetId = settledAsset.id
+        previousSettledAssetId = settledAsset.viewerId
     }
 
-    LaunchedEffect(isOpen, currentAsset.id, retryCount, useJpegView) {
+    // Эффект перепроверяется при изменении прогресса источника (pagesCompleted) и позиции; решение о повторе — в трекере.
+    val pageRequests = remember { ViewerPageRequestTracker() }
+    LaunchedEffect(pagerState.settledPage, assets.size, pagination) {
+        if (pageRequests.shouldRequest(pagerState.settledPage, assets.size, pagination)) onPageNearEnd?.invoke()
+    }
+
+    LaunchedEffect(isOpen, currentAsset.viewerId, retryCount, representation) {
         if (!isOpen || currentAsset.kind != CloudMediaKind.PHOTO) return@LaunchedEffect
+        // Оба представления провалены в этой генерации: терминальная ошибка, превью остаётся до явного Retry.
+        val attempt = representation ?: run {
+            imageState = ViewerImageState.Error
+            return@LaunchedEffect
+        }
         try {
-            if (useJpegView) {
-                val model = jpegViewModel ?: run {
-                    imageState = ViewerImageState.Error
-                    return@LaunchedEffect
+            when (attempt) {
+                ViewerRepresentation.JPEG_VIEW -> {
+                    val model = jpegViewModel ?: run {
+                        imageState = ViewerImageState.Error
+                        return@LaunchedEffect
+                    }
+                    imageState = ViewerImageState.Loading
+                    // Общий файл авторизуется раньше любого чтения кеша (отзыв доступа закрывает и JPEG-вид).
+                    withCloudJpegView(currentAsset, app.fileCache, sharedDownloadUrl, model) {
+                        imageState = ViewerImageState.JpegView(model)
+                        awaitCancellation()
+                    }
                 }
-                imageState = ViewerImageState.Loading
-                app.fileCache.withLoadedPinnedJpegView(currentAsset.id, model.url, model.previewFileId) {
-                    imageState = ViewerImageState.JpegView(model)
-                    awaitCancellation()
-                }
-            } else {
-                imageState = ViewerImageState.Loading
-                app.fileCache.withLoadedPinnedOriginal(currentAsset.id, currentAsset.fileName) { file ->
-                    imageState = ViewerImageState.Original(file)
-                    awaitCancellation()
+                ViewerRepresentation.ORIGINAL -> {
+                    imageState = ViewerImageState.Loading
+                    withCloudOriginal(currentAsset, app.fileCache, sharedDownloadUrl) { file ->
+                        imageState = ViewerImageState.Original(file)
+                        awaitCancellation()
+                    }
                 }
             }
         } catch (error: CancellationException) {
             throw error
-        } catch (_: CacheInvalidatedException) {
-            imageState = ViewerImageState.Error
-        } catch (_: IOException) {
-            imageState = ViewerImageState.Error
         } catch (_: Exception) {
-            imageState = ViewerImageState.Error
+            // Сетевой сбой, протухшая ссылка или сбой кеша: это представление проваливается и больше не повторяется.
+            recovery = recovery.afterFailure(attempt)
         }
     }
 
-    LaunchedEffect(panelExpanded, currentAsset.id, isOpen) {
-        if (panelExpanded && isOpen) infoViewModel.load(currentAsset.id)
+    // Автозапуск со звуком только для видео текущей страницы, когда пейджер устоялся и просмотр открыт.
+    // Гейт фона проверяется внутри controller.open в момент запуска, а не при постановке эффекта.
+    val videoAutoplay = isOpen && currentAsset.isVideo && !appLocked && !pagerState.isScrollInProgress
+    // lifecycleStarted — ключ: первый ON_START после создания в CREATED должен перепроверить автозапуск.
+    LaunchedEffect(videoAutoplay, currentAsset.viewerId, lifecycleStarted) {
+        if (videoAutoplay) {
+            videoSession.value.controller.open(currentAsset.viewerId, playWhenReady = true)
+        } else if (videoSession.isInitialized()) {
+            videoSession.value.controller.stop()
+        }
+    }
+
+    // Инвариант источника: панель свойств открывается только для собственных файлов с включённым info.
+    val infoAvailable = infoEnabled && currentAsset.origin == CloudMediaOrigin.OWN
+    LaunchedEffect(panelExpanded, currentAsset.id, isOpen, infoAvailable) {
+        if (panelExpanded && isOpen && infoAvailable) infoViewModel.load(currentAsset.id)
     }
 
     CloudMediaViewerLayer(
-        infoEnabled = infoEnabled,
+        infoEnabled = infoEnabled && currentAsset.origin == CloudMediaOrigin.OWN,
         isOpen = isOpen,
         isZoomed = isZoomed,
         onDismiss = onDismiss,
         onPanelExpanded = { panelExpanded = it },
-        photoContent = { infoExpanded, onPhotoTap ->
+        photoContent = { infoExpanded, controlsVisible, onPhotoTap ->
             val zoomGestures = when {
                 infoExpanded -> EnabledZoomGestures.None
                 isZoomed -> EnabledZoomGestures.ZoomAndPan
@@ -485,14 +563,14 @@ private fun CloudMediaViewerContent(
             Box(Modifier.fillMaxSize()) {
                 HorizontalPager(
                     state = pagerState,
-                    key = { page -> assets[page].id },
+                    key = { page -> assets[page].viewerId },
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val asset = assets.getOrNull(page) ?: return@HorizontalPager
                     val isCurrentPage = page == pagerState.currentPage
                     val zoomableImageState = rememberZoomableImageState()
                     SideEffect {
-                        zoomStates[asset.id] = zoomableImageState
+                        zoomStates[asset.viewerId] = zoomableImageState
                         if (isCurrentPage) activeZoomState.value = zoomableImageState
                     }
                     val pageImageState = if (isCurrentPage) imageState else ViewerImageState.Preview
@@ -515,23 +593,17 @@ private fun CloudMediaViewerContent(
                             ) { image ->
                                 when (image) {
                                     is ViewerImageState.Original -> {
-                                        val request = remember(image.file, asset.id, useJpegView) {
+                                        val request = remember(image.file, asset.id, representation) {
                                             ImageRequest.Builder(context)
                                                 .data(image.file)
                                                 .listener(onError = { _, _ ->
-                                                    if (!useJpegView && jpegViewModel != null) {
-                                                        failedDecodeCache = null
-                                                        scope.launch {
-                                                            invalidateViewerCacheSafely {
-                                                                app.fileCache.invalidateOriginal(asset.id)
-                                                            }
+                                                    // Декодирование не удалось: оригинал инвалидируется и помечается проваленным, без возврата к нему.
+                                                    scope.launch {
+                                                        invalidateViewerCacheSafely {
+                                                            app.fileCache.invalidateCloudOriginal(asset)
                                                         }
-                                                        imageState = ViewerImageState.Loading
-                                                        useJpegView = true
-                                                    } else {
-                                                        failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView)
-                                                        imageState = ViewerImageState.Error
                                                     }
+                                                    recovery = recovery.afterFailure(ViewerRepresentation.ORIGINAL)
                                                 })
                                                 .build()
                                         }
@@ -546,12 +618,16 @@ private fun CloudMediaViewerContent(
                                         )
                                     }
                                     is ViewerImageState.JpegView -> {
-                                        val request = remember(image.model, asset.id) {
+                                        val request = remember(image.model, asset.id, representation) {
                                             ImageRequest.Builder(context)
                                                 .data(image.model)
                                                 .listener(onError = { _, _ ->
-                                                    failedDecodeCache = viewerCacheKindAfterDecodeFailure(useJpegView = true)
-                                                    imageState = ViewerImageState.Error
+                                                    scope.launch {
+                                                        invalidateViewerCacheSafely {
+                                                            app.fileCache.invalidateJpegView(asset.id, image.model.previewFileId)
+                                                        }
+                                                    }
+                                                    recovery = recovery.afterFailure(ViewerRepresentation.JPEG_VIEW)
                                                 })
                                                 .build()
                                         }
@@ -575,22 +651,9 @@ private fun CloudMediaViewerContent(
                         if (isCurrentPage && pageImageState == ViewerImageState.Error) {
                             Button(
                                 onClick = {
-                                    scope.launch {
-                                        invalidateViewerCacheSafely {
-                                            when (failedDecodeCache) {
-                                                ViewerCacheKind.ORIGINAL -> app.fileCache.invalidateOriginal(asset.id)
-                                                ViewerCacheKind.JPEG_VIEW -> app.fileCache.invalidateJpegView(
-                                                    asset.id,
-                                                    jpegViewModel?.previewFileId,
-                                                )
-                                                null -> Unit
-                                            }
-                                        }
-                                        failedDecodeCache = null
-                                        imageState = ViewerImageState.Preview
-                                        useJpegView = requiresJpegView(asset.fileName, jpegViewModel != null)
-                                        retryCount++
-                                    }
+                                    // Явный Retry начинает новую генерацию (retryCount сбрасывает состояние восстановления).
+                                    imageState = ViewerImageState.Preview
+                                    retryCount++
                                 },
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
@@ -600,12 +663,15 @@ private fun CloudMediaViewerContent(
                                 Text(stringResource(R.string.viewer_retry_original))
                             }
                         }
-                        if (asset.isVideo) {
-                            Icon(
-                                imageVector = Icons.Filled.PlayCircle,
-                                contentDescription = stringResource(R.string.viewer_play_video),
-                                tint = Color.White,
-                                modifier = Modifier.size(72.dp).clickable { onPlayVideo(asset) },
+                        if (isCurrentPage && asset.isVideo) {
+                            val session = videoSession.value
+                            ViewerVideoPlayer(
+                                controller = session.controller,
+                                engine = session.engine,
+                                itemId = asset.viewerId,
+                                controlsVisible = controlsVisible,
+                                onTap = onPhotoTap,
+                                controlsBottomPadding = 104.dp,
                             )
                         }
                     }
