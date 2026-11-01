@@ -504,21 +504,25 @@ class UploadWorker(
         mediaDao: MediaCloudStateDao,
     ) {
         val fileId = presence.fileIds.minOrNull()
-        while (true) {
-            val album = queue.byId(job.id)?.albumId
-            if (album != null) {
-                if (fileId == null) {
-                    throw UploadTerminalException(
-                        "Сервер не вернул ID существующей копии для альбома. Обновите сервер и повторите",
-                    )
-                }
-                albums.addItems(album, listOf(fileId))
+        when (
+            val outcome = completeDeduplicatedWithAlbum(
+                fileId = fileId,
+                read = { queue.dedupRead(job.id) },
+                addToAlbum = { album, id -> albums.addItems(album, listOf(id)) },
+                completeIfAlbum = { album -> queue.completeDeduplicated(job.id, album) },
+            )
+        ) {
+            is DedupOutcome.Completed -> job.mediaKey?.let { key ->
+                mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(hash = hash, status = MediaCloudStatus.IN_CLOUD, cloudFileId = fileId)) }
             }
-            // Альбом мог быть запрошен между чтением и завершением — тогда повторяем добавление.
-            if (queue.completeDeduplicated(job.id, album)) break
-        }
-        job.mediaKey?.let { key ->
-            mediaDao.byKey(key)?.let { mediaDao.upsert(it.copy(hash = hash, status = MediaCloudStatus.IN_CLOUD, cloudFileId = fileId)) }
+            // Отменена/приостановлена/завершена между чтением и CAS: статус облака не публикуем.
+            DedupOutcome.Inactive -> Unit
+            DedupOutcome.MissingFileId -> throw UploadTerminalException(
+                "Сервер не вернул ID существующей копии для альбома. Обновите сервер и повторите",
+            )
+            DedupOutcome.Exhausted -> throw IllegalStateException(
+                "Альбом задачи менялся слишком часто; повтор выполнится позже",
+            )
         }
     }
 
