@@ -128,6 +128,7 @@ fun SmartFolderDetailScreen(
             onDismiss = { viewer = null },
             onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             onDelete = { item -> viewModel.deleteFile(item.id) },
+            onPageNearEnd = { viewModel.loadMore() },
         )
     }
 }
