@@ -92,6 +92,8 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.data.cloud.CloudMediaKind
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
+import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
 import com.barkfluff.BarkCloud.data.gallery.DeviceMedia
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
@@ -175,6 +177,7 @@ fun GalleryScreen(
     var viewer by remember { mutableStateOf<DeviceMedia?>(null) }
     var cloudViewer by remember { mutableStateOf<MediaAsset?>(null) }
     var deleteDialogOpen by remember { mutableStateOf(false) }
+    var deviceConfirm by remember { mutableStateOf<DeviceDeleteConfirm?>(null) }
     var pendingDelete by rememberSaveable(stateSaver = pendingPhotoDeleteSaver) {
         mutableStateOf<PendingPhotoDelete?>(null)
     }
@@ -393,15 +396,17 @@ fun GalleryScreen(
         }
     }
 
-    fun beginDeviceDelete(deviceMediaKeys: List<String>, cloudIds: List<String>) {
-        val targets = viewModel.selectedDeviceTargets(deviceMediaKeys)
-        if (targets.isEmpty()) return
-        val pending = PendingPhotoDelete(
-            deviceMediaKeys = targets.map { it.mediaKey },
-            cloudFileIds = cloudIds,
-            totalCount = targets.size + cloudIds.size,
-        )
-        launchSystemDelete(pending, targets.map { it.uri })
+    /** План проверяется сейчас (хеши и облако), число копий показывается до системного диалога. */
+    fun beginDeviceDelete(mode: DeviceDeleteMode, deviceMediaKeys: List<String>, cloudIds: List<String>) {
+        scope.launch {
+            val plan = viewModel.prepareDeviceDelete(mode, deviceMediaKeys)
+            if (plan.devicePhotos.isEmpty()) {
+                viewModel.clearPendingDevicePlan()
+                snackbarHostState.showSnackbar(context.getString(R.string.device_delete_nothing))
+                return@launch
+            }
+            deviceConfirm = DeviceDeleteConfirm(plan, cloudIds)
+        }
     }
 
     fun deleteCloudOnly(fileIds: List<String>) {
@@ -567,6 +572,45 @@ fun GalleryScreen(
         SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 
+    deviceConfirm?.let { confirm ->
+        val plan = confirm.plan
+        AlertDialog(
+            onDismissRequest = { deviceConfirm = null; viewModel.clearPendingDevicePlan() },
+            title = { Text(stringResource(R.string.gallery_delete_selected_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (plan.mode == DeviceDeleteMode.KEEP_CLOUD) {
+                            stringResource(R.string.device_confirm_keep_cloud, plan.devicePhotos.size)
+                        } else {
+                            stringResource(R.string.device_confirm_everywhere, plan.devicePhotos.size, plan.cloudCopyCount)
+                        },
+                    )
+                    if (plan.skipped.isNotEmpty()) Text(stringResource(R.string.device_confirm_skipped, plan.skipped.size))
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    deviceConfirm = null
+                    val targets = viewModel.selectedDeviceTargets(plan.devicePhotos)
+                    launchSystemDelete(
+                        PendingPhotoDelete(
+                            deviceMediaKeys = plan.devicePhotos,
+                            cloudFileIds = confirm.cloudIds,
+                            totalCount = plan.devicePhotos.size + confirm.cloudIds.size,
+                        ),
+                        targets.map { it.uri },
+                    )
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deviceConfirm = null; viewModel.clearPendingDevicePlan() }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
     if (deleteDialogOpen) {
         AlertDialog(
             onDismissRequest = { deleteDialogOpen = false },
@@ -581,11 +625,13 @@ fun GalleryScreen(
                                 deleteDialogOpen = false
                                 when (action) {
                                     PhotoDeleteAction.DEVICE -> beginDeviceDelete(
+                                        DeviceDeleteMode.KEEP_CLOUD,
                                         selectedDeviceMediaKeys,
                                         emptyList(),
                                     )
                                     PhotoDeleteAction.CLOUD -> deleteCloudOnly(selectedCloudIds)
                                     PhotoDeleteAction.BOTH -> beginDeviceDelete(
+                                        DeviceDeleteMode.EVERYWHERE,
                                         selectedDeviceMediaKeys,
                                         selectedCloudIds,
                                     )
@@ -836,3 +882,6 @@ private fun GalleryCell(
         }
     }
 }
+
+/** Подтверждаемый план удаления фото устройства и выбранные облачные элементы. */
+private data class DeviceDeleteConfirm(val plan: DeviceDeletePlan, val cloudIds: List<String>)

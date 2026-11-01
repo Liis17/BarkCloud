@@ -481,4 +481,17 @@
     <string name="trash_delete_selected">Удалить навсегда (%1$d)</string>
     <string name="trash_delete_selected_title">Удалить навсегда?</string>
     <string name="trash_delete_selected_message">Удалить %1$d элементов из корзины без возможности восстановления?</string>
+    <string name="device_upload_result">В очередь: %1$d, уже в облаке: %2$d, не удалось: %3$d</string>
+    <string name="device_album_result">В альбом: %1$d, в очереди: %2$d, ожидают загрузки: %3$d, не удалось: %4$d</string>
+    <string name="device_delete_nothing">Нет фото для удаления</string>
+    <string name="device_delete_result">С устройства удалено: %1$d, облачных копий удалено: %2$d, повтор очистки: %3$d</string>
+    <string name="device_cleanup_done">Облачная очистка завершена</string>
+    <string name="device_cleanup_pending">Облачная очистка не завершена для фото: %1$d</string>
+    <string name="device_keep_cloud_count">Удалить с устройства (%1$d)</string>
+    <string name="device_delete_everywhere_count">Удалить везде (%1$d)</string>
+    <string name="device_upload_selected_count">Загрузить (%1$d)</string>
+    <string name="device_confirm_keep_cloud">Удалить %1$d фото с устройства? Облачные копии сохранятся.</string>
+    <string name="device_confirm_everywhere">Удалить %1$d фото с устройства и %2$d облачных копий? Облачные копии уйдут в корзину.</string>
+    <string name="device_confirm_skipped">Пропущено (нет подтверждённого состояния облака): %1$d</string>
+    <string name="device_staging_cancel">Остановить</string>
 </resources>
