@@ -341,6 +341,11 @@ class FileCacheService(
     /** Пин удерживает запись от LRU-вытеснения до соответствующего unpin. */
     suspend fun pin(key: FileCacheKey): PinnedFile? = pin(key, null)
 
+    /** Закрепляет уже закешированный оригинал для воспроизведения без загрузки; null, если файла нет. */
+    suspend fun pinCachedOriginal(fileId: String, shared: Boolean): PinnedFile? = pin(
+        if (shared) FileCacheKey.sharedOriginal(currentScope(), fileId) else FileCacheKey.original(currentScope(), fileId),
+    )
+
     private suspend fun pin(
         key: FileCacheKey,
         onPinAcquired: ((FileCachePin) -> Unit)?,
