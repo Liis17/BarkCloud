@@ -51,6 +51,7 @@ jobs:
             | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
             | sort -V | tail -n 1 || true)"
           python3 - "$latest" >> "$GITHUB_OUTPUT" <<'PY'
+          import os
           import re
           import sys
 
@@ -67,7 +68,14 @@ jobs:
           if minor > 999 or patch > 999:
               raise SystemExit("Minor и patch версии не могут превышать 999.")
           version = f"v{major}.{minor}.{patch}"
-          version_code = major * 1_000_000 + minor * 1_000 + patch
+          # versionCode = (major*1e6 + minor*1e3 + patch) * 1000 + build. Стабильный build = 999,
+          # dev-сборка берёт номер запуска CI, чтобы каждая dev-сборка обновлялась поверх предыдущей.
+          build = 999
+          if os.environ["RELEASE_BRANCH"] == "dev":
+              build = int(os.environ["RUN_NUMBER"])
+              if not 1 <= build <= 998:
+                  raise SystemExit("Номер запуска dev-сборки выходит за диапазон versionCode (1-998).")
+          version_code = (major * 1_000_000 + minor * 1_000 + patch) * 1_000 + build
           if version_code <= 0 or version_code > 2_147_483_647:
               raise SystemExit("versionCode выходит за допустимый диапазон Android.")
           print(f"version={version}")

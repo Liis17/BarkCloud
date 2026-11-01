@@ -53,12 +53,12 @@ import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cloud.MediaAsset
 import com.barkfluff.BarkCloud.ui.components.CloudMediaTransitionLayout
 import com.barkfluff.BarkCloud.ui.components.CloudMediaViewer
+import com.barkfluff.BarkCloud.ui.components.ViewerPagination
 import com.barkfluff.BarkCloud.ui.components.LocalCloudMediaViewerAssetId
 import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RefreshableContentSurface
 import com.barkfluff.BarkCloud.ui.components.TextInputDialog
 import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
-import com.barkfluff.BarkCloud.ui.components.rememberRemoteOpener
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +75,6 @@ fun AlbumDetailScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
-    val openRemote = rememberRemoteOpener()
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(),
@@ -163,8 +162,9 @@ fun AlbumDetailScreen(
             assets = state.items,
             selectedAsset = viewer,
             onDismiss = { viewer = null },
-            onPlayVideo = { item -> openRemote(item.id, item.fileName) { } },
             onDelete = { item -> viewModel.deleteFile(item.id) },
+            pagination = ViewerPagination(hasMore = state.canLoadMore, isLoading = state.isLoading || state.isLoadingMore, pagesCompleted = state.pagesCompleted),
+            onPageNearEnd = { viewModel.loadMore() },
         )
     }
 

@@ -25,6 +25,7 @@ data class SharedWithMeUiState(
     val owners: Map<Long, User> = emptyMap(),
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = true,
+    val pagesCompleted: Int = 0,
     val isRefreshing: Boolean = false,
     val downloadingFileId: String? = null,
     val snackbar: String? = null,
@@ -77,6 +78,7 @@ class SharedWithMeViewModel(
                         items = page.items,
                         folders = folders,
                         owners = it.owners + resolved,
+                        pagesCompleted = it.pagesCompleted + 1,
                         canLoadMore = page.hasMore,
                     )
                 }
@@ -106,6 +108,7 @@ class SharedWithMeViewModel(
                         isLoadingMore = false,
                         items = it.items + page.items,
                         owners = it.owners + resolved,
+                        pagesCompleted = it.pagesCompleted + 1,
                         canLoadMore = page.hasMore,
                     )
                 }
