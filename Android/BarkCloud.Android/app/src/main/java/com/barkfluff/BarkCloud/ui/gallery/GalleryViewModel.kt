@@ -278,6 +278,14 @@ class GalleryViewModel(
         }
     }
 
+    /** Добавляет выбранные облачные элементы в альбом; возвращает число переданных. */
+    suspend fun addCloudSelectionToAlbum(albumId: String, fileIds: List<String>): Int {
+        if (deletionState.value.isBusy || fileIds.isEmpty()) return 0
+        (appContext as BarkCloudApplication).albumRepository.addItems(albumId, fileIds)
+        _state.update { it.copy(selected = emptySet(), selecting = false) }
+        return fileIds.size
+    }
+
     suspend fun addFavorites(fileIds: List<String>): Set<String> {
         if (deletionState.value.isBusy) return emptySet()
         val added = linkedSetOf<String>()
