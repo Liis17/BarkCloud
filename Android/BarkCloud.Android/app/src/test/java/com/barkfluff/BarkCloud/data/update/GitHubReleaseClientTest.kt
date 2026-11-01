@@ -21,7 +21,7 @@ class GitHubReleaseClientTest {
                 apiUrl = server.url("/repos/Liis17/BarkCloud/releases/latest").toString(),
             )
             val error = try {
-                client.fetchLatest()
+                client.fetchLatest(includePrerelease = false)
                 throw AssertionError("Expected GitHub rate limit")
             } catch (expected: GitHubRateLimitException) {
                 expected
@@ -49,7 +49,7 @@ class GitHubReleaseClientTest {
                 apiUrl = server.url("/latest").toString(),
             )
             val error = try {
-                client.fetchLatest()
+                client.fetchLatest(includePrerelease = false)
                 throw AssertionError("Expected GitHub rate limit")
             } catch (expected: GitHubRateLimitException) {
                 expected
