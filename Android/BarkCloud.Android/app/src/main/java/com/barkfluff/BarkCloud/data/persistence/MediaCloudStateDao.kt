@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.barkfluff.BarkCloud.data.gallery.MediaCloudState
+import com.barkfluff.BarkCloud.data.gallery.MediaCloudStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -35,13 +36,25 @@ interface MediaCloudStateDao {
     )
     suspend fun markInCloud(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String, cloudFileId: String?): Int
 
-    /** Облачной копии нет. Не понижает IN_CLOUD, чтобы поздний ответ не затёр завершённую загрузку. */
+    /**
+     * Авторитетное «облачной копии нет» с поколением: применяется, только если строка всё ещё в том
+     * состоянии, которое было снято до запроса присутствия ([expectedStatus], [expectedCloudFileId]).
+     * Так устаревший ответ не затирает новую загрузку, а удалённый в облаке файл снимает значок.
+     */
     @Query(
         "UPDATE media_cloud_states SET status = 'NOT_IN_CLOUD', hash = :hash, cloudFileId = NULL " +
             "WHERE mediaKey = :mediaKey AND dateModifiedSeconds = :dateModifiedSeconds AND sizeBytes = :sizeBytes " +
-            "AND status NOT IN ('QUEUED', 'UPLOADING', 'IN_CLOUD')",
+            "AND status = :expectedStatus AND cloudFileId IS :expectedCloudFileId " +
+            "AND status NOT IN ('QUEUED', 'UPLOADING')",
     )
-    suspend fun markAbsent(mediaKey: String, dateModifiedSeconds: Long, sizeBytes: Long, hash: String): Int
+    suspend fun markAbsent(
+        mediaKey: String,
+        dateModifiedSeconds: Long,
+        sizeBytes: Long,
+        hash: String,
+        expectedStatus: MediaCloudStatus,
+        expectedCloudFileId: String?,
+    ): Int
 
     @Query(
         "UPDATE media_cloud_states SET hash = :hash WHERE mediaKey = :mediaKey " +

@@ -63,10 +63,13 @@ internal class CloudPresenceChecker(
         val hashed = batch.mapNotNull { media -> hashOf(media)?.let { media to it } }
         val mediaByHash = hashed.groupBy({ it.second }, { it.first })
         mediaByHash.keys.chunked(CHECK_HASHES_BATCH).forEach { chunk ->
+            // Поколение строк снимается непосредственно перед запросом: ответ относится к этому состоянию.
+            val generations = chunk.flatMap { hash -> mediaByHash.getValue(hash) }
+                .associate { media -> media.mediaKey to mediaDao.byKey(media.mediaKey)?.let { Generation(it.status, it.cloudFileId) } }
             val answers = presence(chunk)
             chunk.forEach { hash ->
                 val answer = answers[hash] ?: return@forEach // нет ответа — UNKNOWN, состояние не меняем
-                mediaByHash.getValue(hash).forEach { media -> record(media, hash, answer) }
+                mediaByHash.getValue(hash).forEach { media -> record(media, hash, answer, generations[media.mediaKey]) }
             }
         }
         val stamp = now()
@@ -89,11 +92,24 @@ internal class CloudPresenceChecker(
         return hash
     }
 
-    private suspend fun record(media: DeviceMedia, hash: String, answer: HashPresence) {
+    /**
+     * Состояние строки, снятое до запроса присутствия. Устаревший «нет в облаке» применяется только
+     * если строка не изменилась (например, не завершилась новая загрузка).
+     */
+    private data class Generation(val status: MediaCloudStatus, val cloudFileId: String?)
+
+    private suspend fun record(media: DeviceMedia, hash: String, answer: HashPresence, generation: Generation?) {
         if (answer.exists) {
             mediaDao.markInCloud(media.mediaKey, media.dateModifiedSeconds, media.sizeBytes, hash, answer.fileIds.firstOrNull())
-        } else {
-            mediaDao.markAbsent(media.mediaKey, media.dateModifiedSeconds, media.sizeBytes, hash)
+        } else if (generation != null) {
+            mediaDao.markAbsent(
+                media.mediaKey,
+                media.dateModifiedSeconds,
+                media.sizeBytes,
+                hash,
+                expectedStatus = generation.status,
+                expectedCloudFileId = generation.cloudFileId,
+            )
         }
     }
 }
