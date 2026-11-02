@@ -52,6 +52,20 @@ internal fun planDeviceDelete(mode: DeviceDeleteMode, items: List<DeviceDeleteIt
     return DeviceDeletePlan(mode, devicePhotos, cloudCopies, skipped)
 }
 
+/**
+ * Очистка «Освободить место»: с устройства удаляются только фото с подтверждённой по ID облачной
+ * копией (как [DeviceDeleteMode.KEEP_CLOUD]). [unconfirmed] — фото, чью копию сервер не подтвердил
+ * (нет ответа или `exists` без пригодных ID, например сервер без `file_ids`): они не удаляются, но
+ * пользователю сообщается именно это, а не «копий нет».
+ */
+internal data class DeviceCopyCleanupPlan(val devicePhotos: List<String>, val unconfirmed: Int)
+
+internal fun planDeviceCopyCleanup(items: List<DeviceDeleteItem>): DeviceCopyCleanupPlan =
+    DeviceCopyCleanupPlan(
+        devicePhotos = planDeviceDelete(DeviceDeleteMode.KEEP_CLOUD, items).devicePhotos,
+        unconfirmed = items.count { it.cloud == CloudCopy.Unknown },
+    )
+
 /** Облачные копии, которые пересекаются с набором скрытых (vault) ID: для них нужна разблокировка. */
 internal fun DeviceDeletePlan.hiddenCopyIds(vaultIds: Set<String>): Set<String> =
     cloudCopies.values.flatten().filter { it in vaultIds }.toSet()

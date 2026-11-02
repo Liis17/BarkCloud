@@ -1,6 +1,7 @@
 package com.barkfluff.BarkCloud.data.gallery
 
 import com.barkfluff.BarkCloud.data.cloud.CloudCopy
+import com.barkfluff.BarkCloud.data.cloud.HashPresence
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -39,6 +40,22 @@ class DeviceDeletePlanTest {
 
         assertEquals(emptyList<String>(), plan.devicePhotos)
         assertEquals(listOf("image:9"), plan.skipped)
+    }
+
+    @Test
+    fun cleanupSkipsPresenceWithoutIdsAndReportsItAsUnconfirmed() {
+        // Сервер без file_ids: exists=true, но ID нет — копия не подтверждена, удалять нельзя.
+        val withoutIds = CloudCopy.of(HashPresence(exists = true, fileIds = emptyList()))
+        val plan = planDeviceCopyCleanup(
+            listOf(
+                DeviceDeleteItem("image:1", present),
+                DeviceDeleteItem("image:2", CloudCopy.Absent),
+                DeviceDeleteItem("image:3", withoutIds),
+            ),
+        )
+
+        assertEquals(listOf("image:1"), plan.devicePhotos)
+        assertEquals(1, plan.unconfirmed)
     }
 
     @Test
