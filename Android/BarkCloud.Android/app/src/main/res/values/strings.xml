@@ -181,6 +181,7 @@
     <string name="gallery_cleanup_action">Удалить локальные копии · %1$s</string>
     <string name="gallery_cleanup_checking">Проверяем копии в облаке…</string>
     <string name="gallery_cleanup_none_confirmed">Подходящих копий не найдено. Ничего не удалено.</string>
+    <string name="gallery_cleanup_server_unconfirmed">Сервер не подтвердил копии в облаке. Обновите сервер BarkCloud и повторите. Ничего не удалено.</string>
     <string name="gallery_cleanup_back">Назад</string>
     <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
     <string name="gallery_selection_count">Выбрано: %1$d</string>
