@@ -165,6 +165,7 @@
     <string name="viewer_action_info">Свойства</string>
     <string name="viewer_action_delete">Удалить</string>
     <string name="viewer_action_share_title">Поделиться файлом</string>
+    <string name="selection_share_partial">Не удалось подготовить %1$d из %2$d</string>
     <string name="viewer_action_copied">Скопировано</string>
     <string name="viewer_action_download_complete">Сохранено в галерею</string>
     <string name="viewer_action_failed">Не удалось выполнить действие</string>
