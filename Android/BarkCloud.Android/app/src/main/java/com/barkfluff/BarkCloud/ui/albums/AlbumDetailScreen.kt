@@ -16,6 +16,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -71,6 +76,7 @@ import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.selection.SelectionAction
 import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
+import com.barkfluff.BarkCloud.ui.selection.rememberSelectionSharer
 import com.barkfluff.BarkCloud.ui.selection.dragSelection
 import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
 import com.barkfluff.BarkCloud.ui.selection.toggled
@@ -99,6 +105,7 @@ fun AlbumDetailScreen(
     var actionBarHeightPx by remember { mutableIntStateOf(0) }
     val app = LocalContext.current.applicationContext as BarkCloudApplication
     val scope = rememberCoroutineScope()
+    val sharer = rememberSelectionSharer()
     val selecting = state.selected.isNotEmpty()
     BackHandler(enabled = selecting || state.busy) { if (!state.busy) viewModel.clearSelection() }
     val dragController = rememberDragSelection(
@@ -191,19 +198,22 @@ fun AlbumDetailScreen(
                     SelectionActionBar(
                         modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
                         actions = buildList {
-                            add(SelectionAction(stringResource(R.string.album_remove_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Share, stringResource(R.string.viewer_action_share), enabled = !state.busy, loading = sharer.isPreparing) {
+                                sharer.share(state.items.filter { it.id in state.selected })
+                            })
+                            add(SelectionAction(Icons.Outlined.RemoveCircleOutline, stringResource(R.string.album_remove_selected, count), enabled = !state.busy) {
                                 viewModel.removeSelectedFromAlbum()
                             })
-                            add(SelectionAction(stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.PhotoAlbum, stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
                                 scope.launch { pickAlbums = loadAllAlbums(app.albumRepository) }
                             })
-                            if (count == 1) add(SelectionAction(stringResource(R.string.albums_set_cover), enabled = !state.busy) {
+                            if (count == 1) add(SelectionAction(Icons.Outlined.Wallpaper, stringResource(R.string.albums_set_cover), enabled = !state.busy) {
                                 viewModel.setCoverFromSelection()
                             })
-                            add(SelectionAction(stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Delete, stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
                                 showDeleteSelected = true
                             })
-                            add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Close, stringResource(R.string.common_cancel), enabled = !state.busy) {
                                 viewModel.clearSelection()
                             })
                         },

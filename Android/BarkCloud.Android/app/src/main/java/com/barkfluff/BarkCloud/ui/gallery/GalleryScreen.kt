@@ -16,8 +16,6 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -33,11 +31,23 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.PhotoAlbum
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
@@ -54,7 +64,6 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import com.barkfluff.BarkCloud.ui.components.PullRefreshHaptics
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -109,7 +118,10 @@ import com.barkfluff.BarkCloud.ui.components.MediaThumb
 import com.barkfluff.BarkCloud.ui.components.RemoteImage
 import com.barkfluff.BarkCloud.ui.components.mediaDateSections
 import com.barkfluff.BarkCloud.ui.media.MediaCell
+import com.barkfluff.BarkCloud.ui.selection.SelectionAction
+import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
 import com.barkfluff.BarkCloud.ui.selection.dragSelection
+import com.barkfluff.BarkCloud.ui.selection.rememberSelectionSharer
 import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
 import com.barkfluff.BarkCloud.ui.selection.viewportBounds
 import com.barkfluff.BarkCloud.ui.selection.visibleCells
@@ -161,6 +173,7 @@ fun GalleryScreen(
     onOpenSettings: () -> Unit,
     onOpenUploads: () -> Unit,
     onOpenCleanup: () -> Unit,
+    onSelectingChange: (Boolean) -> Unit = {},
     viewModel: GalleryViewModel = viewModel(factory = GalleryViewModel.factory()),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -194,6 +207,7 @@ fun GalleryScreen(
     var refreshQueued by remember { mutableStateOf(false) }
     var dragSelecting by remember { mutableStateOf(false) }
     var selectionToolbarHeightPx by remember { mutableStateOf(0) }
+    val sharer = rememberSelectionSharer()
 
     val timeline = remember(cloudPhotos.items, cloudVideos.items) {
         (cloudPhotos.items + cloudVideos.items).map { PhotoTimelineItem.Cloud(it) }
@@ -424,6 +438,8 @@ fun GalleryScreen(
         if (permissionGranted) viewModel.onPermissionResult(true) else permissionLauncher.launch(permissions)
     }
     BackHandler(enabled = state.selecting) { viewModel.clearSelection() }
+    // Во время выделения нижние вкладки скрываются, их место занимает панель действий.
+    LaunchedEffect(state.selecting) { onSelectingChange(state.selecting) }
 
     val profileName = profile?.let { listOf(it.firstName, it.lastName).filter(String::isNotBlank).joinToString(" ") }
         ?.takeIf { it.isNotBlank() }
@@ -538,12 +554,25 @@ fun GalleryScreen(
             }
         }
 
-        if (state.selecting) {
+        AnimatedVisibility(
+            visible = state.selecting,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(BarkMotion.spatial()) { it } + fadeIn(BarkMotion.effect()),
+            exit = ExitTransition.None,
+        ) {
             GallerySelectionToolbar(
-                modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { selectionToolbarHeightPx = it.height },
+                modifier = Modifier.onSizeChanged { selectionToolbarHeightPx = it.height }
+                    .windowInsetsPadding(WindowInsets.navigationBars),
                 actions = state.selectionActions,
                 isBusy = deletionState.isBusy || state.isQueueing,
                 isQueueing = state.isQueueing,
+                isSharing = sharer.isPreparing,
+                onShare = {
+                    sharer.share(
+                        cloud = selectedCloudIds.mapNotNull { id -> (timelineByKey["$CLOUD_SELECTION_PREFIX$id"] as? PhotoTimelineItem.Cloud)?.asset },
+                        device = viewModel.selectedDeviceTargets(selectedDeviceMediaKeys),
+                    )
+                },
                 onUpload = viewModel::uploadSelected,
                 onAlbum = {
                     scope.launch { albumPick = loadAllAlbums(app.albumRepository) }
@@ -577,7 +606,12 @@ fun GalleryScreen(
             }
         }
 
-        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        SnackbarHost(
+            snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(
+                bottom = if (state.selecting) with(density) { selectionToolbarHeightPx.toDp() } else 0.dp,
+            ),
+        )
     }
 
     albumPick?.let { choices ->
@@ -788,72 +822,37 @@ internal fun GalleryHeader(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun GallerySelectionToolbar(
     modifier: Modifier = Modifier,
     actions: PhotoSelectionActions,
     isBusy: Boolean,
     isQueueing: Boolean,
+    isSharing: Boolean,
+    onShare: () -> Unit,
     onUpload: () -> Unit,
     onFavorite: () -> Unit,
     onAlbum: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Box(
-        modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp,
-        ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(0.dp),
-                ) {
-                    if (actions.uploadCount > 0) {
-                        TextButton(
-                            onClick = onUpload,
-                            enabled = !isBusy && !isQueueing,
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                        ) {
-                            Text(stringResource(R.string.gallery_upload_selected, actions.uploadCount))
-                        }
-                    }
-                    if (actions.cloudCount > 0) {
-                        TextButton(
-                            onClick = onAlbum,
-                            enabled = !isBusy,
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                        ) {
-                            Text(stringResource(R.string.album_add_selected, actions.cloudCount))
-                        }
-                    }
-                    if (actions.favoriteCount > 0) {
-                        TextButton(
-                            onClick = onFavorite,
-                            enabled = !isBusy,
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                        ) {
-                            Text(stringResource(R.string.gallery_favorite_selected, actions.favoriteCount))
-                        }
-                    }
-                    if (actions.deleteCount > 0) {
-                        TextButton(
-                            onClick = onDelete,
-                            enabled = !isBusy,
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
-                        ) {
-                            Text(stringResource(R.string.gallery_delete_selected, actions.deleteCount))
-                        }
-                    }
-                }
+    SelectionActionBar(
+        modifier = modifier,
+        actions = buildList {
+            add(SelectionAction(Icons.Outlined.Share, stringResource(R.string.viewer_action_share), enabled = !isBusy, loading = isSharing, onClick = onShare))
+            if (actions.uploadCount > 0) {
+                add(SelectionAction(Icons.Outlined.CloudUpload, stringResource(R.string.gallery_upload_selected, actions.uploadCount), enabled = !isBusy && !isQueueing, onClick = onUpload))
             }
-        }
-    }
+            if (actions.cloudCount > 0) {
+                add(SelectionAction(Icons.Outlined.PhotoAlbum, stringResource(R.string.album_add_selected, actions.cloudCount), enabled = !isBusy, onClick = onAlbum))
+            }
+            if (actions.favoriteCount > 0) {
+                add(SelectionAction(Icons.Outlined.FavoriteBorder, stringResource(R.string.gallery_favorite_selected, actions.favoriteCount), enabled = !isBusy, onClick = onFavorite))
+            }
+            if (actions.deleteCount > 0) {
+                add(SelectionAction(Icons.Outlined.Delete, stringResource(R.string.gallery_delete_selected, actions.deleteCount), enabled = !isBusy, onClick = onDelete))
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

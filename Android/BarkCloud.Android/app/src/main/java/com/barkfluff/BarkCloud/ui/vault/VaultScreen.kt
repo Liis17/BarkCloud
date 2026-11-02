@@ -15,6 +15,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Lock
@@ -68,6 +73,7 @@ import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.selection.SelectionAction
 import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
+import com.barkfluff.BarkCloud.ui.selection.rememberSelectionSharer
 import com.barkfluff.BarkCloud.ui.selection.dragSelection
 import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
 import com.barkfluff.BarkCloud.ui.selection.toggled
@@ -87,6 +93,7 @@ fun VaultScreen(
     val activity = context as? FragmentActivity
     val app = context.applicationContext as BarkCloudApplication
     val scope = rememberCoroutineScope()
+    val sharer = rememberSelectionSharer()
     val unlockTitle = stringResource(R.string.vault_unlock_button)
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
     val gridState = rememberLazyGridState()
@@ -195,16 +202,19 @@ fun VaultScreen(
                             SelectionActionBar(
                                 modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
                                 actions = buildList {
-                                    add(SelectionAction(stringResource(R.string.vault_remove_selected, count), enabled = !state.busy) {
+                                    add(SelectionAction(Icons.Outlined.Share, stringResource(R.string.viewer_action_share), enabled = !state.busy, loading = sharer.isPreparing) {
+                                        sharer.share(vaultAssets.filter { it.id in state.selected })
+                                    })
+                                    add(SelectionAction(Icons.Outlined.LockOpen, stringResource(R.string.vault_remove_selected, count), enabled = !state.busy) {
                                         viewModel.removeSelectedFromVault()
                                     })
-                                    add(SelectionAction(stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
+                                    add(SelectionAction(Icons.Outlined.PhotoAlbum, stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
                                         scope.launch { pickAlbums = loadAllAlbums(app.albumRepository) }
                                     })
-                                    add(SelectionAction(stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
+                                    add(SelectionAction(Icons.Outlined.Delete, stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
                                         showDeleteSelected = true
                                     })
-                                    add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.busy) {
+                                    add(SelectionAction(Icons.Outlined.Close, stringResource(R.string.common_cancel), enabled = !state.busy) {
                                         viewModel.clearSelection()
                                     })
                                 },
