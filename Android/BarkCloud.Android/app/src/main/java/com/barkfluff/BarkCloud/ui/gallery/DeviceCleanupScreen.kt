@@ -135,16 +135,10 @@ internal fun DeviceCleanupScreen(onNavigateUp: () -> Unit, viewModel: GalleryVie
             phase = CleanupPhase.Checking
             scope.launch {
                 try {
-                    val cleanup = viewModel.prepareDeviceCopyDeletion()
-                    val candidates = cleanup.confirmed
+                    val candidates = viewModel.prepareDeviceCopyDeletion()
                     if (candidates.isEmpty()) {
                         phase = CleanupPhase.Idle
-                        val message = if (cleanup.unconfirmed > 0) {
-                            R.string.gallery_cleanup_server_unconfirmed
-                        } else {
-                            R.string.gallery_cleanup_none_confirmed
-                        }
-                        snackbar.showSnackbar(context.getString(message))
+                        snackbar.showSnackbar(context.getString(R.string.gallery_cleanup_none_confirmed))
                     } else {
                         val request = MediaStore.createDeleteRequest(context.contentResolver, candidates.map { it.uri })
                         val deletionRequest = PendingPhotoDelete(

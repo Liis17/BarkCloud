@@ -180,7 +180,6 @@
     <string name="gallery_cleanup_empty">Пока нет локальных копий, которые можно безопасно удалить.</string>
     <string name="gallery_cleanup_checking">Проверяем копии в облаке…</string>
     <string name="gallery_cleanup_none_confirmed">Подходящих копий не найдено. Ничего не удалено.</string>
-    <string name="gallery_cleanup_server_unconfirmed">Сервер не подтвердил копии в облаке. Обновите сервер BarkCloud и повторите. Ничего не удалено.</string>
     <string name="gallery_cleanup_title">Освобождаем место</string>
     <string name="gallery_cleanup_subtitle">Все фото уже в облаке</string>
     <string name="gallery_cleanup_close">Закрыть</string>
