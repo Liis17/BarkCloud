@@ -13,6 +13,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.HeartBroken
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
@@ -61,6 +66,7 @@ import com.barkfluff.BarkCloud.ui.components.cloudMediaSharedElement
 import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.selection.SelectionAction
 import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
+import com.barkfluff.BarkCloud.ui.selection.rememberSelectionSharer
 import com.barkfluff.BarkCloud.ui.selection.dragSelection
 import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
 import com.barkfluff.BarkCloud.ui.selection.toggled
@@ -80,6 +86,7 @@ fun FavoritesScreen(
     var viewer by remember { mutableStateOf<MediaAsset?>(null) }
     val app = LocalContext.current.applicationContext as BarkCloudApplication
     val scope = rememberCoroutineScope()
+    val sharer = rememberSelectionSharer()
     var pickAlbums by remember { mutableStateOf<List<AlbumCard>?>(null) }
     var showDeleteSelected by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
@@ -161,16 +168,19 @@ fun FavoritesScreen(
                     SelectionActionBar(
                         modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
                         actions = buildList {
-                            add(SelectionAction(stringResource(R.string.favorites_remove_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Share, stringResource(R.string.viewer_action_share), enabled = !state.busy, loading = sharer.isPreparing) {
+                                sharer.share(state.items.filter { it.id in state.selected })
+                            })
+                            add(SelectionAction(Icons.Outlined.HeartBroken, stringResource(R.string.favorites_remove_selected, count), enabled = !state.busy) {
                                 viewModel.removeSelectedFavorites()
                             })
-                            add(SelectionAction(stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.PhotoAlbum, stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
                                 scope.launch { pickAlbums = loadAllAlbums(app.albumRepository) }
                             })
-                            add(SelectionAction(stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Delete, stringResource(R.string.gallery_delete_selected, count), enabled = !state.busy) {
                                 showDeleteSelected = true
                             })
-                            add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Close, stringResource(R.string.common_cancel), enabled = !state.busy) {
                                 viewModel.clearSelection()
                             })
                         },

@@ -1,6 +1,9 @@
 package com.barkfluff.BarkCloud.ui.main
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -18,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
@@ -59,6 +63,7 @@ import com.barkfluff.BarkCloud.ui.settings.AndroidUpdatesScreen
 import com.barkfluff.BarkCloud.ui.smartfolders.SmartFolderDetailScreen
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueScreen
 import com.barkfluff.BarkCloud.ui.upload.UploadQueueViewModel
+import com.barkfluff.BarkCloud.ui.theme.BarkMotion
 import com.barkfluff.BarkCloud.ui.vault.VaultScreen
 import kotlinx.coroutines.flow.first
 
@@ -79,6 +84,7 @@ fun MainScreen(
     val currentRoute = navBackStackEntry?.destination?.route
     val isRootScreen = currentRoute in setOf("gallery/root", "files/root", "albums/root", "search/root")
     val isGalleryRoot = currentRoute == "gallery/root"
+    var gallerySelecting by remember { mutableStateOf(false) }
 
     LaunchedEffect(deepLink) {
         val target = deepLink?.uri?.host ?: return@LaunchedEffect
@@ -107,7 +113,14 @@ fun MainScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (isRootScreen) {
-                MainBottomBar(navController)
+                // В «Фото» при выделении вкладки уезжают вниз, их место занимает панель действий галереи.
+                AnimatedVisibility(
+                    visible = !(isGalleryRoot && gallerySelecting),
+                    enter = expandVertically(BarkMotion.spatial(), expandFrom = Alignment.Top),
+                    exit = shrinkVertically(BarkMotion.spatial(), shrinkTowards = Alignment.Top),
+                ) {
+                    MainBottomBar(navController)
+                }
             }
         },
     ) { padding ->
@@ -132,6 +145,7 @@ fun MainScreen(
                         onOpenSettings = { navController.navigate("settings") },
                         onOpenUploads = { navController.navigate("uploads/root") },
                         onOpenCleanup = { navController.navigate("gallery/cleanup") },
+                        onSelectingChange = { gallerySelecting = it },
                     )
                 }
                 drillIn("gallery/cleanup") { entry ->

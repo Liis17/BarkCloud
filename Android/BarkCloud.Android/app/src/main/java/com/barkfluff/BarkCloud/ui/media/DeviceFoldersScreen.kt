@@ -16,6 +16,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MobileOff
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayCircle
@@ -61,6 +67,7 @@ import com.barkfluff.BarkCloud.ui.components.loadAllAlbums
 import com.barkfluff.BarkCloud.ui.gallery.DeviceMediaViewer
 import com.barkfluff.BarkCloud.ui.selection.SelectionAction
 import com.barkfluff.BarkCloud.ui.selection.SelectionActionBar
+import com.barkfluff.BarkCloud.ui.selection.rememberSelectionSharer
 import com.barkfluff.BarkCloud.ui.selection.dragSelection
 import com.barkfluff.BarkCloud.ui.selection.rememberDragSelection
 import com.barkfluff.BarkCloud.ui.selection.toggled
@@ -84,6 +91,7 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
     val app = context.applicationContext as BarkCloudApplication
     val backup = remember { AutoUploadSettings(context) }
     val scope = rememberCoroutineScope()
+    val sharer = rememberSelectionSharer()
     val viewModel: DeviceFoldersViewModel = viewModel(factory = DeviceFoldersViewModel.factory())
     val state by viewModel.state.collectAsStateWithLifecycle()
     var backupRevision by remember { mutableIntStateOf(0) }
@@ -281,19 +289,22 @@ fun DeviceFoldersScreen(onNavigateUp: () -> Unit) {
                     SelectionActionBar(
                         modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
                         actions = buildList {
-                            add(SelectionAction(stringResource(R.string.device_upload_selected_count, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Share, stringResource(R.string.viewer_action_share), enabled = !state.busy) {
+                                sharer.share(cloud = emptyList(), device = selected?.media.orEmpty().filter { it.mediaKey in state.selected })
+                            })
+                            add(SelectionAction(Icons.Outlined.CloudUpload, stringResource(R.string.device_upload_selected_count, count), enabled = !state.busy) {
                                 viewModel.uploadSelected()
                             })
-                            add(SelectionAction(stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.PhotoAlbum, stringResource(R.string.album_add_selected, count), enabled = !state.busy) {
                                 scope.launch { pickAlbums = loadAllAlbums(app.albumRepository) }
                             })
-                            add(SelectionAction(stringResource(R.string.device_keep_cloud_count, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.MobileOff, stringResource(R.string.device_keep_cloud_count, count), enabled = !state.busy) {
                                 viewModel.prepareDelete(DeviceDeleteMode.KEEP_CLOUD)
                             })
-                            add(SelectionAction(stringResource(R.string.device_delete_everywhere_count, count), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.DeleteForever, stringResource(R.string.device_delete_everywhere_count, count), enabled = !state.busy) {
                                 viewModel.prepareDelete(DeviceDeleteMode.EVERYWHERE)
                             })
-                            add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.busy) {
+                            add(SelectionAction(Icons.Outlined.Close, stringResource(R.string.common_cancel), enabled = !state.busy) {
                                 viewModel.clearSelection()
                             })
                         },

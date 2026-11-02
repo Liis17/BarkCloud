@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.DeleteForever
@@ -172,13 +173,13 @@ fun TrashScreen(
                 SelectionActionBar(
                     modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { actionBarHeightPx = it.height },
                     actions = buildList {
-                        add(SelectionAction(stringResource(R.string.trash_restore_selected, count), enabled = !state.isProcessing) {
+                        add(SelectionAction(Icons.Outlined.Restore, stringResource(R.string.trash_restore_selected, count), enabled = !state.isProcessing) {
                             viewModel.restoreSelected()
                         })
-                        add(SelectionAction(stringResource(R.string.trash_delete_selected, count), enabled = !state.isProcessing) {
+                        add(SelectionAction(Icons.Outlined.DeleteForever, stringResource(R.string.trash_delete_selected, count), enabled = !state.isProcessing) {
                             showDeleteSelected = true
                         })
-                        add(SelectionAction(stringResource(R.string.common_cancel), enabled = !state.isProcessing) {
+                        add(SelectionAction(Icons.Outlined.Close, stringResource(R.string.common_cancel), enabled = !state.isProcessing) {
                             viewModel.clearSelection()
                         })
                     },
