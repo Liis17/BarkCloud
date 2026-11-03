@@ -2,6 +2,7 @@ package com.barkfluff.BarkCloud.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,13 +15,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -30,12 +31,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -45,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barkfluff.BarkCloud.R
 import com.barkfluff.BarkCloud.data.cache.FileCacheSettings
 import com.barkfluff.BarkCloud.files.ui.formatSize
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -154,7 +158,7 @@ fun CacheSettingsScreen(
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cache_limit), style = MaterialTheme.typography.titleMedium)
-                    ChipRow(
+                    OptionSlider(
                         options = cacheLimitOptions(),
                         selected = state.maxCacheBytes,
                         onSelect = viewModel::setMaxCacheBytes,
@@ -166,7 +170,7 @@ fun CacheSettingsScreen(
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.cache_auto_clean), style = MaterialTheme.typography.titleMedium)
-                    ChipRow(
+                    OptionSlider(
                         options = staleOptions(),
                         selected = state.staleMaxAgeMillis,
                         onSelect = viewModel::setStaleMaxAge,
@@ -175,11 +179,16 @@ fun CacheSettingsScreen(
                 }
             }
 
-            OutlinedButton(onClick = viewModel::clearStale, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.cache_clear_stale))
-            }
-            Button(onClick = { confirmClearAll = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.cache_clear_all))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = viewModel::clearStale, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.cache_clear_stale), textAlign = TextAlign.Center)
+                }
+                Button(onClick = { confirmClearAll = true }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.cache_clear_all), textAlign = TextAlign.Center)
+                }
             }
         }
     }
@@ -225,23 +234,29 @@ private fun CacheCategorySummary(
 }
 
 @Composable
-private fun ChipRow(
+private fun OptionSlider(
     options: List<Long>,
     selected: Long,
     onSelect: (Long) -> Unit,
     label: @Composable (Long) -> String,
 ) {
-    androidx.compose.foundation.layout.FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        options.forEach { value ->
-            FilterChip(
-                selected = value == selected,
-                onClick = { onSelect(value) },
-                label = { Text(label(value)) },
-            )
-        }
+    val selectedIndex = options.indexOf(selected).coerceAtLeast(0)
+    // Позиция ползунка во время перетаскивания; сохраняется только по отпусканию,
+    // т.к. setMaxCacheBytes запускает вытеснение кеша.
+    var position by remember(selectedIndex) { mutableFloatStateOf(selectedIndex.toFloat()) }
+    Column {
+        Text(
+            label(options[position.roundToInt()]),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Slider(
+            value = position,
+            onValueChange = { position = it },
+            onValueChangeFinished = { onSelect(options[position.roundToInt()]) },
+            valueRange = 0f..(options.size - 1).toFloat(),
+            steps = options.size - 2,
+        )
     }
 }
 
