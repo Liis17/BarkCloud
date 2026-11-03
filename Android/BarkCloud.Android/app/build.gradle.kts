@@ -98,8 +98,8 @@ android {
         applicationId = "com.barkfluff.BarkCloud"
         minSdk = 30
         targetSdk = 36
-        versionCode = androidReleaseVersionCode ?: 5
-        versionName = androidReleaseVersionName ?: "1.2.2"
+        versionCode = androidReleaseVersionCode ?: 6
+        versionName = androidReleaseVersionName ?: "1.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
