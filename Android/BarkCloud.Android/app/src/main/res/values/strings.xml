@@ -372,6 +372,15 @@
     <string name="devices_current">Текущее устройство</string>
     <string name="devices_rename">Переименовать</string>
     <string name="devices_rename_hint">Имя устройства</string>
+    <string name="devices_close_session">Завершить сессию</string>
+    <string name="devices_close_session_title">Завершить сессию?</string>
+    <string name="devices_close_session_message">Устройство «%1$s» будет отключено.</string>
+    <string name="devices_close_session_confirm">Отключить</string>
+    <string name="devices_detail_original_name">Исходное имя</string>
+    <string name="devices_detail_os">Система</string>
+    <string name="devices_detail_app">Приложение</string>
+    <string name="devices_detail_location">Местоположение</string>
+    <string name="devices_detail_authorized">Вход выполнен</string>
 
     <!-- Files section -->
     <string name="files_section_on_device">На устройстве</string>
