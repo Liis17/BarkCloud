@@ -16,6 +16,7 @@ import barkcloud.files.FilesApiOuterClass.DeleteFromTrashRequest
 import barkcloud.files.FilesApiOuterClass.DeleteUserMediaRequest
 import barkcloud.files.FilesApiOuterClass.EmptyTrashRequest
 import barkcloud.files.FilesApiOuterClass.GetPathRequest
+import barkcloud.files.FilesApiOuterClass.GetTrashSummaryRequest
 import barkcloud.files.FilesApiOuterClass.ListDirectoryRequest
 import barkcloud.files.FilesApiOuterClass.ListFavoritesRequest
 import barkcloud.files.FilesApiOuterClass.ListTrashRequest
@@ -256,6 +257,15 @@ class CloudRepository(
             items = resp.itemsList.map { TrashItem.from(it) },
             nextCursorDeletedAtMillis = if (resp.hasNextCursorDeletedAt()) resp.nextCursorDeletedAt.toEpochMillis() else null,
             nextCursorEntryId = resp.nextCursorEntryId,
+        )
+    }
+
+    /** Число записей в корзине и ближайшая дата авто-удаления (для виджета корзины). */
+    suspend fun trashSummary(): TrashSummary {
+        val resp = grpc.cloudStub().getTrashSummary(GetTrashSummaryRequest.getDefaultInstance())
+        return TrashSummary(
+            count = resp.totalCount,
+            oldestPurgeAtMillis = if (resp.hasOldestPurgeAt()) resp.oldestPurgeAt.toEpochMillis() else null,
         )
     }
 

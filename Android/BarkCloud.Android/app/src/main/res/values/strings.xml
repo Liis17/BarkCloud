@@ -311,7 +311,41 @@
     <string name="widget_storage_title">BarkCloud</string>
     <string name="widget_storage_summary">%1$s из %2$s</string>
     <string name="widget_storage_no_data">Откройте приложение</string>
+    <string name="widget_storage_unlimited">Без лимита квоты</string>
     <string name="widget_storage_description">Заполнение облачного хранилища BarkCloud</string>
+    <string name="widget_login_required">Войдите в приложение</string>
+
+    <string name="widget_trash_title">Корзина</string>
+    <string name="widget_trash_description">Объекты в корзине и срок их автоудаления</string>
+    <plurals name="widget_trash_count">
+        <item quantity="one">%d объект</item>
+        <item quantity="few">%d объекта</item>
+        <item quantity="many">%d объектов</item>
+        <item quantity="other">%d объекта</item>
+    </plurals>
+    <plurals name="widget_trash_days">
+        <item quantity="one">Удалится через %d день</item>
+        <item quantity="few">Удалится через %d дня</item>
+        <item quantity="many">Удалится через %d дней</item>
+        <item quantity="other">Удалится через %d дня</item>
+    </plurals>
+    <plurals name="widget_trash_hours">
+        <item quantity="one">Удалится через %d час</item>
+        <item quantity="few">Удалится через %d часа</item>
+        <item quantity="many">Удалится через %d часов</item>
+        <item quantity="other">Удалится через %d часа</item>
+    </plurals>
+    <string name="widget_trash_soon">Удалится в ближайший час</string>
+    <string name="widget_trash_empty">Корзина пуста</string>
+
+    <string name="widget_photo_title">Фото из альбома</string>
+    <string name="widget_photo_description">Фото из выбранного альбома меняются автоматически</string>
+    <string name="widget_photo_pick_title">Альбом для виджета</string>
+    <string name="widget_photo_pick_empty">В облаке пока нет альбомов</string>
+    <string name="widget_photo_pick_login">Войдите в приложение, чтобы выбрать альбом</string>
+    <string name="widget_photo_empty">В альбоме нет фото</string>
+    <string name="widget_photo_loading">Загружаем фото…</string>
+    <string name="widget_photo_no_album">Выберите альбом в настройках виджета</string>
 
     <!-- Edit profile -->
     <string name="edit_profile_title">Профиль</string>

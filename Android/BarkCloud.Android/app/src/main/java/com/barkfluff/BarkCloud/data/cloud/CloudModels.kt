@@ -181,6 +181,12 @@ data class TrashPage(
     val hasMore: Boolean get() = nextCursorDeletedAtMillis != null
 }
 
+/** Сводка корзины (зеркалит `GetTrashSummaryResponse`); `oldestPurgeAtMillis` = null, если корзина пуста. */
+data class TrashSummary(
+    val count: Int,
+    val oldestPurgeAtMillis: Long?,
+)
+
 /** Карточка альбома (зеркалит `AlbumInfo`). */
 data class AlbumCard(
     val id: String,
