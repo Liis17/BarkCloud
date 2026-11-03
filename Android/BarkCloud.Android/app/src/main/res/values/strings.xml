@@ -366,6 +366,12 @@
     <string name="privacy_everyone">Все</string>
     <string name="privacy_contacts">Контакты</string>
     <string name="privacy_nobody">Никто</string>
+    <string name="privacy_section_visibility">Видимость</string>
+    <string name="privacy_section_search">Поиск</string>
+    <string name="privacy_searchable_description">Другие пользователи смогут найти вас по юзернейму</string>
+    <string name="privacy_desc_everyone">Видно всем пользователям</string>
+    <string name="privacy_desc_contacts">Видно только вашим контактам</string>
+    <string name="privacy_desc_nobody">Не видно никому</string>
 
     <!-- Devices -->
     <string name="devices_title">Устройства</string>
