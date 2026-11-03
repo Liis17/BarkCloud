@@ -9,6 +9,7 @@ import com.barkfluff.BarkCloud.data.upload.UploadQueueStore
 import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import com.barkfluff.BarkCloud.data.vault.VaultStore
 import com.barkfluff.BarkCloud.grpc.GrpcManager
+import com.barkfluff.BarkCloud.widgets.WidgetRefresh
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -33,6 +34,7 @@ class SessionManager(
 
     fun resetLocalState() {
         globalParam.clearSession()
+        WidgetRefresh.clearAll(appContext)
         runBlocking {
             cancelUploadWorkBeforeQueueClear(
                 cancelDiscovery = { AutoUploadScheduler.disableAndAwait(appContext) },

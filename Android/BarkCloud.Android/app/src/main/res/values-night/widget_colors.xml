@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Фолбэк тёмной темы для Android 11 и ниже: фирменная тёмная схема из ui/theme/Color.kt. -->
+<resources>
+    <color name="widget_surface">#FF271E18</color>
+    <color name="widget_on_surface">#FFF0DFD6</color>
+    <color name="widget_on_surface_variant">#FFD7C2B5</color>
+    <color name="widget_primary">#FFFFB68A</color>
+    <color name="widget_track">#FF322822</color>
+</resources>

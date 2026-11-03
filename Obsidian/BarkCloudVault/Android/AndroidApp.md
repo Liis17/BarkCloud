@@ -1,6 +1,6 @@
 # Android — приложение
 
-Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] · Загрузка: [[Android/ResumableUpload]] · См. также: [[Shared/Proto]] · [[Backend/Identity]] · [[Backend/Users]] · [[Backend/Files]]
+Parent: [[Architecture]] · Авторизация: [[Android/Authentication]] · Загрузка: [[Android/ResumableUpload]] · Виджеты: [[Android/Widgets]] · См. также: [[Shared/Proto]] · [[Backend/Identity]] · [[Backend/Users]] · [[Backend/Files]]
 
 ## Назначение
 

@@ -55,6 +55,7 @@
 | [[Android/AndroidApp]] | Android-приложение |
 | [[Android/Authentication]] | Первый запуск и авторизация на Android |
 | [[Android/ResumableUpload]] | Возобновляемая загрузка на Android |
+| [[Android/Widgets]] | Виджеты хранилища, корзины и фото из альбома |
 | [[Ios/IosApp]] | iOS-приложение |
 | [[Ios/BackgroundUpload]] | Фоновая загрузка и Live Activity |
 | [[Ios/Widgets]] | Виджеты и deep links |
