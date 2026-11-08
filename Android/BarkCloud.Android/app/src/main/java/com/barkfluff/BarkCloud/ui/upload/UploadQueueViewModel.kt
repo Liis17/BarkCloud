@@ -26,13 +26,25 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
     val pendingErrorCount: Int = pendingJobs.count {
         it.phase == UploadPhase.FAILED || it.phase == UploadPhase.UPLOADED_NOT_ATTACHED
     }
+    // Незавершённые задачи входят всегда: backup сохраняет исходный createdAtMillis, а длинная
+    // очередь идёт дольше окна. Завершённые учитываются по времени завершения.
     private val sessionJobs: List<UploadJob>
-        get() = jobs.filter { it.createdAtMillis >= System.currentTimeMillis() - SESSION_WINDOW_MILLIS }
+        get() {
+            val since = System.currentTimeMillis() - SESSION_WINDOW_MILLIS
+            return jobs.filter {
+                when (it.phase) {
+                    in ACTIVE_PHASES -> true
+                    UploadPhase.COMPLETED -> (it.completedAtMillis ?: it.createdAtMillis) >= since
+                    else -> it.createdAtMillis >= since
+                }
+            }
+        }
     val current: UploadJob? get() = sessionJobs.firstOrNull { it.phase in ACTIVE_PHASES }
     val total: Int get() = sessionJobs.size
     val completed: Int get() = sessionJobs.count { it.phase == UploadPhase.COMPLETED }
     val failed: Int get() = sessionJobs.count { it.phase == UploadPhase.FAILED }
-    val isActive: Boolean get() = current != null
+    // Только задачи в работе: QUEUED backup, отложенный политикой сети, не крутит кольцо бесконечно.
+    val isActive: Boolean get() = jobs.any { it.phase in IN_FLIGHT_PHASES }
     val progress: Float get() {
         val bytes = sessionJobs.sumOf { if (it.phase == UploadPhase.COMPLETED) it.bytesTotal else it.bytesSent }
         val totalBytes = sessionJobs.sumOf { it.bytesTotal }
@@ -41,10 +53,11 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
 
     private companion object {
         const val SESSION_WINDOW_MILLIS = 60L * 60L * 1000L
-        val ACTIVE_PHASES = setOf(
-            UploadPhase.QUEUED, UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
+        val IN_FLIGHT_PHASES = setOf(
+            UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
             UploadPhase.UPLOADING, UploadPhase.COMPLETING, UploadPhase.PROCESSING, UploadPhase.ATTACHING,
         )
+        val ACTIVE_PHASES = IN_FLIGHT_PHASES + UploadPhase.QUEUED
     }
 }
 
