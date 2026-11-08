@@ -80,6 +80,7 @@ class UploadQueueUiStateTest {
                 job(UploadPhase.COMPLETED, id = "old-done", createdAt = 1).copy(completedAtMillis = now),
                 job(UploadPhase.COMPLETED, id = "stale-done", createdAt = 1).copy(completedAtMillis = 1),
             ),
+            workerRunning = true,
         )
 
         assertTrue(state.isActive)
@@ -88,11 +89,12 @@ class UploadQueueUiStateTest {
         assertEquals(0.75f, state.progress, 0.001f)
     }
 
-    @Test fun queuedOnlyJobsDoNotSpinRing() {
-        val state = UploadQueueUiState(listOf(job(UploadPhase.QUEUED, createdAt = System.currentTimeMillis())))
+    @Test fun uploadingJobWithoutRunningWorkerDoesNotShowRing() {
+        // Backup на платной сети при WIFI_ONLY или в backoff: фаза UPLOADING осталась, воркер не работает.
+        val state = UploadQueueUiState(listOf(job(UploadPhase.UPLOADING)), workerRunning = false)
 
         assertFalse(state.isActive)
-        assertEquals("QUEUED", state.current?.id)
+        assertEquals("UPLOADING", state.current?.id)
     }
 
     private fun job(phase: UploadPhase, id: String = phase.name, createdAt: Long = 1) = UploadJob(

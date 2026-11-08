@@ -15,7 +15,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
+data class UploadQueueUiState(
+    val jobs: List<UploadJob> = emptyList(),
+    /** WorkManager-задача очереди в RUNNING: фаза в Room сама по себе не значит, что воркер работает. */
+    val workerRunning: Boolean = false,
+) {
     val pendingJobs: List<UploadJob> = jobs
         .filter { it.phase != UploadPhase.COMPLETED && it.phase != UploadPhase.CANCELLED }
         .sortedWith(
@@ -43,8 +47,9 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
     val total: Int get() = sessionJobs.size
     val completed: Int get() = sessionJobs.count { it.phase == UploadPhase.COMPLETED }
     val failed: Int get() = sessionJobs.count { it.phase == UploadPhase.FAILED }
-    // Только задачи в работе: QUEUED backup, отложенный политикой сети, не крутит кольцо бесконечно.
-    val isActive: Boolean get() = jobs.any { it.phase in IN_FLIGHT_PHASES }
+    // Фаза UPLOADING остаётся в Room и без воркера (backoff, backup на платной сети при WIFI_ONLY),
+    // поэтому кольцо требует работающий воркер.
+    val isActive: Boolean get() = workerRunning && current != null
     val progress: Float get() {
         val bytes = sessionJobs.sumOf { if (it.phase == UploadPhase.COMPLETED) it.bytesTotal else it.bytesSent }
         val totalBytes = sessionJobs.sumOf { it.bytesTotal }
@@ -53,11 +58,10 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
 
     private companion object {
         const val SESSION_WINDOW_MILLIS = 60L * 60L * 1000L
-        val IN_FLIGHT_PHASES = setOf(
-            UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
+        val ACTIVE_PHASES = setOf(
+            UploadPhase.QUEUED, UploadPhase.HASHING, UploadPhase.CREATING_SESSION,
             UploadPhase.UPLOADING, UploadPhase.COMPLETING, UploadPhase.PROCESSING, UploadPhase.ATTACHING,
         )
-        val ACTIVE_PHASES = IN_FLIGHT_PHASES + UploadPhase.QUEUED
     }
 }
 
@@ -79,6 +83,9 @@ class UploadQueueViewModel(private val app: BarkCloudApplication) : ViewModel() 
     init {
         viewModelScope.launch {
             app.uploadQueue.recentJobs.collectLatest { jobs -> _state.update { it.copy(jobs = jobs) } }
+        }
+        viewModelScope.launch {
+            UploadScheduler.isRunning(app).collectLatest { running -> _state.update { it.copy(workerRunning = running) } }
         }
     }
 
