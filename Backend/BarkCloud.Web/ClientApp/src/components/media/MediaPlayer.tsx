@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from '../Icon';
 import { Slider } from '../ui/Slider';
 import { formatDuration } from '../../lib/format';
+import { decodeSubtitleBytes, toWebVtt } from '../../lib/subtitles';
 
 interface MediaState {
   playing: boolean;
@@ -13,6 +14,7 @@ interface MediaState {
 
 const IDLE: MediaState = { playing: false, time: 0, duration: 0, volume: 1, muted: false };
 const VIDEO_QUALITY_COOKIE = 'bc_video_quality';
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 export interface VideoQuality {
   height: number;
@@ -90,11 +92,12 @@ function togglePlay(el: HTMLMediaElement | null) {
   else el.pause();
 }
 
-function MediaControls({ el, state, filledPlay, fullscreen, qualityMenu }: {
+function MediaControls({ el, state, filledPlay, fullscreen, extraControls, qualityMenu }: {
   el: HTMLMediaElement | null;
   state: MediaState;
   filledPlay?: boolean;
   fullscreen?: { active: boolean; toggle: () => void };
+  extraControls?: React.ReactNode;
   qualityMenu?: React.ReactNode;
 }) {
   const silent = state.muted || state.volume === 0;
@@ -120,6 +123,7 @@ function MediaControls({ el, state, filledPlay, fullscreen, qualityMenu }: {
         onChange={(v) => { if (el) { el.muted = false; el.volume = v; } }}
         aria-label="Громкость"
       />
+      {extraControls}
       {qualityMenu}
       {fullscreen && (
         <button className="icon-btn" onClick={fullscreen.toggle} title={fullscreen.active ? 'Выйти из полноэкранного режима' : 'Во весь экран'} aria-label={fullscreen.active ? 'Выйти из полноэкранного режима' : 'Во весь экран'}>
@@ -142,7 +146,8 @@ interface VideoPlayerProps {
 }
 
 /** Видеоплеер с M3-контролами поверх кадра (вместо нативных controls).
- *  Клавиши при фокусе на плеере: Space/K — пауза, M — звук, F — полный экран. */
+ *  Клавиши при фокусе на плеере: Space/K — пауза, M — звук, F — полный экран.
+ *  Есть выбор скорости, картинка-в-картинке (где браузер поддерживает) и локальные субтитры .vtt/.srt. */
 export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPlay, onMediaRef }: VideoPlayerProps) {
   const [el, ref] = useMediaElement<HTMLVideoElement>(onMediaRef);
   const state = useMediaState(el);
@@ -155,6 +160,12 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
   const pendingPlayback = React.useRef<{ time: number; paused: boolean } | null>(null);
   const previousSource = React.useRef({ src, qualities });
   const idleTimer = React.useRef<number>();
+  const [rate, setRate] = React.useState(1);
+  // blob: URL загруженного пользователем файла субтитров (WebVTT); null — субтитров нет.
+  const [subtitlesUrl, setSubtitlesUrl] = React.useState<string | null>(null);
+  const subtitlesInput = React.useRef<HTMLInputElement>(null);
+  const [inPip, setInPip] = React.useState(false);
+  const pipSupported = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
   const originalQuality = qualities?.find((quality) => quality.isOriginal);
   const qualityOptions: VideoQuality[] = [
     { height: originalQuality?.height || 0, width: originalQuality?.width || 0, fileSize: originalQuality?.fileSize || 0, isOriginal: true, url: src },
@@ -165,11 +176,38 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
 
   React.useEffect(() => {
     if (previousSource.current.src === src && previousSource.current.qualities === qualities) return;
+    const previousSrc = previousSource.current.src;
     previousSource.current = { src, qualities };
     pendingPlayback.current = null;
     setSwitchingQuality(false);
     setSelectedQuality(selectInitialQuality(qualities, av1Supported));
+    // Субтитры относятся к конкретному видео; смена качества src не меняет и их сохраняет.
+    if (previousSrc !== src) setSubtitlesUrl(null);
   }, [src, qualities, av1Supported]);
+
+  // Отзыв blob: URL при замене/снятии субтитров и размонтировании.
+  React.useEffect(() => () => {
+    if (subtitlesUrl) URL.revokeObjectURL(subtitlesUrl);
+  }, [subtitlesUrl]);
+
+  // Динамически добавленный <track default> браузеры часто не включают — показываем дорожку явно.
+  const showSubtitles = React.useCallback(() => {
+    if (!el || !subtitlesUrl) return;
+    for (let n = 0; n < el.textTracks.length; n++) el.textTracks[n].mode = 'showing';
+  }, [el, subtitlesUrl]);
+  React.useEffect(showSubtitles, [showSubtitles]);
+
+  React.useEffect(() => {
+    if (!el) return;
+    const enter = () => setInPip(true);
+    const leave = () => setInPip(false);
+    el.addEventListener('enterpictureinpicture', enter);
+    el.addEventListener('leavepictureinpicture', leave);
+    return () => {
+      el.removeEventListener('enterpictureinpicture', enter);
+      el.removeEventListener('leavepictureinpicture', leave);
+    };
+  }, [el]);
 
   React.useEffect(() => {
     const onChange = () => setIsFull(document.fullscreenElement === wrap.current);
@@ -219,6 +257,27 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
     if (pending.paused) el.pause();
     else void el.play().catch(() => {});
     setSwitchingQuality(false);
+    showSubtitles();
+  };
+
+  // Скорость задаём и как defaultPlaybackRate: при смене src (качество, соседний файл) load() сбрасывает playbackRate к нему.
+  const changeRate = (value: number) => {
+    setRate(value);
+    if (el) {
+      el.defaultPlaybackRate = value;
+      el.playbackRate = value;
+    }
+  };
+
+  const togglePip = () => {
+    if (!el) return;
+    if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => {});
+    else void el.requestPictureInPicture().catch(() => {});
+  };
+
+  const loadSubtitles = async (file: File) => {
+    const vtt = toWebVtt(decodeSubtitleBytes(await file.arrayBuffer()));
+    setSubtitlesUrl(URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' })));
   };
 
   return (
@@ -230,7 +289,9 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
       onMouseLeave={() => setIdle(true)}
       onKeyDown={onKeyDown}
     >
-      <video ref={ref} src={selectedQualityOption.url || src} poster={poster} autoPlay={autoPlay && !switchingQuality} playsInline onLoadedMetadata={restorePlayback} onClick={() => togglePlay(el)} onDoubleClick={toggleFull} />
+      <video ref={ref} src={selectedQualityOption.url || src} poster={poster} autoPlay={autoPlay && !switchingQuality} playsInline onLoadedMetadata={restorePlayback} onClick={() => togglePlay(el)} onDoubleClick={toggleFull}>
+        {subtitlesUrl && <track key={subtitlesUrl} kind="subtitles" src={subtitlesUrl} srcLang="ru" label="Субтитры" default />}
+      </video>
       {bigPlay && !state.playing && (
         <button className="video-player-play" onClick={() => togglePlay(el)} title="Играть" aria-label="Играть">
           <Icon.play size={40} />
@@ -241,6 +302,44 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
           el={el}
           state={state}
           fullscreen={{ active: isFull, toggle: toggleFull }}
+          extraControls={(
+            <>
+              <select
+                className="media-rate"
+                aria-label="Скорость воспроизведения"
+                value={rate}
+                onChange={(event) => changeRate(Number(event.target.value))}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                {PLAYBACK_RATES.map((value) => <option key={value} value={value}>{value}×</option>)}
+              </select>
+              <button
+                className={'icon-btn' + (subtitlesUrl ? ' active' : '')}
+                onClick={() => (subtitlesUrl ? setSubtitlesUrl(null) : subtitlesInput.current?.click())}
+                title={subtitlesUrl ? 'Убрать субтитры' : 'Загрузить субтитры (.vtt, .srt)'}
+                aria-label={subtitlesUrl ? 'Убрать субтитры' : 'Загрузить субтитры'}
+              >
+                <Icon.subtitles size={20} />
+              </button>
+              <input
+                ref={subtitlesInput}
+                type="file"
+                accept=".vtt,.srt,text/vtt"
+                hidden
+                aria-label="Файл субтитров"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) void loadSubtitles(file);
+                }}
+              />
+              {pipSupported && (
+                <button className="icon-btn" onClick={togglePip} title={inPip ? 'Вернуть из окна' : 'Картинка в картинке'} aria-label={inPip ? 'Вернуть из окна' : 'Картинка в картинке'}>
+                  <Icon.pip size={20} />
+                </button>
+              )}
+            </>
+          )}
           qualityMenu={qualityOptions.length > 1 ? (
             <select
               className="media-quality"
