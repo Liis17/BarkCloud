@@ -17,6 +17,7 @@ import io.grpc.ManagedChannel
 import io.grpc.okhttp.OkHttpChannelBuilder
 import java.util.concurrent.ConcurrentHashMap
 import java.net.URI
+import java.util.concurrent.TimeUnit
 
 /**
  * Управляет gRPC-каналами ко всем сервисам. На каждый адрес — один кэшированный
@@ -34,7 +35,8 @@ class GrpcManager(
     private val managedChannels = ConcurrentHashMap<String, ManagedChannel>()
 
     private val tokenRefresher = TokenRefresher(globalParam) { refreshToken ->
-        val response = publicIdentityStub().createToken(
+        // Без дедлайна refresh на «мёртвом» соединении держал бы mutex, блокируя все вызовы с авторизацией.
+        val response = publicIdentityStub().withDeadlineAfter(REFRESH_DEADLINE_SECONDS, TimeUnit.SECONDS).createToken(
             CreateTokenRequest.newBuilder().setRefreshToken(refreshToken).build(),
         )
         TokenRefresher.RefreshedAccessToken(
@@ -76,7 +78,7 @@ class GrpcManager(
         interceptedChannels.computeIfAbsent("${ServerSettings.config.key}|$address") {
             val managed = createChannel(address, ServerSettings.config.allowSelfSigned)
             managedChannels[it] = managed
-            ClientInterceptors.intercept(managed, AuthInterceptor { tokenRefresher.validAccessToken() }, metadataInterceptor)
+            ClientInterceptors.intercept(managed, AuthInterceptor(onUnauthenticated = tokenRefresher::invalidate) { tokenRefresher.validAccessToken() }, metadataInterceptor)
         }
 
     fun publicIdentityStub(): IdentityApiGrpcKt.IdentityApiCoroutineStub =
@@ -122,4 +124,8 @@ class GrpcManager(
 
     private fun ensureScheme(url: String): String =
         if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url"
+
+    private companion object {
+        const val REFRESH_DEADLINE_SECONDS = 20L
+    }
 }
