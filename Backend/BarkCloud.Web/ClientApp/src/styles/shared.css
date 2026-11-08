@@ -896,7 +896,7 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
   display: flex; align-items: center; justify-content: center;
 }
 .lb-stage img, .lb-stage video { max-width: 92vw; max-height: 86vh; object-fit: contain; border-radius: var(--r-sm); }
-.lb-stage img { cursor: zoom-in; will-change: transform; }
+.lb-stage img { cursor: zoom-in; will-change: transform; touch-action: none; }
 .lb-stage img.zoomed { cursor: grab; }
 .lb-stage img.zoomed:active { cursor: grabbing; }
 .lb-msg { color: #fff; display: flex; align-items: center; gap: 10px; font-size: 15px; }
