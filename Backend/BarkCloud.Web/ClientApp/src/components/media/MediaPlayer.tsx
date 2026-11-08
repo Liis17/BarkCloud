@@ -260,7 +260,7 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
     showSubtitles();
   };
 
-  // Скорость задаём и как defaultPlaybackRate: при смене src (качество, соседний файл) load() сбрасывает playbackRate к нему.
+  // Скорость задаём и как defaultPlaybackRate: при смене src (например, качества) load() сбрасывает playbackRate к нему.
   const changeRate = (value: number) => {
     setRate(value);
     if (el) {

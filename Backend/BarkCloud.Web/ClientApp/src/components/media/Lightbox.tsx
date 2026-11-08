@@ -144,7 +144,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   React.useEffect(() => {
     const needUrls: string[] = [];
     for (const item of [prevItem, nextItem]) {
-      if (!item || item.kind === 'video') continue;
+      if (!item || item.kind !== 'photo') continue;
       const src = selectPhotoViewSource(item.name, item.jpegViewUrl, item.previews, urls[item.id]);
       if (src) new Image().src = src;
       else if (!isSvgFileName(item.name) && !isSvgFileName(item.ext) && !(item.id in urls)) needUrls.push(item.id);
