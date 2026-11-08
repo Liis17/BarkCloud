@@ -15,6 +15,7 @@ export function MoveToFolderModal({
   onPick,
   onClose,
   progress,
+  excludeDirs,
 }: {
   count: number;
   currentDir: string;
@@ -22,6 +23,8 @@ export function MoveToFolderModal({
   onClose: () => void;
   /** Идущее массовое перемещение: пока задан, модалку закрыть нельзя. */
   progress?: { done: number; total: number };
+  /** Перемещаемые папки: в них нельзя войти, поэтому нельзя выбрать ни их самих, ни их подпапки. */
+  excludeDirs?: { id: string; name: string }[];
 }) {
   const [stack, setStack] = React.useState<{ id: string; name: string }[]>([]);
   const [dirs, setDirs] = React.useState<DirInfo[] | null>(null);
@@ -90,11 +93,12 @@ export function MoveToFolderModal({
     setStack((s) => s.slice(0, i + 1));
   };
   const isCurrent = here === currentDir;
+  const onlyDir = count === 1 && excludeDirs?.length === 1 ? excludeDirs[0] : null;
   const percent = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
     <Modal
-      title={`Переместить (${count})`}
+      title={onlyDir ? `Переместить «${onlyDir.name}»` : `Переместить (${count})`}
       onClose={progress ? undefined : () => leave(onClose)}
       actions={
         <>
@@ -102,7 +106,7 @@ export function MoveToFolderModal({
             Отмена
           </button>
           <button className="btn primary" disabled={isCurrent || !!progress} onClick={() => leave(() => onPick(here))}>
-            {progress ? 'Перемещение…' : isCurrent ? 'Файлы уже здесь' : 'Переместить сюда'}
+            {progress ? 'Перемещение…' : isCurrent ? (onlyDir ? 'Папка уже здесь' : excludeDirs?.length ? 'Уже здесь' : 'Файлы уже здесь') : 'Переместить сюда'}
           </button>
         </>
       }
@@ -131,22 +135,27 @@ export function MoveToFolderModal({
         <p style={{ color: 'var(--md-on-surface-variant)', fontSize: 13, margin: '8px 2px' }}>Вложенных папок нет.</p>
       ) : (
         <ul className="move-folder-list" style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 320, overflowY: 'auto' }}>
-          {dirs.map((d) => (
-            <li key={d.id}>
-              <button
-                className="album-pick-row"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10 }}
-                onClick={() => {
-                  if (progress) return;
-                  enter({ id: d.id, name: d.name });
-                }}
-              >
-                <Icon.folder size={18} />
-                <span style={{ flex: 1, textAlign: 'left' }}>{d.name}</span>
-                <Icon.chev size={16} />
-              </button>
-            </li>
-          ))}
+          {dirs.map((d) => {
+            const excluded = !!excludeDirs?.some((x) => x.id === d.id);
+            return (
+              <li key={d.id}>
+                <button
+                  className="album-pick-row"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, opacity: excluded ? 0.5 : undefined }}
+                  disabled={excluded}
+                  title={excluded ? 'Нельзя переместить папку в саму себя' : undefined}
+                  onClick={() => {
+                    if (progress || excluded) return;
+                    enter({ id: d.id, name: d.name });
+                  }}
+                >
+                  <Icon.folder size={18} />
+                  <span style={{ flex: 1, textAlign: 'left' }}>{d.name}</span>
+                  {!excluded && <Icon.chev size={16} />}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 

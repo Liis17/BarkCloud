@@ -54,21 +54,28 @@ function directoryCursorOf(listing: Listing): DirectoryCursor | null {
 
 type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 
-function DirRow({ dir, onOpen, onMenu, dropHandlers, active }: {
+/** Ключ папки в общем выборе с файлами (файлы выбираются по entryId). */
+const dirKey = (id: string) => 'dir:' + id;
+
+function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }: {
   dir: DirInfo;
   onOpen: (d: DirInfo) => void;
   onMenu: (e: React.MouseEvent, d: DirInfo) => void;
   dropHandlers: FileDropHandlers;
   active: boolean;
+  checked: boolean;
+  onToggle: (shift: boolean) => void;
 }) {
   return (
     <tr
-      className={active ? 'drop-target' : ''}
+      className={(active ? 'drop-target' : '') + (checked ? ' checked' : '')}
       {...dropHandlers}
-      onClick={() => onOpen(dir)}
+      onClick={(e) => (e.shiftKey ? onToggle(true) : onOpen(dir))}
       onContextMenu={(e) => onMenu(e, dir)}
     >
-      <td className="selcell" />
+      <td className="selcell" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={checked} onChange={() => {}} onClick={(e) => onToggle(e.shiftKey)} />
+      </td>
       <td className="name">
         <div className="name-cell">
           <div className="file-icon folder"><Icon.folder size={22} /></div>
@@ -258,6 +265,7 @@ export function FilesPage() {
   const [confirmDel, setConfirmDel] = React.useState<RenameTarget | null>(null);
   const [bulkConfirm, setBulkConfirm] = React.useState(false);
   const [bulkMoving, setBulkMoving] = React.useState(false);
+  const [movingDir, setMovingDir] = React.useState<DirInfo | null>(null);
   const [moveProgress, setMoveProgress] = React.useState<{ done: number; total: number } | null>(null);
   const [archiving, setArchiving] = React.useState(false);
   const [smartFolders, setSmartFolders] = React.useState<DynamicFolder[]>([]);
@@ -587,6 +595,7 @@ export function FilesPage() {
       { label: 'Сделать папку публичной', icon: 'share', onClick: () => createFolderShare(dir.id, dir.name, toast) },
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareDirWith(dir) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(dir, true) },
+      { label: 'Переместить', icon: 'folder', onClick: () => setMovingDir(dir) },
       { label: 'Свойства', icon: 'info', onClick: () => setDirProps(dir) },
       { divider: true },
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
@@ -598,17 +607,33 @@ export function FilesPage() {
     enqueue(files, { dir: target?.id || currentDir });
   }
 
+  const chosenDirs = () => (listing?.dirs || []).filter((d) => fsel.has(dirKey(d.id)));
+
   async function bulkDelete() {
     const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
+    const dirsToDelete = chosenDirs();
     try {
+      // Пакетного удаления папок нет: каждая папка — отдельный запрос, файлы — одним пакетом.
+      let succeeded = 0;
+      let failed = 0;
+      for (const d of dirsToDelete) {
+        try {
+          await apiPost('/api/cloud/dir/delete', { id: d.id });
+          succeeded++;
+        } catch {
+          failed++;
+        }
+      }
       const result = await deleteEntriesBatch(chosen.map((e) => e.entryId));
+      succeeded += result.succeeded;
+      failed += result.failed;
       setBulkConfirm(false);
       fsel.clear();
-      if (result.succeeded) {
-        toast(result.failed ? `Перемещено в корзину: ${result.succeeded}, не удалось: ${result.failed}` : `Перемещено в корзину: ${result.succeeded}`);
+      if (succeeded) {
+        toast(failed ? `Перемещено в корзину: ${succeeded}, не удалось: ${failed}` : `Перемещено в корзину: ${succeeded}`);
         load();
-      } else if (result.failed) {
-        toast('Не удалось переместить выбранные файлы в корзину', 'err');
+      } else if (failed) {
+        toast('Не удалось переместить выбранное в корзину', 'err');
       }
     } catch (err) {
       toast((err as Error).message, 'err');
@@ -617,7 +642,12 @@ export function FilesPage() {
 
   async function bulkMove(targetDir: string) {
     if (moveProgress) return;
-    const chosen = (listing?.files || []).filter((e) => fsel.has(e.entryId));
+    const chosen = [
+      ...chosenDirs().map((d) => ({ name: d.name, move: () => apiPost('/api/cloud/dir/move', { id: d.id, parentId: targetDir }) })),
+      ...(listing?.files || [])
+        .filter((e) => fsel.has(e.entryId))
+        .map((e) => ({ name: e.name, move: () => apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir }) })),
+    ];
     let ok = 0;
     let failed = 0;
     let firstError: { name: string; message: string } | null = null;
@@ -625,7 +655,7 @@ export function FilesPage() {
     try {
       for (const e of chosen) {
         try {
-          await apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir });
+          await e.move();
           ok++;
         } catch (err) {
           failed++;
@@ -644,7 +674,19 @@ export function FilesPage() {
     } else if (failed === 1 && firstError) {
       toast(`«${firstError.name}»: ${firstError.message}`, 'err');
     } else if (failed) {
-      toast(`Не удалось переместить выбранные файлы (${failed})`, 'err');
+      toast(`Не удалось переместить выбранное (${failed})`, 'err');
+    }
+  }
+  async function moveDir(targetDir: string) {
+    const dir = movingDir;
+    if (!dir) return;
+    setMovingDir(null);
+    try {
+      await apiPost('/api/cloud/dir/move', { id: dir.id, parentId: targetDir });
+      toast(`Папка «${dir.name}» перемещена`);
+      load();
+    } catch (err) {
+      toast((err as Error).message, 'err');
     }
   }
   async function bulkCopyLinks() {
@@ -718,7 +760,14 @@ export function FilesPage() {
   const dirs = listing ? listing.dirs : [];
   const files = listing ? listing.files : [];
   const isEmpty = listing && !dirs.length && !files.length && !directoryCursor;
-  const allChecked = files.length > 0 && files.every((e) => fsel.has(e.entryId));
+  // Ключи выбора: папки с префиксом dirKey, файлы — по entryId; общий порядок нужен для Shift-диапазона.
+  const orderedKeys = [...dirs.map((d) => dirKey(d.id)), ...files.map((f) => f.entryId)];
+  const allChecked = orderedKeys.length > 0 && orderedKeys.every((k) => fsel.has(k));
+  const selectedDirs = dirs.filter((d) => fsel.has(dirKey(d.id)));
+  const selectedFileCount = fsel.count - selectedDirs.length;
+  // Сервер архивирует либо набор файлов, либо одну папку целиком; смешанный выбор не поддерживается.
+  const archiveDir = selectedDirs.length === 1 && !selectedFileCount ? selectedDirs[0] : null;
+  const canArchive = !selectedDirs.length || !!archiveDir;
   const dropDirectoryName = dropTarget?.label || (stack.length ? stack[stack.length - 1].name : 'корень облака');
 
   return (
@@ -729,8 +778,13 @@ export function FilesPage() {
         onClear={fsel.clear}
         actions={[
           { label: 'Переместить', icon: 'folder', onClick: () => setBulkMoving(true) },
-          { label: archiving ? 'Архивирую…' : 'Скачать архивом', icon: 'download', disabled: archiving, onClick: bulkArchive },
-          { label: 'Копировать ссылки', icon: 'link', onClick: bulkCopyLinks },
+          {
+            label: archiving ? 'Архивирую…' : 'Скачать архивом',
+            icon: 'download',
+            disabled: archiving || !canArchive,
+            onClick: () => (archiveDir ? archiveFolder(archiveDir).then(fsel.clear) : bulkArchive()),
+          },
+          { label: 'Копировать ссылки', icon: 'link', disabled: !selectedFileCount, onClick: bulkCopyLinks },
           { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) },
         ]}
       />
@@ -819,8 +873,8 @@ export function FilesPage() {
                         <input
                           type="checkbox"
                           checked={allChecked}
-                          disabled={!files.length}
-                          onChange={(e) => fsel.setAll(files.map((f) => f.entryId), e.target.checked)}
+                          disabled={!orderedKeys.length}
+                          onChange={(e) => fsel.setAll(orderedKeys, e.target.checked)}
                         />
                       </th>
                       <th>Имя</th>
@@ -838,6 +892,8 @@ export function FilesPage() {
                         dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
                         onOpen={openDir}
                         onMenu={(ev, t) => openAt(ev, dirMenu(t))}
+                        checked={fsel.has(dirKey(d.id))}
+                        onToggle={(shift) => fsel.select(dirKey(d.id), orderedKeys, shift)}
                       />
                     ))}
                     {files.map((e) => (
@@ -846,7 +902,7 @@ export function FilesPage() {
                         entry={e}
                         selected={!!sel && sel.entryId === e.entryId}
                         bulkChecked={fsel.has(e.entryId)}
-                        onBulkToggle={(t, shift) => fsel.select(t.entryId, files.map((f) => f.entryId), shift)}
+                        onBulkToggle={(t, shift) => fsel.select(t.entryId, orderedKeys, shift)}
                         onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
                         onOpen={openEntry}
                         onDownload={download}
@@ -955,7 +1011,7 @@ export function FilesPage() {
           title="Удалить в корзину?"
           danger
           confirmLabel="Удалить"
-          message={`Выбранные файлы (${fsel.count}) будут перемещены в корзину.`}
+          message={`Выбранное (${fsel.count}) будет перемещено в корзину.`}
           onClose={() => setBulkConfirm(false)}
           onConfirm={bulkDelete}
         />
@@ -980,8 +1036,19 @@ export function FilesPage() {
           count={fsel.count}
           currentDir={currentDir}
           progress={moveProgress ?? undefined}
+          excludeDirs={selectedDirs}
           onPick={bulkMove}
           onClose={() => setBulkMoving(false)}
+        />
+      )}
+
+      {movingDir && (
+        <MoveToFolderModal
+          count={1}
+          currentDir={currentDir}
+          excludeDirs={[movingDir]}
+          onPick={moveDir}
+          onClose={() => setMovingDir(null)}
         />
       )}
 
