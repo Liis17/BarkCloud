@@ -45,7 +45,11 @@ internal object UploadFailurePolicy {
         }
         val grpcError = grpcErrors.firstOrNull()
         if (grpcError != null) {
-            return if (grpcError.status.code in setOf(Status.Code.UNAVAILABLE, Status.Code.DEADLINE_EXCEEDED, Status.Code.RESOURCE_EXHAUSTED)) {
+            // UNAUTHENTICATED — сбой токена, а не файла: терминальный FAILED навсегда выбросил бы backup из очереди.
+            return if (grpcError.status.code in setOf(
+                    Status.Code.UNAVAILABLE, Status.Code.DEADLINE_EXCEEDED, Status.Code.RESOURCE_EXHAUSTED, Status.Code.UNAUTHENTICATED,
+                )
+            ) {
                 UploadFailureDisposition.RETRY_AND_STOP_CLAIMING
             } else {
                 UploadFailureDisposition.ITEM_TERMINAL

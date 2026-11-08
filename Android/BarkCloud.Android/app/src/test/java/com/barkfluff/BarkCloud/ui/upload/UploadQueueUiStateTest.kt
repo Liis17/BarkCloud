@@ -5,6 +5,8 @@ import com.barkfluff.BarkCloud.data.upload.UploadJob
 import com.barkfluff.BarkCloud.data.upload.UploadPhase
 import com.barkfluff.BarkCloud.data.upload.UploadSource
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UploadQueueUiStateTest {
@@ -68,6 +70,31 @@ class UploadQueueUiStateTest {
         val state = UploadQueueUiState(listOf(uploading))
         assertEquals(1, state.pendingJobs.size)
         assertEquals(emptyList<UploadJob>(), state.copy(jobs = listOf(uploading.copy(phase = UploadPhase.COMPLETED))).pendingJobs)
+    }
+
+    @Test fun ringStaysVisibleForLongRunningBackupCreatedBeforeWindow() {
+        val now = System.currentTimeMillis()
+        val state = UploadQueueUiState(
+            listOf(
+                job(UploadPhase.UPLOADING, id = "old-active", createdAt = 1),
+                job(UploadPhase.COMPLETED, id = "old-done", createdAt = 1).copy(completedAtMillis = now),
+                job(UploadPhase.COMPLETED, id = "stale-done", createdAt = 1).copy(completedAtMillis = 1),
+            ),
+            workerRunning = true,
+        )
+
+        assertTrue(state.isActive)
+        assertEquals(2, state.total)
+        assertEquals(1, state.completed)
+        assertEquals(0.75f, state.progress, 0.001f)
+    }
+
+    @Test fun uploadingJobWithoutRunningWorkerDoesNotShowRing() {
+        // Backup на платной сети при WIFI_ONLY или в backoff: фаза UPLOADING осталась, воркер не работает.
+        val state = UploadQueueUiState(listOf(job(UploadPhase.UPLOADING)), workerRunning = false)
+
+        assertFalse(state.isActive)
+        assertEquals("UPLOADING", state.current?.id)
     }
 
     private fun job(phase: UploadPhase, id: String = phase.name, createdAt: Long = 1) = UploadJob(

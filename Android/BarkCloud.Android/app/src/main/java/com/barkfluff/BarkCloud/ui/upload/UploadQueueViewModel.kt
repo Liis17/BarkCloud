@@ -15,7 +15,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
+data class UploadQueueUiState(
+    val jobs: List<UploadJob> = emptyList(),
+    /** WorkManager-задача очереди в RUNNING: фаза в Room сама по себе не значит, что воркер работает. */
+    val workerRunning: Boolean = false,
+) {
     val pendingJobs: List<UploadJob> = jobs
         .filter { it.phase != UploadPhase.COMPLETED && it.phase != UploadPhase.CANCELLED }
         .sortedWith(
@@ -26,13 +30,26 @@ data class UploadQueueUiState(val jobs: List<UploadJob> = emptyList()) {
     val pendingErrorCount: Int = pendingJobs.count {
         it.phase == UploadPhase.FAILED || it.phase == UploadPhase.UPLOADED_NOT_ATTACHED
     }
+    // Незавершённые задачи входят всегда: backup сохраняет исходный createdAtMillis, а длинная
+    // очередь идёт дольше окна. Завершённые учитываются по времени завершения.
     private val sessionJobs: List<UploadJob>
-        get() = jobs.filter { it.createdAtMillis >= System.currentTimeMillis() - SESSION_WINDOW_MILLIS }
+        get() {
+            val since = System.currentTimeMillis() - SESSION_WINDOW_MILLIS
+            return jobs.filter {
+                when (it.phase) {
+                    in ACTIVE_PHASES -> true
+                    UploadPhase.COMPLETED -> (it.completedAtMillis ?: it.createdAtMillis) >= since
+                    else -> it.createdAtMillis >= since
+                }
+            }
+        }
     val current: UploadJob? get() = sessionJobs.firstOrNull { it.phase in ACTIVE_PHASES }
     val total: Int get() = sessionJobs.size
     val completed: Int get() = sessionJobs.count { it.phase == UploadPhase.COMPLETED }
     val failed: Int get() = sessionJobs.count { it.phase == UploadPhase.FAILED }
-    val isActive: Boolean get() = current != null
+    // Фаза UPLOADING остаётся в Room и без воркера (backoff, backup на платной сети при WIFI_ONLY),
+    // поэтому кольцо требует работающий воркер.
+    val isActive: Boolean get() = workerRunning && current != null
     val progress: Float get() {
         val bytes = sessionJobs.sumOf { if (it.phase == UploadPhase.COMPLETED) it.bytesTotal else it.bytesSent }
         val totalBytes = sessionJobs.sumOf { it.bytesTotal }
@@ -66,6 +83,9 @@ class UploadQueueViewModel(private val app: BarkCloudApplication) : ViewModel() 
     init {
         viewModelScope.launch {
             app.uploadQueue.recentJobs.collectLatest { jobs -> _state.update { it.copy(jobs = jobs) } }
+        }
+        viewModelScope.launch {
+            UploadScheduler.isRunning(app).collectLatest { running -> _state.update { it.copy(workerRunning = running) } }
         }
     }
 
