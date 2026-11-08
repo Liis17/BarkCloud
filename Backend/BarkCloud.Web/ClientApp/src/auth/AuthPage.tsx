@@ -3,6 +3,7 @@ import { OtpInput } from './OtpInput';
 import type { AuthPageState, AuthScreen, AuthValues } from './types';
 import { webauthnAuthenticate, webauthnSupported } from '../lib/webauthn';
 import { TextField } from '../components/ui/TextField';
+import { loginUrl, RETURN_URL_PARAM, returnUrlFromLocation } from '../lib/loginRedirect';
 import './auth.css';
 
 interface AuthPageProps {
@@ -11,6 +12,8 @@ interface AuthPageProps {
   authenticate?: (optionsJson: string) => Promise<string>;
   passkeyAvailable?: boolean;
   navigate?: (url: string) => void;
+  /** Куда вернуться после входа; по умолчанию — из ?returnUrl= текущего адреса. */
+  returnUrl?: string;
 }
 
 function safeValuesFromForm(form: FormData, current: AuthValues): AuthValues {
@@ -57,12 +60,17 @@ async function responseJson(response: Response): Promise<Record<string, unknown>
   }
 }
 
-function canonicalUrl(state: AuthPageState): string {
+function isLoginScreen(screen: AuthScreen): boolean {
+  return screen === 'login' || screen === 'login-otp';
+}
+
+function canonicalUrl(state: AuthPageState, returnUrl?: string): string {
   let route = '/login';
   if (state.screen === 'register' || state.screen === 'register-otp' || state.screen === 'session-pending') route = '/register';
   if (state.screen === 'forgot' || state.screen === 'reset') route = '/forgot';
   const params = new URLSearchParams();
   if (state.flowId) params.set('flow', state.flowId);
+  if (returnUrl && isLoginScreen(state.screen)) params.set(RETURN_URL_PARAM, returnUrl);
   if (state.screen === 'session-pending') params.set('stage', 'account-created');
   const query = params.toString();
   return query ? route + '?' + query : route;
@@ -128,6 +136,7 @@ export function AuthPage({
   authenticate = webauthnAuthenticate,
   passkeyAvailable = webauthnSupported(),
   navigate = (url) => window.location.assign(url),
+  returnUrl = returnUrlFromLocation(window.location),
 }: AuthPageProps) {
   const [page, setPage] = useState(() => ({ ...initialState, values: withDefaultChoices(initialState.values ?? {}) }));
   const pageRef = useRef(page);
@@ -220,7 +229,7 @@ export function AuthPage({
       setPasswordVisible(false);
       setNewPasswordVisible(false);
     }
-    window.history.replaceState(null, '', canonicalUrl(merged));
+    window.history.replaceState(null, '', canonicalUrl(merged, returnUrl));
   }
 
   async function consumeResponse(
@@ -304,6 +313,7 @@ export function AuthPage({
     formData.set('__RequestVerificationToken', page.csrfToken);
     if (page.flowId) formData.set('flow_id', page.flowId);
     else formData.delete('flow_id');
+    if (returnUrl && isLoginScreen(page.screen)) formData.set('return_url', returnUrl);
     const submittedValues = safeValuesFromForm(formData, values);
     await runMutation(async () => {
       const response = await request(routeForSubmit(page.screen), {
@@ -325,6 +335,7 @@ export function AuthPage({
     const formData = new FormData();
     formData.set('__RequestVerificationToken', page.csrfToken);
     if (page.flowId) formData.set('flow_id', page.flowId);
+    if (returnUrl && page.screen === 'login-otp') formData.set('return_url', returnUrl);
     await runMutation(async () => {
       const response = await request(route!, {
         method: 'POST',
@@ -365,6 +376,7 @@ export function AuthPage({
           challengeId: begin.challengeId,
           assertion: JSON.parse(assertion),
           remember: values.remember ?? true,
+          returnUrl,
         }),
       });
       const complete = await responseJson(completeResponse);
@@ -399,7 +411,8 @@ export function AuthPage({
     </>
   );
   const setTextValue = (key: keyof AuthValues) => (value: string) => updateValue(key, value);
-  const link = (href: string, text: string, className = 'auth-text-link') => <a className={className} href={href}>{text}</a>;
+  const withReturnUrl = (href: string) => (href === '/login' && returnUrl ? loginUrl(returnUrl) : href);
+  const link = (href: string, text: string, className = 'auth-text-link') => <a className={className} href={withReturnUrl(href)}>{text}</a>;
 
   return (
     <main className="auth-page">

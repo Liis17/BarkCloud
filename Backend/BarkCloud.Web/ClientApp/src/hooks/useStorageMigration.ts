@@ -1,4 +1,5 @@
 import React from 'react';
+import { redirectToLogin } from '../lib/loginRedirect';
 
 export interface MigrationSource {
   id: string; serviceUrl: string; bucketName: string; roles: string[]; profileIds: string[];
@@ -27,7 +28,7 @@ export async function migrationRequest<T>(path: string, body?: unknown, signal?:
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (response.status === 401) window.location.href = '/login';
+  if (response.status === 401) redirectToLogin();
   const data = await response.json().catch(() => null) as T & { message?: string };
   if (!response.ok) throw new MigrationApiError(data?.message || 'Не удалось выполнить операцию', response.status);
   return data;

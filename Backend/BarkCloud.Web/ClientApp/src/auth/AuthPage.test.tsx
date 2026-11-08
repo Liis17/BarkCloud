@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthPage } from './AuthPage';
 import type { AuthPageState } from './types';
 
@@ -429,6 +429,29 @@ describe('one-time code input', () => {
   });
 });
 
+describe('return to the requested page', () => {
+  afterEach(() => window.history.replaceState(null, '', '/login'));
+
+  it('sends the return url with the password and code steps and keeps it in the address', async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(state({ screen: 'login-otp', flowId: 'flow-1', otpMethod: 'email' })))
+      .mockResolvedValueOnce(jsonResponse({ redirectTo: '/settings#tags' }));
+    const navigate = vi.fn();
+    render(<AuthPage initialState={state()} request={request} navigate={navigate} returnUrl="/settings#tags" />);
+    fireEvent.change(screen.getByLabelText('Логин или почта'), { target: { value: 'liis' } });
+    fireEvent.change(screen.getByLabelText('Пароль'), { target: { value: 'secret1' } });
+
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Войти' }).closest('form')!));
+    expect((request.mock.calls[0][1]?.body as FormData).get('return_url')).toBe('/settings#tags');
+    expect(window.location.search).toBe('?flow=flow-1&returnUrl=%2Fsettings%23tags');
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Шестизначный код' }), { target: { value: '123456' } });
+    await act(async () => fireEvent.submit(screen.getByRole('button', { name: 'Продолжить' }).closest('form')!));
+    expect((request.mock.calls[1][1]?.body as FormData).get('return_url')).toBe('/settings#tags');
+    expect(navigate).toHaveBeenCalledWith('/settings#tags');
+  });
+});
+
 describe('WebAuthn passwordless login', () => {
   it('sends CSRF and preserves the remember choice through the assertion', async () => {
     const request = vi.fn<typeof fetch>()
@@ -451,6 +474,26 @@ describe('WebAuthn passwordless login', () => {
     const complete = JSON.parse(String(request.mock.calls[1][1]?.body)) as Record<string, unknown>;
     expect(complete).toEqual({ challengeId: 'challenge-1', assertion: { id: 'assertion' }, remember: true });
     expect(navigate).toHaveBeenCalledWith('/photos');
+  });
+
+  it('passes the return url to the passkey login', async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ optionsJson: '{}', challengeId: 'challenge-1' }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, redirectTo: '/files?dir=1' }));
+    const navigate = vi.fn();
+    render(<AuthPage
+      initialState={state()}
+      request={request}
+      authenticate={vi.fn().mockResolvedValue('{}')}
+      passkeyAvailable
+      navigate={navigate}
+      returnUrl="/files?dir=1"
+    />);
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Войти с ключом' })));
+
+    expect(JSON.parse(String(request.mock.calls[1][1]?.body)).returnUrl).toBe('/files?dir=1');
+    expect(navigate).toHaveBeenCalledWith('/files?dir=1');
   });
 
   it('quietly returns when the user cancels the platform key prompt', async () => {
