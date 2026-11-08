@@ -63,6 +63,8 @@ class UploadWorker(
             isRegistered = { UploadNotification.isForegroundRegistered(applicationContext, runToken) },
             notify = { tally -> UploadNotification.update(applicationContext, tally, runToken) },
         )
+        // Итоговое уведомление прежних версий больше не нужно: снимаем оставшееся.
+        applicationContext.getSystemService(NotificationManager::class.java)?.cancel(UploadNotification.FINISHED_ID)
         val queue = UploadQueueStore(applicationContext)
         queue.initialize()
 
@@ -98,7 +100,13 @@ class UploadWorker(
             val stagingBudget = BackupStagingBudget(queue.stagedBackupCount())
             // Единственный setForeground на проход. WorkManager ставит в очередь две асинхронные команды сервиса,
             // публикация не подтверждается; дальше обновления идут напрямую и только при видимой регистрации.
-            setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, initialTally, runToken)))
+            // С Android 12 запуск из фона (discovery, MediaStore, продолжение очереди) может быть запрещён:
+            // тогда проход идёт без foreground, а не падает целиком, как раньше до открытия приложения.
+            try {
+                setForeground(foregroundInfo(UploadNotification.foreground(applicationContext, initialTally, runToken)))
+            } catch (_: IllegalStateException) {
+                // ForegroundServiceStartNotAllowedException — подкласс IllegalStateException.
+            }
 
             coroutineScope {
                 val notificationConsumer = launch {
@@ -181,11 +189,6 @@ class UploadWorker(
                     )
                 ) {
                     UploadScheduler.enqueue(applicationContext, userInitiated = false)
-                }
-                val finalTally = progress.tally()
-                if (finalTally.isGenuineSuccess) {
-                    applicationContext.getSystemService(NotificationManager::class.java)
-                        .notify(UploadNotification.FINISHED_ID, UploadNotification.finished(applicationContext, finalTally.done))
                 }
                 Result.success()
             }

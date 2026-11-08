@@ -12,9 +12,6 @@ data class UploadRunTally(val done: Int, val remaining: Int, val failed: Int) {
     val total: Int get() = done + remaining + failed
     val percent: Int get() = if (total == 0) 0 else done * 100 / total
 
-    /** Только настоящий успех: что-то завершено, очередь пуста, ошибок этого прохода нет. */
-    val isGenuineSuccess: Boolean get() = done > 0 && remaining == 0 && failed == 0
-
     /** Короткий текст чипа: `done/total`, если влезает в [CHIP_MAX_LENGTH] символов, иначе процент. */
     fun chipText(): String = "$done/$total".takeIf { it.length <= CHIP_MAX_LENGTH } ?: "$percent%"
 

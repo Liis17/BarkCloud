@@ -251,13 +251,6 @@
     <string name="upload_notification_channel">Загрузки BarkCloud</string>
     <string name="upload_notification_title">Загрузка в BarkCloud</string>
     <string name="upload_notification_progress">%1$d из %2$d</string>
-    <string name="upload_notification_done">Загрузка завершена</string>
-    <plurals name="upload_notification_done_count">
-        <item quantity="one">%1$d файл загружен</item>
-        <item quantity="few">%1$d файла загружено</item>
-        <item quantity="many">%1$d файлов загружено</item>
-        <item quantity="other">%1$d файлов загружено</item>
-    </plurals>
     <string name="upload_v1_cancelled_message">Загрузка отменена при обновлении приложения — добавьте файл заново</string>
     <string name="upload_error_quota_exceeded">Недостаточно свободного места в облаке</string>
     <string name="upload_error_empty_file">Пустые файлы не поддерживаются</string>

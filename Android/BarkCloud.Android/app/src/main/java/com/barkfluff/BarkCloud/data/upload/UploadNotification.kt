@@ -20,7 +20,7 @@ object UploadNotification {
     /** Foreground-уведомление прохода; живёт до выхода воркера. */
     const val ID = 4201
 
-    /** Итог успешного прохода. Отдельный ID: иначе WorkManager снимет его вместе с foreground-уведомлением. */
+    /** ID прежнего итогового уведомления «Загрузка завершена»: больше не публикуется, снимается в начале прохода. */
     const val FINISHED_ID = 4202
 
     /** Токен прохода в extras `deleteIntent`: смахивание учитывается только для своего прохода. */
@@ -78,16 +78,6 @@ object UploadNotification {
             )
         }
         return isRegisteredForeground(active, runToken)
-    }
-
-    fun finished(context: Context, total: Int): Notification {
-        ensureChannel(context)
-        return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(context.getString(R.string.upload_notification_done))
-            .setContentText(context.resources.getQuantityString(R.plurals.upload_notification_done_count, total, total))
-            .setOnlyAlertOnce(true)
-            .build()
     }
 
     private fun openAppIntent(context: Context): PendingIntent = PendingIntent.getActivity(
