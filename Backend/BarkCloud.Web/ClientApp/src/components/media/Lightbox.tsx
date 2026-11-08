@@ -25,8 +25,31 @@ interface LightboxProps {
   actions?: MediaActionsApi;
 }
 
+/** Касания, начатые на элементах управления, не превращаются в жесты просмотра. */
+const GESTURE_IGNORE = '.lb-actions, .video-player-bar, .ctx-backdrop, .ctx-menu, button, a, input, select';
+const SWIPE_MIN_PX = 50;
+const MAX_SCALE = 5;
+
+type TouchGesture =
+  | { kind: 'swipe'; x: number; y: number }
+  | { kind: 'pan'; x: number; y: number; px: number; py: number }
+  | { kind: 'pinch'; dist: number; scale: number }
+  /** Щипок закончился не всеми пальцами сразу: оставшийся палец не должен листать. */
+  | { kind: 'done' };
+
+function touchDistance(t: TouchList): number {
+  return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+}
+
+function isTextEntry(target: EventTarget | null): boolean {
+  if (target instanceof HTMLTextAreaElement) return true;
+  if (target instanceof HTMLInputElement) return target.type !== 'range';
+  return target instanceof HTMLElement && target.isContentEditable;
+}
+
 /** Полноэкранный просмотр ОРИГИНАЛА (временная ссылка через /api/files/download).
- *  Листание стрелками/кнопками, зум колесом для фото, перемотка ±5c для видео.
+ *  Листание стрелками/кнопками/свайпом (на видео стрелки перематывают ±5c, листание — Shift+стрелки),
+ *  зум колесом и щипком для фото, предзагрузка соседних фото.
  *  При переданных actions под изображением — плавающая панель действий. */
 export function Lightbox({ items, index = 0, media, onClose, actions }: LightboxProps) {
   const list: CardFile[] = Array.isArray(items) ? items : media ? [media] : [];
@@ -38,6 +61,12 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const [pan, setPan] = React.useState({ x: 0, y: 0 });
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  // Запросы временных ссылок по id: общий промис не даёт дублировать запрос, если перешли на соседа во время предзагрузки.
+  const urlRequestsRef = React.useRef(new Map<string, Promise<void>>());
+  const gestureRef = React.useRef<TouchGesture | null>(null);
+  const viewRef = React.useRef({ scale: 1, pan: { x: 0, y: 0 } });
+  viewRef.current = { scale, pan };
   const dragRef = React.useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const pausedMusicRef = React.useRef(false);
   const { menu, openAt } = useContextMenu();
@@ -70,25 +99,58 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     20,
   );
 
+  const requestUrls = React.useCallback((ids: string[]) => {
+    const requests = urlRequestsRef.current;
+    const missing = ids.filter((id) => !requests.has(id));
+    if (missing.length) {
+      const request = apiGet<DownloadResponse>('/api/files/download?ids=' + missing.map(encodeURIComponent).join(','))
+        .then((d) => {
+          setUrls((u) => {
+            const next = { ...u };
+            for (const id of missing) next[id] = (d.urls && d.urls[id]) || null;
+            return next;
+          });
+          setVideoQualities((current) => {
+            const next = { ...current };
+            for (const id of missing) next[id] = d.videoQualities?.[id] || [];
+            return next;
+          });
+          // Без ссылки — разрешаем повторный запрос при следующем открытии файла.
+          for (const id of missing) if (!d.urls?.[id]) requests.delete(id);
+        });
+      request.catch(() => missing.forEach((id) => requests.delete(id)));
+      for (const id of missing) requests.set(id, request);
+    }
+    return Promise.all(ids.map((id) => requests.get(id)));
+  }, []);
+
   React.useEffect(() => {
     let alive = true;
     setErr(null);
     if (!fileId || urls[fileId]) return;
-    apiGet<DownloadResponse>('/api/files/download?ids=' + encodeURIComponent(fileId))
-      .then((d) => {
-        if (alive) {
-          setUrls((u) => ({ ...u, [fileId]: (d.urls && d.urls[fileId]) || null }));
-          setVideoQualities((current) => ({ ...current, [fileId]: d.videoQualities?.[fileId] || [] }));
-        }
-      })
-      .catch((e) => {
-        if (alive) setErr(e.message);
-      });
+    requestUrls([fileId]).catch((e) => {
+      if (alive) setErr(e.message);
+    });
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId]);
+
+  // Предзагрузка соседних фото: показываемый источник прогревается в кэше браузера,
+  // а для фото без JpegView заранее запрашивается временная ссылка на оригинал. Видео не предзагружаем.
+  const prevItem = list[i - 1];
+  const nextItem = list[i + 1];
+  React.useEffect(() => {
+    const needUrls: string[] = [];
+    for (const item of [prevItem, nextItem]) {
+      if (!item || item.kind !== 'photo') continue;
+      const src = selectPhotoViewSource(item.name, item.jpegViewUrl, item.previews, urls[item.id]);
+      if (src) new Image().src = src;
+      else if (!isSvgFileName(item.name) && !isSvgFileName(item.ext) && !(item.id in urls)) needUrls.push(item.id);
+    }
+    if (needUrls.length) requestUrls(needUrls).catch(() => {});
+  }, [prevItem, nextItem, urls, requestUrls]);
 
   React.useEffect(() => {
     setScale(1);
@@ -117,6 +179,13 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
         onClose && onClose();
         return;
       }
+      if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        // Листание работает и на видео, и при фокусе на слайдере плеера; в текстовых полях Shift+стрелки выделяют текст.
+        if (isTextEntry(e.target)) return;
+        e.preventDefault();
+        go(e.key === 'ArrowLeft' ? -1 : 1);
+        return;
+      }
       if (e.target instanceof HTMLInputElement) return; // слайдеры плеера сами обрабатывают стрелки
       if (e.key === 'ArrowLeft') {
         if (isVideo && videoRef.current) videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
@@ -138,11 +207,72 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     const onWheel = (e: WheelEvent) => {
       if (isVideo) return;
       e.preventDefault();
-      setScale((s) => Math.min(5, Math.max(1, +(s - Math.sign(e.deltaY) * 0.25).toFixed(2))));
+      setScale((s) => Math.min(MAX_SCALE, Math.max(1, +(s - Math.sign(e.deltaY) * 0.25).toFixed(2))));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [isVideo]);
+
+  // Касания: свайп листает (без зума), щипок зумит фото, одним пальцем двигается увеличенное фото.
+  // Нативные слушатели с passive: false — иначе preventDefault не отменит прокрутку и зум страницы.
+  React.useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const onStart = (e: TouchEvent) => {
+      if (e.target instanceof Element && e.target.closest(GESTURE_IGNORE)) {
+        gestureRef.current = null;
+        return;
+      }
+      const { scale: s, pan: p } = viewRef.current;
+      if (e.touches.length >= 2) {
+        gestureRef.current = isVideo ? { kind: 'done' } : { kind: 'pinch', dist: touchDistance(e.touches), scale: s };
+      } else if (e.touches.length === 1) {
+        const t = e.touches[0];
+        gestureRef.current = !isVideo && s > 1
+          ? { kind: 'pan', x: t.clientX, y: t.clientY, px: p.x, py: p.y }
+          : { kind: 'swipe', x: t.clientX, y: t.clientY };
+      }
+    };
+    const onMove = (e: TouchEvent) => {
+      const g = gestureRef.current;
+      if (!g || g.kind === 'done') return;
+      e.preventDefault();
+      if (g.kind === 'pinch' && e.touches.length >= 2) {
+        const next = Math.min(MAX_SCALE, Math.max(1, g.scale * (touchDistance(e.touches) / g.dist)));
+        setScale(next);
+        if (next === 1) setPan({ x: 0, y: 0 });
+      } else if (g.kind === 'pan' && e.touches.length === 1) {
+        setPan({ x: g.px + (e.touches[0].clientX - g.x), y: g.py + (e.touches[0].clientY - g.y) });
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      const g = gestureRef.current;
+      if (!g) return;
+      if (e.touches.length > 0) {
+        if (g.kind === 'pinch') gestureRef.current = { kind: 'done' };
+        return;
+      }
+      gestureRef.current = null;
+      if (g.kind !== 'swipe') return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - g.x;
+      const dy = t.clientY - g.y;
+      if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+    };
+    const onCancel = () => {
+      gestureRef.current = null;
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onCancel);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onCancel);
+    };
+  }, [isVideo, go]);
 
   if (!cur) return null;
   // Оригинал (временная ссылка) — для скачивания, видео и фолбэка фото.
@@ -213,18 +343,18 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   }
 
   return (
-    <div className="lightbox" onClick={onClose} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
+    <div className="lightbox" ref={rootRef} onClick={onClose} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
       <button className="lb-close icon-btn" onClick={onClose} title="Закрыть">
         <Icon.x size={24} />
       </button>
 
       {i > 0 && (
-        <button className="lb-nav left" onClick={(e) => { e.stopPropagation(); go(-1); }} title="Назад (←)">
+        <button className="lb-nav left" onClick={(e) => { e.stopPropagation(); go(-1); }} title={isVideo ? 'Назад (Shift+←)' : 'Назад (←)'}>
           <Icon.chev size={30} />
         </button>
       )}
       {i < list.length - 1 && (
-        <button className="lb-nav right" onClick={(e) => { e.stopPropagation(); go(1); }} title="Вперёд (→)">
+        <button className="lb-nav right" onClick={(e) => { e.stopPropagation(); go(1); }} title={isVideo ? 'Вперёд (Shift+→)' : 'Вперёд (→)'}>
           <Icon.chev size={30} />
         </button>
       )}

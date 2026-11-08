@@ -896,7 +896,7 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
   display: flex; align-items: center; justify-content: center;
 }
 .lb-stage img, .lb-stage video { max-width: 92vw; max-height: 86vh; object-fit: contain; border-radius: var(--r-sm); }
-.lb-stage img { cursor: zoom-in; will-change: transform; }
+.lb-stage img { cursor: zoom-in; will-change: transform; touch-action: none; }
 .lb-stage img.zoomed { cursor: grab; }
 .lb-stage img.zoomed:active { cursor: grabbing; }
 .lb-msg { color: #fff; display: flex; align-items: center; gap: 10px; font-size: 15px; }
@@ -942,8 +942,8 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 .media-controls .icon-btn { flex: 0 0 auto; }
 .media-controls .media-seek { flex: 1 1 auto; }
 .media-controls .media-volume { flex: 0 0 96px; width: 96px; }
-.media-quality { flex: 0 0 auto; max-width: 96px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; background: rgba(0,0,0,.3); color: #fff; font-size: 12px; }
-.media-quality option { background: #fff; color: #111; }
+.media-quality, .media-rate { flex: 0 0 auto; max-width: 96px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; background: rgba(0,0,0,.3); color: #fff; font-size: 12px; }
+.media-quality option, .media-rate option { background: #fff; color: #111; }
 .media-time { flex: 0 0 auto; font-size: 12px; letter-spacing: .4px; font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); white-space: nowrap; }
 
 .video-player {
@@ -964,6 +964,7 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 /* Поверх кадра — светлые контролы независимо от темы */
 .video-player-bar .icon-btn { color: #fff; }
 .video-player-bar .icon-btn:hover { background: rgba(255,255,255,.16); color: #fff; }
+.video-player-bar .icon-btn.active { background: rgba(255,255,255,.24); color: #fff; }
 .video-player-bar .media-time { color: rgba(255,255,255,.85); }
 .video-player-bar .m3-slider { --active: #fff; --inactive: rgba(255,255,255,.3); }
 /* Узкий плеер (вертикальное видео): таймлайн — отдельной строкой на всю ширину, громкость скрыта (остаётся mute) */

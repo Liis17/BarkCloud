@@ -72,3 +72,63 @@ describe('VideoPlayer quality selection', () => {
     expect(video.play).not.toHaveBeenCalled();
   });
 });
+
+describe('VideoPlayer extra controls', () => {
+  it('sets playback speed as the default rate so it survives source changes', () => {
+    const { container } = render(<VideoPlayer src="/original.webm" qualities={qualities} />);
+    const video = container.querySelector('video')!;
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Скорость воспроизведения' }), { target: { value: '1.5' } });
+
+    expect(video.playbackRate).toBe(1.5);
+    expect(video.defaultPlaybackRate).toBe(1.5);
+  });
+
+  it('shows picture-in-picture only when the browser supports it', () => {
+    const { unmount } = render(<VideoPlayer src="/original.webm" />);
+    expect(screen.queryByRole('button', { name: 'Картинка в картинке' })).toBeNull();
+    unmount();
+
+    Object.defineProperty(document, 'pictureInPictureEnabled', { configurable: true, value: true });
+    try {
+      const { container } = render(<VideoPlayer src="/original.webm" />);
+      const video = container.querySelector('video')!;
+      video.requestPictureInPicture = vi.fn().mockResolvedValue({});
+
+      fireEvent.click(screen.getByRole('button', { name: 'Картинка в картинке' }));
+      expect(video.requestPictureInPicture).toHaveBeenCalledOnce();
+
+      fireEvent(video, new Event('enterpictureinpicture'));
+      expect(screen.getByRole('button', { name: 'Вернуть из окна' })).toBeTruthy();
+    } finally {
+      delete (document as { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled;
+    }
+  });
+
+  it('loads a local SRT file as a showing subtitle track and drops it for another video', async () => {
+    const createObjectURL = vi.fn().mockReturnValue('blob:subs');
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const { container, rerender } = render(<VideoPlayer src="/a.webm" />);
+    const video = container.querySelector('video')!;
+    const track = { mode: 'disabled' };
+    Object.defineProperty(video, 'textTracks', { configurable: true, value: [track] });
+
+    const text = '1\n00:00:01,000 --> 00:00:02,000\nПривет\n';
+    // В jsdom у File нет arrayBuffer().
+    const srt = Object.assign(new File([text], 'a.srt'), { arrayBuffer: async () => new TextEncoder().encode(text).buffer });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Файл субтитров'), { target: { files: [srt] } });
+    });
+
+    expect(createObjectURL.mock.calls[0][0].type).toBe('text/vtt');
+    expect(container.querySelector('track')?.getAttribute('src')).toBe('blob:subs');
+    expect(track.mode).toBe('showing');
+
+    rerender(<VideoPlayer src="/b.webm" />);
+    expect(container.querySelector('track')).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:subs');
+    delete (URL as { createObjectURL?: unknown }).createObjectURL;
+    delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
+  });
+});
