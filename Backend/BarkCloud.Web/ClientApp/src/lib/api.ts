@@ -1,5 +1,6 @@
 // Data-слой: same-origin /api (бэкенд проксирует в Files/Users/Identity с токеном из cookie).
 // Перенос из Pages/shared.jsx с типизацией.
+import { redirectToLogin } from './loginRedirect';
 
 export class ApiError extends Error {
   code?: string;
@@ -33,7 +34,7 @@ export async function api<T = unknown>(path: string, opts: RequestInit = {}): Pr
     ...opts,
   });
   if (res.status === 401) {
-    window.location.href = '/login';
+    redirectToLogin();
     throw new ApiError('unauthorized', { status: 401 });
   }
 

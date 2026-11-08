@@ -16,7 +16,8 @@ public static class AuthEndpoints
     private const string ExpiredFlowMessage = "Этот шаг истёк или недоступен. Начните заново.";
     private const int DefaultResendCooldownSeconds = 60;
 
-    public sealed record WebAuthnLoginCompleteBody(string? ChallengeId, JsonElement Assertion, bool Remember);
+    public sealed record WebAuthnLoginCompleteBody(string? ChallengeId, JsonElement Assertion, bool Remember,
+        string? ReturnUrl = null);
 
     public static void MapAuthEndpoints(this WebApplication app)
     {
@@ -69,7 +70,7 @@ public static class AuthEndpoints
     {
         var deviceId = auth.GetOrCreateDeviceId(http);
         if (await auth.AuthenticateAsync(http) is not null)
-            return Redirect(http, "/photos");
+            return Redirect(http, LoginReturnUrl.Resolve(http.Request.Query[LoginReturnUrl.QueryKey]));
 
         var registrationEnabled = await features.RegistrationEnabledAsync(http.RequestAborted);
         var flowId = http.Request.Query["flow"].ToString();
@@ -118,7 +119,7 @@ public static class AuthEndpoints
             if (result.Outcome == LoginOutcome.Success)
             {
                 flows.Complete(flow);
-                return Redirect(http, "/photos");
+                return Redirect(http, LoginReturnUrl.Resolve(form[LoginReturnUrl.FormKey]));
             }
 
             if (result.Outcome is LoginOutcome.WrongOtp or LoginOutcome.NeedsOtp)
@@ -185,7 +186,7 @@ public static class AuthEndpoints
             if (result.Outcome == LoginOutcome.Success)
             {
                 flows.Complete(flowToComplete);
-                return Redirect(http, "/photos");
+                return Redirect(http, LoginReturnUrl.Resolve(form[LoginReturnUrl.FormKey]));
             }
 
             if (result.Outcome == LoginOutcome.NeedsOtp)
@@ -242,7 +243,7 @@ public static class AuthEndpoints
             if (result.Outcome == LoginOutcome.Success)
             {
                 flows.Complete(flow);
-                return Redirect(http, "/photos");
+                return Redirect(http, LoginReturnUrl.Resolve(form[LoginReturnUrl.FormKey]));
             }
 
             if (result.Outcome is LoginOutcome.TooManyAttempts or LoginOutcome.Error or LoginOutcome.WrongOtp)
@@ -286,7 +287,7 @@ public static class AuthEndpoints
         var result = await auth.CompleteWebAuthnAsync(http, body.ChallengeId ?? string.Empty,
             body.Assertion.GetRawText(), body.Remember, http.RequestAborted);
         return result.Outcome == LoginOutcome.Success
-            ? Results.Ok(new { ok = true, redirectTo = "/photos" })
+            ? Results.Ok(new { ok = true, redirectTo = LoginReturnUrl.Resolve(body.ReturnUrl) })
             : Results.BadRequest(new { message = result.Message ?? "Не удалось войти по ключу" });
     }
 

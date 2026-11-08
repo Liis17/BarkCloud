@@ -391,6 +391,24 @@ public sealed class AuthEndpointsTests
     }
 
     [Theory]
+    [InlineData("/files?dir=abc#x", "/files?dir=abc#x")]
+    [InlineData("//evil.com", "/photos")]
+    [InlineData("https://evil.com", "/photos")]
+    public async Task LoginRedirectsOnlyToSafeReturnUrl(string returnUrl, string expected)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Identity.Setup(x => x.AuthAsync(It.IsAny<AuthRequest>(), It.IsAny<Metadata>(),
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(GrpcCallHelpers.AsyncUnary(SuccessAuthResponse()));
+
+        using var initial = await fixture.GetStateAsync("/login");
+        using var login = await fixture.PostStateAsync("/login", initial.RootElement.GetProperty("csrfToken").GetString()!,
+            Fields(("login", "demo@example.test"), ("password", "secret-password"), ("return_url", returnUrl)));
+
+        login.Json.RootElement.GetProperty("redirectTo").GetString().Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task LoginResendCompletesLoginWhenOtpIsNoLongerRequired(bool remember)
