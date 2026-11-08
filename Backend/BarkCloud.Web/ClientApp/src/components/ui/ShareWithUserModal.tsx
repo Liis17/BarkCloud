@@ -13,11 +13,17 @@ interface SearchUser {
   avatar: string;
 }
 
+interface PlaylistGrant {
+  grantId: string;
+  user: SearchUser;
+}
+
 const hint: React.CSSProperties = { color: 'var(--md-on-surface-variant)', fontSize: 13, margin: '10px 2px 0' };
 
 /**
  * Модалка «Поделиться с пользователем»: поиск получателей и выдача гранта доступа.
  * Если передан folderId — выдаётся грант на папку (рекурсивно), playlistId — на плейлист, иначе на файл.
+ * Для плейлиста дополнительно показывается, у кого уже есть доступ, с возможностью отозвать его.
  */
 export function ShareWithUserModal({
   fileId,
@@ -38,6 +44,20 @@ export function ShareWithUserModal({
   const [users, setUsers] = React.useState<SearchUser[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [shared, setShared] = React.useState<Set<number>>(new Set());
+  const [grants, setGrants] = React.useState<PlaylistGrant[] | null>(null);
+  const [revoking, setRevoking] = React.useState<string | null>(null);
+
+  const loadGrants = React.useCallback(() => {
+    if (!playlistId) return;
+    apiGet<{ items: PlaylistGrant[] }>('/api/music/shared/outgoing?playlistId=' + encodeURIComponent(playlistId))
+      .then((d) => setGrants(d.items || []))
+      .catch((e) => {
+        setGrants([]);
+        toast((e as Error).message, 'err');
+      });
+  }, [playlistId, toast]);
+
+  React.useEffect(loadGrants, [loadGrants]);
 
   React.useEffect(() => {
     const query = q.trim();
@@ -66,14 +86,65 @@ export function ShareWithUserModal({
       else await apiPost('/api/shared/grant', { fileId, recipientUserId: u.id });
       setShared((prev) => new Set(prev).add(u.id));
       toast(`Доступ выдан: ${u.username || u.firstName || 'пользователь'}`);
+      loadGrants();
     } catch (e) {
       toast((e as Error).message, 'err');
     }
   }
 
-  function displayName(u: SearchUser) {
-    return [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username;
+  async function revoke(g: PlaylistGrant) {
+    setRevoking(g.grantId);
+    try {
+      await apiPost('/api/music/shared/revoke-grant', { grantId: g.grantId });
+      setGrants((prev) => prev && prev.filter((x) => x.grantId !== g.grantId));
+      setShared((prev) => {
+        const next = new Set(prev);
+        next.delete(g.user.id);
+        return next;
+      });
+      toast(`Доступ отозван: ${g.user.username || g.user.firstName || 'пользователь'}`);
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setRevoking(null);
+    }
   }
+
+  function displayName(u: SearchUser) {
+    return [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username || `Пользователь #${u.id}`;
+  }
+
+  function userInfo(u: SearchUser) {
+    return (
+      <>
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: 'var(--md-surface-container-high)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {u.avatar ? (
+            <img src={u.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <Icon.user size={18} />
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 500 }}>{displayName(u)}</div>
+          {u.username && <div style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>@{u.username}</div>}
+        </div>
+      </>
+    );
+  }
+
+  const grantedIds = new Set(grants?.map((g) => g.user.id));
 
   return (
     <Modal
@@ -103,30 +174,8 @@ export function ShareWithUserModal({
         <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0' }}>
           {users.map((u) => (
             <li key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  background: 'var(--md-surface-container-high)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                {u.avatar ? (
-                  <img src={u.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <Icon.user size={18} />
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 500 }}>{displayName(u)}</div>
-                {u.username && <div style={{ fontSize: 12, color: 'var(--md-on-surface-variant)' }}>@{u.username}</div>}
-              </div>
-              {shared.has(u.id) ? (
+              {userInfo(u)}
+              {shared.has(u.id) || grantedIds.has(u.id) ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--md-primary)' }}>
                   <Icon.check size={16} /> Выдан
                 </span>
@@ -138,6 +187,27 @@ export function ShareWithUserModal({
             </li>
           ))}
         </ul>
+      )}
+      {playlistId && (
+        <>
+          <div style={{ fontWeight: 500, margin: '18px 2px 0' }}>Доступ есть у</div>
+          {grants === null ? (
+            <p style={hint}>Загрузка…</p>
+          ) : grants.length === 0 ? (
+            <p style={hint}>Плейлист пока никому не выдан.</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: '6px 0 0' }}>
+              {grants.map((g) => (
+                <li key={g.grantId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                  {userInfo(g.user)}
+                  <button className="btn text" disabled={revoking === g.grantId} onClick={() => revoke(g)}>
+                    Отозвать
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </Modal>
   );
