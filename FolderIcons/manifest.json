@@ -120,6 +120,18 @@
       "source": "lucide:film"
     },
     {
+      "key": "subtitles",
+      "label": "Субтитры",
+      "category": "media",
+      "keywords": [
+        "srt",
+        "vtt",
+        "ass",
+        "титры"
+      ],
+      "source": "lucide:captions"
+    },
+    {
       "key": "clapperboard",
       "label": "Кино",
       "category": "media",
@@ -200,6 +212,17 @@
         "бумаги"
       ],
       "source": "lucide:files"
+    },
+    {
+      "key": "file",
+      "label": "Файл",
+      "category": "documents",
+      "keywords": [
+        "файл",
+        "прочее",
+        "бинарный"
+      ],
+      "source": "lucide:file"
     },
     {
       "key": "book",
@@ -332,6 +355,19 @@
         "архив"
       ],
       "source": "lucide:file-archive"
+    },
+    {
+      "key": "disc",
+      "label": "Образы дисков",
+      "category": "archives",
+      "keywords": [
+        "iso",
+        "img",
+        "dmg",
+        "диск",
+        "образ"
+      ],
+      "source": "lucide:disc"
     },
     {
       "key": "hard-drive",

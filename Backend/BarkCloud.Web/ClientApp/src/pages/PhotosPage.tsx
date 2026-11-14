@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { MediaThumb } from '../components/media/MediaThumb';
+import { PhotoTile } from '../components/media/PhotoTile';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { FileDropOverlay } from '../components/ui/FileDropOverlay';
@@ -16,36 +16,9 @@ import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, pickFiles } from '../lib/api';
-import { GRID_SIZES, plural, groupByDate } from '../lib/format';
+import { plural, groupByDate } from '../lib/format';
 import { searchHitToCardFile, type SearchHit } from '../lib/search';
 import type { Album, MediaItem } from '../lib/types';
-
-function Photo({ m, selecting, checked, onToggle, onOpen, onMenu }: {
-  m: MediaItem;
-  selecting: boolean;
-  checked: boolean;
-  onToggle: (shift: boolean) => void;
-  onOpen: (m: MediaItem) => void;
-  onMenu: (e: React.MouseEvent, m: MediaItem) => void;
-}) {
-  return (
-    <div
-      className={'photo' + (checked ? ' checked' : '')}
-      onClick={(e) => (e.shiftKey ? onToggle(true) : selecting ? onToggle(false) : onOpen(m))}
-      onContextMenu={(e) => onMenu(e, m)}
-    >
-      <MediaThumb media={m} sizes={GRID_SIZES} colorPlaceholder />
-      <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать">
-        {checked ? <Icon.check size={14} /> : null}
-      </button>
-      {m.kind === 'video' && (
-        <div className="vbadge">
-          <Icon.play size={10} /> видео
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function PhotosPage() {
   const location = useLocation();
@@ -213,7 +186,7 @@ export function PhotosPage() {
                 </div>
                 <div className="photo-grid">
                   {g.items.map((m) => (
-                    <Photo
+                    <PhotoTile
                       key={m.id}
                       m={m}
                       selecting={bulk.active}
