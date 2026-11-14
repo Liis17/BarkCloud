@@ -27,11 +27,13 @@ RUN set -eu; \
     sha256sum -c selected.sha256; \
     tar -xzf "$archive"; test -f lognara-agent; chmod 755 lognara-agent; mkdir -p /spool
 
-# Стадия сборки React-SPA (Vite). outDir в vite.config.ts = ../wwwroot → /wwwroot.
+# Стадия сборки React-SPA (Vite). Структура повторяет репозиторий: Vite берёт общий пак
+# иконок из корня (FolderIcons/), outDir = ../wwwroot → /src/Backend/BarkCloud.Web/wwwroot.
 FROM node:22-alpine AS client
-WORKDIR /client
+WORKDIR /src/Backend/BarkCloud.Web/ClientApp
 COPY Backend/BarkCloud.Web/ClientApp/package.json Backend/BarkCloud.Web/ClientApp/package-lock.json ./
 RUN npm ci
+COPY FolderIcons/ /src/FolderIcons/
 COPY Backend/BarkCloud.Web/ClientApp/ ./
 RUN npm run build
 
@@ -47,7 +49,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet restore "Backend/BarkCloud.Web/BarkCloud.Web.csproj"
 COPY . .
 # Собранный SPA из node-стадии (Microsoft.NET.Sdk.Web включит wwwroot в publish).
-COPY --from=client /wwwroot ./Backend/BarkCloud.Web/wwwroot
+COPY --from=client /src/Backend/BarkCloud.Web/wwwroot ./Backend/BarkCloud.Web/wwwroot
 WORKDIR "/src/Backend/BarkCloud.Web"
 RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet publish "BarkCloud.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
