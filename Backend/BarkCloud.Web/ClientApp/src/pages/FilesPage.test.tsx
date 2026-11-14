@@ -413,6 +413,21 @@ describe('FilesPage grid view', () => {
     expect(again.container.querySelector('.files-grid')).not.toBeNull();
   });
 
+  it('показывает квадратное превью фото вместо иконки типа', async () => {
+    stored.set('bark_files_view', 'grid');
+    mockDirectoryListings({
+      '': {
+        dirs: [],
+        files: [{ ...fileEntry('entry-2', 'кот.jpg'), media: { id: 'f2', name: 'кот.jpg', ext: 'JPG', kind: 'photo', iconKind: 'img', size: 1, sizeLabel: '1 Б', width: 400, height: 300, previews: [{ url: '/p/320', w: 320 }], createdAt: null, uploadedAt: null } }],
+      },
+    });
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    const tile = (await screen.findByText('кот.jpg')).closest('.file-tile')!;
+
+    expect(tile.querySelector('.tile-media > .thumb img')).not.toBeNull();
+    expect(tile.querySelector('.file-type-icon')).toBeNull();
+  });
+
   it('принимает файлы, брошенные на плитку папки', async () => {
     stored.set('bark_files_view', 'grid');
     render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
