@@ -60,6 +60,7 @@ internal sealed partial class CloudGateway : IDisposable
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ListStaleTtl = TimeSpan.FromSeconds(60);
     private const int MaxListingPatches = 10_000;
+    private const int MaxReplayedListingPatches = 256;
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageRpcTimeout = TimeSpan.FromSeconds(15);
@@ -128,6 +129,7 @@ internal sealed partial class CloudGateway : IDisposable
     public Action<string>? SyncError { get; set; }
 
     internal Action? ListingLoadWaiterJoinedForTesting { get; set; }
+    internal Action<string>? ListingLoadFinishedForTesting { get; set; }
     internal Action<long, long>? ListingMoveSnapshotCopiedForTesting { get; set; }
     internal Action<string>? CacheEntryBeforeOpenForTesting { get; set; }
     internal Action<string>? CacheFileOpenedForTesting { get; set; }
@@ -424,11 +426,13 @@ internal sealed partial class CloudGateway : IDisposable
                     {
                         _listCache[dirId] = new CachedDirectoryListing(
                             _time.GetUtcNow().UtcDateTime, generationAfter, key.AccountEpoch, listing, index);
+                        TrimListingPatchesLocked(dirId, generationAfter);
                         break;
                     }
 
+                    // Каждая правка копирует листинг; длинный хвост дешевле перечитать.
                     replay = TakeListingPatchesLocked(dirId, appliedGeneration, generationAfter);
-                    if (replay is null)
+                    if (replay is null || replay.Count > MaxReplayedListingPatches)
                         break;
                     appliedGeneration = generationAfter;
                 }
@@ -461,6 +465,7 @@ internal sealed partial class CloudGateway : IDisposable
             load.TrySetException(failure);
         else
             load.TrySetResult(loadedListing!);
+        ListingLoadFinishedForTesting?.Invoke(dirId);
     }
 
     private DirectoryListingDetailed LoadDirectoryListing(string dirId, CancellationToken cancellationToken)
@@ -1574,8 +1579,10 @@ internal sealed partial class CloudGateway : IDisposable
                 && IsCurrentFileMoveListingLocked(destinationDirectoryId, snapshot.DestinationGeneration,
                     snapshot.AccountEpoch, snapshot.Destination))
             {
-                var sourceGeneration = BumpListingGenerationLocked(sourceDirectoryId);
-                var destinationGeneration = BumpListingGenerationLocked(destinationDirectoryId);
+                var sourceGeneration = BumpListingGenerationWithPatchLocked(sourceDirectoryId,
+                    listing => CopyDirectoryListingWithoutFile(listing, entryId));
+                var destinationGeneration = BumpListingGenerationWithPatchLocked(destinationDirectoryId,
+                    listing => UpsertFile(listing, movedFile));
                 _listCache[sourceDirectoryId] = snapshot.Source with
                 {
                     Generation = sourceGeneration,
@@ -1732,6 +1739,21 @@ internal sealed partial class CloudGateway : IDisposable
         if (patches.Count > MaxListingPatches)
             patches.RemoveRange(0, patches.Count - MaxListingPatches);
         return generation;
+    }
+
+    // Записи не старше самой ранней загрузки этой папки в полёте больше никому не нужны.
+    private void TrimListingPatchesLocked(string directoryId, int cachedGeneration)
+    {
+        if (!_listPatches.TryGetValue(directoryId, out var patches))
+            return;
+
+        var oldestNeeded = cachedGeneration;
+        foreach (var load in _listLoads.Keys)
+            if (load.DirectoryId == directoryId && load.Generation < oldestNeeded)
+                oldestNeeded = load.Generation;
+        patches.RemoveAll(patch => patch.Generation <= oldestNeeded);
+        if (patches.Count == 0)
+            _listPatches.Remove(directoryId);
     }
 
     // Правки поколений (from, to], если журнал покрывает их все подряд; иначе null.

@@ -40,6 +40,14 @@ internal sealed partial class CloudGateway
     private volatile bool _batchMoveUnsupported;
 
     internal int PendingMoveCount => _pendingMoves.Count;
+
+    internal DateTime? ListingCachedAtForTesting(string directoryId)
+    {
+        lock (_listLock)
+            return TryGetCurrentListingLocked(directoryId, Volatile.Read(ref _accountEpoch), out var cached)
+                ? cached.At
+                : null;
+    }
     internal bool QueueMovesForTesting { get; set; } = true;
 
     private void CreateMoveTimer()
@@ -58,22 +66,17 @@ internal sealed partial class CloudGateway
         // и публикацией — пробуем ещё раз, а не уходим на медленный синхронный путь.
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var result = TryQueueMoveOnce(entryId, sourceDirectoryId, destinationDirectoryId, out var sendNow);
-            if (result is null)
-                continue;
-            if (sendNow)
-                SendMovesSafe(drainAll: false, CancellationToken.None);
-            return result.Value;
+            var result = TryQueueMoveOnce(entryId, sourceDirectoryId, destinationDirectoryId);
+            if (result is not null)
+                return result.Value;
         }
 
         return false;
     }
 
     // null — снимки изменились во время подготовки копий, нужна повторная попытка.
-    private bool? TryQueueMoveOnce(string entryId, string sourceDirectoryId, string destinationDirectoryId,
-        out bool sendNow)
+    private bool? TryQueueMoveOnce(string entryId, string sourceDirectoryId, string destinationDirectoryId)
     {
-        sendNow = false;
         CachedDirectoryListing source;
         CachedDirectoryListing destination;
         long epoch;
@@ -127,12 +130,13 @@ internal sealed partial class CloudGateway
             PublishListingLocked(destinationDirectoryId, destination, destinationListing, destinationIndex,
                 listing => UpsertFile(listing, moved));
 
+            // Полная пачка отправляется таймером сразу, а не в колбэке Dokany: тот не должен
+            // ждать фоновую отправку к медленному серверу.
             lock (_moveLock)
             {
                 _moveQueue.Add(pending);
-                sendNow = _moveQueue.Count >= MoveBatchMax;
-                if (!sendNow)
-                    _moveTimer?.Change(MoveWindow, Timeout.InfiniteTimeSpan);
+                _moveTimer?.Change(_moveQueue.Count >= MoveBatchMax ? TimeSpan.Zero : MoveWindow,
+                    Timeout.InfiniteTimeSpan);
             }
         }
 
@@ -241,9 +245,10 @@ internal sealed partial class CloudGateway
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        // Пакет не уходил на сервер — файл достоверно остаётся в исходной папке.
+                        // Без попыток запрос не уходил — файл достоверно в исходной папке; после
+                        // прерванной попытки сервер мог перенос выполнить.
                         foreach (var move in chunks[i].Moves)
-                            FailMove(move, Loc.T("Eng_MoveNotSent"), uncertain: false);
+                            FailMove(move, move.Attempts > 0 ? "" : Loc.T("Eng_MoveNotSent"), uncertain: move.Attempts > 0);
                         continue;
                     }
 

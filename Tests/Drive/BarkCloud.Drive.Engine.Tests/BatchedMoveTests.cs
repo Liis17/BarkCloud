@@ -118,6 +118,13 @@ public sealed class BatchedMoveTests(ITestOutputHelper output)
             refreshRead.TrySetResult();
             releaseRefresh.Wait(TimeSpan.FromSeconds(5));
         };
+        var refreshFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        gateway.ListingLoadFinishedForTesting = directoryId =>
+        {
+            if (directoryId == source)
+                refreshFinished.TrySetResult();
+        };
+        var staleAt = gateway.ListingCachedAtForTesting(source);
         gateway.ListDirectory(source); // устаревший снимок → фоновое обновление
         await refreshRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -125,21 +132,45 @@ public sealed class BatchedMoveTests(ITestOutputHelper output)
         gateway.FlushPending(throwOnFailure: true);
         cloud.Invoker.AfterResponse = null;
         releaseRefresh.Set();
+        await refreshFinished.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var listCalls = CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed);
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < deadline)
-        {
-            await Task.Delay(20);
-            gateway.ListDirectory(source); // пока снимок не обновлён, вызов ставит новое фоновое обновление
-            if (CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed) == listCalls)
-                break;
-            listCalls = CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed);
-        }
-
-        CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed).Should().Be(listCalls, "снимок снова свежий");
-        listCalls.Should().Be(2, "результат загрузки догнан правкой, а не выброшен");
+        // Результат загрузки догнан правкой и закеширован: снимок свежий, удалённого файла нет.
+        gateway.ListingCachedAtForTesting(source).Should().Be(time.GetUtcNow().UtcDateTime).And.NotBe(staleAt);
         gateway.ListDirectory(source).Files.Select(file => file.Entry.Id).Should().Equal(kept.EntryId);
+        CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Background_refresh_overtaken_by_an_invalidation_is_discarded()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var (source, _) = AddFolders(cloud);
+        cloud.AddFile(source, "a.jpg", [1]);
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.ListDirectory(source);
+        time.Advance(TimeSpan.FromSeconds(6));
+        var refreshRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRefresh = new ManualResetEventSlim();
+        var refreshFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cloud.Invoker.AfterResponse = (method, request) =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            refreshRead.TrySetResult();
+            releaseRefresh.Wait(TimeSpan.FromSeconds(5));
+        };
+        gateway.ListingLoadFinishedForTesting = _ => refreshFinished.TrySetResult();
+        gateway.ListDirectory(source);
+        await refreshRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        gateway.InvalidateListing(source);
+        cloud.Invoker.AfterResponse = null;
+        releaseRefresh.Set();
+        await refreshFinished.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        gateway.ListingCachedAtForTesting(source).Should().BeNull("ответ мог устареть после инвалидации");
     }
 
     [Fact]
