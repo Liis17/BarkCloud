@@ -55,6 +55,15 @@ public class CloudDirectory
     /// </summary>
     public long SizeVersion { get; set; }
 
+    /// <summary>
+    /// Ключ иконки из общего пака FolderIcons (имя SVG без расширения). null — стандартная иконка папки.
+    /// Сервер проверяет только формат ключа: неизвестный клиенту ключ показывается как обычная папка.
+    /// </summary>
+    public string? IconKey { get; set; }
+
+    /// <summary>Цвет подложки иконки в формате #RRGGBB. null — цвет темы клиента.</summary>
+    public string? IconColor { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

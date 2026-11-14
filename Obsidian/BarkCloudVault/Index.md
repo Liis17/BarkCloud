@@ -45,6 +45,7 @@
 |---------|------------|
 | [[Shared/Proto]] | gRPC-контракты |
 | [[Shared/SharedLibraries]] | Auth, Exceptions, Identity, Queue, SecurityUtilities |
+| [[Shared/FolderIcons]] | Общий пак иконок папок (`FolderIcons/`) |
 | [[Api/UsersClientGuide]] | Гайд по Users API для клиентов |
 | [[Api/FilesClientGuide]] | Гайд по Files API для клиентов |
 

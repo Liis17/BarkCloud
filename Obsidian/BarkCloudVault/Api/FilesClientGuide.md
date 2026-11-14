@@ -61,6 +61,8 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 
 `CloudApi.GetDirectoryProperties(directory_id)` возвращает свойства папки, рекурсивные счётчики живых файлов и вложенных папок, суммарный размер и собственные/effective-настройки видимости. `CloudApi.SetDirectoryVisibility` сохраняет `inherit`, `hide_from_gallery` и `hide_from_search`; для верхнеуровневой папки сервер рассчитывает `inherit` по её собственным флагам. Скрытие из галереи не убирает файл из папок, альбомов и плейлистов.
 
+`DirectoryInfo.icon_key` и `icon_color` задают значок папки: ключ иконки из пака `FolderIcons/` ([[Shared/FolderIcons]]) и цвет подложки `#RRGGBB`. Пустое значение — стандартная папка и цвет темы; неизвестный клиенту ключ тоже показывается как обычная папка. `CloudApi.SetDirectoryAppearance(directory_id, icon_key, icon_color)` сохраняет оба поля разом и возвращает обновлённый `DirectoryInfo`; пустые строки сбрасывают значок.
+
 В `CloudApi.SearchFilesRequest` передавайте `exclude_hidden_from_gallery=true`, если поиск обслуживает галерею и должен исключать файлы из папок, скрытых из галереи. Без этого флага обычный поиск Files включает их. Этот параметр не управляет `SearchApi.Search`, который применяет отдельную настройку скрытия из поиска.
 
 ### Поиск

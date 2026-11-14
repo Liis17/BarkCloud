@@ -47,6 +47,7 @@ using BarkCloud.Files.Features.Cloud.ListMyOutgoingSharesAll;
 using BarkCloud.Files.Features.Cloud.ListSharedWithMe;
 using BarkCloud.Files.Features.Cloud.GetSharedFileDownloadUrl;
 using BarkCloud.Files.Features.Cloud.SetVideoThumbnail;
+using BarkCloud.Files.Features.Cloud.SetDirectoryAppearance;
 using BarkCloud.Files.Features.Cloud.SetDirectoryVisibility;
 using BarkCloud.Files.Features.Cloud.GetMemories;
 using BarkCloud.Files.Features.Cloud.GetUserMediaStats;
@@ -99,6 +100,14 @@ public class CloudApiService : CloudApi.CloudApiBase
             Inherit = request.Inherit,
             HideFromGallery = request.HideFromGallery,
             HideFromSearch = request.HideFromSearch
+        });
+
+    public override Task<DirectoryInfo> SetDirectoryAppearance(SetDirectoryAppearanceRequest request, ServerCallContext context) =>
+        _mediator.Send(new SetDirectoryAppearanceCommand
+        {
+            DirectoryId = Guid.Parse(request.DirectoryId),
+            IconKey = request.IconKey,
+            IconColor = request.IconColor
         });
 
     public override Task<CloudEmpty> RenameDirectory(RenameDirectoryRequest request, ServerCallContext context)

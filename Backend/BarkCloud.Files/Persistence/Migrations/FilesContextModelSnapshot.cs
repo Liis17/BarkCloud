@@ -156,6 +156,14 @@ namespace BarkCloud.Files.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("IconColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("IconKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<bool>("InheritVisibility")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
