@@ -16,6 +16,64 @@ namespace BarkCloud.Drive.Engine.Tests;
 public sealed class CloudGatewayTests
 {
     [Fact]
+    public async Task Stale_listing_is_returned_without_waiting_and_refreshed_in_background()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "old.txt");
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.ListDirectory("").Files.Should().ContainSingle();
+
+        cloud.AddFile("", "new.txt");
+        time.Advance(TimeSpan.FromSeconds(6));
+        var refreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRefresh = new ManualResetEventSlim();
+        cloud.Invoker.OnCall = method =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed)
+                return;
+            refreshStarted.TrySetResult();
+            releaseRefresh.Wait(TimeSpan.FromSeconds(5));
+        };
+
+        try
+        {
+            var stale = await Task.Run(() => gateway.ListDirectory("")).WaitAsync(TimeSpan.FromSeconds(2));
+            stale.Files.Select(file => file.Entry.Name).Should().Equal("old.txt");
+            await refreshStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseRefresh.Set();
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (gateway.ListDirectory("").Files.Count != 2 && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+        gateway.ListDirectory("").Files.Select(file => file.Entry.Name)
+            .Should().BeEquivalentTo(["old.txt", "new.txt"]);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public void Listing_older_than_stale_limit_is_reloaded_synchronously()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "old.txt");
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.ListDirectory("").Files.Should().ContainSingle();
+
+        cloud.AddFile("", "new.txt");
+        time.Advance(TimeSpan.FromSeconds(61));
+
+        gateway.ListDirectory("").Files.Should().HaveCount(2);
+    }
+
+    [Fact]
     public void Resolve_finds_files_case_insensitively()
     {
         using var temp = new TestDirectory();
@@ -100,7 +158,7 @@ public sealed class CloudGatewayTests
     }
 
     [Fact]
-    public void ListDirectory_reuses_entries_until_ttl_expires()
+    public async Task ListDirectory_reuses_entries_until_ttl_expires()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
@@ -113,7 +171,12 @@ public sealed class CloudGatewayTests
 
         time.Advance(TimeSpan.FromSeconds(4));
         gateway.ListDirectory("").Files.Should().HaveCount(1);
+        cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
+            .Should().Be(1);
         time.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(1));
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (gateway.ListDirectory("").Files.Count != 2 && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
         gateway.ListDirectory("").Files.Should().HaveCount(2);
 
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)

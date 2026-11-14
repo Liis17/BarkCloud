@@ -58,6 +58,7 @@ internal sealed partial class CloudGateway : IDisposable
         long AccountEpoch);
 
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ListStaleTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageRpcTimeout = TimeSpan.FromSeconds(15);
@@ -300,9 +301,10 @@ internal sealed partial class CloudGateway : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             ListingLoadKey key;
-            TaskCompletionSource<DirectoryListingDetailed> load;
+            TaskCompletionSource<DirectoryListingDetailed>? load = null;
             DirectoryListingDetailed? cachedListing = null;
             var ownsLoad = false;
+            var refreshInBackground = false;
             lock (_listLock)
             {
                 _listGen.TryGetValue(dirId, out var generation);
@@ -311,22 +313,40 @@ internal sealed partial class CloudGateway : IDisposable
 
                 if (_listCache.TryGetValue(dirId, out var cached)
                     && cached.Generation == generation
-                    && cached.AccountEpoch == accountEpoch
-                    && _time.GetUtcNow().UtcDateTime - cached.At < ListTtl)
-                    cachedListing = cached.Listing;
-
-                if (cachedListing is null)
+                    && cached.AccountEpoch == accountEpoch)
                 {
-                    if (!_listLoads.TryGetValue(key, out load!))
+                    var age = _time.GetUtcNow().UtcDateTime - cached.At;
+                    if (age < ListStaleTtl)
+                        cachedListing = cached.Listing;
+                    // Неинвалидированный, но несвежий снимок отдаём сразу и обновляем в фоне:
+                    // иначе каждый колбэк Dokany в большой папке ждал бы полную перезагрузку листинга.
+                    if (age >= ListTtl && age < ListStaleTtl && !_listLoads.ContainsKey(key))
                     {
                         load = new TaskCompletionSource<DirectoryListingDetailed>(
                             TaskCreationOptions.RunContinuationsAsynchronously);
                         _listLoads.Add(key, load);
-                        ownsLoad = true;
+                        refreshInBackground = true;
                     }
                 }
-                else
-                    load = null!;
+
+                if (cachedListing is null && !_listLoads.TryGetValue(key, out load))
+                {
+                    load = new TaskCompletionSource<DirectoryListingDetailed>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    _listLoads.Add(key, load);
+                    ownsLoad = true;
+                }
+            }
+
+            if (refreshInBackground)
+            {
+                var epoch = CaptureCacheEpoch();
+                _ = Task.Run(() =>
+                {
+                    RunListingLoad(dirId, key, load!, epoch.CancellationToken);
+                    if (load!.Task.Exception is { } error)
+                        EngineLog.Error($"Фоновое обновление листинга {dirId}", error.InnerException ?? error);
+                });
             }
 
             if (cachedListing is not null)
@@ -336,57 +356,9 @@ internal sealed partial class CloudGateway : IDisposable
                 ListingLoadWaiterJoinedForTesting?.Invoke();
 
             if (ownsLoad)
-            {
-                DirectoryListingDetailed? loadedListing = null;
-                OperationCanceledException? cancellation = null;
-                Exception? failure = null;
-                try
-                {
-                    var listing = LoadDirectoryListing(dirId, cancellationToken);
-                    loadedListing = listing;
-                    var cached = new CachedDirectoryListing(
-                        _time.GetUtcNow().UtcDateTime,
-                        key.Generation,
-                        key.AccountEpoch,
-                        listing,
-                        CreateDirectoryListingIndex(listing));
+                RunListingLoad(dirId, key, load!, cancellationToken);
 
-                    // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
-                    // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
-                    // удерживая исчезнувший файл в кэше на ListTtl. Проверка поколения и запись кэша —
-                    // под _listLock (тем же, что инвалидация), иначе попавшая между ними InvalidateListing терялась бы.
-                    lock (_listLock)
-                    {
-                        _listGen.TryGetValue(dirId, out var generationAfter);
-                        if (key.Generation == generationAfter
-                            && key.AccountEpoch == Volatile.Read(ref _accountEpoch))
-                            _listCache[dirId] = cached;
-                    }
-                }
-                catch (OperationCanceledException ex)
-                {
-                    cancellation = ex;
-                }
-                catch (Exception ex)
-                {
-                    failure = ex;
-                }
-                finally
-                {
-                    lock (_listLock)
-                        if (_listLoads.TryGetValue(key, out var current) && ReferenceEquals(current, load))
-                            _listLoads.Remove(key);
-                }
-
-                if (cancellation is not null)
-                    load.TrySetCanceled(cancellation.CancellationToken);
-                else if (failure is not null)
-                    load.TrySetException(failure);
-                else
-                    load.TrySetResult(loadedListing!);
-            }
-
-            var result = ownsLoad ? load.Task : load.Task.WaitAsync(cancellationToken);
+            var result = ownsLoad ? load!.Task : load!.Task.WaitAsync(cancellationToken);
             try
             {
                 return result.GetAwaiter().GetResult();
@@ -402,6 +374,58 @@ internal sealed partial class CloudGateway : IDisposable
                 // Отмена общей gRPC-загрузки не должна отменять живой вызов-ожидатель.
             }
         }
+    }
+
+    private void RunListingLoad(string dirId, ListingLoadKey key,
+        TaskCompletionSource<DirectoryListingDetailed> load, CancellationToken cancellationToken)
+    {
+        DirectoryListingDetailed? loadedListing = null;
+        OperationCanceledException? cancellation = null;
+        Exception? failure = null;
+        try
+        {
+            var listing = LoadDirectoryListing(dirId, cancellationToken);
+            loadedListing = listing;
+            var cached = new CachedDirectoryListing(
+                _time.GetUtcNow().UtcDateTime,
+                key.Generation,
+                key.AccountEpoch,
+                listing,
+                CreateDirectoryListingIndex(listing));
+
+            // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
+            // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
+            // удерживая исчезнувший файл в кэше на ListTtl. Проверка поколения и запись кэша —
+            // под _listLock (тем же, что инвалидация), иначе попавшая между ними InvalidateListing терялась бы.
+            lock (_listLock)
+            {
+                _listGen.TryGetValue(dirId, out var generationAfter);
+                if (key.Generation == generationAfter
+                    && key.AccountEpoch == Volatile.Read(ref _accountEpoch))
+                    _listCache[dirId] = cached;
+            }
+        }
+        catch (OperationCanceledException ex)
+        {
+            cancellation = ex;
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
+        finally
+        {
+            lock (_listLock)
+                if (_listLoads.TryGetValue(key, out var current) && ReferenceEquals(current, load))
+                    _listLoads.Remove(key);
+        }
+
+        if (cancellation is not null)
+            load.TrySetCanceled(cancellation.CancellationToken);
+        else if (failure is not null)
+            load.TrySetException(failure);
+        else
+            load.TrySetResult(loadedListing!);
     }
 
     private DirectoryListingDetailed LoadDirectoryListing(string dirId, CancellationToken cancellationToken)

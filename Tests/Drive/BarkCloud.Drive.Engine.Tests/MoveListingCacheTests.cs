@@ -165,7 +165,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void MoveFile_keeps_the_original_listing_ttl()
+    public async Task MoveFile_keeps_the_original_listing_ttl()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
@@ -187,10 +187,16 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         gateway.ListDirectory(destinationDirectoryId).Files.Should().ContainSingle();
         CountListCalls(cloud).Should().Be(3);
 
+        // После исходного TTL снимки отдаются сразу, а обе папки обновляются в фоне.
         time.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(1));
         gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
         gateway.ListDirectory(destinationDirectoryId).Files.Should().ContainSingle();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (CountListCalls(cloud) < 5 && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
         CountListCalls(cloud).Should().Be(5);
+        gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
+        gateway.ListDirectory(destinationDirectoryId).Files.Should().ContainSingle();
     }
 
     [Fact]
