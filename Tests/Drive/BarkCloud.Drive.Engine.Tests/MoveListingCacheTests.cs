@@ -255,9 +255,9 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
         gateway.ListDirectory(destinationDirectoryId).Files.Should()
             .ContainSingle(entry => entry.Entry.Id == file.EntryId);
-        // Снимки старше 5 с обновляются в фоне по одному на папку: ещё одна загрузка
-        // источника появляется, только если предыдущее фоновое обновление уже завершилось.
-        CountListCalls(cloud).Should().BeInRange(5, 6);
+        // Снимки старше 5 с обновляются в фоне по одному на папку; к моменту проверки
+        // фоновые обновления источника и назначения могут ещё не начаться.
+        CountListCalls(cloud).Should().BeInRange(4, 6);
     }
 
     [Fact]
