@@ -24,6 +24,7 @@ public interface ICloudHierarchyStorage
     Task<CloudFileEntry?> GetFileEntry(Guid id, CancellationToken cancellationToken = default);
     Task<List<CloudFileEntry>> GetLiveFileEntriesByIds(long ownerId, IReadOnlyCollection<Guid> entryIds, CancellationToken cancellationToken = default);
     Task<bool> FileEntryNameExists(long ownerId, Guid directoryId, string name, CancellationToken cancellationToken = default);
+    Task<HashSet<string>> GetLiveFileEntryNames(long ownerId, Guid directoryId, IReadOnlyCollection<string> names, CancellationToken cancellationToken = default);
     Task<bool> FileEntryExistsForFile(long ownerId, Guid fileId, CancellationToken cancellationToken = default);
     Task<CloudFileEntry> AddFileEntry(CloudFileEntry entry, CancellationToken cancellationToken = default);
     /// <summary>

@@ -424,6 +424,21 @@ public class CloudHierarchyStorage : ICloudHierarchyStorage
             .AnyAsync(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && x.Name == name && !x.IsDeleted, cancellationToken);
     }
 
+    /// <summary>Какие из имён уже заняты живыми записями в папке (то же сравнение, что FileEntryNameExists).</summary>
+    public async Task<HashSet<string>> GetLiveFileEntryNames(long ownerId, Guid directoryId,
+        IReadOnlyCollection<string> names, CancellationToken cancellationToken = default)
+    {
+        if (names.Count == 0)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        var taken = await _context.CloudFileEntries
+            .AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && x.DirectoryId == directoryId && !x.IsDeleted && names.Contains(x.Name))
+            .Select(x => x.Name)
+            .ToListAsync(cancellationToken);
+        return taken.ToHashSet(StringComparer.Ordinal);
+    }
+
     /// <summary>
     /// Проверяет, есть ли у владельца уже живая запись для данного файла в любой директории.
     /// Гарантирует инвариант «один блоб владельца — максимум одна запись в иерархии».
