@@ -167,3 +167,27 @@ describe('gallery media statistics', () => {
     });
   });
 });
+
+describe('video layout preference', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('рисует видео сеткой «Фото» с длительностью, если выбрана сетка', () => {
+    vi.stubGlobal('localStorage', { getItem: (key: string) => (key === 'bark_video_layout' ? 'grid' : null), setItem: vi.fn() });
+    mocks.items = makeItems('video').map((item) => ({ ...item, video: { duration: 75 } }));
+    const { container } = render(<MemoryRouter><VideosPage /></MemoryRouter>);
+
+    expect(container.querySelector('.vid-grid')).toBeNull();
+    const tiles = container.querySelectorAll('.photo-grid .photo');
+    expect(tiles).toHaveLength(60);
+    expect(tiles[0].querySelector('.vbadge')?.textContent).toContain('1:15');
+  });
+
+  it('по умолчанию оставляет карточки', () => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn() });
+    mocks.items = makeItems('video');
+    const { container } = render(<MemoryRouter><VideosPage /></MemoryRouter>);
+
+    expect(container.querySelector('.photo-grid')).toBeNull();
+    expect(container.querySelectorAll('.vid-grid .vcard')).toHaveLength(60);
+  });
+});

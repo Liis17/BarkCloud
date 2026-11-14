@@ -1567,6 +1567,7 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
 
 /* ─────────── Множественный выбор в галереях ─────────── */
 .photo-grid .photo .selbox,
+.file-tile .selbox,
 .vcard .vthumb .selbox,
 .df-dup-photo .selbox {
   position: absolute; top: 8px; left: 8px; z-index: 3;
@@ -1576,12 +1577,15 @@ body:has(.mini-player) .toast-stack { bottom: 128px; }
   opacity: 0; transition: opacity var(--d-short), background var(--d-short);
 }
 .photo-grid .photo:hover .selbox,
+.file-tile:hover .selbox,
+.file-tile.checked .selbox,
 .df-dup-photo:hover .selbox,
 .vcard:hover .vthumb .selbox,
 .photo-grid .photo.checked .selbox,
 .df-dup-photo.checked .selbox,
 .vcard.checked .vthumb .selbox { opacity: 1; }
 .photo-grid .photo.checked .selbox,
+.file-tile.checked .selbox,
 .df-dup-photo.checked .selbox,
 .vcard.checked .vthumb .selbox { background: var(--md-primary); border-color: var(--md-primary); }
 .photo-grid .photo.checked { outline: 3px solid var(--md-primary); outline-offset: -3px; }

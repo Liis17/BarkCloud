@@ -8,6 +8,7 @@ import { TextField } from '../components/ui/TextField';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { FolderPropertiesModal } from '../components/ui/FolderPropertiesModal';
 import { FolderIcon } from '../components/ui/FolderIcon';
+import { FileTypeIcon } from '../components/ui/FileTypeIcon';
 import { FolderIconEditorModal, type FolderAppearance } from '../components/ui/FolderIconEditorModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
@@ -32,6 +33,8 @@ import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolder
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
 import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
+import { GRID_SIZES } from '../lib/format';
+import { FILES_VIEW_KEY, FILES_VIEWS, useStoredChoice } from '../lib/viewPrefs';
 import type { Album, CardFile, DirInfo, DynamicFolder, Entry, Listing, MusicTrack } from '../lib/types';
 
 const ruDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -156,6 +159,67 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
   );
 }
 
+function TileSelbox({ checked, onToggle }: { checked: boolean; onToggle: (shift: boolean) => void }) {
+  return (
+    <button className="selbox" onClick={(e) => { e.stopPropagation(); onToggle(e.shiftKey); }} title="Выбрать" aria-pressed={checked}>
+      {checked ? <Icon.check size={14} /> : null}
+    </button>
+  );
+}
+
+/** Плитка папки в режиме сетки: те же действия, что у DirRow. */
+function DirTile({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }: React.ComponentProps<typeof DirRow>) {
+  return (
+    <div
+      className={'file-tile' + (active ? ' drop-target' : '') + (checked ? ' checked' : '')}
+      {...dropHandlers}
+      onClick={(e) => (e.shiftKey ? onToggle(true) : onOpen(dir))}
+      onContextMenu={(e) => onMenu(e, dir)}
+    >
+      <div className="tile-media">
+        <FolderIcon iconKey={dir.iconKey} iconColor={dir.iconColor} size={48} className="big" />
+        <TileSelbox checked={checked} onToggle={onToggle} />
+      </div>
+      <div className="tile-name" title={dir.name}>{dir.name}</div>
+    </div>
+  );
+}
+
+/** Плитка файла в режиме сетки: превью фото/видео или иконка типа из пака FolderIcons. */
+function FileTile({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onMenu }: {
+  entry: Entry;
+  selected: boolean;
+  bulkChecked: boolean;
+  onBulkToggle: (e: Entry, shift: boolean) => void;
+  onSelect: (e: Entry) => void;
+  onOpen: (e: Entry) => void;
+  onMenu: (e: React.MouseEvent<HTMLElement>, entry: Entry) => void;
+}) {
+  const m = entry.media;
+  const isMedia = m?.kind === 'photo' || m?.kind === 'video';
+  const hasPreview = (m?.previews || []).length > 0;
+  return (
+    <div
+      tabIndex={-1}
+      className={'file-tile' + (selected ? ' selected' : '') + (bulkChecked ? ' checked' : '')}
+      onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
+      onDoubleClick={(e) => { e.currentTarget.focus(); onOpen(entry); }}
+      onContextMenu={(e) => { e.currentTarget.focus(); onMenu(e, entry); }}
+    >
+      <div className="tile-media">
+        {isMedia && hasPreview ? (
+          <MediaThumb media={m} sizes={GRID_SIZES} colorPlaceholder />
+        ) : (
+          <FileTypeIcon media={m} size={48} className="big" />
+        )}
+        <TileSelbox checked={bulkChecked} onToggle={(shift) => onBulkToggle(entry, shift)} />
+        {m?.kind === 'video' && hasPreview && <div className="vbadge"><Icon.play size={10} /> видео</div>}
+      </div>
+      <div className="tile-name" title={entry.name}>{entry.name}</div>
+    </div>
+  );
+}
+
 function Inspector({ entry, onOpen, onRename, onDelete, onDownload }: {
   entry: Entry | null;
   onOpen: (e: Entry) => void;
@@ -253,6 +317,7 @@ export function FilesPage() {
   const pendingSelect = React.useRef<string | null>(navState.selectEntryId || null);
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [sel, setSel] = React.useState<Entry | null>(null);
+  const [view, setView] = useStoredChoice(FILES_VIEW_KEY, FILES_VIEWS, 'list');
   const [lightbox, setLightbox] = React.useState<CardFile | null>(null);
   const { openTextFile, textViewer } = useTextFileViewer();
   const [creating, setCreating] = React.useState(false);
@@ -845,6 +910,21 @@ export function FilesPage() {
                   ))}
                 </div>
               )}
+              {!openSmart && (
+                <div className="files-view">
+                  {view === 'grid' && orderedKeys.length > 0 && (
+                    <label className="files-select-all" title="Выбрать все">
+                      <input type="checkbox" checked={allChecked} onChange={(e) => fsel.setAll(orderedKeys, e.target.checked)} />
+                    </label>
+                  )}
+                  <button className={'icon-btn' + (view === 'list' ? ' active' : '')} title="Списком" aria-pressed={view === 'list'} onClick={() => setView('list')}>
+                    <Icon.list size={18} />
+                  </button>
+                  <button className={'icon-btn' + (view === 'grid' ? ' active' : '')} title="Сеткой" aria-pressed={view === 'grid'} onClick={() => setView('grid')}>
+                    <Icon.grid size={18} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {openSmart ? (
@@ -881,6 +961,33 @@ export function FilesPage() {
                     }
                   />
                 )
+              ) : view === 'grid' ? (
+                <div className="photo-grid files-grid">
+                  {dirs.map((d) => (
+                    <DirTile
+                      key={d.id}
+                      dir={d}
+                      active={dropTarget?.id === d.id}
+                      dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                      onOpen={openDir}
+                      onMenu={(ev, t) => openAt(ev, dirMenu(t))}
+                      checked={fsel.has(dirKey(d.id))}
+                      onToggle={(shift) => fsel.select(dirKey(d.id), orderedKeys, shift)}
+                    />
+                  ))}
+                  {files.map((e) => (
+                    <FileTile
+                      key={e.entryId}
+                      entry={e}
+                      selected={!!sel && sel.entryId === e.entryId}
+                      bulkChecked={fsel.has(e.entryId)}
+                      onBulkToggle={(t, shift) => fsel.select(t.entryId, orderedKeys, shift)}
+                      onSelect={(t) => { setSel(t); fsel.setAnchor(t.entryId); }}
+                      onOpen={openEntry}
+                      onMenu={(ev, t) => openAt(ev, fileMenu(t, ev.currentTarget))}
+                    />
+                  ))}
+                </div>
               ) : (
                 <table className="ftable">
                   <thead>

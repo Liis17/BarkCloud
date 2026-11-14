@@ -8,6 +8,7 @@ import { usePageHeader } from '../hooks/usePageHeader';
 import { plural } from '../lib/format';
 import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
+import { useStoredChoice, VIDEO_LAYOUT_KEY, VIDEO_LAYOUTS } from '../lib/viewPrefs';
 import { webauthnAuthenticate, webauthnRegister, webauthnSupported } from '../lib/webauthn';
 import { useConfirm, usePrompt } from '../hooks/useDialog';
 import { Switch as Toggle } from '../components/ui/Switch';
@@ -1895,6 +1896,7 @@ function SessionsTab({ sessions: initial, flash }: { sessions: Session[]; flash:
 
 function AppearanceTab() {
   const [theme, setTheme] = React.useState<Theme>(getTheme());
+  const [videoLayout, setVideoLayout] = useStoredChoice(VIDEO_LAYOUT_KEY, VIDEO_LAYOUTS, 'cards');
   function pick(t: Theme) {
     setTheme(t);
     applyTheme(t);
@@ -1903,7 +1905,7 @@ function AppearanceTab() {
     <div className="set-card">
       <div className="set-card-head">
         <h3>Внешний вид</h3>
-        <div className="sub">Тема оформления (сохраняется в этом браузере)</div>
+        <div className="sub">Тема и раскладка страниц (сохраняются в этом браузере)</div>
       </div>
       <div className="set-card-body">
         <Field label="Тема">
@@ -1916,6 +1918,14 @@ function AppearanceTab() {
         <div style={{ fontSize: 13, color: 'var(--md-on-surface-variant)' }}>
           {theme === 'light' ? 'Светлая тема.' : theme === 'dark' ? 'Тёмная тема.' : 'Тема следует настройкам системы.'}
         </div>
+        <Field label="Раскладка видео" help="Карточки с качеством и кодеками или сетка как в «Фото»">
+          <Select
+            value={videoLayout}
+            options={[{ value: 'cards', label: 'Карточки' }, { value: 'grid', label: 'Сетка как в «Фото»' }]}
+            onChange={setVideoLayout}
+            aria-label="Раскладка видео"
+          />
+        </Field>
       </div>
     </div>
   );
@@ -1956,6 +1966,7 @@ const SEARCH_ITEMS = [
   ['storage', 'S3 · группы', 'Расход по группам, лимиты и бакеты без группы'],
   ['sessions', 'Устройства и сессии', 'Активные устройства, выход'],
   ['appearance', 'Тема', 'Светлая, тёмная, системная'],
+  ['appearance', 'Раскладка видео', 'Карточки или сетка как в фото'],
   ['system', 'Обслуживание', 'Контейнеры, обновление, перезапуск, каналы'],
   ['server-settings', 'Параметры сервисов', 'Серверные конфигурации'],
   ['server-settings', 'S3-профили', 'Endpoint, bucket, credentials, регион, адресация, группы квот, применить миграцию'],

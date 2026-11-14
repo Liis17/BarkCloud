@@ -378,3 +378,51 @@ describe('FilesPage bulk selection with folders', () => {
     go.mockRestore();
   });
 });
+
+describe('FilesPage grid view', () => {
+  const stored = new Map<string, string>();
+  beforeEach(() => {
+    stored.clear();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+    });
+  });
+
+  it('переключается на сетку, запоминает выбор и показывает иконку типа у файла без превью', async () => {
+    mockDirectoryListings({
+      '': {
+        dirs: [{ id: 'dir-1', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' }],
+        files: [{ ...fileEntry('entry-1', 'таблица.xlsx'), media: { id: 'f1', name: 'таблица.xlsx', ext: 'XLSX', kind: 'document', iconKind: 'doc', size: 1, sizeLabel: '1 Б', width: 0, height: 0, previews: [], createdAt: null, uploadedAt: null } }],
+      },
+    });
+    const view = render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('таблица.xlsx');
+    expect(view.container.querySelector('.ftable')).not.toBeNull();
+
+    fireEvent.click(screen.getByTitle('Сеткой'));
+    expect(view.container.querySelector('.ftable')).toBeNull();
+    const tile = screen.getByText('таблица.xlsx').closest('.file-tile')!;
+    expect(tile.querySelector('.file-type-icon .folder-glyph svg')).not.toBeNull();
+    expect(within(tile as HTMLElement).getByText('XLSX')).toBeTruthy();
+    expect(stored.get('bark_files_view')).toBe('grid');
+
+    view.unmount();
+    const again = render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('таблица.xlsx');
+    expect(again.container.querySelector('.files-grid')).not.toBeNull();
+  });
+
+  it('принимает файлы, брошенные на плитку папки', async () => {
+    stored.set('bark_files_view', 'grid');
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    const tile = (await screen.findByText('Документы')).closest('.file-tile')!;
+    const dataTransfer = transfer('report.pdf');
+
+    fireEvent.dragEnter(tile, { dataTransfer });
+    await waitFor(() => expect(tile.className).toContain('drop-target'));
+    fireEvent.drop(tile, { dataTransfer });
+
+    expect(mocks.enqueue).toHaveBeenCalledWith(expect.any(Array), { dir: 'dir-1' });
+  });
+});
