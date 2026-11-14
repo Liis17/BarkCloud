@@ -4,7 +4,9 @@ import { FOLDER_ICON_CATEGORIES, FOLDER_ICONS, findFolderIcon, foregroundFor } f
 const svgFiles = import.meta.glob<string>('@folder-icons/svg/*.svg', { eager: true, query: '?raw', import: 'default' });
 const manifestFiles = import.meta.glob<{ icons: { key: string; category: string }[] }>('@folder-icons/manifest.json', { eager: true, import: 'default' });
 const manifestIcons = Object.values(manifestFiles)[0].icons;
-const fileKeys = Object.keys(svgFiles).map((path) => path.slice(path.lastIndexOf('/') + 1, -4)).sort();
+const SAFE_TAGS = new Set(['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']);
+const SAFE_ATTRS = /^(xmlns|viewBox|d|cx|cy|r|rx|ry|x|y|x1|y1|x2|y2|width|height|points|fill|stroke|stroke-width|stroke-linecap|stroke-linejoin)$/;
+const fileKeys =Object.keys(svgFiles).map((path) => path.slice(path.lastIndexOf('/') + 1, -4)).sort();
 
 describe('пак FolderIcons', () => {
   it('манифест и SVG-файлы совпадают в обе стороны', () => {
@@ -31,7 +33,13 @@ describe('пак FolderIcons', () => {
     for (const [path, svg] of Object.entries(svgFiles)) {
       expect(svg, path).toMatch(/^<svg [^>]*viewBox="0 0 24 24"/);
       expect(svg, path).toContain('currentColor');
-      expect(svg, path).not.toMatch(/<script|<foreignObject|<style|\son[a-z]+\s*=|href\s*=|url\(/i);
+      // Белый список: SVG вставляются в DOM как разметка, любой другой тег или атрибут роняет тест.
+      const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      expect(doc.querySelector('parsererror'), path).toBeNull();
+      for (const el of Array.from(doc.querySelectorAll('*'))) {
+        expect(SAFE_TAGS.has(el.tagName), `${path}: <${el.tagName}>`).toBe(true);
+        for (const attr of Array.from(el.attributes)) expect(attr.name, path).toMatch(SAFE_ATTRS);
+      }
     }
   });
 });

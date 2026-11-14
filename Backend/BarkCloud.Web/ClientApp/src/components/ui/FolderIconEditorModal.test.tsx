@@ -30,6 +30,14 @@ describe('FolderIconEditorModal', () => {
     expect(screen.queryByRole('option', { name: 'Музыка' })).toBeNull();
   });
 
+  it('пустой HEX возвращает цвет темы', async () => {
+    const onSave = renderEditor({ iconKey: 'archive', iconColor: '#2E7D32' });
+    fireEvent.change(screen.getByLabelText('HEX цвета подложки'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ iconKey: 'archive', iconColor: null }));
+  });
+
   it('не даёт сохранить некорректный HEX и сбрасывает значок к стандартному', async () => {
     const onSave = renderEditor({ iconKey: 'archive', iconColor: '#2E7D32' });
     const hex = screen.getByLabelText('HEX цвета подложки');

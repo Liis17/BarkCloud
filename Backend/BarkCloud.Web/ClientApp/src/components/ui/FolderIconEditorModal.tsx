@@ -49,6 +49,7 @@ export function FolderIconEditorModal({ folderName, initial, onClose, onSave }: 
     setHexInput(raw);
     const normalized = normalizeHex(raw);
     if (normalized) setIconColor(normalized);
+    else if (!raw.trim()) setIconColor(null); // пустое поле — цвет темы
   }
   async function save() {
     setBusy(true);

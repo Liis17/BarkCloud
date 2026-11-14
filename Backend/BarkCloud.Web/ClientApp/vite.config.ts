@@ -8,8 +8,9 @@ const BACKEND = 'http://localhost:5148';
 const FILES_HTTP1 = 'http://localhost:7026';
 const clientFile = (path: string) => decodeURI(new URL(path, import.meta.url).pathname);
 // Общий пак иконок папок в корне репозитория (FolderIcons/) — собирается в бандл при каждой сборке SPA.
-// Путь без ведущего «/» перед буквой диска: иначе glob по alias на Windows ничего не находит.
-const folderIcons = clientFile('../../../FolderIcons').replace(/^\/([A-Za-z]:)/, '$1');
+// Файловый путь без ведущего «/» перед буквой диска: иначе на Windows glob по alias и server.fs.allow не работают.
+const clientDir = (path: string) => clientFile(path).replace(/^\/([A-Za-z]:)/, '$1');
+const folderIcons = clientDir('../../../FolderIcons');
 const backendRoutes = ['/api', '/login', '/register', '/forgot', '/logout', '/healthz', '/updating', '/restarting', '/maintenance-status', '/maintenance-wait.js'];
 
 export default defineConfig({
@@ -24,7 +25,7 @@ export default defineConfig({
   server: {
     port: 5173,
     fs: {
-      allow: [clientFile('./'), folderIcons],
+      allow: [clientDir('./'), folderIcons],
     },
     proxy: {
       ...Object.fromEntries(
