@@ -151,6 +151,7 @@ internal sealed partial class CloudGateway : IDisposable
             _ => DrainTimer(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _cacheCleanupTimer = _time.CreateTimer(
             _ => ScheduleCacheCleanup(), null, CacheCleanupInterval, CacheCleanupInterval);
+        CreateMoveTimer();
     }
 
     // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
@@ -183,6 +184,7 @@ internal sealed partial class CloudGateway : IDisposable
             _downloads.Clear();
             _blockFetches.Clear();
             _wholeMode.Clear();
+            DropPendingMoves(); // переносы прежнего аккаунта досылаются до смены сессии (FlushPending)
         }
 
         oldCancellation.Cancel();
@@ -384,7 +386,7 @@ internal sealed partial class CloudGateway : IDisposable
         Exception? failure = null;
         try
         {
-            var listing = LoadDirectoryListing(dirId, cancellationToken);
+            var listing = ApplyPendingMoves(dirId, LoadDirectoryListing(dirId, cancellationToken));
             loadedListing = listing;
             var cached = new CachedDirectoryListing(
                 _time.GetUtcNow().UtcDateTime,
@@ -1814,6 +1816,9 @@ internal sealed partial class CloudGateway : IDisposable
     {
         if (final)
             Volatile.Write(ref _ending, 1);
+        // Переносы досылаются первыми: удаление записи, ждущей переноса, иначе сорвало бы перенос.
+        using (var moveCancellation = new CancellationTokenSource(timeout))
+            FlushPendingMoves(moveCancellation.Token);
         var elapsed = Stopwatch.StartNew();
         var deadline = _time.GetUtcNow().UtcDateTime.Add(timeout);
         if (!Monitor.TryEnter(_sendLock, timeout))
@@ -1862,6 +1867,7 @@ internal sealed partial class CloudGateway : IDisposable
     {
         if (allowRetry && Volatile.Read(ref _ending) != 0)
             return;
+        FlushPendingMoves(cancellationToken);
 
         lock (_sendLock)
         {
@@ -2074,6 +2080,8 @@ internal sealed partial class CloudGateway : IDisposable
         try { cacheCleanupTask?.GetAwaiter().GetResult(); }
         catch (Exception ex) { EngineLog.Error("Остановка очистки кеша", ex); }
         _delTimer.Dispose();
+        _moveTimer?.Dispose();
+        DropPendingMoves();
         _cacheEpochCancellation.Cancel();
         _cacheEpochCancellation.Dispose();
     }

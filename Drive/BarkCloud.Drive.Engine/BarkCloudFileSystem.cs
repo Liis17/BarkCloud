@@ -148,6 +148,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         _serverKey = serverKey;
         _ownerUserId = ownerUserId ?? (() => null);
         Directory.CreateDirectory(_writeDir);
+        // Отложенные удаления и переносы завершаются вне колбэка Dokany — их ошибки видны через статус.
+        _gateway.SyncError = SetLastSyncError;
 
         UpdateOutboxSession(_ownerUserId());
     }
@@ -1094,6 +1096,23 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 return DokanResult.Success;
             }
 
+            var updateListingCache = sourceFile is null
+                && targetFile is null
+                && !isDirectory
+                && !targetExists
+                && parentChanged
+                && !nameChanged;
+            // Массовый перенос в Проводнике: отвечаем сразу, сервер получит пачку MoveFileEntries.
+            if (updateListingCache
+                && _gateway.TryQueueMoveFileEntry(sourceNode!.EntryId, sourceDirectoryId, to.Value.DirectoryId))
+            {
+                listingCacheHandledByMove = true;
+                return DokanResult.Success;
+            }
+
+            // Остальные операции полагаются на серверное состояние, поэтому отложенные переносы досылаются.
+            _gateway.FlushPendingMoves();
+
             var replaceEntryId = replace && !sameObject && !isDirectory ? targetEntryId : null;
             var rollback = new Stack<Action>();
             var targetDeleted = false;
@@ -1113,12 +1132,6 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     }
                 }
 
-                var updateListingCache = sourceFile is null
-                    && targetFile is null
-                    && !isDirectory
-                    && !targetExists
-                    && parentChanged
-                    && !nameChanged;
                 listingCacheHandledByMove = MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName,
                     to.Value.DirectoryId, to.Value.Name, parentChanged, nameChanged,
                     updateListingCache, rollback);
@@ -1981,6 +1994,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             SaveOutboxState(file);
         }
 
+        // Замена удаляет и прикрепляет записи по серверному состоянию — сначала досылаем отложенные переносы.
+        if (operation.Stage is PersistStage.DeleteOld or PersistStage.Attach)
+            _gateway.FlushPendingMoves(cancellationToken);
+
         if (operation.Stage == PersistStage.DeleteOld)
         {
             if (operation.SupersededFileId is { } supersededFileId)
@@ -2690,6 +2707,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 return;
             }
 
+            _gateway.FlushPendingMoves();
             _gateway.DeleteDirectory(node.DirectoryId);
             _gateway.InvalidateListing(node.DirectoryId);
         }
