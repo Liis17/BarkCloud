@@ -27,7 +27,7 @@ See also: [[Backend/OriginalLifetime]] · [[Backend/DynamicFolders]] · [[Api/Fi
 |---|---|
 | Дерево | `CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `GetPath`, `SearchFiles` |
 | Свойства и видимость | `GetDirectoryProperties`, `SetDirectoryVisibility` |
-| Записи | `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `DeleteFileEntry`, `DeleteFileEntries` |
+| Записи | `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `MoveFileEntries`, `DeleteFileEntry`, `DeleteFileEntries` |
 | Галерея | `ListUserMedia`, `GetUserMediaStats`, `DeleteUserMedia`, `SetVideoThumbnail` |
 | Корзина | `ListTrash`, `GetTrashSummary`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` |
 | Избранное и ссылки | `AddFavorite`, `RemoveFavorite`, `ListFavorites`, `CreateShare`, `ListMyShares`, `RevokeShare` |
@@ -36,6 +36,11 @@ See also: [[Backend/OriginalLifetime]] · [[Backend/DynamicFolders]] · [[Api/Fi
 | Доступ пользователям | Файлы: `ShareFileWithUser`, `RevokeUserShare`, `ListMyOutgoingShares`, `ListMyOutgoingSharesAll`, `ListSharedWithMe`, `GetSharedFileDownloadUrl`; папки: `ShareFolderWithUser`, `RevokeFolderUserShare`, `ListMyOutgoingFolderShares`, `ListSharedFoldersWithMe`, `ListSharedDirectory` |
 
 Полный контракт с сообщениями находится в `Shared/BarkCloud.Proto/files_api.proto`. Практические шаги клиента собраны в [[Api/FilesClientGuide]].
+
+### Массовые операции и компактный листинг
+
+- `MoveFileEntries` переносит до 100 записей в одну папку под одним `LockTree` с той же семантикой, что `MoveFileEntry`. Ошибка целевой папки (нет, чужая) отклоняет весь пакет; не найденные записи и конфликты имени (в том числе внутри пакета) возвращаются по каждой записи в `failed` с кодом ошибки сервера и не отменяют остальные. Запись, уже лежащая в целевой папке, считается перенесённой, поэтому повтор пакета безопасен. Обработчик — `Features/Cloud/MoveFileEntries`; имена в папке проверяются одним запросом `GetLiveFileEntryNames`.
+- `ListDirectoryRequest.compact` (только `ListDirectoryDetailed`) — облегчённые страницы для полного обхода папки: лимит до 1000, без превью и ссылок, подпапки только на странице без курсора. Остальные клиенты флаг не передают и получают прежний ответ; страницы без флага по-прежнему содержат подпапки на каждой странице.
 
 ### Видимость папок
 
