@@ -2472,6 +2472,55 @@ public sealed class BarkCloudFileSystemTests
     }
 
     [Fact]
+    public void Save_in_a_large_folder_finds_the_new_entry_without_rereading_the_folder()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        for (var i = 0; i < 1000; i++)
+            cloud.AddFile("", $"file-{i:D4}.jpg", [1]);
+        cloud.AddFile("", "edit.bin", [1, 2, 3]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var fs = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        gateway.ListDirectory("").Files.Should().HaveCount(1001);
+        var listCalls = CountListCalls(cloud);
+
+        var (info, _) = OpenWritableAndWrite(fs, "\\edit.bin", [7, 7, 7]);
+        fs.Cleanup("\\edit.bin", info);
+        fs.CloseFile("\\edit.bin", info);
+
+        CountListCalls(cloud).Should().Be(listCalls + 1, "новую запись ищем одной страницей");
+        var saved = gateway.ListDirectory("").Files.Where(file => file.Entry.Name == "edit.bin").ToList();
+        saved.Should().ContainSingle();
+        saved[0].File.FileSize.Should().Be(3);
+        gateway.ListDirectory("").Files.Should().HaveCount(1001);
+        CountListCalls(cloud).Should().Be(listCalls + 1);
+    }
+
+    [Fact]
+    public void Mass_delete_in_a_large_folder_does_not_reread_the_folder()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        for (var i = 0; i < 1000; i++)
+            cloud.AddFile("", $"file-{i:D4}.jpg", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var listing = gateway.ListDirectory("");
+        var listCalls = CountListCalls(cloud);
+
+        foreach (var file in listing.Files.Take(250))
+            gateway.QueueDeleteFileEntry(file.Entry.Id, "");
+        gateway.FlushPending(throwOnFailure: true);
+
+        gateway.ListDirectory("").Files.Should().HaveCount(750);
+        CountListCalls(cloud).Should().Be(listCalls);
+        gateway.InvalidateListing("");
+        gateway.ListDirectory("").Files.Should().HaveCount(750);
+    }
+
+    private static int CountListCalls(FakeCloud cloud)
+        => cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed);
+
+    [Fact]
     public void Written_placeholder_is_removed_after_save_and_cloud_deletion()
     {
         using var temp = new TestDirectory();
@@ -2490,6 +2539,8 @@ public sealed class BarkCloudFileSystemTests
         local.Kind.Should().Be(LocalFileKind.Writable);
         File.Exists(local.TempPath).Should().BeFalse();
         gateway.DeleteFileEntry(local.ExistingEntryId!);
+        // Внешнее удаление видно после обновления снимка, а не мгновенно (снимок после сохранения правится точечно).
+        gateway.InvalidateListing("");
         fs.FindFiles("\\", out var files, new FakeDokanFileInfo()).Should().Be(DokanResult.Success);
         files.Should().BeEmpty();
     }

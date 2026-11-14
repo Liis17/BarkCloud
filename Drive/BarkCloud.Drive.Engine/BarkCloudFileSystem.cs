@@ -1985,7 +1985,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             if (operation.SupersededFileId is { } supersededFileId)
             {
-                var superseded = _gateway.FindFileEntryByFileId(file.DirectoryId, supersededFileId, cancellationToken);
+                var superseded = _gateway.FindFileEntryByFileId(file.DirectoryId, supersededFileId, file.Name,
+                    cancellationToken);
                 if (superseded is not null)
                 {
                     file.ExistingEntryId = superseded.Entry.Id;
@@ -2007,6 +2008,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     // Запись уже удалена, в том числе при потере ответа предыдущего вызова.
                 }
 
+                _gateway.RemoveFileFromListing(file.DirectoryId, oldEntryId);
                 operation.OldEntryDeleted = true;
                 SaveOutboxState(file);
             }
@@ -2015,11 +2017,15 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             SaveOutboxState(file);
         }
 
+        FileEntryDetailed? attachedEntry = null;
+        string? replacedEntryId = null;
         if (operation.Stage == PersistStage.Attach)
         {
             try
             {
+                replacedEntryId = operation.OldEntryDeleted ? file.ExistingEntryId : null;
                 var attached = AttachUploadedFile(file, operation, cancellationToken);
+                attachedEntry = attached;
                 file.ExistingEntryId = attached.Entry.Id;
                 file.ExistingNode = new ResolvedNode
                 {
@@ -2043,7 +2049,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         operation.Stage = PersistStage.Done;
         SaveOutboxState(file);
-        _gateway.InvalidateListing(file.DirectoryId);
+        if (attachedEntry is not null)
+            _gateway.ApplyAttachedFile(file.DirectoryId, attachedEntry, replacedEntryId);
+        else
+            _gateway.InvalidateListing(file.DirectoryId);
         file.Modified = false;
         file.DirtyAfterPersist = false;
         file.KeepData = false;
@@ -2061,7 +2070,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         FileEntryDetailed? attached = null;
         if (operation.AttachAttempted || operation.AttachCompleted)
         {
-            attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+            attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
             if (attached is not null)
                 operation.AttachCompleted = true;
         }
@@ -2093,7 +2102,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 catch (RpcException ex) when (ServerErrors.HasCode(ex, ServerErrors.FileAlreadyAttached))
                 {
                     file.KeepData = true;
-                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
                     if (attached is not null)
                     {
                         operation.AttachCompleted = true;
@@ -2106,7 +2115,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     file.KeepData = true;
-                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
                     if (attached is not null)
                     {
                         operation.AttachCompleted = true;
@@ -2123,7 +2132,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             }
         }
 
-        attached ??= _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+        attached ??= _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
         if (attached is null)
             throw new InvalidOperationException(Loc.T("Eng_AttachedFileNotListedFmt", file.Name));
 
@@ -2391,7 +2400,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             try
             {
-                var attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+                var attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name);
                 if (attached is not null)
                     _gateway.QueueDeleteFileEntry(attached.Entry.Id, file.DirectoryId);
             }

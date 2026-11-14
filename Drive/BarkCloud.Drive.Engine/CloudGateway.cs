@@ -481,9 +481,23 @@ internal sealed partial class CloudGateway : IDisposable
             subdirectoriesByName, subdirectoriesByExactName, filesByName, filesByExactName);
     }
 
-    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId,
+    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId, string name,
         CancellationToken cancellationToken = default)
     {
+        // Курсор (name, пустой Guid) исключающий, поэтому страница начинается ровно с записей
+        // этого имени: новую запись находим одним запросом вместо перечитывания всей папки.
+        var page = _cloud.ListDirectoryDetailed(new ListDirectoryRequest
+        {
+            DirectoryId = directoryId,
+            Limit = 20,
+            CursorName = name,
+            CursorEntryId = Guid.Empty.ToString(),
+        }, cancellationToken: cancellationToken);
+        var found = page.Files.FirstOrDefault(file =>
+            string.Equals(file.File.Id, fileId, StringComparison.Ordinal));
+        if (found is not null)
+            return found;
+
         InvalidateListing(directoryId);
         return ListDirectory(directoryId, cancellationToken).Files.FirstOrDefault(file =>
             string.Equals(file.File.Id, fileId, StringComparison.Ordinal));
@@ -1589,6 +1603,76 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
+    // Добавляет прикреплённую запись в актуальный снимок папки (и убирает заменённую старую),
+    // чтобы сохранение в большой папке не заставляло перечитывать весь листинг.
+    public void ApplyAttachedFile(string directoryId, FileEntryDetailed attached, string? removedEntryId)
+        => PatchListing(directoryId, listing =>
+        {
+            var copy = CopyDirectoryListing(listing);
+            for (var i = copy.Files.Count - 1; i >= 0; i--)
+            {
+                var id = copy.Files[i].Entry.Id;
+                if (id == attached.Entry.Id || id == removedEntryId)
+                    copy.Files.RemoveAt(i);
+            }
+
+            var index = 0;
+            while (index < copy.Files.Count && CompareFileEntries(copy.Files[index], attached) <= 0)
+                index++;
+            copy.Files.Insert(index, attached);
+            return copy;
+        });
+
+    public void RemoveFileFromListing(string directoryId, string entryId)
+        => RemoveFilesFromListing(directoryId, new HashSet<string> { entryId });
+
+    private bool ListingSnapshotContains(string directoryId, string entryId)
+    {
+        lock (_listLock)
+        {
+            _listGen.TryGetValue(directoryId, out var generation);
+            return _listCache.TryGetValue(directoryId, out var cached)
+                   && cached.Generation == generation
+                   && cached.AccountEpoch == Volatile.Read(ref _accountEpoch)
+                   && cached.Listing.Files.Any(file => file.Entry.Id == entryId);
+        }
+    }
+
+    private void RemoveFilesFromListing(string directoryId, IReadOnlySet<string> entryIds)
+        => PatchListing(directoryId, listing =>
+        {
+            var copy = CopyDirectoryListing(listing);
+            copy.Files.Clear();
+            copy.Files.AddRange(listing.Files.Where(file => !entryIds.Contains(file.Entry.Id)));
+            return copy;
+        });
+
+    // Правит неинвалидированный снимок с сохранением исходного времени кеширования;
+    // без такого снимка папка просто инвалидируется.
+    private void PatchListing(string directoryId, Func<DirectoryListingDetailed, DirectoryListingDetailed> patch)
+    {
+        lock (_cacheEpochLock)
+        lock (_listLock)
+        {
+            _listGen.TryGetValue(directoryId, out var generation);
+            if (!_listCache.TryGetValue(directoryId, out var cached)
+                || cached.Generation != generation
+                || cached.AccountEpoch != Volatile.Read(ref _accountEpoch))
+            {
+                InvalidateListingLocked(directoryId);
+                return;
+            }
+
+            var listing = patch(cached.Listing);
+            _listCache[directoryId] = cached with
+            {
+                Generation = BumpListingGenerationLocked(directoryId),
+                Listing = listing,
+                Index = CreateDirectoryListingIndex(listing),
+            };
+        }
+    }
+
     private void InvalidateListingLocked(string directoryId)
     {
         _listCache.TryRemove(directoryId, out _);
@@ -1695,8 +1779,11 @@ internal sealed partial class CloudGateway : IDisposable
     // пачкой через DeleteFileEntries — по таймеру (1 c тишины) либо по достижении порога в 100.
     public void QueueDeleteFileEntry(string entryId, string parentDirId)
     {
-        _delTombstones[entryId] = 0;     // скрыть из листингов немедленно
-        InvalidateListing(parentDirId);  // следующее перечисление пересоберётся уже без записи
+        // Тумбстон скрывает запись из листингов и поиска по имени. Снимок, уже содержащий запись,
+        // не сбрасываем, иначе массовое удаление перечитывало бы большую папку на каждый файл.
+        _delTombstones[entryId] = 0;
+        if (!ListingSnapshotContains(parentDirId, entryId))
+            InvalidateListing(parentDirId);
 
         bool atThreshold;
         lock (_delLock)
@@ -1852,11 +1939,12 @@ internal sealed partial class CloudGateway : IDisposable
                 continue;
             }
 
-            foreach (var (entryId, dirId) in chunk)
+            // Порядок важен: сначала убираем записи из снимков листинга, потом снимаем тумбстоны —
+            // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
+            foreach (var group in chunk.GroupBy(item => item.DirId))
+                RemoveFilesFromListing(group.Key, group.Select(item => item.EntryId).ToHashSet());
+            foreach (var (entryId, _) in chunk)
             {
-                // Порядок важен: сначала сбрасываем кэш листинга, потом снимаем тумбстон —
-                // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
-                InvalidateListing(dirId);
                 _delTombstones.TryRemove(entryId, out _);
                 _delAttempts.TryRemove(entryId, out _);
             }

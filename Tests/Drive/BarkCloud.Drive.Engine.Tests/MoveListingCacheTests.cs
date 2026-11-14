@@ -413,7 +413,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void MoveFile_retries_after_a_tombstoned_destination_conflict_and_invalidates_listings()
+    public void MoveFile_retries_after_a_tombstoned_destination_conflict_and_patches_listings()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
@@ -442,13 +442,17 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         injectedConflict.Should().BeTrue();
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.MoveFileEntry).Should().Be(2);
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntries).Should().Be(1);
-        snapshotCopyCount.Should().Be(0);
+        // Доставленное удаление точечно убирает цель из снимка, поэтому повторный перенос
+        // правит актуальные снимки обеих папок без перечитывания.
+        snapshotCopyCount.Should().Be(1);
         var listCallsAfterMove = CountListCalls(cloud);
         gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
-        CountListCalls(cloud).Should().Be(listCallsAfterMove + 1);
         gateway.ListDirectory(destinationDirectoryId).Files.Should()
             .ContainSingle(entry => entry.Entry.Id == file.EntryId && entry.Entry.Name == "item.bin");
-        CountListCalls(cloud).Should().Be(listCallsAfterMove + 2);
+        CountListCalls(cloud).Should().Be(listCallsAfterMove);
+        gateway.InvalidateListing(destinationDirectoryId);
+        gateway.ListDirectory(destinationDirectoryId).Files.Should()
+            .ContainSingle(entry => entry.Entry.Id == file.EntryId);
     }
 
     [Fact]
