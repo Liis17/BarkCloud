@@ -476,6 +476,21 @@
   <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
     <value>После привязки файл «{0}» не найден в свежем листинге каталога.</value>
   </data>
+  <data name="Eng_MoveFailedFmt" xml:space="preserve">
+    <value>Не удалось перенести «{0}»: файл возвращён в исходную папку. {1}</value>
+  </data>
+  <data name="Eng_MoveNameConflict" xml:space="preserve">
+    <value>В целевой папке уже есть файл с таким именем.</value>
+  </data>
+  <data name="Eng_MoveEntryGone" xml:space="preserve">
+    <value>Файл уже удалён или перемещён в облаке.</value>
+  </data>
+  <data name="Eng_MoveUnconfirmedFmt" xml:space="preserve">
+    <value>Сервер не подтвердил перенос «{0}»; папки перечитаны, проверьте, где находится файл. {1}</value>
+  </data>
+  <data name="Eng_MoveNotSent" xml:space="preserve">
+    <value>Перенос не успел уйти на сервер.</value>
+  </data>
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Не удалось удалить запись «{0}» из облака после {1} попыток.</value>
   </data>

@@ -476,6 +476,21 @@
   <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
     <value>Nach dem Verknüpfen wurde „{0}“ nicht in der aktuellen Verzeichnisliste gefunden.</value>
   </data>
+  <data name="Eng_MoveFailedFmt" xml:space="preserve">
+    <value>„{0}“ konnte nicht verschoben werden: Die Datei liegt wieder im ursprünglichen Ordner. {1}</value>
+  </data>
+  <data name="Eng_MoveNameConflict" xml:space="preserve">
+    <value>Im Zielordner gibt es bereits eine Datei mit diesem Namen.</value>
+  </data>
+  <data name="Eng_MoveEntryGone" xml:space="preserve">
+    <value>Die Datei wurde in der Cloud bereits gelöscht oder verschoben.</value>
+  </data>
+  <data name="Eng_MoveUnconfirmedFmt" xml:space="preserve">
+    <value>Der Server hat das Verschieben von „{0}“ nicht bestätigt; die Ordner wurden neu geladen, prüfen Sie den Speicherort der Datei. {1}</value>
+  </data>
+  <data name="Eng_MoveNotSent" xml:space="preserve">
+    <value>Das Verschieben wurde nicht rechtzeitig an den Server gesendet.</value>
+  </data>
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Cloud-Eintrag „{0}“ konnte nach {1} Versuchen nicht gelöscht werden.</value>
   </data>

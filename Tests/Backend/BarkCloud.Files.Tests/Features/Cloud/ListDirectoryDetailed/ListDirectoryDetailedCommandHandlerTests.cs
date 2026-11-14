@@ -88,4 +88,48 @@ public class ListDirectoryDetailedCommandHandlerTests
         response.NextCursorName.Should().Be("a.txt");
         response.NextCursorEntryId.Should().Be(first.Id.ToString());
     }
+
+    [Fact]
+    public async Task Handle_CompactContinuation_SkipsSubdirsAndPreviewsAndAllowsLargerPage()
+    {
+        var cursorId = Guid.NewGuid();
+        var entry = new CloudFileEntry
+        {
+            Id = Guid.NewGuid(), OwnerId = OwnerId, FileId = Guid.NewGuid(), Name = "b.jpg"
+        };
+        _storage.Setup(s => s.ListFilesInDirectoryPage(
+                OwnerId, CloudHierarchyStorage.RootDirectoryId, "a.jpg", cursorId, 1000, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([entry]);
+        _files.Setup(s => s.GetFiles(It.IsAny<List<Guid>>()))
+            .ReturnsAsync([new UploadFileEntity { Id = entry.FileId, Size = 7, MediaKind = MediaKind.Photo }]);
+
+        var response = await CreateSut().Handle(new ListDirectoryDetailedCommand
+        {
+            Limit = 5000, CursorName = "a.jpg", CursorEntryId = cursorId, Compact = true
+        }, default);
+
+        response.Subdirs.Should().BeEmpty();
+        response.Files.Should().ContainSingle();
+        response.Files[0].File.FileSize.Should().Be(7);
+        response.Files[0].File.FileUrl.Should().BeEmpty();
+        _storage.Verify(s => s.ListSubdirectories(It.IsAny<long>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _files.Verify(s => s.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_CompactFirstPage_ReturnsSubdirs()
+    {
+        _storage.Setup(s => s.ListSubdirectories(OwnerId, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new CloudDirectory { Id = Guid.NewGuid(), OwnerId = OwnerId, Name = "Фото" }]);
+        _storage.Setup(s => s.ListFilesInDirectoryPage(
+                OwnerId, CloudHierarchyStorage.RootDirectoryId, null, null, 1000, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var response = await CreateSut().Handle(new ListDirectoryDetailedCommand { Limit = 1000, Compact = true },
+            default);
+
+        response.Subdirs.Should().ContainSingle(d => d.Name == "Фото");
+    }
 }

@@ -148,6 +148,8 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         _serverKey = serverKey;
         _ownerUserId = ownerUserId ?? (() => null);
         Directory.CreateDirectory(_writeDir);
+        // Отложенные удаления и переносы завершаются вне колбэка Dokany — их ошибки видны через статус.
+        _gateway.SyncError = SetLastSyncError;
 
         UpdateOutboxSession(_ownerUserId());
     }
@@ -341,6 +343,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             return CreateFileCore(fileName, access, share, mode, options, attributes, info);
         }
         catch (Exception ex)
@@ -482,6 +485,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             if (info.Context is HandleContext { File: { } file } handle)
             {
                 var becameInactive = false;
@@ -511,7 +515,6 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     DeleteLocalFile(file);
                 else if (persist)
                 {
-                    using var keepAlive = DokanKeepAlive.Start(info, _time);
                     lock (file.Sync)
                     {
                         if (file.Modified && file.Op?.Stage != PersistStage.Processing)
@@ -572,6 +575,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             if (info.Context is HandleContext { File: { } file })
                 CloseLocalFile(fileName, file, info);
         }
@@ -749,6 +753,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         fileInfo = default;
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var handle = info.Context as HandleContext;
             var localFile = handle?.File;
             if (localFile is null && handle?.Node is { IsDirectory: false } nodeHandle)
@@ -788,6 +793,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         files = new List<FileInformation>();
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var registeredFiles = GetLocalFiles();
             var node = SafeResolve(fileName);
             if (node is null || !node.IsDirectory)
@@ -938,6 +944,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             return MoveFileCore(oldName, newName, replace, info);
         }
         catch (Exception ex)
@@ -1090,6 +1097,23 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 return DokanResult.Success;
             }
 
+            var updateListingCache = sourceFile is null
+                && targetFile is null
+                && !isDirectory
+                && !targetExists
+                && parentChanged
+                && !nameChanged;
+            // Массовый перенос в Проводнике: отвечаем сразу, сервер получит пачку MoveFileEntries.
+            if (updateListingCache
+                && _gateway.TryQueueMoveFileEntry(sourceNode!.EntryId, sourceDirectoryId, to.Value.DirectoryId))
+            {
+                listingCacheHandledByMove = true;
+                return DokanResult.Success;
+            }
+
+            // Остальные операции полагаются на серверное состояние, поэтому отложенные переносы досылаются.
+            _gateway.FlushPendingMoves();
+
             var replaceEntryId = replace && !sameObject && !isDirectory ? targetEntryId : null;
             var rollback = new Stack<Action>();
             var targetDeleted = false;
@@ -1109,12 +1133,6 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     }
                 }
 
-                var updateListingCache = sourceFile is null
-                    && targetFile is null
-                    && !isDirectory
-                    && !targetExists
-                    && parentChanged
-                    && !nameChanged;
                 listingCacheHandledByMove = MoveCloudNode(sourceNode!, sourceDirectoryId, sourceName,
                     to.Value.DirectoryId, to.Value.Name, parentChanged, nameChanged,
                     updateListingCache, rollback);
@@ -1471,6 +1489,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var localFile = FindLocalFile(fileName);
             if (localFile?.Kind == LocalFileKind.Pending || FindPendingFileByPath(fileName) is not null)
                 return DokanResult.AccessDenied;
@@ -1493,12 +1512,15 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var node = SafeResolve(fileName);
             if (node is null || !node.IsDirectory)
                 return DokanResult.Success;
 
+            // Пустота проверяется по серверу: неподтверждённые переносы сначала досылаются.
+            _gateway.FlushPendingMoves();
             _gateway.InvalidateListing(node.DirectoryId);
-            if (DirectoryIsNotEmpty(fileName, node))
+            if (_gateway.PendingMoveCount > 0 || DirectoryIsNotEmpty(fileName, node))
                 return DokanResult.DirectoryNotEmpty;
 
             return DokanResult.Success;
@@ -1525,6 +1547,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         freeBytesAvailable = totalNumberOfBytes = totalNumberOfFreeBytes = 0;
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var s = _gateway.GetStorage().Info;
             long total;
             long free;
@@ -1974,11 +1997,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             SaveOutboxState(file);
         }
 
+        // Замена удаляет и прикрепляет записи по серверному состоянию — сначала досылаем отложенные переносы.
+        if (operation.Stage is PersistStage.DeleteOld or PersistStage.Attach)
+            _gateway.FlushPendingMoves(cancellationToken);
+
         if (operation.Stage == PersistStage.DeleteOld)
         {
             if (operation.SupersededFileId is { } supersededFileId)
             {
-                var superseded = _gateway.FindFileEntryByFileId(file.DirectoryId, supersededFileId, cancellationToken);
+                var superseded = _gateway.FindFileEntryByFileId(file.DirectoryId, supersededFileId, file.Name,
+                    cancellationToken);
                 if (superseded is not null)
                 {
                     file.ExistingEntryId = superseded.Entry.Id;
@@ -2000,6 +2028,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     // Запись уже удалена, в том числе при потере ответа предыдущего вызова.
                 }
 
+                _gateway.RemoveFileFromListing(file.DirectoryId, oldEntryId);
                 operation.OldEntryDeleted = true;
                 SaveOutboxState(file);
             }
@@ -2008,11 +2037,15 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             SaveOutboxState(file);
         }
 
+        FileEntryDetailed? attachedEntry = null;
+        string? replacedEntryId = null;
         if (operation.Stage == PersistStage.Attach)
         {
             try
             {
+                replacedEntryId = operation.OldEntryDeleted ? file.ExistingEntryId : null;
                 var attached = AttachUploadedFile(file, operation, cancellationToken);
+                attachedEntry = attached;
                 file.ExistingEntryId = attached.Entry.Id;
                 file.ExistingNode = new ResolvedNode
                 {
@@ -2036,7 +2069,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
 
         operation.Stage = PersistStage.Done;
         SaveOutboxState(file);
-        _gateway.InvalidateListing(file.DirectoryId);
+        if (attachedEntry is not null)
+            _gateway.ApplyAttachedFile(file.DirectoryId, attachedEntry, replacedEntryId);
+        else
+            _gateway.InvalidateListing(file.DirectoryId);
         file.Modified = false;
         file.DirtyAfterPersist = false;
         file.KeepData = false;
@@ -2054,7 +2090,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         FileEntryDetailed? attached = null;
         if (operation.AttachAttempted || operation.AttachCompleted)
         {
-            attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+            attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
             if (attached is not null)
                 operation.AttachCompleted = true;
         }
@@ -2086,7 +2122,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 catch (RpcException ex) when (ServerErrors.HasCode(ex, ServerErrors.FileAlreadyAttached))
                 {
                     file.KeepData = true;
-                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
                     if (attached is not null)
                     {
                         operation.AttachCompleted = true;
@@ -2099,7 +2135,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     file.KeepData = true;
-                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+                    attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
                     if (attached is not null)
                     {
                         operation.AttachCompleted = true;
@@ -2116,7 +2152,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             }
         }
 
-        attached ??= _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, cancellationToken);
+        attached ??= _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name, cancellationToken);
         if (attached is null)
             throw new InvalidOperationException(Loc.T("Eng_AttachedFileNotListedFmt", file.Name));
 
@@ -2384,7 +2420,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         {
             try
             {
-                var attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId);
+                var attached = _gateway.FindFileEntryByFileId(file.DirectoryId, fileId, file.Name);
                 if (attached is not null)
                     _gateway.QueueDeleteFileEntry(attached.Entry.Id, file.DirectoryId);
             }
@@ -2674,6 +2710,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 return;
             }
 
+            // FlushPending выше досылает и переносы. Если часть не ушла, файл, перенесённый из этой
+            // папки только в снимке, на сервере ещё в ней — рекурсивное удаление унесло бы его в корзину.
+            if (_gateway.PendingMoveCount > 0)
+            {
+                var reason = Loc.T("Eng_MoveNotSent");
+                LastSyncError = Loc.T("Eng_DirectoryDeleteFailedFmt", Path.GetFileName(fileName), reason);
+                EngineLog.Error($"Cleanup(\"{fileName}\")", new IOException(reason));
+                return;
+            }
+
             _gateway.DeleteDirectory(node.DirectoryId);
             _gateway.InvalidateListing(node.DirectoryId);
         }
@@ -2732,6 +2778,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     }
 
     private ResolvedNode? SafeResolve(string path) => _gateway.Resolve(path);
+
+    // Листинг большой папки или RPC может идти дольше таймаута Dokany; без продления
+    // драйвер сам отменяет запрос, и Проводник показывает 0x800705AA.
+    private IDisposable StartNetworkKeepAlive(IDokanFileInfo info) => DokanKeepAlive.Start(info, _time);
 
     private static DateTime? ToDate(Timestamp? t) => t?.ToDateTime();
 }

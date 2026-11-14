@@ -19,6 +19,7 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
 {
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
+    private const int CompactMaxLimit = 1000;
 
     private readonly ICloudHierarchyStorage _storage;
     private readonly IUploadedFilesStorage _uploadedFiles;
@@ -63,12 +64,18 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
             fileDirectoryId = CloudHierarchyStorage.RootDirectoryId;
         }
 
-        var limit = request.Limit <= 0 ? DefaultLimit : Math.Min(request.Limit, MaxLimit);
+        var limit = request.Limit <= 0
+            ? DefaultLimit
+            : Math.Min(request.Limit, request.Compact ? CompactMaxLimit : MaxLimit);
         var entries = await _storage.ListFilesInDirectoryPage(
             ownerId, fileDirectoryId, request.CursorName, request.CursorEntryId, limit, cancellationToken);
         var hasMore = entries.Count > limit;
         var page = hasMore ? entries.Take(limit).ToList() : entries;
-        var subdirs = await _storage.ListSubdirectories(ownerId, request.DirectoryId, cancellationToken);
+        // Компактный обход берёт подпапки с первой страницы, поэтому на страницах с курсором их не читаем.
+        var isContinuation = !string.IsNullOrEmpty(request.CursorName) && request.CursorEntryId.HasValue;
+        var subdirs = request.Compact && isContinuation
+            ? []
+            : await _storage.ListSubdirectories(ownerId, request.DirectoryId, cancellationToken);
 
         var fileIds = page.Select(e => e.FileId).Distinct().ToList();
         var files = fileIds.Count == 0
@@ -76,8 +83,10 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
             : await _uploadedFiles.GetFiles(fileIds);
         var filesById = files.ToDictionary(f => f.Id);
 
-        var previewsByOriginal = await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
-        var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
+        var previewsByOriginal = request.Compact
+            ? new Dictionary<Guid, List<Domain.FilePreview>>()
+            : await _uploadedFiles.GetPreviewsForFiles(filesById.Keys, cancellationToken);
+        var baseUrl = request.Compact ? null : FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
 
         var response = new DirectoryListingDetailed();
         foreach (var d in subdirs)

@@ -476,6 +476,21 @@
   <data name="Eng_AttachedFileNotListedFmt" xml:space="preserve">
     <value>After attaching, “{0}” was not found in the fresh directory listing.</value>
   </data>
+  <data name="Eng_MoveFailedFmt" xml:space="preserve">
+    <value>Could not move “{0}”: the file was returned to its original folder. {1}</value>
+  </data>
+  <data name="Eng_MoveNameConflict" xml:space="preserve">
+    <value>The destination folder already has a file with this name.</value>
+  </data>
+  <data name="Eng_MoveEntryGone" xml:space="preserve">
+    <value>The file was already deleted or moved in the cloud.</value>
+  </data>
+  <data name="Eng_MoveUnconfirmedFmt" xml:space="preserve">
+    <value>The server did not confirm moving “{0}”; folders were reloaded, check where the file is. {1}</value>
+  </data>
+  <data name="Eng_MoveNotSent" xml:space="preserve">
+    <value>The move was not sent to the server in time.</value>
+  </data>
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Could not delete cloud entry “{0}” after {1} attempts.</value>
   </data>

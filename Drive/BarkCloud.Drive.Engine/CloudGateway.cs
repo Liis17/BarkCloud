@@ -58,6 +58,9 @@ internal sealed partial class CloudGateway : IDisposable
         long AccountEpoch);
 
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ListStaleTtl = TimeSpan.FromSeconds(60);
+    private const int MaxListingPatches = 10_000;
+    private const int MaxReplayedListingPatches = 256;
     private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageRpcTimeout = TimeSpan.FromSeconds(15);
@@ -66,7 +69,7 @@ internal sealed partial class CloudGateway : IDisposable
     private static readonly TimeSpan HttpUploadResponseLimit = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan CacheCleanupInterval = TimeSpan.FromMinutes(1);
     private const long DefaultCacheLimitBytes = 5L * 1024 * 1024 * 1024;
-    private const int DirectoryPageSize = 200;
+    private const int DirectoryPageSize = 1000; // compact-страницы; старый сервер ограничит до 200
 
     private readonly CloudApi.CloudApiClient _cloud;
     private readonly FilesApi.FilesApiClient _files;
@@ -85,6 +88,9 @@ internal sealed partial class CloudGateway : IDisposable
     private readonly ConcurrentDictionary<string, int> _listGen = new(); // «поколение» инвалидации на папку — защита от записи устаревшего ответа
     private readonly object _listLock = new(); // защищает кэш, поколения и реестр объединяемых загрузок
     private readonly Dictionary<ListingLoadKey, TaskCompletionSource<DirectoryListingDetailed>> _listLoads = new();
+    private readonly HashSet<string> _backgroundRefreshes = new(); // папки с фоновым обновлением в полёте
+    private readonly Dictionary<string, List<(int Generation, Func<DirectoryListingDetailed, DirectoryListingDetailed> Patch)>>
+        _listPatches = new(); // под _listLock
     private readonly ConcurrentDictionary<DownloadKey, Lazy<Task<string>>> _downloads = new();
     private readonly object _cacheEpochLock = new();
     private CancellationTokenSource _cacheEpochCancellation = new();
@@ -123,6 +129,7 @@ internal sealed partial class CloudGateway : IDisposable
     public Action<string>? SyncError { get; set; }
 
     internal Action? ListingLoadWaiterJoinedForTesting { get; set; }
+    internal Action<string>? ListingLoadFinishedForTesting { get; set; }
     internal Action<long, long>? ListingMoveSnapshotCopiedForTesting { get; set; }
     internal Action<string>? CacheEntryBeforeOpenForTesting { get; set; }
     internal Action<string>? CacheFileOpenedForTesting { get; set; }
@@ -150,6 +157,7 @@ internal sealed partial class CloudGateway : IDisposable
             _ => DrainTimer(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _cacheCleanupTimer = _time.CreateTimer(
             _ => ScheduleCacheCleanup(), null, CacheCleanupInterval, CacheCleanupInterval);
+        CreateMoveTimer();
     }
 
     // Сменить папку кэша на лету: новые чтения пойдут в неё. Уже скачанные файлы
@@ -177,11 +185,13 @@ internal sealed partial class CloudGateway : IDisposable
                 oldCancellation = _cacheEpochCancellation;
                 _cacheEpochCancellation = new CancellationTokenSource();
                 _listCache.Clear();
+                _listPatches.Clear();
             }
             _tempUrls.Clear();
             _downloads.Clear();
             _blockFetches.Clear();
             _wholeMode.Clear();
+            DropPendingMoves(); // переносы прежнего аккаунта досылаются до смены сессии (FlushPending)
         }
 
         oldCancellation.Cancel();
@@ -300,9 +310,10 @@ internal sealed partial class CloudGateway : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             ListingLoadKey key;
-            TaskCompletionSource<DirectoryListingDetailed> load;
+            TaskCompletionSource<DirectoryListingDetailed>? load = null;
             DirectoryListingDetailed? cachedListing = null;
             var ownsLoad = false;
+            var refreshInBackground = false;
             lock (_listLock)
             {
                 _listGen.TryGetValue(dirId, out var generation);
@@ -311,22 +322,51 @@ internal sealed partial class CloudGateway : IDisposable
 
                 if (_listCache.TryGetValue(dirId, out var cached)
                     && cached.Generation == generation
-                    && cached.AccountEpoch == accountEpoch
-                    && _time.GetUtcNow().UtcDateTime - cached.At < ListTtl)
-                    cachedListing = cached.Listing;
-
-                if (cachedListing is null)
+                    && cached.AccountEpoch == accountEpoch)
                 {
-                    if (!_listLoads.TryGetValue(key, out load!))
+                    var age = _time.GetUtcNow().UtcDateTime - cached.At;
+                    if (age < ListStaleTtl)
+                        cachedListing = cached.Listing;
+                    // Неинвалидированный, но несвежий снимок отдаём сразу и обновляем в фоне:
+                    // иначе каждый колбэк Dokany в большой папке ждал бы полную перезагрузку листинга.
+                    // Одно фоновое обновление на папку: правки меняют поколение, и ключ загрузки
+                    // с поколением не удержал бы параллельные полные перечитывания.
+                    if (age >= ListTtl && age < ListStaleTtl
+                        && !_listLoads.ContainsKey(key) && _backgroundRefreshes.Add(dirId))
                     {
                         load = new TaskCompletionSource<DirectoryListingDetailed>(
                             TaskCreationOptions.RunContinuationsAsynchronously);
                         _listLoads.Add(key, load);
-                        ownsLoad = true;
+                        refreshInBackground = true;
                     }
                 }
-                else
-                    load = null!;
+
+                if (cachedListing is null && !_listLoads.TryGetValue(key, out load))
+                {
+                    load = new TaskCompletionSource<DirectoryListingDetailed>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    _listLoads.Add(key, load);
+                    ownsLoad = true;
+                }
+            }
+
+            if (refreshInBackground)
+            {
+                var epoch = CaptureCacheEpoch();
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        RunListingLoad(dirId, key, load!, epoch.CancellationToken);
+                    }
+                    finally
+                    {
+                        lock (_listLock)
+                            _backgroundRefreshes.Remove(dirId);
+                    }
+                    if (load!.Task.Exception is { } error)
+                        EngineLog.Error($"Фоновое обновление листинга {dirId}", error.InnerException ?? error);
+                });
             }
 
             if (cachedListing is not null)
@@ -336,57 +376,9 @@ internal sealed partial class CloudGateway : IDisposable
                 ListingLoadWaiterJoinedForTesting?.Invoke();
 
             if (ownsLoad)
-            {
-                DirectoryListingDetailed? loadedListing = null;
-                OperationCanceledException? cancellation = null;
-                Exception? failure = null;
-                try
-                {
-                    var listing = LoadDirectoryListing(dirId, cancellationToken);
-                    loadedListing = listing;
-                    var cached = new CachedDirectoryListing(
-                        _time.GetUtcNow().UtcDateTime,
-                        key.Generation,
-                        key.AccountEpoch,
-                        listing,
-                        CreateDirectoryListingIndex(listing));
+                RunListingLoad(dirId, key, load!, cancellationToken);
 
-                    // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
-                    // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
-                    // удерживая исчезнувший файл в кэше на ListTtl. Проверка поколения и запись кэша —
-                    // под _listLock (тем же, что инвалидация), иначе попавшая между ними InvalidateListing терялась бы.
-                    lock (_listLock)
-                    {
-                        _listGen.TryGetValue(dirId, out var generationAfter);
-                        if (key.Generation == generationAfter
-                            && key.AccountEpoch == Volatile.Read(ref _accountEpoch))
-                            _listCache[dirId] = cached;
-                    }
-                }
-                catch (OperationCanceledException ex)
-                {
-                    cancellation = ex;
-                }
-                catch (Exception ex)
-                {
-                    failure = ex;
-                }
-                finally
-                {
-                    lock (_listLock)
-                        if (_listLoads.TryGetValue(key, out var current) && ReferenceEquals(current, load))
-                            _listLoads.Remove(key);
-                }
-
-                if (cancellation is not null)
-                    load.TrySetCanceled(cancellation.CancellationToken);
-                else if (failure is not null)
-                    load.TrySetException(failure);
-                else
-                    load.TrySetResult(loadedListing!);
-            }
-
-            var result = ownsLoad ? load.Task : load.Task.WaitAsync(cancellationToken);
+            var result = ownsLoad ? load!.Task : load!.Task.WaitAsync(cancellationToken);
             try
             {
                 return result.GetAwaiter().GetResult();
@@ -404,6 +396,78 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
+    private void RunListingLoad(string dirId, ListingLoadKey key,
+        TaskCompletionSource<DirectoryListingDetailed> load, CancellationToken cancellationToken)
+    {
+        DirectoryListingDetailed? loadedListing = null;
+        OperationCanceledException? cancellation = null;
+        Exception? failure = null;
+        try
+        {
+            var listing = ApplyPendingMoves(dirId, LoadDirectoryListing(dirId, cancellationToken));
+            var appliedGeneration = key.Generation;
+            var index = CreateDirectoryListingIndex(listing);
+
+            // Кэшируем только если за время RPC папку не инвалидировали: иначе ответ устарел
+            // (например, запись удалена и тумбстон уже снят) и не должен затирать инвалидацию,
+            // удерживая исчезнувший файл в кэше на ListTtl. Если поколение сменили только точечные
+            // правки собственных операций, ответ догоняется их повтором (они идемпотентны) —
+            // иначе поток правок при массовой операции отбрасывал бы каждое обновление снимка.
+            // Проверка поколения и запись кэша — под _listLock (тем же, что инвалидация).
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                List<Func<DirectoryListingDetailed, DirectoryListingDetailed>>? replay;
+                lock (_listLock)
+                {
+                    _listGen.TryGetValue(dirId, out var generationAfter);
+                    if (key.AccountEpoch != Volatile.Read(ref _accountEpoch))
+                        break;
+                    if (appliedGeneration == generationAfter)
+                    {
+                        _listCache[dirId] = new CachedDirectoryListing(
+                            _time.GetUtcNow().UtcDateTime, generationAfter, key.AccountEpoch, listing, index);
+                        TrimListingPatchesLocked(dirId, generationAfter);
+                        break;
+                    }
+
+                    // Каждая правка копирует листинг; длинный хвост дешевле перечитать.
+                    replay = TakeListingPatchesLocked(dirId, appliedGeneration, generationAfter);
+                    if (replay is null || replay.Count > MaxReplayedListingPatches)
+                        break;
+                    appliedGeneration = generationAfter;
+                }
+
+                foreach (var patch in replay)
+                    listing = patch(listing);
+                index = CreateDirectoryListingIndex(listing);
+            }
+
+            loadedListing = listing;
+        }
+        catch (OperationCanceledException ex)
+        {
+            cancellation = ex;
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
+        finally
+        {
+            lock (_listLock)
+                if (_listLoads.TryGetValue(key, out var current) && ReferenceEquals(current, load))
+                    _listLoads.Remove(key);
+        }
+
+        if (cancellation is not null)
+            load.TrySetCanceled(cancellation.CancellationToken);
+        else if (failure is not null)
+            load.TrySetException(failure);
+        else
+            load.TrySetResult(loadedListing!);
+        ListingLoadFinishedForTesting?.Invoke(dirId);
+    }
+
     private DirectoryListingDetailed LoadDirectoryListing(string dirId, CancellationToken cancellationToken)
     {
         var listing = new DirectoryListingDetailed();
@@ -415,6 +479,7 @@ internal sealed partial class CloudGateway : IDisposable
             {
                 DirectoryId = dirId,
                 Limit = DirectoryPageSize,
+                Compact = true,
                 CursorEntryId = cursorEntryId,
             };
             if (!string.IsNullOrEmpty(cursorName)) request.CursorName = cursorName;
@@ -457,9 +522,24 @@ internal sealed partial class CloudGateway : IDisposable
             subdirectoriesByName, subdirectoriesByExactName, filesByName, filesByExactName);
     }
 
-    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId,
+    public FileEntryDetailed? FindFileEntryByFileId(string directoryId, string fileId, string name,
         CancellationToken cancellationToken = default)
     {
+        // Курсор (name, пустой Guid) исключающий, поэтому страница начинается ровно с записей
+        // этого имени: новую запись находим одним запросом вместо перечитывания всей папки.
+        var page = _cloud.ListDirectoryDetailed(new ListDirectoryRequest
+        {
+            DirectoryId = directoryId,
+            Limit = 20,
+            Compact = true,
+            CursorName = name,
+            CursorEntryId = Guid.Empty.ToString(),
+        }, cancellationToken: cancellationToken);
+        var found = page.Files.FirstOrDefault(file =>
+            string.Equals(file.File.Id, fileId, StringComparison.Ordinal));
+        if (found is not null)
+            return found;
+
         InvalidateListing(directoryId);
         return ListDirectory(directoryId, cancellationToken).Files.FirstOrDefault(file =>
             string.Equals(file.File.Id, fileId, StringComparison.Ordinal));
@@ -1499,8 +1579,10 @@ internal sealed partial class CloudGateway : IDisposable
                 && IsCurrentFileMoveListingLocked(destinationDirectoryId, snapshot.DestinationGeneration,
                     snapshot.AccountEpoch, snapshot.Destination))
             {
-                var sourceGeneration = BumpListingGenerationLocked(sourceDirectoryId);
-                var destinationGeneration = BumpListingGenerationLocked(destinationDirectoryId);
+                var sourceGeneration = BumpListingGenerationWithPatchLocked(sourceDirectoryId,
+                    listing => CopyDirectoryListingWithoutFile(listing, entryId));
+                var destinationGeneration = BumpListingGenerationWithPatchLocked(destinationDirectoryId,
+                    listing => UpsertFile(listing, movedFile));
                 _listCache[sourceDirectoryId] = snapshot.Source with
                 {
                     Generation = sourceGeneration,
@@ -1565,9 +1647,141 @@ internal sealed partial class CloudGateway : IDisposable
         }
     }
 
+    // Добавляет прикреплённую запись в актуальный снимок папки (и убирает заменённую старую),
+    // чтобы сохранение в большой папке не заставляло перечитывать весь листинг.
+    public void ApplyAttachedFile(string directoryId, FileEntryDetailed attached, string? removedEntryId)
+        => PatchListing(directoryId, listing =>
+        {
+            var copy = CopyDirectoryListing(listing);
+            for (var i = copy.Files.Count - 1; i >= 0; i--)
+            {
+                var id = copy.Files[i].Entry.Id;
+                if (id == attached.Entry.Id || id == removedEntryId)
+                    copy.Files.RemoveAt(i);
+            }
+
+            var index = 0;
+            while (index < copy.Files.Count && CompareFileEntries(copy.Files[index], attached) <= 0)
+                index++;
+            copy.Files.Insert(index, attached);
+            return copy;
+        });
+
+    public void RemoveFileFromListing(string directoryId, string entryId)
+        => RemoveFilesFromListing(directoryId, new HashSet<string> { entryId });
+
+    private bool ListingSnapshotContains(string directoryId, string entryId)
+    {
+        lock (_listLock)
+        {
+            _listGen.TryGetValue(directoryId, out var generation);
+            return _listCache.TryGetValue(directoryId, out var cached)
+                   && cached.Generation == generation
+                   && cached.AccountEpoch == Volatile.Read(ref _accountEpoch)
+                   && cached.Listing.Files.Any(file => file.Entry.Id == entryId);
+        }
+    }
+
+    private void RemoveFilesFromListing(string directoryId, IReadOnlySet<string> entryIds)
+        => PatchListing(directoryId, listing =>
+        {
+            var copy = CopyDirectoryListing(listing);
+            copy.Files.Clear();
+            copy.Files.AddRange(listing.Files.Where(file => !entryIds.Contains(file.Entry.Id)));
+            return copy;
+        });
+
+    // Правит неинвалидированный снимок с сохранением исходного времени кеширования;
+    // без такого снимка папка просто инвалидируется.
+    // Копия и индекс строятся вне глобальных блокировок; под ними — перепроверка и публикация.
+    private void PatchListing(string directoryId, Func<DirectoryListingDetailed, DirectoryListingDetailed> patch)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            CachedDirectoryListing cached;
+            lock (_cacheEpochLock)
+            lock (_listLock)
+            {
+                if (!TryGetCurrentListingLocked(directoryId, Volatile.Read(ref _accountEpoch), out cached))
+                {
+                    InvalidateListingLocked(directoryId);
+                    return;
+                }
+            }
+
+            var listing = patch(cached.Listing);
+            var index = CreateDirectoryListingIndex(listing);
+            lock (_cacheEpochLock)
+            lock (_listLock)
+            {
+                if (TryGetCurrentListingLocked(directoryId, Volatile.Read(ref _accountEpoch), out var current)
+                    && ReferenceEquals(current, cached))
+                {
+                    PublishListingLocked(directoryId, cached, listing, index, patch);
+                    return;
+                }
+            }
+        }
+
+        lock (_listLock)
+            InvalidateListingLocked(directoryId);
+    }
+
+    // Журнал точечных правок по поколениям: загрузку, начатую до них, можно догнать повтором.
+    // Инвалидация обрывает журнал, и такие загрузки отбрасываются.
+    private int BumpListingGenerationWithPatchLocked(string directoryId,
+        Func<DirectoryListingDetailed, DirectoryListingDetailed> patch)
+    {
+        var generation = BumpListingGenerationLocked(directoryId);
+        if (!_listPatches.TryGetValue(directoryId, out var patches))
+            _listPatches[directoryId] = patches = new List<(int, Func<DirectoryListingDetailed, DirectoryListingDetailed>)>();
+        patches.Add((generation, patch));
+        if (patches.Count > MaxListingPatches)
+            patches.RemoveRange(0, patches.Count - MaxListingPatches);
+        return generation;
+    }
+
+    // Записи не старше самой ранней загрузки этой папки в полёте больше никому не нужны.
+    private void TrimListingPatchesLocked(string directoryId, int cachedGeneration)
+    {
+        if (!_listPatches.TryGetValue(directoryId, out var patches))
+            return;
+
+        var oldestNeeded = cachedGeneration;
+        foreach (var load in _listLoads.Keys)
+            if (load.DirectoryId == directoryId && load.Generation < oldestNeeded)
+                oldestNeeded = load.Generation;
+        patches.RemoveAll(patch => patch.Generation <= oldestNeeded);
+        if (patches.Count == 0)
+            _listPatches.Remove(directoryId);
+    }
+
+    // Правки поколений (from, to], если журнал покрывает их все подряд; иначе null.
+    private List<Func<DirectoryListingDetailed, DirectoryListingDetailed>>? TakeListingPatchesLocked(
+        string directoryId, int fromGeneration, int toGeneration)
+    {
+        if (!_listPatches.TryGetValue(directoryId, out var patches))
+            return null;
+
+        var result = new List<Func<DirectoryListingDetailed, DirectoryListingDetailed>>();
+        var expected = fromGeneration + 1;
+        foreach (var (generation, patch) in patches)
+        {
+            if (generation <= fromGeneration)
+                continue;
+            if (generation != expected)
+                return null;
+            result.Add(patch);
+            expected++;
+        }
+
+        return expected == toGeneration + 1 ? result : null;
+    }
+
     private void InvalidateListingLocked(string directoryId)
     {
         _listCache.TryRemove(directoryId, out _);
+        _listPatches.Remove(directoryId);
         BumpListingGenerationLocked(directoryId);
     }
 
@@ -1671,8 +1885,11 @@ internal sealed partial class CloudGateway : IDisposable
     // пачкой через DeleteFileEntries — по таймеру (1 c тишины) либо по достижении порога в 100.
     public void QueueDeleteFileEntry(string entryId, string parentDirId)
     {
-        _delTombstones[entryId] = 0;     // скрыть из листингов немедленно
-        InvalidateListing(parentDirId);  // следующее перечисление пересоберётся уже без записи
+        // Тумбстон скрывает запись из листингов и поиска по имени. Снимок, уже содержащий запись,
+        // не сбрасываем, иначе массовое удаление перечитывало бы большую папку на каждый файл.
+        _delTombstones[entryId] = 0;
+        if (!ListingSnapshotContains(parentDirId, entryId))
+            InvalidateListing(parentDirId);
 
         bool atThreshold;
         lock (_delLock)
@@ -1701,6 +1918,9 @@ internal sealed partial class CloudGateway : IDisposable
     {
         if (final)
             Volatile.Write(ref _ending, 1);
+        // Переносы досылаются первыми: удаление записи, ждущей переноса, иначе сорвало бы перенос.
+        using (var moveCancellation = new CancellationTokenSource(timeout))
+            FlushPendingMoves(moveCancellation.Token);
         var elapsed = Stopwatch.StartNew();
         var deadline = _time.GetUtcNow().UtcDateTime.Add(timeout);
         if (!Monitor.TryEnter(_sendLock, timeout))
@@ -1749,6 +1969,7 @@ internal sealed partial class CloudGateway : IDisposable
     {
         if (allowRetry && Volatile.Read(ref _ending) != 0)
             return;
+        FlushPendingMoves(cancellationToken);
 
         lock (_sendLock)
         {
@@ -1828,11 +2049,12 @@ internal sealed partial class CloudGateway : IDisposable
                 continue;
             }
 
-            foreach (var (entryId, dirId) in chunk)
+            // Порядок важен: сначала убираем записи из снимков листинга, потом снимаем тумбстоны —
+            // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
+            foreach (var group in chunk.GroupBy(item => item.DirId))
+                RemoveFilesFromListing(group.Key, group.Select(item => item.EntryId).ToHashSet());
+            foreach (var (entryId, _) in chunk)
             {
-                // Порядок важен: сначала сбрасываем кэш листинга, потом снимаем тумбстон —
-                // иначе осталось бы микроокно, где запись из устаревшего кэша снова видна.
-                InvalidateListing(dirId);
                 _delTombstones.TryRemove(entryId, out _);
                 _delAttempts.TryRemove(entryId, out _);
             }
@@ -1960,6 +2182,8 @@ internal sealed partial class CloudGateway : IDisposable
         try { cacheCleanupTask?.GetAwaiter().GetResult(); }
         catch (Exception ex) { EngineLog.Error("Остановка очистки кеша", ex); }
         _delTimer.Dispose();
+        _moveTimer?.Dispose();
+        DropPendingMoves();
         _cacheEpochCancellation.Cancel();
         _cacheEpochCancellation.Dispose();
     }

@@ -55,6 +55,7 @@ See also: [[Backend/ResumableUpload]] · [[Backend/FilesCloud]] · [[Backend/Dyn
 
 - Пустой `directory_id` в запросах дерева означает корень, если не задан `route_by_media_kind=true`. `ListDirectory` возвращает метаданные, `ListDirectoryDetailed` также содержит `UploadFileInfo`.
 - `file_id` обозначает загруженный блоб; `entry_id` — запись этого блоба в дереве. Для переименования, перемещения и удаления записи используйте `entry_id`; для `AttachFile` — `file_id`.
+- Для массового переноса используйте `MoveFileEntries` (до 100 записей в одну папку, результат по каждой записи); для полного обхода большой папки — `ListDirectoryDetailed` с `compact=true`.
 - `AttachFile` вызывайте только после статуса `READY`. Параметр `route_by_media_kind=true` позволяет серверу выбрать системную папку по типу файла.
 - Фото и видео добавляются в альбомы через `AlbumApi.AddItemsToAlbum`; страница альбома использует `ListAlbums` и `ListAlbumItems`. Курсор альбомов — пара `(cursor_updated_at, cursor_album_id)`, элементов — `(cursor_added_at, cursor_file_id)`.
 
