@@ -30,6 +30,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         }
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
 
         gateway.ListDirectory("");
@@ -100,6 +101,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         cloud.AddFile(destinationDirectoryId, "b.txt", [3]);
         cloud.AddFile(destinationDirectoryId, "z.txt", [4]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         WarmListings(gateway, sourceDirectoryId, destinationDirectoryId);
 
@@ -136,6 +138,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         cloud.AddFile(destinationDirectoryId, "b.txt", [3]);
         cloud.AddFile(destinationDirectoryId, "z.txt", [4]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
 
         gateway.ListDirectory("");
@@ -165,7 +168,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void MoveFile_keeps_the_original_listing_ttl()
+    public async Task MoveFile_keeps_the_original_listing_ttl()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
@@ -174,6 +177,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
 
         gateway.ListDirectory("");
@@ -187,10 +191,16 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         gateway.ListDirectory(destinationDirectoryId).Files.Should().ContainSingle();
         CountListCalls(cloud).Should().Be(3);
 
+        // После исходного TTL снимки отдаются сразу, а обе папки обновляются в фоне.
         time.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(1));
         gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
         gateway.ListDirectory(destinationDirectoryId).Files.Should().ContainSingle();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (CountListCalls(cloud) < 5 && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
         CountListCalls(cloud).Should().Be(5);
+        gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
+        gateway.ListDirectory(destinationDirectoryId).Files.Should().ContainSingle();
     }
 
     [Fact]
@@ -204,6 +214,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(start);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         gateway.ListDirectory("");
         gateway.ListDirectory(sourceDirectoryId);
         gateway.ListDirectory(destinationDirectoryId);
@@ -244,7 +255,9 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
         gateway.ListDirectory(destinationDirectoryId).Files.Should()
             .ContainSingle(entry => entry.Entry.Id == file.EntryId);
-        CountListCalls(cloud).Should().Be(6);
+        // Снимки старше 5 с обновляются в фоне по одному на папку; к моменту проверки
+        // фоновые обновления источника и назначения могут ещё не начаться.
+        CountListCalls(cloud).Should().BeInRange(4, 6);
     }
 
     [Fact]
@@ -256,6 +269,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var destinationDirectoryId = cloud.AddDirectory("Destination");
         var file = cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         WarmListings(gateway, sourceDirectoryId, destinationDirectoryId);
         var responseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -296,6 +310,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var destinationDirectoryId = cloud.AddDirectory("Destination");
         var file = cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         WarmListings(gateway, sourceDirectoryId, destinationDirectoryId);
         var responseReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -337,6 +352,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         var target = cloud.AddFile(destinationDirectoryId, "ITEM.BIN", [2]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         WarmListings(gateway, sourceDirectoryId, destinationDirectoryId);
 
@@ -370,6 +386,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var file = cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         var target = cloud.AddFile(destinationDirectoryId, "ITEM.BIN", [2]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         WarmListings(gateway, sourceDirectoryId, destinationDirectoryId);
         var warmListCalls = CountListCalls(cloud);
 
@@ -393,6 +410,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var destinationDirectoryId = cloud.AddDirectory("Destination");
         var file = cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         gateway.ListDirectory(sourceDirectoryId);
         var warmListCalls = CountListCalls(cloud);
 
@@ -407,7 +425,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void MoveFile_retries_after_a_tombstoned_destination_conflict_and_invalidates_listings()
+    public void MoveFile_retries_after_a_tombstoned_destination_conflict_and_patches_listings()
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
@@ -415,6 +433,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var destinationDirectoryId = cloud.AddDirectory("Destination");
         var file = cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         WarmListings(gateway, sourceDirectoryId, destinationDirectoryId);
         var injectedConflict = false;
@@ -436,13 +455,17 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         injectedConflict.Should().BeTrue();
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.MoveFileEntry).Should().Be(2);
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.DeleteFileEntries).Should().Be(1);
-        snapshotCopyCount.Should().Be(0);
+        // Доставленное удаление точечно убирает цель из снимка, поэтому повторный перенос
+        // правит актуальные снимки обеих папок без перечитывания.
+        snapshotCopyCount.Should().Be(1);
         var listCallsAfterMove = CountListCalls(cloud);
         gateway.ListDirectory(sourceDirectoryId).Files.Should().BeEmpty();
-        CountListCalls(cloud).Should().Be(listCallsAfterMove + 1);
         gateway.ListDirectory(destinationDirectoryId).Files.Should()
             .ContainSingle(entry => entry.Entry.Id == file.EntryId && entry.Entry.Name == "item.bin");
-        CountListCalls(cloud).Should().Be(listCallsAfterMove + 2);
+        CountListCalls(cloud).Should().Be(listCallsAfterMove);
+        gateway.InvalidateListing(destinationDirectoryId);
+        gateway.ListDirectory(destinationDirectoryId).Files.Should()
+            .ContainSingle(entry => entry.Entry.Id == file.EntryId);
     }
 
     [Fact]
@@ -454,6 +477,7 @@ public sealed class MoveListingCacheTests(ITestOutputHelper output)
         var destinationDirectoryId = cloud.AddDirectory("Destination");
         var file = cloud.AddFile(sourceDirectoryId, "item.bin", [1]);
         using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        gateway.QueueMovesForTesting = false; // класс проверяет синхронный путь переноса
         var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"));
         fileSystem.FindFiles("\\Source", out var sourceFiles, new FakeDokanFileInfo())
             .Should().Be(DokanResult.Success);

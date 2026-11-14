@@ -1,7 +1,8 @@
 name: "🚀 BarkCloud Release"
 
 # Push в master публикует стабильный релиз, в dev — prerelease со сборками
-# всех приложений. Релиз создаётся только после успешного полного
+# Android и Windows. В master собираются все приложения.
+# Релиз создаётся только после успешного полного
 # прогона всех тестов (tests.yml с force-all).
 
 on:
@@ -183,6 +184,7 @@ jobs:
 
   ios:
     name: "iOS IPA"
+    if: ${{ github.ref_name == 'master' }}
     needs: tests
     runs-on: macos-latest
     timeout-minutes: 40
@@ -215,6 +217,7 @@ jobs:
 
   macos:
     name: "macOS DMG"
+    if: ${{ github.ref_name == 'master' }}
     needs: tests
     runs-on: macos-latest
     timeout-minutes: 40
@@ -316,7 +319,15 @@ jobs:
   publish:
     name: "Публикация релиза"
     needs: [tests, version, android, ios, macos, drive, builder]
-    if: ${{ success() }}
+    if: >-
+      ${{ !cancelled() &&
+          needs.tests.result == 'success' &&
+          needs.version.result == 'success' &&
+          needs.android.result == 'success' &&
+          needs.drive.result == 'success' &&
+          needs.builder.result == 'success' &&
+          ((github.ref_name == 'dev' && needs.ios.result == 'skipped' && needs.macos.result == 'skipped') ||
+           (github.ref_name == 'master' && needs.ios.result == 'success' && needs.macos.result == 'success')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -329,12 +340,15 @@ jobs:
       - name: "Именование артефактов"
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           mv Artifacts/android-apk/*.apk        "Artifacts/BarkCloud.Android-${VERSION}.apk"
           mv Artifacts/android-apk/android-update.json "Artifacts/android-update.json"
-          mv Artifacts/ios-ipa/*.ipa            "Artifacts/BarkCloud.iOS-${VERSION}.ipa"
-          mv Artifacts/macos-dmg/*.dmg          "Artifacts/BarkCloud.Mac-${VERSION}.dmg"
+          if [ "$RELEASE_BRANCH" = master ]; then
+            mv Artifacts/ios-ipa/*.ipa          "Artifacts/BarkCloud.iOS-${VERSION}.ipa"
+            mv Artifacts/macos-dmg/*.dmg        "Artifacts/BarkCloud.Mac-${VERSION}.dmg"
+          fi
           mv Artifacts/drive-zip/*.zip          "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip"
           mv Artifacts/builder-zip/*.zip        "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip"
           find Artifacts -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
@@ -350,16 +364,18 @@ jobs:
         run: |
           set -euo pipefail
           release_flags=()
+          apple_assets=()
           if [ "$RELEASE_BRANCH" = dev ]; then
             release_flags+=(--prerelease --latest=false)
+          else
+            apple_assets+=("Artifacts/BarkCloud.iOS-${VERSION}.ipa" "Artifacts/BarkCloud.Mac-${VERSION}.dmg")
           fi
           gh release create "$VERSION" \
             "Artifacts/BarkCloud.Android-${VERSION}.apk" \
             "Artifacts/android-update.json" \
-            "Artifacts/BarkCloud.iOS-${VERSION}.ipa" \
-            "Artifacts/BarkCloud.Mac-${VERSION}.dmg" \
             "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip" \
             "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip" \
+            "${apple_assets[@]}" \
             --target "$SHA" \
             --title "BarkCloud $VERSION" \
             --generate-notes "${release_flags[@]}"

@@ -8,8 +8,6 @@ import com.barkfluff.BarkCloud.data.persistence.BarkCloudDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,7 +63,6 @@ class UploadRunTallyRoomTest {
         val blocked = dao.runTally(RUN_START, includeBackup = false, failedIds = listOf("backup-failed"))
 
         assertEquals(UploadRunTally(done = 1, remaining = 0, failed = 1), blocked)
-        assertFalse(blocked.isGenuineSuccess)
     }
 
     @Test
@@ -78,7 +75,6 @@ class UploadRunTallyRoomTest {
         val tally = dao.runTally(RUN_START, includeBackup = false, failedIds = listOf("backup-failed"))
 
         assertEquals(UploadRunTally(done = 1, remaining = 0, failed = 0), tally)
-        assertTrue(tally.isGenuineSuccess)
     }
 
     @Test

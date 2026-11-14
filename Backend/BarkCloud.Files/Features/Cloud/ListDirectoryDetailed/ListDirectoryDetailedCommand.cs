@@ -25,4 +25,10 @@ public class ListDirectoryDetailedCommand : IRequest<DirectoryListingDetailed>
     /// Идентификатор записи последнего элемента предыдущей страницы.
     /// </summary>
     public Guid? CursorEntryId { get; set; }
+
+    /// <summary>
+    /// Облегчённые страницы для полного обхода папки: больший лимит, без превью и ссылок,
+    /// подпапки только на первой странице.
+    /// </summary>
+    public bool Compact { get; set; }
 }

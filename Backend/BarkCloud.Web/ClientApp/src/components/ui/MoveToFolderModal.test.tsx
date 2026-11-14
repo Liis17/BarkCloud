@@ -106,3 +106,37 @@ describe('MoveToFolderModal: кнопка «назад» браузера', () =
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('MoveToFolderModal: перемещение папки', () => {
+  it('не даёт войти в перемещаемую папку, поэтому её и подпапки выбрать нельзя', async () => {
+    const onClose = vi.fn();
+    const onPick = vi.fn();
+    apiGetMock.mockResolvedValue({
+      dirs: [
+        { id: 'dir-a', name: 'Папка А', updatedAt: '2026-01-01T00:00:00Z' },
+        { id: 'dir-b', name: 'Папка Б', updatedAt: '2026-01-01T00:00:00Z' },
+      ],
+      files: [],
+    });
+    render(
+      <MoveToFolderModal
+        count={1}
+        currentDir=""
+        excludeDirs={[{ id: 'dir-a', name: 'Папка А' }]}
+        onPick={onPick}
+        onClose={onClose}
+      />,
+    );
+
+    const self = (await screen.findByText('Папка А')).closest('button') as HTMLButtonElement;
+    expect(self.disabled).toBe(true);
+    fireEvent.click(self);
+    expect(apiGetMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Переместить «Папка А»')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Папка уже здесь' }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByText('Папка Б'));
+    expect(await screen.findByText('Переместить сюда')).toBeTruthy();
+    expect(apiGetMock).toHaveBeenLastCalledWith('/api/cloud/list?dir=dir-b');
+  });
+});

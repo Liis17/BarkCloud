@@ -7,6 +7,7 @@ import { Select } from '../components/ui/Select';
 import { useApiResource } from '../hooks/useApiResource';
 import { plural } from '../lib/format';
 import { MigrationApplyPanel } from '../components/settings/MigrationApplyPanel';
+import { redirectToLogin } from '../lib/loginRedirect';
 
 interface ServerSetting {
   serviceId: number; section: string; key: string; value: string;
@@ -100,7 +101,7 @@ async function request<T>(path: string, body?: unknown): Promise<{ ok: boolean; 
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (response.status === 401) window.location.href = '/login';
+    if (response.status === 401) redirectToLogin();
     let data: T | null = null;
     try { data = await response.json() as T; } catch { /* empty response */ }
     return { ok: response.ok, status: response.status, data };

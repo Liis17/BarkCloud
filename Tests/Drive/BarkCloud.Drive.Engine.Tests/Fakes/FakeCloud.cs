@@ -33,6 +33,7 @@ internal static class FakeCloudMethods
     public const string MoveFileEntry = "/barkcloud.files.CloudApi/MoveFileEntry";
     public const string DeleteFileEntry = "/barkcloud.files.CloudApi/DeleteFileEntry";
     public const string DeleteFileEntries = "/barkcloud.files.CloudApi/DeleteFileEntries";
+    public const string MoveFileEntries = "/barkcloud.files.CloudApi/MoveFileEntries";
     public const string RestoreFromTrash = "/barkcloud.files.CloudApi/RestoreFromTrash";
 }
 
@@ -102,6 +103,7 @@ internal sealed class FakeCloud
         Invoker.Handle<AttachFileRequest, CloudEmpty>(FakeCloudMethods.AttachFile, AttachFile);
         Invoker.Handle<RenameFileEntryRequest, CloudEmpty>(FakeCloudMethods.RenameFileEntry, RenameFileEntry);
         Invoker.Handle<MoveFileEntryRequest, CloudEmpty>(FakeCloudMethods.MoveFileEntry, MoveFileEntry);
+        Invoker.Handle<MoveFileEntriesRequest, MoveFileEntriesResponse>(FakeCloudMethods.MoveFileEntries, MoveFileEntries);
         Invoker.Handle<DeleteFileEntryRequest, CloudEmpty>(FakeCloudMethods.DeleteFileEntry, DeleteFileEntry);
         Invoker.Handle<DeleteFileEntriesRequest, DeleteFileEntriesResponse>(
             FakeCloudMethods.DeleteFileEntries, DeleteFileEntries);
@@ -194,10 +196,11 @@ internal sealed class FakeCloud
                 .ThenBy(entry => entry.Id, StringComparer.Ordinal)
                 .Where(entry => IsAfterCursor(entry, request.CursorName, request.CursorEntryId))
                 .ToArray();
-            var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 200);
+            var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, request.Compact ? 1000 : 200);
             var page = entries.Take(limit).ToArray();
             var response = new DirectoryListingDetailed();
-            response.Subdirs.Add(directories.Select(ToProto));
+            if (!request.Compact || string.IsNullOrEmpty(request.CursorName))
+                response.Subdirs.Add(directories.Select(ToProto));
 
             foreach (var entry in page)
             {
@@ -480,6 +483,39 @@ internal sealed class FakeCloud
 
             entry.DirectoryId = request.NewDirectoryId;
             return new CloudEmpty();
+        }
+    }
+
+    public bool MoveFileEntriesUnsupported { get; set; }
+
+    private MoveFileEntriesResponse MoveFileEntries(MoveFileEntriesRequest request)
+    {
+        if (MoveFileEntriesUnsupported)
+            throw new Grpc.Core.RpcException(new Grpc.Core.Status(Grpc.Core.StatusCode.Unimplemented, "MoveFileEntries"));
+        lock (_gate)
+        {
+            EnsureDirectory(request.NewDirectoryId);
+            var response = new MoveFileEntriesResponse();
+            foreach (var entryId in request.EntryIds.Distinct())
+            {
+                if (!_entries.TryGetValue(entryId, out var entry))
+                {
+                    response.Failed.Add(new FailedFileEntryMove { EntryId = entryId, ErrorCode = FileEntryNotFoundCode });
+                    continue;
+                }
+
+                if (entry.DirectoryId != request.NewDirectoryId
+                    && FileNameExists(request.NewDirectoryId, entry.Name, ignoreEntryId: entry.Id))
+                {
+                    response.Failed.Add(new FailedFileEntryMove { EntryId = entryId, ErrorCode = DirectoryNameConflictCode });
+                    continue;
+                }
+
+                entry.DirectoryId = request.NewDirectoryId;
+                response.MovedEntryIds.Add(entryId);
+            }
+
+            return response;
         }
     }
 

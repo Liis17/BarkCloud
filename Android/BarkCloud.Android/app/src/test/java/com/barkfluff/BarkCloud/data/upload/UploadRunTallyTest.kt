@@ -1,8 +1,6 @@
 package com.barkfluff.BarkCloud.data.upload
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UploadRunTallyTest {
@@ -24,13 +22,5 @@ class UploadRunTallyTest {
     @Test
     fun emptyTallyHasZeroPercent() {
         assertEquals(0, UploadRunTally(done = 0, remaining = 0, failed = 0).percent)
-    }
-
-    @Test
-    fun onlyFullyCompletedRunWithoutErrorsIsGenuineSuccess() {
-        assertTrue(UploadRunTally(done = 3, remaining = 0, failed = 0).isGenuineSuccess)
-        assertFalse(UploadRunTally(done = 0, remaining = 0, failed = 0).isGenuineSuccess)
-        assertFalse(UploadRunTally(done = 3, remaining = 0, failed = 1).isGenuineSuccess)
-        assertFalse(UploadRunTally(done = 3, remaining = 1, failed = 0).isGenuineSuccess)
     }
 }

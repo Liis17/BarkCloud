@@ -108,6 +108,16 @@ class UploadQueueDrainTest {
     }
 
     @Test
+    fun unauthenticatedIsRetriedInsteadOfFailingTheBackupForever() {
+        val error = io.grpc.StatusRuntimeException(Status.UNAUTHENTICATED)
+
+        assertEquals(
+            UploadFailureDisposition.RETRY_AND_STOP_CLAIMING,
+            UploadFailurePolicy.classify(error, UploadSource.BACKUP),
+        )
+    }
+
+    @Test
     fun unreadableSingleMediaIsTerminalWithoutBlockingTheQueueTail() = runTest {
         val source = FakeQueue((1..16).map { job(it) }.toMutableList())
         val disposition = UploadFailurePolicy.classify(BackupSourceReadException(IOException("unreadable")), UploadSource.BACKUP)

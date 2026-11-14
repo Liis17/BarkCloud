@@ -51,6 +51,28 @@ class TokenRefresherTest {
     }
 
     @Test
+    fun `server rejection expires the rejected token unless it was just refreshed`() = runTest {
+        val session = mockk<GlobalParam>()
+        every { session.accessToken } returns "expired"
+        every { session.accessTokenExpiresAt } returns 0L
+        every { session.refreshToken } returns "refresh"
+        every { session.saveRefreshedAccessToken(any(), any()) } just runs
+        every { session.expireAccessToken(any()) } just runs
+        val refresher = TokenRefresher(session) { TokenRefresher.RefreshedAccessToken("fresh", Long.MAX_VALUE) }
+
+        refresher.invalidate("old", nowMillis = 100_000L)
+        verify(exactly = 1) { session.expireAccessToken("old") }
+
+        refresher.validAccessToken()
+        val now = System.currentTimeMillis()
+        refresher.invalidate("fresh", nowMillis = now)
+        verify(exactly = 0) { session.expireAccessToken("fresh") }
+
+        refresher.invalidate("fresh", nowMillis = now + 31_000L)
+        verify(exactly = 1) { session.expireAccessToken("fresh") }
+    }
+
+    @Test
     fun `invalid refresh clears the local session`() = runTest {
         val session = mockk<GlobalParam>()
         every { session.accessToken } returns "expired"

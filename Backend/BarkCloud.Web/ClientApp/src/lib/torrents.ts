@@ -1,6 +1,7 @@
 // API-хелперы вкладки «Торренты» (проксируются веб-бэкендом в торрент-сервис).
 import { api, apiPost, ApiError } from './api';
 import type { Torrent, TorrentFile } from '../hooks/useTorrentStream';
+import { redirectToLogin } from './loginRedirect';
 
 export const listTorrents = () => api<{ torrents: Torrent[] }>('/api/torrents');
 
@@ -13,7 +14,7 @@ export async function addTorrentFile(file: File): Promise<Torrent> {
   fd.append('file', file, file.name);
   const res = await fetch('/api/torrents/file', { method: 'POST', credentials: 'same-origin', body: fd });
   if (res.status === 401) {
-    window.location.href = '/login';
+    redirectToLogin();
     throw new ApiError('unauthorized', { status: 401 });
   }
   const data = await res.json().catch(() => ({}));

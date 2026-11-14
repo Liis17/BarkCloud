@@ -14,14 +14,28 @@ internal sealed class DokanKeepAlive : IDisposable
     private bool _disposed;
     private bool _failureLogged;
 
+    // Колбэк, который уже продлевается на этом потоке: вложенный Start не заводит второй таймер.
+    [ThreadStatic] private static IDokanFileInfo? t_active;
+    private readonly IDokanFileInfo? _previous;
+
     private DokanKeepAlive(IDokanFileInfo info, TimeProvider time)
     {
         _info = info;
+        _previous = t_active;
+        t_active = info;
         _timer = time.CreateTimer(Tick, null, Interval, Interval);
     }
 
     public static IDisposable Start(IDokanFileInfo info, TimeProvider? time = null)
-        => new DokanKeepAlive(info, time ?? TimeProvider.System);
+        => ReferenceEquals(t_active, info)
+            ? NoOp.Instance
+            : new DokanKeepAlive(info, time ?? TimeProvider.System);
+
+    private sealed class NoOp : IDisposable
+    {
+        public static readonly NoOp Instance = new();
+        public void Dispose() { }
+    }
 
     private void Tick(object? _)
     {
@@ -63,5 +77,8 @@ internal sealed class DokanKeepAlive : IDisposable
             _disposed = true;
             _timer.Dispose();
         }
+
+        if (ReferenceEquals(t_active, _info))
+            t_active = _previous;
     }
 }

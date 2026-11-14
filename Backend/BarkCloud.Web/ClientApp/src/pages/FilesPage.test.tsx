@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilesPage } from './FilesPage';
@@ -313,5 +313,68 @@ describe('FilesPage directory pagination', () => {
     expect(await screen.findByText('inside.txt')).toBeTruthy();
     expect(listUrls).toContain('/api/cloud/list?dir=dir-1&limit=50');
     expect(screen.queryByRole('button', { name: 'Показать ещё' })).toBeNull();
+  });
+});
+
+describe('FilesPage folder move', () => {
+  it('перемещает папку через пункт меню «Переместить»', async () => {
+    mockDirectoryListings({
+      '': {
+        dirs: [
+          { id: 'dir-1', parentId: '', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' },
+          { id: 'dir-2', parentId: '', name: 'Архив', updatedAt: '2026-01-01T00:00:00Z' },
+        ],
+        files: [],
+      },
+    });
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+    });
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+
+    fireEvent.contextMenu((await screen.findByText('Документы')).closest('tr')!);
+    fireEvent.click(await screen.findByText('Переместить'));
+
+    const dialog = await screen.findByRole('dialog');
+    const archive = await within(dialog).findByText('Архив');
+    expect((within(dialog).getByText('Документы').closest('button') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(archive);
+    fireEvent.click(await within(dialog).findByText('Переместить сюда'));
+
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/dir/move', { id: 'dir-1', parentId: 'dir-2' }));
+    go.mockRestore();
+  });
+});
+
+describe('FilesPage bulk selection with folders', () => {
+  it('выделяет папку вместе с файлом и переносит обоих', async () => {
+    mockDirectoryListings({
+      '': {
+        dirs: [
+          { id: 'dir-1', parentId: '', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' },
+          { id: 'dir-2', parentId: '', name: 'Архив', updatedAt: '2026-01-01T00:00:00Z' },
+        ],
+        files: [fileEntry('entry-1', 'root.txt')],
+      },
+    });
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+    });
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+
+    fireEvent.click((await screen.findByText('Документы')).closest('tr')!.querySelector('input')!);
+    fireEvent.click(screen.getByText('root.txt').closest('tr')!.querySelector('input')!);
+    expect(screen.getByText('Выбрано: 2')).toBeTruthy();
+    expect((screen.getByRole('button', { name: /Скачать архивом/ }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: /Переместить/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect((within(dialog).getByText('Документы').closest('button') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(await within(dialog).findByText('Архив'));
+    fireEvent.click(await within(dialog).findByText('Переместить сюда'));
+
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/dir/move', { id: 'dir-1', parentId: 'dir-2' }));
+    expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-1', dir: 'dir-2' });
+    go.mockRestore();
   });
 });

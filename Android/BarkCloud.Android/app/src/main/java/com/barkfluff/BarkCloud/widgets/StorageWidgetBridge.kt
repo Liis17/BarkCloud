@@ -1,7 +1,5 @@
 package com.barkfluff.BarkCloud.widgets
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 
 object StorageWidgetBridge {
@@ -17,11 +15,12 @@ object StorageWidgetBridge {
             .putLong(KEY_LIMIT, limit)
             .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
             .apply()
+        StorageWidgetProvider.refreshAll(context)
+    }
 
-        val manager = AppWidgetManager.getInstance(context)
-        val component = ComponentName(context, StorageWidgetProvider::class.java)
-        val ids = manager.getAppWidgetIds(component)
-        StorageWidgetProvider.updateAll(context, manager, ids)
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+        StorageWidgetProvider.refreshAll(context)
     }
 
     fun snapshot(context: Context): StorageSnapshot {
@@ -39,6 +38,8 @@ data class StorageSnapshot(
     val limit: Long,
     val updatedAt: Long,
 ) {
-    val hasData: Boolean get() = limit > 0
+    /** Был хотя бы один успешный снимок (`limit` = 0 у пользователя без квоты — это тоже данные). */
+    val hasData: Boolean get() = updatedAt > 0
+    val hasLimit: Boolean get() = limit > 0
     val percent: Int get() = if (limit > 0) ((used * 100) / limit).toInt().coerceIn(0, 100) else 0
 }

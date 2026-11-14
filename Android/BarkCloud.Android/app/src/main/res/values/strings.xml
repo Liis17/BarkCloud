@@ -178,10 +178,21 @@
     <string name="gallery_cleanup_description">Удалите с устройства фото и видео, копии которых уже есть в облаке. Перед удалением мы повторно проверим их наличие на сервере.</string>
     <string name="gallery_cleanup_count">Локальных копий: %1$d</string>
     <string name="gallery_cleanup_empty">Пока нет локальных копий, которые можно безопасно удалить.</string>
-    <string name="gallery_cleanup_action">Удалить локальные копии · %1$s</string>
     <string name="gallery_cleanup_checking">Проверяем копии в облаке…</string>
     <string name="gallery_cleanup_none_confirmed">Подходящих копий не найдено. Ничего не удалено.</string>
-    <string name="gallery_cleanup_back">Назад</string>
+    <string name="gallery_cleanup_server_unconfirmed">Сервер не подтвердил копии в облаке. Обновите сервер BarkCloud и повторите. Ничего не удалено.</string>
+    <string name="gallery_cleanup_title">Освобождаем место</string>
+    <string name="gallery_cleanup_subtitle">Все фото уже в облаке</string>
+    <string name="gallery_cleanup_close">Закрыть</string>
+    <string name="gallery_cleanup_idle_title">Освободить %1$s</string>
+    <string name="gallery_cleanup_idle_hint">Фото уже в облаке, копии останутся там</string>
+    <string name="gallery_cleanup_busy_title">Освобождаем · %1$s</string>
+    <string name="gallery_cleanup_busy_hint">Удаляем с телефона, в облаке всё останется</string>
+    <string name="gallery_cleanup_busy_action">Освобождаем…</string>
+    <string name="gallery_cleanup_done_title">Готово · %1$s освобождено</string>
+    <string name="gallery_cleanup_done_hint">Фото в облаке, на телефоне место</string>
+    <string name="gallery_cleanup_win_title">Готово!</string>
+    <string name="gallery_cleanup_win_body">Место освобождено. Все фото сохранены в облаке.</string>
     <string name="gallery_device_copies_deleted">Удалено с устройства: %1$d</string>
     <string name="gallery_selection_count">Выбрано: %1$d</string>
     <string name="gallery_account_menu">Меню аккаунта</string>
@@ -240,13 +251,6 @@
     <string name="upload_notification_channel">Загрузки BarkCloud</string>
     <string name="upload_notification_title">Загрузка в BarkCloud</string>
     <string name="upload_notification_progress">%1$d из %2$d</string>
-    <string name="upload_notification_done">Загрузка завершена</string>
-    <plurals name="upload_notification_done_count">
-        <item quantity="one">%1$d файл загружен</item>
-        <item quantity="few">%1$d файла загружено</item>
-        <item quantity="many">%1$d файлов загружено</item>
-        <item quantity="other">%1$d файлов загружено</item>
-    </plurals>
     <string name="upload_v1_cancelled_message">Загрузка отменена при обновлении приложения — добавьте файл заново</string>
     <string name="upload_error_quota_exceeded">Недостаточно свободного места в облаке</string>
     <string name="upload_error_empty_file">Пустые файлы не поддерживаются</string>
@@ -300,7 +304,41 @@
     <string name="widget_storage_title">BarkCloud</string>
     <string name="widget_storage_summary">%1$s из %2$s</string>
     <string name="widget_storage_no_data">Откройте приложение</string>
+    <string name="widget_storage_unlimited">Без лимита квоты</string>
     <string name="widget_storage_description">Заполнение облачного хранилища BarkCloud</string>
+    <string name="widget_login_required">Войдите в приложение</string>
+
+    <string name="widget_trash_title">Корзина</string>
+    <string name="widget_trash_description">Объекты в корзине и срок их автоудаления</string>
+    <plurals name="widget_trash_count">
+        <item quantity="one">%d объект</item>
+        <item quantity="few">%d объекта</item>
+        <item quantity="many">%d объектов</item>
+        <item quantity="other">%d объекта</item>
+    </plurals>
+    <plurals name="widget_trash_days">
+        <item quantity="one">Удалится через %d день</item>
+        <item quantity="few">Удалится через %d дня</item>
+        <item quantity="many">Удалится через %d дней</item>
+        <item quantity="other">Удалится через %d дня</item>
+    </plurals>
+    <plurals name="widget_trash_hours">
+        <item quantity="one">Удалится через %d час</item>
+        <item quantity="few">Удалится через %d часа</item>
+        <item quantity="many">Удалится через %d часов</item>
+        <item quantity="other">Удалится через %d часа</item>
+    </plurals>
+    <string name="widget_trash_soon">Удалится в ближайший час</string>
+    <string name="widget_trash_empty">Корзина пуста</string>
+
+    <string name="widget_photo_title">Фото из альбома</string>
+    <string name="widget_photo_description">Фото из выбранного альбома меняются автоматически</string>
+    <string name="widget_photo_pick_title">Альбом для виджета</string>
+    <string name="widget_photo_pick_empty">В облаке пока нет альбомов</string>
+    <string name="widget_photo_pick_login">Войдите в приложение, чтобы выбрать альбом</string>
+    <string name="widget_photo_empty">В альбоме нет фото</string>
+    <string name="widget_photo_loading">Загружаем фото…</string>
+    <string name="widget_photo_no_album">Выберите альбом в настройках виджета</string>
 
     <!-- Edit profile -->
     <string name="edit_profile_title">Профиль</string>
@@ -321,12 +359,27 @@
     <string name="privacy_everyone">Все</string>
     <string name="privacy_contacts">Контакты</string>
     <string name="privacy_nobody">Никто</string>
+    <string name="privacy_section_visibility">Видимость</string>
+    <string name="privacy_section_search">Поиск</string>
+    <string name="privacy_searchable_description">Другие пользователи смогут найти вас по юзернейму</string>
+    <string name="privacy_desc_everyone">Видно всем пользователям</string>
+    <string name="privacy_desc_contacts">Видно только вашим контактам</string>
+    <string name="privacy_desc_nobody">Не видно никому</string>
 
     <!-- Devices -->
     <string name="devices_title">Устройства</string>
     <string name="devices_current">Текущее устройство</string>
     <string name="devices_rename">Переименовать</string>
     <string name="devices_rename_hint">Имя устройства</string>
+    <string name="devices_close_session">Завершить сессию</string>
+    <string name="devices_close_session_title">Завершить сессию?</string>
+    <string name="devices_close_session_message">Устройство «%1$s» будет отключено.</string>
+    <string name="devices_close_session_confirm">Отключить</string>
+    <string name="devices_detail_original_name">Исходное имя</string>
+    <string name="devices_detail_os">Система</string>
+    <string name="devices_detail_app">Приложение</string>
+    <string name="devices_detail_location">Местоположение</string>
+    <string name="devices_detail_authorized">Вход выполнен</string>
 
     <!-- Files section -->
     <string name="files_section_on_device">На устройстве</string>
@@ -440,10 +493,27 @@
     <string name="device_media_error">Не удалось прочитать медиатеку</string>
     <string name="android_updates_title">Обновления Android</string>
     <string name="android_updates_installed">Установленная версия</string>
-    <string name="android_updates_current_version">%1$s (код %2$d)</string>
-    <string name="android_updates_latest_version">Последняя версия: %1$s (код %2$d)</string>
-    <string name="android_updates_latest_tag">Последний стабильный релиз: %1$s</string>
-    <string name="android_updates_size">Размер APK: %1$s</string>
+    <string name="android_updates_latest">Последняя версия</string>
+    <string name="android_updates_latest_release">Последний релиз</string>
+    <string name="android_updates_version_code">Код сборки %1$d</string>
+    <string name="android_updates_section_versions">Версии</string>
+    <string name="android_updates_section_settings">Настройки</string>
+    <string name="android_updates_title_idle">Проверка обновлений</string>
+    <string name="android_updates_title_checking">Проверяем обновления</string>
+    <string name="android_updates_title_available">Доступно обновление</string>
+    <string name="android_updates_title_up_to_date">Обновлений нет</string>
+    <string name="android_updates_title_unavailable_metadata">Нужна ручная установка</string>
+    <string name="android_updates_title_downloading">Загрузка обновления</string>
+    <string name="android_updates_title_waiting">Загрузка приостановлена</string>
+    <string name="android_updates_title_verifying">Проверка APK</string>
+    <string name="android_updates_title_ready">Готово к установке</string>
+    <string name="android_updates_title_failed">Не удалось обновить</string>
+    <string name="android_updates_percent">%1$d%%</string>
+    <string name="android_updates_notes_whats_changed">Что изменилось</string>
+    <string name="android_updates_notes_new_contributors">Новые участники</string>
+    <string name="android_updates_notes_first_contribution">впервые участвует в</string>
+    <string name="android_updates_notes_full_changelog">Полный список изменений</string>
+    <string name="android_updates_size">Размер APK</string>
     <string name="android_updates_check">Проверить обновления</string>
     <string name="android_updates_idle">Проверьте GitHub Releases, чтобы узнать о новой версии.</string>
     <string name="android_updates_checking">Проверяем стабильный релиз GitHub…</string>

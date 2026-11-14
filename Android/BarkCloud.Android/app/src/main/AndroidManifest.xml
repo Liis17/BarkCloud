@@ -95,6 +95,37 @@
         </receiver>
 
         <receiver
+            android:name=".widgets.TrashWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/trash_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.PhotoWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/photo_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widgets.PhotoWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.BarkCloud">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <receiver
             android:name=".data.update.UpdateDownloadCompleteReceiver"
             android:exported="true">
             <intent-filter>

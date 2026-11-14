@@ -684,11 +684,13 @@ public static class CloudApiEndpoints
                 return Results.Json(new { ok = true }, Json);
             }));
 
-        api.MapGet("/music/shared/outgoing", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music, string playlistId) =>
+        api.MapGet("/music/shared/outgoing", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
+            UsersServerApi.UsersServerApiClient usersServer, string playlistId) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await music.ListMyOutgoingPlaylistSharesAsync(
                     new ListMyOutgoingMusicPlaylistSharesRequest { PlaylistId = playlistId }, token);
+                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -697,7 +699,8 @@ public static class CloudApiEndpoints
                         playlistId = i.PlaylistId,
                         name = i.Name,
                         recipientUserId = i.RecipientUserId,
-                        sharedAt = i.SharedAt?.ToDateTimeOffset()
+                        sharedAt = i.SharedAt?.ToDateTimeOffset(),
+                        user = byId.TryGetValue(i.RecipientUserId, out var u) ? UserJson(u) : MinimalUserJson(i.RecipientUserId)
                     }).ToArray()
                 }, Json);
             }));

@@ -4,6 +4,7 @@ using BarkCloud.Files.Features.Cloud.CreateDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteDirectory;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntry;
 using BarkCloud.Files.Features.Cloud.DeleteFileEntries;
+using BarkCloud.Files.Features.Cloud.MoveFileEntries;
 using BarkCloud.Files.Features.Cloud.CreateArchive;
 using BarkCloud.Files.Features.Cloud.DeleteFromTrash;
 using BarkCloud.Files.Features.Cloud.DeleteUserMedia;
@@ -160,7 +161,8 @@ public class CloudApiService : CloudApi.CloudApiBase
             DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null,
             Limit = request.Limit,
             CursorName = request.HasCursorName ? request.CursorName : null,
-            CursorEntryId = cursorEntryId
+            CursorEntryId = cursorEntryId,
+            Compact = request.Compact
         };
 
         return _mediator.Send(command);
@@ -242,6 +244,23 @@ public class CloudApiService : CloudApi.CloudApiBase
                 ids.Add(id);
 
         var command = new DeleteFileEntriesCommand { EntryIds = ids };
+
+        return _mediator.Send(command);
+    }
+
+    private const int MoveFileEntriesMax = 100;
+
+    public override Task<MoveFileEntriesResponse> MoveFileEntries(MoveFileEntriesRequest request, ServerCallContext context)
+    {
+        if (request.EntryIds.Count > MoveFileEntriesMax)
+            throw new RpcException(new Status(StatusCode.InvalidArgument,
+                $"Не более {MoveFileEntriesMax} записей за запрос"));
+
+        var command = new MoveFileEntriesCommand
+        {
+            EntryIds = ParseGuids(request.EntryIds),
+            NewDirectoryId = ParseOptionalGuid(request.NewDirectoryId)
+        };
 
         return _mediator.Send(command);
     }

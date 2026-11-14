@@ -8,8 +8,12 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.util.concurrent.TimeUnit
 
 object UploadScheduler {
@@ -32,6 +36,11 @@ object UploadScheduler {
             .build()
         UniqueWorkEnqueuer.enqueue(WorkManager.getInstance(context), WORK_NAME, request)
     }
+
+    fun isRunning(context: Context): Flow<Boolean> =
+        WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(WORK_NAME)
+            .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING } }
+            .distinctUntilChanged()
 
     suspend fun cancelAndAwait(context: Context) {
         val workManager = WorkManager.getInstance(context)

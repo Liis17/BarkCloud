@@ -9,7 +9,9 @@ class GlobalParam(context: Context) {
     private val store = TokenStore(context)
     private val identityLock = Any()
     @Volatile private var cachedUserId = store.read()?.userId?.takeIf { it.isNotBlank() }
-    private val _sessionActive = MutableStateFlow(hasValidRefreshToken())
+    // Общий для процесса: воркеры создают свои GlobalParam, и очистка сессии в воркере
+    // (недействительный refresh) должна сразу вывести UI на вход, а не оставлять его без токенов.
+    private val _sessionActive = sharedSessionActive.also { it.value = hasValidRefreshToken() }
     val sessionActive: StateFlow<Boolean> = _sessionActive.asStateFlow()
     var onCacheIdentityChanging: ((previousAccountId: String?, nextAccountId: String?) -> Unit)? = null
     var onCacheIdentityChanged: ((previousAccountId: String?, nextAccountId: String?) -> Unit)? = null
@@ -67,6 +69,15 @@ class GlobalParam(context: Context) {
         update { it.copy(accessToken = accessToken, accessTokenExpiresAt = accessTokenExpiresAt) }
     }
 
+    /** Помечает истёкшим только [rejectedToken]: уже обновлённый другим вызовом токен не трогается. */
+    fun expireAccessToken(rejectedToken: String) {
+        synchronized(identityLock) {
+            val current = store.read() ?: return
+            if (current.accessToken != rejectedToken || current.accessTokenExpiresAt == 0L) return
+            store.save(current.copy(accessTokenExpiresAt = 0L))
+        }
+    }
+
     fun hasValidRefreshToken(): Boolean {
         val token = refreshToken ?: return false
         if (token.isBlank()) return false
@@ -96,5 +107,9 @@ class GlobalParam(context: Context) {
 
     private fun publishSessionState() {
         _sessionActive.value = hasValidRefreshToken()
+    }
+
+    private companion object {
+        val sharedSessionActive = MutableStateFlow(false)
     }
 }

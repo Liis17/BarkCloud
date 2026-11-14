@@ -5,11 +5,15 @@ import io.grpc.Channel
 import io.grpc.ClientCall
 import io.grpc.ClientInterceptor
 import io.grpc.ForwardingClientCall
+import io.grpc.ForwardingClientCallListener
 import io.grpc.Metadata
 import io.grpc.MethodDescriptor
+import io.grpc.Status
 import kotlinx.coroutines.runBlocking
 
 class AuthInterceptor(
+    /** Сервер отверг отправленный access-token (UNAUTHENTICATED): его нужно перевыпустить. */
+    private val onUnauthenticated: (rejectedToken: String) -> Unit = {},
     private val tokenProvider: suspend (String) -> String?,
 ) : ClientInterceptor {
 
@@ -26,10 +30,17 @@ class AuthInterceptor(
                 val token = if (methodName in UNAUTHENTICATED_METHODS) null else runBlocking {
                     tokenProvider(methodName)
                 }
-                if (!token.isNullOrBlank()) {
-                    headers.put(AUTH_TOKEN_KEY, token)
+                if (token.isNullOrBlank()) {
+                    super.start(responseListener, headers)
+                    return
                 }
-                super.start(responseListener, headers)
+                headers.put(AUTH_TOKEN_KEY, token)
+                super.start(object : ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(responseListener) {
+                    override fun onClose(status: Status, trailers: Metadata) {
+                        if (status.code == Status.Code.UNAUTHENTICATED) onUnauthenticated(token)
+                        super.onClose(status, trailers)
+                    }
+                }, headers)
             }
         }
     }

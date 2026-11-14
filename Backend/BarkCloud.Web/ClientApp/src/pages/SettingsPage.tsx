@@ -14,6 +14,7 @@ import { Switch as Toggle } from '../components/ui/Switch';
 import { Select } from '../components/ui/Select';
 import { TagsTab } from './TagsTab';
 import type { Privacy, Session, SettingsState } from '../lib/types';
+import { redirectToLogin } from '../lib/loginRedirect';
 
 const ServerSettingsTab = React.lazy(() => import('./ServerSettingsTab'));
 const MigrationTab = React.lazy(() => import('./MigrationTab'));
@@ -44,7 +45,7 @@ async function apiJson<T = unknown>(method: string, path: string, body?: unknown
   } catch {
     /* пусто */
   }
-  if (r.status === 401) window.location.href = "/login";
+  if (r.status === 401) redirectToLogin();
   return { ok: r.ok, status: r.status, data };
 }
 const sGet = <T,>(p: string, signal?: AbortSignal) => apiJson<T>('GET', p, undefined, signal);

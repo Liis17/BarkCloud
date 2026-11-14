@@ -22,6 +22,7 @@ import com.barkfluff.BarkCloud.data.gallery.DeviceDeleteMode
 import com.barkfluff.BarkCloud.data.gallery.DeviceDeletePlan
 import com.barkfluff.BarkCloud.data.gallery.HiddenDeviceSession
 import com.barkfluff.BarkCloud.data.gallery.MediaHasher
+import com.barkfluff.BarkCloud.data.gallery.planDeviceCopyCleanup
 import com.barkfluff.BarkCloud.data.gallery.planDeviceDelete
 import com.barkfluff.BarkCloud.data.gallery.resolveCloudCopies
 import com.barkfluff.BarkCloud.data.cloud.CloudCopy
@@ -227,12 +228,14 @@ class GalleryViewModel(
      * Перед системным диалогом очистки устройства: подтверждённая (пригодная для действия) облачная
      * копия по хешу. Фото без такой копии не удаляются: «удалить с устройства» сохраняет облако.
      */
-    suspend fun prepareDeviceCopyDeletion(): List<DeviceMedia> {
+    internal suspend fun prepareDeviceCopyDeletion(): DeviceCopyCleanup {
         val localItems = DeviceMediaStore.query(appContext)
         _state.update { it.copy(items = localItems) }
         val items = localItems.filter { _state.value.cloudStates[it.mediaKey] == MediaCloudStatus.IN_CLOUD }
         val copies = resolveCloudCopies(items, hashOf = presence::hashOf, presence = cloudRepository::checkFileHashesDetailed)
-        return items.filter { copies[it.mediaKey] is CloudCopy.Present }
+        val plan = planDeviceCopyCleanup(items.map { DeviceDeleteItem(it.mediaKey, copies[it.mediaKey] ?: CloudCopy.Unknown) })
+        val confirmedKeys = plan.devicePhotos.toSet()
+        return DeviceCopyCleanup(items.filter { it.mediaKey in confirmedKeys }, plan.unconfirmed)
     }
 
     /**
@@ -399,6 +402,9 @@ class GalleryViewModel(
         }
     }
 }
+
+/** Кандидаты очистки устройства: подтверждённые копии и число фото, чью копию сервер не подтвердил. */
+internal data class DeviceCopyCleanup(val confirmed: List<DeviceMedia>, val unconfirmed: Int)
 
 /** Подготовленное удаление фото устройства: план и хеши, без состояния в полях ViewModel. */
 internal data class PreparedDeviceDelete(val plan: DeviceDeletePlan, val hashes: Map<String, String>)

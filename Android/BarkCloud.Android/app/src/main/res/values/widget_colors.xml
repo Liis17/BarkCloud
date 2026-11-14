@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Фолбэк для Android 11 и ниже (minSdk 30): фирменная светлая схема из ui/theme/Color.kt. -->
+<resources>
+    <color name="widget_surface">#FFFBEBE1</color>
+    <color name="widget_on_surface">#FF211A15</color>
+    <color name="widget_on_surface_variant">#FF52443C</color>
+    <color name="widget_primary">#FF9A4F1E</color>
+    <color name="widget_track">#FFF5E5DC</color>
+</resources>

@@ -5,6 +5,8 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -58,6 +60,7 @@ import com.barkfluff.BarkCloud.grpc.GrpcManager
 import com.barkfluff.BarkCloud.grpc.ServerSettings
 import com.barkfluff.BarkCloud.net.FileTransferService
 import com.barkfluff.BarkCloud.net.InsecureHttp
+import com.barkfluff.BarkCloud.widgets.WidgetRefresh
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -199,6 +202,10 @@ class BarkCloudApplication : Application(), SingletonImageLoader.Factory {
         ProcessLifecycleOwner.get().lifecycle.addObserver(SessionForegroundObserver(appScope) {
             grpcManager.validAccessToken()
             Unit
+        })
+        // Открытие приложения обновляет виджеты, чтобы после входа они не ждали периодического прохода.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) WidgetRefresh.refreshNowIfAnyWidget(this)
         })
         appScope.launch {
             fileCache.runStartupSweepIfNeeded()

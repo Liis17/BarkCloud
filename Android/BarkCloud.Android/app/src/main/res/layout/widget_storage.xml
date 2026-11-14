@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_storage_background"
+    android:clipToOutline="true"
     android:orientation="vertical"
     android:padding="14dp">
 
@@ -13,7 +14,7 @@
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="@android:color/white"
+        android:textColor="@color/widget_on_surface"
         android:textSize="14sp"
         android:textStyle="bold" />
 
@@ -22,7 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:textColor="@android:color/white"
+        android:textColor="@color/widget_on_surface"
         android:textSize="30sp"
         android:textStyle="bold" />
 
@@ -32,7 +33,9 @@
         android:layout_width="match_parent"
         android:layout_height="8dp"
         android:layout_marginTop="8dp"
-        android:max="100" />
+        android:max="100"
+        android:progressBackgroundTint="@color/widget_track"
+        android:progressTint="@color/widget_primary" />
 
     <TextView
         android:id="@+id/storage_widget_summary"
@@ -41,6 +44,6 @@
         android:layout_marginTop="8dp"
         android:ellipsize="end"
         android:maxLines="2"
-        android:textColor="#CCFFFFFF"
+        android:textColor="@color/widget_on_surface_variant"
         android:textSize="12sp" />
 </LinearLayout>

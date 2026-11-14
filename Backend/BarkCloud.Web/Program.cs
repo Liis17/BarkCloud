@@ -15,6 +15,7 @@ using BarkCloud.Web.Endpoints;
 using BarkCloud.Web.Infrastructure;
 using BarkCloud.Web.Rendering;
 
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
 
@@ -239,7 +240,7 @@ app.MapFallback(async (HttpContext http, AuthGateway auth) =>
         || http.Request.Path.StartsWithSegments("/al")
         || http.Request.Path.StartsWithSegments("/mpl");
     if (!isPublicView && await auth.AuthenticateAsync(http) is null)
-        return Results.Redirect("/login");
+        return Results.Redirect(LoginReturnUrl.LoginPath(http.Request.GetEncodedPathAndQuery()));
 
     var index = app.Environment.WebRootFileProvider.GetFileInfo("index.html");
     return index.Exists && index.PhysicalPath is not null
