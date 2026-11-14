@@ -485,6 +485,9 @@
   <data name="Eng_MoveEntryGone" xml:space="preserve">
     <value>The file was already deleted or moved in the cloud.</value>
   </data>
+  <data name="Eng_MoveUnconfirmedFmt" xml:space="preserve">
+    <value>The server did not confirm moving “{0}”; folders were reloaded, check where the file is. {1}</value>
+  </data>
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Could not delete cloud entry “{0}” after {1} attempts.</value>
   </data>

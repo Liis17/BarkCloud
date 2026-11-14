@@ -18,6 +18,7 @@ internal sealed partial class CloudGateway
     private const int MoveMaxAttempts = 3;
     private static readonly TimeSpan MoveWindow = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan MoveDeadline = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MoveDrainLimit = TimeSpan.FromSeconds(40);
 
     private sealed class PendingMove(string entryId, string sourceDirectoryId, string destinationDirectoryId,
         FileEntryDetailed movedEntry, long accountEpoch)
@@ -52,29 +53,51 @@ internal sealed partial class CloudGateway
         if (!QueueMovesForTesting)
             return false;
 
+        CachedDirectoryListing source;
+        CachedDirectoryListing destination;
+        long epoch;
+        lock (_cacheEpochLock)
+        lock (_listLock)
+        {
+            epoch = Volatile.Read(ref _accountEpoch);
+            if (_pendingMoves.ContainsKey(entryId)
+                || !TryGetCurrentListingLocked(sourceDirectoryId, epoch, out source)
+                || !TryGetCurrentListingLocked(destinationDirectoryId, epoch, out destination))
+                return false;
+        }
+
+        var file = source.Listing.Files.FirstOrDefault(item => item.Entry.Id == entryId);
+        if (file is null
+            || destination.Index.FilesByName.ContainsKey(file.Entry.Name)
+            || destination.Index.SubdirectoriesByName.ContainsKey(file.Entry.Name))
+            return false;
+
+        // Копии строятся вне глобальной блокировки листингов и правят индексы инкрементально;
+        // под блокировкой остаются только перепроверка снимков и публикация.
+        var moved = file.Clone();
+        moved.Entry.DirectoryId = destinationDirectoryId;
+        var sourceListing = CopyDirectoryListingWithoutFile(source.Listing, entryId);
+        var sourceIndex = CopyDirectoryListingIndex(source.Index);
+        RemoveFileFromIndex(sourceIndex, sourceListing, file);
+        var destinationListing = CopyDirectoryListingWithFile(destination.Listing, moved);
+        var destinationIndex = CopyDirectoryListingIndex(destination.Index);
+        AddFileToIndex(destinationIndex, moved);
+
         bool sendNow;
         lock (_cacheEpochLock)
         lock (_listLock)
         {
-            var epoch = Volatile.Read(ref _accountEpoch);
             if (_pendingMoves.ContainsKey(entryId)
-                || !TryGetCurrentListingLocked(sourceDirectoryId, epoch, out var source)
-                || !TryGetCurrentListingLocked(destinationDirectoryId, epoch, out var destination))
+                || !TryGetCurrentListingLocked(sourceDirectoryId, epoch, out var currentSource)
+                || !TryGetCurrentListingLocked(destinationDirectoryId, epoch, out var currentDestination)
+                || !ReferenceEquals(currentSource, source)
+                || !ReferenceEquals(currentDestination, destination))
                 return false;
 
-            var file = source.Listing.Files.FirstOrDefault(item => item.Entry.Id == entryId);
-            if (file is null
-                || destination.Index.FilesByName.ContainsKey(file.Entry.Name)
-                || destination.Index.SubdirectoriesByName.ContainsKey(file.Entry.Name))
-                return false;
-
-            var moved = file.Clone();
-            moved.Entry.DirectoryId = destinationDirectoryId;
             var pending = new PendingMove(entryId, sourceDirectoryId, destinationDirectoryId, moved, epoch);
             _pendingMoves[entryId] = pending;
-            PublishListingLocked(sourceDirectoryId, source, CopyDirectoryListingWithoutFile(source.Listing, entryId));
-            PublishListingLocked(destinationDirectoryId, destination,
-                CopyDirectoryListingWithFile(destination.Listing, moved));
+            PublishListingLocked(sourceDirectoryId, source, sourceListing, sourceIndex);
+            PublishListingLocked(destinationDirectoryId, destination, destinationListing, destinationIndex);
 
             lock (_moveLock)
             {
@@ -92,10 +115,16 @@ internal sealed partial class CloudGateway
 
     // Досылает все отложенные переносы; вызывается перед операциями, которым важен серверный
     // порядок (другой перенос, удаление, сохранение, удаление папки).
+    // Общий лимит не даёт недоступному серверу держать размонтирование или колбэк Dokany
+    // дольше одного дедлайна RPC с запасом; неотправленное по истечении считается неизвестным.
     public void FlushPendingMoves(CancellationToken cancellationToken = default)
     {
-        if (!_pendingMoves.IsEmpty)
-            SendMovesSafe(drainAll: true, cancellationToken);
+        if (_pendingMoves.IsEmpty)
+            return;
+
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(MoveDrainLimit);
+        SendMovesSafe(drainAll: true, limit.Token);
     }
 
     // Наложение отложенных переносов на листинг, только что загруженный с сервера.
@@ -115,9 +144,11 @@ internal sealed partial class CloudGateway
         var movedIds = moves.Select(move => move.EntryId).ToHashSet(StringComparer.Ordinal);
         var copy = CopyDirectoryListing(listing);
         copy.Files.Clear();
-        copy.Files.AddRange(listing.Files.Where(file => !movedIds.Contains(file.Entry.Id)));
-        foreach (var move in moves.Where(move => move.DestinationDirectoryId == directoryId))
-            copy = CopyDirectoryListingWithFile(copy, move.MovedEntry);
+        var files = listing.Files.Where(file => !movedIds.Contains(file.Entry.Id))
+            .Concat(moves.Where(move => move.DestinationDirectoryId == directoryId).Select(move => move.MovedEntry))
+            .ToList();
+        files.Sort(CompareFileEntries);
+        copy.Files.AddRange(files);
         return copy;
     }
 
@@ -190,10 +221,17 @@ internal sealed partial class CloudGateway
             {
                 var response = _cloud.MoveFileEntries(request, new CallOptions(
                     deadline: _time.GetUtcNow().UtcDateTime.Add(MoveDeadline), cancellationToken: cancellationToken));
+                var moved = response.MovedEntryIds.ToHashSet(StringComparer.Ordinal);
                 var failed = response.Failed.ToDictionary(item => item.EntryId, item => item.ErrorCode);
-                CompleteMoves(chunk.Where(move => !failed.ContainsKey(move.EntryId)));
-                foreach (var move in chunk.Where(move => failed.ContainsKey(move.EntryId)))
-                    FailMove(move, DescribeMoveFailure(failed[move.EntryId], null));
+                CompleteMoves(chunk.Where(move => moved.Contains(move.EntryId)));
+                foreach (var move in chunk.Where(move => !moved.Contains(move.EntryId) && failed.ContainsKey(move.EntryId)))
+                    FailMove(move, DescribeMoveFailure(failed[move.EntryId], null), uncertain: false);
+                // Запись без результата в ответе — исход неизвестен; повтор пакета идемпотентен.
+                var unanswered = chunk.Where(move => !moved.Contains(move.EntryId) && !failed.ContainsKey(move.EntryId))
+                    .ToArray();
+                if (unanswered.Length > 0)
+                    RequeueMoves(unanswered, new InvalidOperationException("MoveFileEntries без результата записи"),
+                        allowRetry: true);
                 return;
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
@@ -204,7 +242,7 @@ internal sealed partial class CloudGateway
             catch (RpcException ex) when (IsMoveRejected(ex))
             {
                 foreach (var move in chunk)
-                    FailMove(move, DescribeMoveFailure(null, ex));
+                    FailMove(move, DescribeMoveFailure(null, ex), uncertain: false);
                 return;
             }
             catch (Exception ex)
@@ -229,7 +267,7 @@ internal sealed partial class CloudGateway
             }
             catch (RpcException ex) when (IsMoveRejected(ex))
             {
-                FailMove(move, DescribeMoveFailure(null, ex));
+                FailMove(move, DescribeMoveFailure(null, ex), uncertain: false);
             }
             catch (Exception ex)
             {
@@ -268,7 +306,7 @@ internal sealed partial class CloudGateway
             if (allowRetry && move.Attempts < MoveMaxAttempts)
                 retry.Add(move);
             else
-                FailMove(move, DescribeMoveFailure(null, error));
+                FailMove(move, DescribeMoveFailure(null, error), uncertain: true);
         }
 
         if (retry.Count == 0)
@@ -297,7 +335,8 @@ internal sealed partial class CloudGateway
     }
 
     // Итог переноса неизвестен или отрицателен: снимаем наложение и перечитываем обе папки.
-    private void FailMove(PendingMove move, string reason)
+    // При неизвестном исходе сервер мог перенос выполнить — сообщение не обещает возврат файла.
+    private void FailMove(PendingMove move, string reason, bool uncertain)
     {
         lock (_cacheEpochLock)
         lock (_listLock)
@@ -307,7 +346,7 @@ internal sealed partial class CloudGateway
             InvalidateListingLocked(move.DestinationDirectoryId);
         }
 
-        var error = Loc.T("Eng_MoveFailedFmt", move.MovedEntry.Entry.Name, reason);
+        var error = Loc.T(uncertain ? "Eng_MoveUnconfirmedFmt" : "Eng_MoveFailedFmt", move.MovedEntry.Entry.Name, reason);
         EngineLog.Info(error);
         try { SyncError?.Invoke(error); }
         catch (Exception ex) { EngineLog.Error("Обновление ошибки синхронизации переноса", ex); }
@@ -339,11 +378,11 @@ internal sealed partial class CloudGateway
     }
 
     private void PublishListingLocked(string directoryId, CachedDirectoryListing cached,
-        DirectoryListingDetailed listing)
+        DirectoryListingDetailed listing, DirectoryListingIndex index)
         => _listCache[directoryId] = cached with
         {
             Generation = BumpListingGenerationLocked(directoryId),
             Listing = listing,
-            Index = CreateDirectoryListingIndex(listing),
+            Index = index,
         };
 }

@@ -6,9 +6,11 @@ using FluentAssertions;
 
 using Microsoft.Extensions.Time.Testing;
 
+using Xunit.Abstractions;
+
 namespace BarkCloud.Drive.Engine.Tests;
 
-public sealed class BatchedMoveTests
+public sealed class BatchedMoveTests(ITestOutputHelper output)
 {
     [Fact]
     public void Bulk_move_answers_immediately_and_sends_batches_of_one_hundred()
@@ -67,6 +69,30 @@ public sealed class BatchedMoveTests
         gateway.ListDirectory(source).Files.Should().ContainSingle(entry => entry.Entry.Id == file.EntryId);
         gateway.ListDirectory(destination).Files.Should().ContainSingle(entry => entry.Entry.Id == rival.EntryId);
         fs.LastSyncError.Should().Contain("item.jpg");
+    }
+
+    [Fact]
+    public void Unreachable_server_gives_up_after_retries_and_shows_the_real_server_state()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var (source, destination) = AddFolders(cloud);
+        var file = cloud.AddFile(source, "item.jpg", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var fs = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        Warm(gateway, source, destination);
+        fs.MoveFile("\\Source\\item.jpg", "\\Destination\\item.jpg", false, new FakeDokanFileInfo());
+        for (var i = 0; i < 3; i++)
+            cloud.Invoker.FailNext(FakeCloudMethods.MoveFileEntries,
+                new Grpc.Core.RpcException(new Grpc.Core.Status(Grpc.Core.StatusCode.Unavailable, "offline")));
+
+        gateway.FlushPendingMoves();
+
+        CountCalls(cloud, FakeCloudMethods.MoveFileEntries).Should().Be(3);
+        gateway.PendingMoveCount.Should().Be(0);
+        gateway.ListDirectory(source).Files.Should().ContainSingle(entry => entry.Entry.Id == file.EntryId);
+        gateway.ListDirectory(destination).Files.Should().BeEmpty();
+        fs.LastSyncError.Should().Contain("item.jpg").And.NotContain("возвращён");
     }
 
     [Fact]
@@ -155,6 +181,37 @@ public sealed class BatchedMoveTests
         gateway.ListDirectory(destination).Files.Should()
             .ContainSingle(entry => entry.Entry.Id == file.EntryId && entry.Entry.Name == "renamed.jpg");
         fs.LastSyncError.Should().BeNull();
+    }
+
+    [Fact]
+    public void Moving_5000_files_out_of_a_5000_file_folder_stays_fast_and_never_rereads_listings()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var (source, destination) = AddFolders(cloud);
+        for (var i = 0; i < 5000; i++)
+            cloud.AddFile(source, $"img-{i:D4}.jpg", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var fs = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        Warm(gateway, source, destination);
+        var listCalls = CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        for (var i = 0; i < 5000; i++)
+            fs.MoveFile($"\\Source\\img-{i:D4}.jpg", $"\\Destination\\img-{i:D4}.jpg", false, new FakeDokanFileInfo())
+                .Should().Be(DokanResult.Success);
+        stopwatch.Stop();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        gateway.FlushPendingMoves();
+
+        output.WriteLine($"moves=5000; elapsed={stopwatch.Elapsed.TotalMilliseconds:F0} ms " +
+                         $"({stopwatch.Elapsed.TotalMilliseconds / 5000:F3} ms/move); allocated={allocated / 5000:N0} bytes/move; " +
+                         $"MoveFileEntries={CountCalls(cloud, FakeCloudMethods.MoveFileEntries)}");
+        CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed).Should().Be(listCalls);
+        CountCalls(cloud, FakeCloudMethods.MoveFileEntries).Should().Be(50);
+        gateway.ListDirectory(source).Files.Should().BeEmpty();
+        gateway.ListDirectory(destination).Files.Should().HaveCount(5000);
     }
 
     private static (string Source, string Destination) AddFolders(FakeCloud cloud)
