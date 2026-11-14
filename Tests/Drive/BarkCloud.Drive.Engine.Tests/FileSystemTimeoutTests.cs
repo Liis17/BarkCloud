@@ -231,13 +231,14 @@ public sealed class FileSystemTimeoutTests
                 return (status, bytesRead);
             });
 
+        var keepAliveTimerCount = time.KeepAliveTimerCount;
         var firstRead = ReadAsync(firstInfo);
         Task<(NtStatus Status, int BytesRead)>? secondRead = null;
         try
         {
             await downloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             secondRead = ReadAsync(secondInfo);
-            await time.WaitForKeepAliveTimerAsync(2).WaitAsync(TimeSpan.FromSeconds(5));
+            await time.WaitForKeepAliveTimerAsync(keepAliveTimerCount + 2).WaitAsync(TimeSpan.FromSeconds(5));
             time.Advance(TimeSpan.FromSeconds(10));
 
             secondInfo.TryResetTimeoutCalls.Should().BeGreaterThan(0);
@@ -254,6 +255,44 @@ public sealed class FileSystemTimeoutTests
             fileSystem.CloseFile("\\waiter.bin", firstInfo);
             fileSystem.CloseFile("\\waiter.bin", secondInfo);
         }
+    }
+
+    [Fact]
+    public async Task MoveFile_renews_Dokany_timeout_while_server_call_is_slow()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        cloud.AddFile("", "slow.bin", [1]);
+        var time = new TrackingTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        var fileSystem = new BarkCloudFileSystem(gateway, temp.Path("write"), time: time);
+        var renameStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRename = new ManualResetEventSlim();
+        cloud.Invoker.OnCall = method =>
+        {
+            if (method != FakeCloudMethods.RenameFileEntry)
+                return;
+            renameStarted.TrySetResult();
+            releaseRename.Wait(TimeSpan.FromSeconds(5));
+        };
+        var info = new FakeDokanFileInfo();
+        var keepAliveTimerCount = time.KeepAliveTimerCount;
+
+        var move = Task.Run(() => fileSystem.MoveFile("\\slow.bin", "\\renamed.bin", false, info));
+        try
+        {
+            await renameStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await time.WaitForKeepAliveTimerAsync(keepAliveTimerCount + 1).WaitAsync(TimeSpan.FromSeconds(5));
+            time.Advance(TimeSpan.FromSeconds(10));
+
+            info.TryResetTimeoutCalls.Should().Be(1);
+        }
+        finally
+        {
+            releaseRename.Set();
+        }
+
+        (await move.WaitAsync(TimeSpan.FromSeconds(5))).Should().Be(DokanResult.Success);
     }
 
     [Fact]

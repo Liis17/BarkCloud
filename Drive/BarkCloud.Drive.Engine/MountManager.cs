@@ -8,6 +8,7 @@ namespace BarkCloud.Drive.Engine;
 // обслуживать IPC, а диск оставаться примонтированным.
 internal sealed class MountManager : IDisposable
 {
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     private readonly object _lock = new();
     private Dokan? _dokan;
     private DokanInstance? _instance;
@@ -40,6 +41,8 @@ internal sealed class MountManager : IDisposable
                     {
                         options.Options = DokanOptions.FixedDrive;
                         options.MountPoint = mountPoint;
+                        // Явный запас над первым тиком DokanKeepAlive (10 с), не зависящий от дефолта драйвера.
+                        options.TimeOut = RequestTimeout;
                     })
                     .Build(fs);
             }

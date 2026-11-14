@@ -341,6 +341,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             return CreateFileCore(fileName, access, share, mode, options, attributes, info);
         }
         catch (Exception ex)
@@ -749,6 +750,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         fileInfo = default;
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var handle = info.Context as HandleContext;
             var localFile = handle?.File;
             if (localFile is null && handle?.Node is { IsDirectory: false } nodeHandle)
@@ -788,6 +790,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         files = new List<FileInformation>();
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var registeredFiles = GetLocalFiles();
             var node = SafeResolve(fileName);
             if (node is null || !node.IsDirectory)
@@ -938,6 +941,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             return MoveFileCore(oldName, newName, replace, info);
         }
         catch (Exception ex)
@@ -1471,6 +1475,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var localFile = FindLocalFile(fileName);
             if (localFile?.Kind == LocalFileKind.Pending || FindPendingFileByPath(fileName) is not null)
                 return DokanResult.AccessDenied;
@@ -1493,6 +1498,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var node = SafeResolve(fileName);
             if (node is null || !node.IsDirectory)
                 return DokanResult.Success;
@@ -1525,6 +1531,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
         freeBytesAvailable = totalNumberOfBytes = totalNumberOfFreeBytes = 0;
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             var s = _gateway.GetStorage().Info;
             long total;
             long free;
@@ -2732,6 +2739,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     }
 
     private ResolvedNode? SafeResolve(string path) => _gateway.Resolve(path);
+
+    // Листинг большой папки или RPC может идти дольше таймаута Dokany; без продления
+    // драйвер сам отменяет запрос, и Проводник показывает 0x800705AA.
+    private IDisposable StartNetworkKeepAlive(IDokanFileInfo info) => DokanKeepAlive.Start(info, _time);
 
     private static DateTime? ToDate(Timestamp? t) => t?.ToDateTime();
 }
