@@ -8,6 +8,7 @@ import './styles/shared.css';
 import './styles/pages.css';
 import './styles/fields.css';
 import './styles/tag-color-picker.css';
+import './styles/folder-icon-editor.css';
 
 import { AppShell } from './components/shell/AppShell';
 import { PhotosPage } from './pages/PhotosPage';

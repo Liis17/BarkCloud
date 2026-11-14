@@ -7,6 +7,8 @@ import { Modal } from '../components/ui/Modal';
 import { TextField } from '../components/ui/TextField';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { FolderPropertiesModal } from '../components/ui/FolderPropertiesModal';
+import { FolderIcon } from '../components/ui/FolderIcon';
+import { FolderIconEditorModal, type FolderAppearance } from '../components/ui/FolderIconEditorModal';
 import { PropertiesModal } from '../components/ui/PropertiesModal';
 import { ShareWithUserModal } from '../components/ui/ShareWithUserModal';
 import { PlaylistPickerModal } from '../components/music/PlaylistPickerModal';
@@ -78,7 +80,7 @@ function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }
       </td>
       <td className="name">
         <div className="name-cell">
-          <div className="file-icon folder"><Icon.folder size={22} /></div>
+          <FolderIcon iconKey={dir.iconKey} iconColor={dir.iconColor} />
           <div className="file-name-col">
             <div className="fn">{dir.name}</div>
           </div>
@@ -259,6 +261,7 @@ export function FilesPage() {
   const [albums, setAlbums] = React.useState<Album[]>([]);
   const [props, setProps] = React.useState<CardFile | null>(null);
   const [dirProps, setDirProps] = React.useState<DirInfo | null>(null);
+  const [iconDir, setIconDir] = React.useState<DirInfo | null>(null);
   const [playlistPick, setPlaylistPick] = React.useState<Entry | null>(null);
   const [shareWith, setShareWith] = React.useState<Entry | null>(null);
   const [shareDirWith, setShareDirWith] = React.useState<DirInfo | null>(null);
@@ -596,6 +599,7 @@ export function FilesPage() {
       { label: 'Поделиться с пользователем', icon: 'user', onClick: () => setShareDirWith(dir) },
       { label: 'Переименовать', icon: 'pencil', onClick: () => startRename(dir, true) },
       { label: 'Переместить', icon: 'folder', onClick: () => setMovingDir(dir) },
+      { label: 'Изменить значок', icon: 'palette', onClick: () => setIconDir(dir) },
       { label: 'Свойства', icon: 'info', onClick: () => setDirProps(dir) },
       { divider: true },
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
@@ -714,6 +718,18 @@ export function FilesPage() {
       toast((e as Error).message, 'err');
     } finally {
       setArchiving(false);
+    }
+  }
+  async function saveDirAppearance(dir: DirInfo, appearance: FolderAppearance) {
+    try {
+      const updated = await apiPost<DirInfo>('/api/cloud/dir/appearance', { id: dir.id, ...appearance });
+      setListing((prev) => prev && ({
+        ...prev,
+        dirs: prev.dirs.map((d) => (d.id === dir.id ? { ...d, iconKey: updated.iconKey, iconColor: updated.iconColor } : d)),
+      }));
+      setIconDir(null);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось изменить значок', 'err');
     }
   }
   async function archiveFolder(dir: DirInfo) {
@@ -1019,6 +1035,14 @@ export function FilesPage() {
 
       {props && <PropertiesModal fileId={props.id} fallback={props} onClose={() => setProps(null)} />}
 
+      {iconDir && (
+        <FolderIconEditorModal
+          folderName={iconDir.name}
+          initial={{ iconKey: iconDir.iconKey || null, iconColor: iconDir.iconColor || null }}
+          onClose={() => setIconDir(null)}
+          onSave={(appearance) => saveDirAppearance(iconDir, appearance)}
+        />
+      )}
       {dirProps && <FolderPropertiesModal directoryId={dirProps.id} onClose={() => setDirProps(null)} toast={toast} />}
 
       {playlistPick && <PlaylistPickerModal fileId={playlistPick.fileId} onClose={() => setPlaylistPick(null)} toast={toast} />}

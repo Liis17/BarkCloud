@@ -218,6 +218,18 @@ public static class CloudApiEndpoints
                 return Results.Json(CloudJson.DirProperties(properties), Json);
             }));
 
+        api.MapPost("/cloud/dir/appearance", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, AppearanceReq body) =>
+            await Guarded(http, auth, async token =>
+            {
+                var info = await cloud.SetDirectoryAppearanceAsync(new SetDirectoryAppearanceRequest
+                {
+                    DirectoryId = body.Id,
+                    IconKey = body.IconKey ?? "",
+                    IconColor = body.IconColor ?? ""
+                }, token);
+                return Results.Json(CloudJson.Dir(info), Json);
+            }));
+
         api.MapPost("/cloud/dir/rename", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud, RenameReq body) =>
             await Guarded(http, auth, async token =>
             {
@@ -1890,6 +1902,7 @@ public static class CloudApiEndpoints
     private sealed record DirCreate(string? ParentId, string Name);
     private sealed record VisibilityReq(string Id, bool Inherit, bool HideFromGallery, bool HideFromSearch);
     private sealed record RenameReq(string Id, string Name);
+    private sealed record AppearanceReq(string Id, string? IconKey, string? IconColor);
     private sealed record MoveReq(string Id, string? ParentId);
     private sealed record IdReq(string Id);
     private sealed record AttachReq(
