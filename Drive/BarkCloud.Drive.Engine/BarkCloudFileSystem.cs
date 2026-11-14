@@ -485,6 +485,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             if (info.Context is HandleContext { File: { } file } handle)
             {
                 var becameInactive = false;
@@ -514,7 +515,6 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                     DeleteLocalFile(file);
                 else if (persist)
                 {
-                    using var keepAlive = DokanKeepAlive.Start(info, _time);
                     lock (file.Sync)
                     {
                         if (file.Modified && file.Op?.Stage != PersistStage.Processing)
@@ -575,6 +575,7 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
     {
         try
         {
+            using var keepAlive = StartNetworkKeepAlive(info);
             if (info.Context is HandleContext { File: { } file })
                 CloseLocalFile(fileName, file, info);
         }
@@ -1516,8 +1517,10 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
             if (node is null || !node.IsDirectory)
                 return DokanResult.Success;
 
+            // Пустота проверяется по серверу: неподтверждённые переносы сначала досылаются.
+            _gateway.FlushPendingMoves();
             _gateway.InvalidateListing(node.DirectoryId);
-            if (DirectoryIsNotEmpty(fileName, node))
+            if (_gateway.PendingMoveCount > 0 || DirectoryIsNotEmpty(fileName, node))
                 return DokanResult.DirectoryNotEmpty;
 
             return DokanResult.Success;
@@ -2707,7 +2710,16 @@ internal sealed class BarkCloudFileSystem : IDokanOperations
                 return;
             }
 
-            _gateway.FlushPendingMoves();
+            // FlushPending выше досылает и переносы. Если часть не ушла, файл, перенесённый из этой
+            // папки только в снимке, на сервере ещё в ней — рекурсивное удаление унесло бы его в корзину.
+            if (_gateway.PendingMoveCount > 0)
+            {
+                var reason = Loc.T("Eng_MoveNotSent");
+                LastSyncError = Loc.T("Eng_DirectoryDeleteFailedFmt", Path.GetFileName(fileName), reason);
+                EngineLog.Error($"Cleanup(\"{fileName}\")", new IOException(reason));
+                return;
+            }
+
             _gateway.DeleteDirectory(node.DirectoryId);
             _gateway.InvalidateListing(node.DirectoryId);
         }

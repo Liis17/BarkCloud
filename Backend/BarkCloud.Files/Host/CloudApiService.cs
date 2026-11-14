@@ -248,8 +248,14 @@ public class CloudApiService : CloudApi.CloudApiBase
         return _mediator.Send(command);
     }
 
+    private const int MoveFileEntriesMax = 100;
+
     public override Task<MoveFileEntriesResponse> MoveFileEntries(MoveFileEntriesRequest request, ServerCallContext context)
     {
+        if (request.EntryIds.Count > MoveFileEntriesMax)
+            throw new RpcException(new Status(StatusCode.InvalidArgument,
+                $"Не более {MoveFileEntriesMax} записей за запрос"));
+
         var command = new MoveFileEntriesCommand
         {
             EntryIds = ParseGuids(request.EntryIds),

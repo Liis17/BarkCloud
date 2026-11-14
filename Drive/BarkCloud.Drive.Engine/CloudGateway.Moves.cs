@@ -19,6 +19,7 @@ internal sealed partial class CloudGateway
     private static readonly TimeSpan MoveWindow = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan MoveDeadline = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MoveDrainLimit = TimeSpan.FromSeconds(40);
+    private static readonly TimeSpan OptimisticMoveMaxSnapshotAge = TimeSpan.FromSeconds(15);
 
     private sealed class PendingMove(string entryId, string sourceDirectoryId, string destinationDirectoryId,
         FileEntryDetailed movedEntry, long accountEpoch)
@@ -53,6 +54,26 @@ internal sealed partial class CloudGateway
         if (!QueueMovesForTesting)
             return false;
 
+        // Параллельный перенос в ту же пару папок мог опубликовать снимок между копированием
+        // и публикацией — пробуем ещё раз, а не уходим на медленный синхронный путь.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var result = TryQueueMoveOnce(entryId, sourceDirectoryId, destinationDirectoryId, out var sendNow);
+            if (result is null)
+                continue;
+            if (sendNow)
+                SendMovesSafe(drainAll: false, CancellationToken.None);
+            return result.Value;
+        }
+
+        return false;
+    }
+
+    // null — снимки изменились во время подготовки копий, нужна повторная попытка.
+    private bool? TryQueueMoveOnce(string entryId, string sourceDirectoryId, string destinationDirectoryId,
+        out bool sendNow)
+    {
+        sendNow = false;
         CachedDirectoryListing source;
         CachedDirectoryListing destination;
         long epoch;
@@ -66,8 +87,13 @@ internal sealed partial class CloudGateway
                 return false;
         }
 
+        // Успех отдаётся Проводнику по снимку: старый снимок чаще пропустит конфликт имени,
+        // о котором тогда узнали бы только после ответа, поэтому такие переносы идут синхронно.
+        var now = _time.GetUtcNow().UtcDateTime;
         var file = source.Listing.Files.FirstOrDefault(item => item.Entry.Id == entryId);
         if (file is null
+            || now - source.At >= OptimisticMoveMaxSnapshotAge
+            || now - destination.At >= OptimisticMoveMaxSnapshotAge
             || destination.Index.FilesByName.ContainsKey(file.Entry.Name)
             || destination.Index.SubdirectoriesByName.ContainsKey(file.Entry.Name))
             return false;
@@ -83,21 +109,23 @@ internal sealed partial class CloudGateway
         var destinationIndex = CopyDirectoryListingIndex(destination.Index);
         AddFileToIndex(destinationIndex, moved);
 
-        bool sendNow;
         lock (_cacheEpochLock)
         lock (_listLock)
         {
-            if (_pendingMoves.ContainsKey(entryId)
-                || !TryGetCurrentListingLocked(sourceDirectoryId, epoch, out var currentSource)
+            if (_pendingMoves.ContainsKey(entryId))
+                return false;
+            if (!TryGetCurrentListingLocked(sourceDirectoryId, epoch, out var currentSource)
                 || !TryGetCurrentListingLocked(destinationDirectoryId, epoch, out var currentDestination)
                 || !ReferenceEquals(currentSource, source)
                 || !ReferenceEquals(currentDestination, destination))
-                return false;
+                return null;
 
             var pending = new PendingMove(entryId, sourceDirectoryId, destinationDirectoryId, moved, epoch);
             _pendingMoves[entryId] = pending;
-            PublishListingLocked(sourceDirectoryId, source, sourceListing, sourceIndex);
-            PublishListingLocked(destinationDirectoryId, destination, destinationListing, destinationIndex);
+            PublishListingLocked(sourceDirectoryId, source, sourceListing, sourceIndex,
+                listing => CopyDirectoryListingWithoutFile(listing, entryId));
+            PublishListingLocked(destinationDirectoryId, destination, destinationListing, destinationIndex,
+                listing => UpsertFile(listing, moved));
 
             lock (_moveLock)
             {
@@ -108,8 +136,6 @@ internal sealed partial class CloudGateway
             }
         }
 
-        if (sendNow)
-            SendMovesSafe(drainAll: false, CancellationToken.None);
         return true;
     }
 
@@ -159,6 +185,8 @@ internal sealed partial class CloudGateway
             _moveQueue.Clear();
             _moveTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
+        if (!_pendingMoves.IsEmpty)
+            EngineLog.Info($"Сброшены неподтверждённые переносы: {_pendingMoves.Count}; листинги перечитаются с сервера");
         _pendingMoves.Clear();
     }
 
@@ -176,7 +204,18 @@ internal sealed partial class CloudGateway
 
     private void SendMoves(bool drainAll, CancellationToken cancellationToken)
     {
-        lock (_moveSendLock)
+        // Ожидание чужой отправки тоже ограничено токеном: колбэк Dokany не должен висеть
+        // за фоновой отправкой к недоступному серверу.
+        if (!cancellationToken.CanBeCanceled)
+            Monitor.Enter(_moveSendLock);
+        else
+        {
+            while (!Monitor.TryEnter(_moveSendLock, TimeSpan.FromMilliseconds(100)))
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+        }
+
+        try
         {
             do
             {
@@ -194,24 +233,43 @@ internal sealed partial class CloudGateway
                 foreach (var stale in batch.Where(move => move.AccountEpoch != epoch))
                     _pendingMoves.TryRemove(new KeyValuePair<string, PendingMove>(stale.EntryId, stale));
 
-                foreach (var group in batch.Where(move => move.AccountEpoch == epoch)
-                             .GroupBy(move => move.DestinationDirectoryId))
-                foreach (var chunk in group.Chunk(MoveBatchMax))
+                var chunks = batch.Where(move => move.AccountEpoch == epoch)
+                    .GroupBy(move => move.DestinationDirectoryId)
+                    .SelectMany(group => group.Chunk(MoveBatchMax).Select(chunk => (Directory: group.Key, Moves: chunk)))
+                    .ToList();
+                for (var i = 0; i < chunks.Count; i++)
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        RequeueMoves(chunk, new OperationCanceledException(cancellationToken), allowRetry: false);
+                        // Пакет не уходил на сервер — файл достоверно остаётся в исходной папке.
+                        foreach (var move in chunks[i].Moves)
+                            FailMove(move, Loc.T("Eng_MoveNotSent"), uncertain: false);
                         continue;
                     }
 
-                    SendMoveChunk(group.Key, chunk, cancellationToken);
+                    if (SendMoveChunk(chunks[i].Directory, chunks[i].Moves, cancellationToken) || drainAll)
+                        continue;
+
+                    // Фоновый проход после сетевой ошибки не перебирает остальные пакеты по дедлайну
+                    // каждого: они вернутся в очередь к следующему тику.
+                    lock (_moveLock)
+                    {
+                        _moveQueue.AddRange(chunks.Skip(i + 1).SelectMany(chunk => chunk.Moves));
+                        _moveTimer?.Change(MoveWindow, Timeout.InfiniteTimeSpan);
+                    }
+                    return;
                 }
             }
             while (drainAll);
         }
+        finally
+        {
+            Monitor.Exit(_moveSendLock);
+        }
     }
 
-    private void SendMoveChunk(string destinationDirectoryId, PendingMove[] chunk, CancellationToken cancellationToken)
+    // false — сетевая ошибка: пакет возвращён в очередь.
+    private bool SendMoveChunk(string destinationDirectoryId, PendingMove[] chunk, CancellationToken cancellationToken)
     {
         if (!_batchMoveUnsupported)
         {
@@ -232,7 +290,7 @@ internal sealed partial class CloudGateway
                 if (unanswered.Length > 0)
                     RequeueMoves(unanswered, new InvalidOperationException("MoveFileEntries без результата записи"),
                         allowRetry: true);
-                return;
+                return true;
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
             {
@@ -243,18 +301,19 @@ internal sealed partial class CloudGateway
             {
                 foreach (var move in chunk)
                     FailMove(move, DescribeMoveFailure(null, ex), uncertain: false);
-                return;
+                return true;
             }
             catch (Exception ex)
             {
                 EngineLog.Error($"Массовый перенос {chunk.Length} записей", ex);
                 RequeueMoves(chunk, ex, allowRetry: true);
-                return;
+                return false;
             }
         }
 
-        foreach (var move in chunk)
+        for (var i = 0; i < chunk.Length; i++)
         {
+            var move = chunk[i];
             try
             {
                 _cloud.MoveFileEntry(new MoveFileEntryRequest
@@ -273,8 +332,14 @@ internal sealed partial class CloudGateway
             {
                 EngineLog.Error($"Перенос записи {move.EntryId}", ex);
                 RequeueMoves([move], ex, allowRetry: true);
+                // Остальные записи пакета не отправлялись — возвращаем их без расхода попыток.
+                lock (_moveLock)
+                    _moveQueue.AddRange(chunk.Skip(i + 1));
+                return false;
             }
         }
+
+        return true;
     }
 
     private static bool IsMoveRejected(RpcException exception)
@@ -327,9 +392,10 @@ internal sealed partial class CloudGateway
             foreach (var move in moves)
             {
                 _pendingMoves.TryRemove(new KeyValuePair<string, PendingMove>(move.EntryId, move));
-                // Листинги, загруженные до подтверждения, могли не увидеть перенос — их не кешируем.
-                RenewGenerationLocked(move.SourceDirectoryId);
-                RenewGenerationLocked(move.DestinationDirectoryId);
+                // Листинги, загруженные до подтверждения, могли не увидеть перенос — догоняются журналом правок.
+                RecordConfirmedMoveLocked(move.SourceDirectoryId,
+                    listing => CopyDirectoryListingWithoutFile(listing, move.EntryId));
+                RecordConfirmedMoveLocked(move.DestinationDirectoryId, listing => UpsertFile(listing, move.MovedEntry));
             }
         }
     }
@@ -367,22 +433,28 @@ internal sealed partial class CloudGateway
         return false;
     }
 
-    // Новое поколение без сброса снимка: незавершённые загрузки этой папки не попадут в кеш.
-    private void RenewGenerationLocked(string directoryId)
+    // Снимок уже отражает перенос; новое поколение с записью в журнале нужно для загрузок,
+    // прочитавших сервер до подтверждения: их результат догонится этой же правкой.
+    private void RecordConfirmedMoveLocked(string directoryId,
+        Func<DirectoryListingDetailed, DirectoryListingDetailed> patch)
     {
-        var epoch = Volatile.Read(ref _accountEpoch);
-        var hasCurrent = TryGetCurrentListingLocked(directoryId, epoch, out var cached);
-        var generation = BumpListingGenerationLocked(directoryId);
+        var hasCurrent = TryGetCurrentListingLocked(directoryId, Volatile.Read(ref _accountEpoch), out var cached);
+        var generation = BumpListingGenerationWithPatchLocked(directoryId, patch);
         if (hasCurrent)
             _listCache[directoryId] = cached with { Generation = generation };
     }
 
     private void PublishListingLocked(string directoryId, CachedDirectoryListing cached,
-        DirectoryListingDetailed listing, DirectoryListingIndex index)
+        DirectoryListingDetailed listing, DirectoryListingIndex index,
+        Func<DirectoryListingDetailed, DirectoryListingDetailed> patch)
         => _listCache[directoryId] = cached with
         {
-            Generation = BumpListingGenerationLocked(directoryId),
+            Generation = BumpListingGenerationWithPatchLocked(directoryId, patch),
             Listing = listing,
             Index = index,
         };
+
+    // Идемпотентная вставка: запись с тем же id заменяется, порядок листинга сохраняется.
+    private static DirectoryListingDetailed UpsertFile(DirectoryListingDetailed listing, FileEntryDetailed entry)
+        => CopyDirectoryListingWithFile(CopyDirectoryListingWithoutFile(listing, entry.Entry.Id), entry);
 }

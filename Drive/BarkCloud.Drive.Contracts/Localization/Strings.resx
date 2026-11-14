@@ -488,6 +488,9 @@
   <data name="Eng_MoveUnconfirmedFmt" xml:space="preserve">
     <value>Сервер не подтвердил перенос «{0}»; папки перечитаны, проверьте, где находится файл. {1}</value>
   </data>
+  <data name="Eng_MoveNotSent" xml:space="preserve">
+    <value>Перенос не успел уйти на сервер.</value>
+  </data>
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Не удалось удалить запись «{0}» из облака после {1} попыток.</value>
   </data>

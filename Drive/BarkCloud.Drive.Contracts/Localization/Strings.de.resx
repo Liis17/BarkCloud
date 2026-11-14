@@ -488,6 +488,9 @@
   <data name="Eng_MoveUnconfirmedFmt" xml:space="preserve">
     <value>Der Server hat das Verschieben von „{0}“ nicht bestätigt; die Ordner wurden neu geladen, prüfen Sie den Speicherort der Datei. {1}</value>
   </data>
+  <data name="Eng_MoveNotSent" xml:space="preserve">
+    <value>Das Verschieben wurde nicht rechtzeitig an den Server gesendet.</value>
+  </data>
   <data name="Eng_DeleteFailedFmt" xml:space="preserve">
     <value>Cloud-Eintrag „{0}“ konnte nach {1} Versuchen nicht gelöscht werden.</value>
   </data>

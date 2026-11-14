@@ -96,6 +96,73 @@ public sealed class BatchedMoveTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task Background_refresh_started_before_an_own_patch_is_caught_up_instead_of_discarded()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var (source, _) = AddFolders(cloud);
+        var kept = cloud.AddFile(source, "kept.jpg", [1]);
+        var deleted = cloud.AddFile(source, "deleted.jpg", [1]);
+        var time = new FakeTimeProvider();
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+        gateway.ListDirectory(source);
+        time.Advance(TimeSpan.FromSeconds(6));
+
+        var refreshRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRefresh = new ManualResetEventSlim();
+        cloud.Invoker.AfterResponse = (method, request) =>
+        {
+            if (method != FakeCloudMethods.ListDirectoryDetailed
+                || ((BarkCloud.Proto.Files.ListDirectoryRequest)request).DirectoryId != source)
+                return;
+            refreshRead.TrySetResult();
+            releaseRefresh.Wait(TimeSpan.FromSeconds(5));
+        };
+        gateway.ListDirectory(source); // устаревший снимок → фоновое обновление
+        await refreshRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        gateway.QueueDeleteFileEntry(deleted.EntryId, source); // правка снимка во время загрузки
+        gateway.FlushPending(throwOnFailure: true);
+        cloud.Invoker.AfterResponse = null;
+        releaseRefresh.Set();
+
+        var listCalls = CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(20);
+            gateway.ListDirectory(source); // пока снимок не обновлён, вызов ставит новое фоновое обновление
+            if (CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed) == listCalls)
+                break;
+            listCalls = CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed);
+        }
+
+        CountCalls(cloud, FakeCloudMethods.ListDirectoryDetailed).Should().Be(listCalls, "снимок снова свежий");
+        listCalls.Should().Be(2, "результат загрузки догнан правкой, а не выброшен");
+        gateway.ListDirectory(source).Files.Select(file => file.Entry.Id).Should().Equal(kept.EntryId);
+    }
+
+    [Fact]
+    public void Deleting_a_folder_after_its_file_move_was_rejected_keeps_the_folder_and_the_file()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var (source, destination) = AddFolders(cloud);
+        var file = cloud.AddFile(source, "item.jpg", [1]);
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), new FakeTimeProvider());
+        var fs = new BarkCloudFileSystem(gateway, temp.Path("write"));
+        Warm(gateway, source, destination);
+        fs.MoveFile("\\Source\\item.jpg", "\\Destination\\item.jpg", false, new FakeDokanFileInfo());
+        cloud.AddFile(destination, "item.jpg", [2]); // перенос будет отклонён конфликтом имени
+
+        fs.DeleteDirectory("\\Source", new FakeDokanFileInfo { IsDirectory = true })
+            .Should().Be(DokanResult.DirectoryNotEmpty);
+
+        CountCalls(cloud, FakeCloudMethods.DeleteDirectory).Should().Be(0);
+        gateway.ListDirectory(source).Files.Should().ContainSingle(entry => entry.Entry.Id == file.EntryId);
+    }
+
+    [Fact]
     public void Old_server_without_batch_move_falls_back_to_single_moves()
     {
         using var temp = new TestDirectory();
