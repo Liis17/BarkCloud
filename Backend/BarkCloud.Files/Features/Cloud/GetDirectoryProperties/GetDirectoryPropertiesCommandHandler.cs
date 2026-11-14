@@ -49,7 +49,9 @@ public class GetDirectoryPropertiesCommandHandler : IRequestHandler<GetDirectory
                 ParentId = directory.ParentId?.ToString() ?? string.Empty,
                 Name = directory.Name,
                 CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(directory.CreatedAt, DateTimeKind.Utc)),
-                UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(directory.UpdatedAt, DateTimeKind.Utc))
+                UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(directory.UpdatedAt, DateTimeKind.Utc)),
+                IconKey = directory.IconKey ?? string.Empty,
+                IconColor = directory.IconColor ?? string.Empty
             },
             FileCount = fileCount,
             FolderCount = folderCount,

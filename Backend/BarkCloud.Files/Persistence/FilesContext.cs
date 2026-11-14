@@ -135,6 +135,8 @@ public class FilesContext : DbContext
             b.Property(x => x.EffectiveHideFromGallery).HasDefaultValue(false);
             b.Property(x => x.EffectiveHideFromSearch).HasDefaultValue(false);
             b.Property(x => x.SizeVersion).HasDefaultValue(0L);
+            b.Property(x => x.IconKey).HasMaxLength(64);
+            b.Property(x => x.IconColor).HasMaxLength(7);
             // Уникальность имени папки в рамках одного владельца и одного родителя
             b.HasIndex(x => new { x.OwnerId, x.ParentId, x.Name }).IsUnique();
             // NULL в ParentId не участвует в прежней уникальности — корень защищаем отдельно.
