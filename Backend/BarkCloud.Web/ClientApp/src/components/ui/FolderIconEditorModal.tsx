@@ -59,7 +59,6 @@ export function FolderIconEditorModal({ folderName, initial, onClose, onSave }: 
     }
   }
   const hexInvalid = hexInput !== '' && !normalizeHex(hexInput);
-  const changed = iconKey !== (initial.iconKey || null) || iconColor !== (initial.iconColor ? normalizeHex(initial.iconColor) : null);
 
   return (
     <Modal
@@ -72,7 +71,7 @@ export function FolderIconEditorModal({ folderName, initial, onClose, onSave }: 
             Сбросить
           </button>
           <button className="btn text" onClick={onClose}>Отмена</button>
-          <button className="btn primary" onClick={save} disabled={busy || hexInvalid || !changed}>
+          <button className="btn primary" onClick={save} disabled={busy || hexInvalid}>
             {busy ? '…' : 'Сохранить'}
           </button>
         </>

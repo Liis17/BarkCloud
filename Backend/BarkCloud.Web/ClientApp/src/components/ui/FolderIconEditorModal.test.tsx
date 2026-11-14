@@ -14,7 +14,6 @@ function renderEditor(initial = { iconKey: null as string | null, iconColor: nul
 describe('FolderIconEditorModal', () => {
   it('сохраняет выбранные иконку и цвет', async () => {
     const onSave = renderEditor();
-    expect((screen.getByRole('button', { name: 'Сохранить' }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByRole('option', { name: 'Музыка' }));
     fireEvent.click(screen.getByRole('button', { name: 'Цвет #EF6C00' }));
