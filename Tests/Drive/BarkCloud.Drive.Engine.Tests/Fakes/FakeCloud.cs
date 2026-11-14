@@ -194,10 +194,11 @@ internal sealed class FakeCloud
                 .ThenBy(entry => entry.Id, StringComparer.Ordinal)
                 .Where(entry => IsAfterCursor(entry, request.CursorName, request.CursorEntryId))
                 .ToArray();
-            var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 200);
+            var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, request.Compact ? 1000 : 200);
             var page = entries.Take(limit).ToArray();
             var response = new DirectoryListingDetailed();
-            response.Subdirs.Add(directories.Select(ToProto));
+            if (!request.Compact || string.IsNullOrEmpty(request.CursorName))
+                response.Subdirs.Add(directories.Select(ToProto));
 
             foreach (var entry in page)
             {

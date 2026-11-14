@@ -67,7 +67,7 @@ internal sealed partial class CloudGateway : IDisposable
     private static readonly TimeSpan HttpUploadResponseLimit = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan CacheCleanupInterval = TimeSpan.FromMinutes(1);
     private const long DefaultCacheLimitBytes = 5L * 1024 * 1024 * 1024;
-    private const int DirectoryPageSize = 200;
+    private const int DirectoryPageSize = 1000; // compact-страницы; старый сервер ограничит до 200
 
     private readonly CloudApi.CloudApiClient _cloud;
     private readonly FilesApi.FilesApiClient _files;
@@ -439,6 +439,7 @@ internal sealed partial class CloudGateway : IDisposable
             {
                 DirectoryId = dirId,
                 Limit = DirectoryPageSize,
+                Compact = true,
                 CursorEntryId = cursorEntryId,
             };
             if (!string.IsNullOrEmpty(cursorName)) request.CursorName = cursorName;
@@ -490,6 +491,7 @@ internal sealed partial class CloudGateway : IDisposable
         {
             DirectoryId = directoryId,
             Limit = 20,
+            Compact = true,
             CursorName = name,
             CursorEntryId = Guid.Empty.ToString(),
         }, cancellationToken: cancellationToken);

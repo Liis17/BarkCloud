@@ -160,7 +160,8 @@ public class CloudApiService : CloudApi.CloudApiBase
             DirectoryId = request.HasDirectoryId ? ParseOptionalGuid(request.DirectoryId) : null,
             Limit = request.Limit,
             CursorName = request.HasCursorName ? request.CursorName : null,
-            CursorEntryId = cursorEntryId
+            CursorEntryId = cursorEntryId,
+            Compact = request.Compact
         };
 
         return _mediator.Send(command);

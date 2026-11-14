@@ -142,19 +142,20 @@ public sealed class CloudGatewayTests
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        for (var i = 0; i < 205; i++)
-            cloud.AddFile("", $"file-{i:D3}.txt");
+        for (var i = 0; i < 1005; i++)
+            cloud.AddFile("", $"file-{i:D4}.txt");
         using var gateway = cloud.CreateGateway(temp.Path("cache"));
 
         var listing = gateway.ListDirectory("");
 
-        listing.Files.Should().HaveCount(205);
+        listing.Files.Should().HaveCount(1005);
         var calls = cloud.Invoker.Calls
             .Where(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
             .ToArray();
         calls.Should().HaveCount(2);
-        calls.Select(call => ((ListDirectoryRequest)call.Request).Limit).Should().OnlyContain(limit => limit == 200);
+        calls.Select(call => ((ListDirectoryRequest)call.Request).Limit).Should().OnlyContain(limit => limit == 1000);
         ((ListDirectoryRequest)calls[1].Request).CursorEntryId.Should().NotBeEmpty();
+        calls.Select(call => ((ListDirectoryRequest)call.Request).Compact).Should().OnlyContain(compact => compact);
     }
 
     [Fact]
@@ -196,7 +197,7 @@ public sealed class CloudGatewayTests
         gateway.Resolve("\\FILE-00000.TXT")!.Name.Should().Be("file-00000.txt");
 
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
-            .Should().Be(50);
+            .Should().Be(10);
     }
 
     [Fact]
@@ -204,8 +205,8 @@ public sealed class CloudGatewayTests
     {
         using var temp = new TestDirectory();
         var cloud = new FakeCloud();
-        for (var i = 0; i < 205; i++)
-            cloud.AddFile("", $"file-{i:D3}.txt");
+        for (var i = 0; i < 1005; i++)
+            cloud.AddFile("", $"file-{i:D4}.txt");
         var callersReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var startCallers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -250,7 +251,7 @@ public sealed class CloudGatewayTests
 
         var listings = await Task.WhenAll(requests).WaitAsync(TimeSpan.FromSeconds(10));
 
-        listings.Should().OnlyContain(listing => listing.Files.Count == 205);
+        listings.Should().OnlyContain(listing => listing.Files.Count == 1005);
         cloud.Invoker.Calls.Count(call => call.MethodFullName == FakeCloudMethods.ListDirectoryDetailed)
             .Should().Be(2);
     }

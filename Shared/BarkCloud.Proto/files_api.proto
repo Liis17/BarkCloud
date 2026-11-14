@@ -532,6 +532,9 @@ message ListDirectoryRequest {
   int32 limit = 2; // 1..200, default 50
   optional string cursor_name = 3; // exclusive; пусто = с первого имени
   string cursor_entry_id = 4; // tie-breaker для стабильной cursor-пагинации
+  // Только ListDirectoryDetailed: облегчённые страницы для полного обхода папки (Windows Drive) —
+  // limit до 1000, без превью и ссылок, подпапки только на первой странице (без курсора).
+  bool compact = 5;
 }
 
 message DirectoryListing {
