@@ -572,3 +572,26 @@ describe('FilesPage drag-to-move', () => {
     await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-9', dir: '' }));
   });
 });
+
+describe('FilesPage paste upload', () => {
+  function paste(target: EventTarget, files: File[]) {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files } });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  it('загружает файлы из буфера в текущую папку, но не перехватывает вставку в поле', async () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/files', state: { stack: [{ id: 'dir-1', name: 'Документы' }] } }]}><FilesPage /></MemoryRouter>);
+    await waitFor(() => expect(mocks.apiGet).toHaveBeenCalledWith(expect.stringContaining('dir=dir-1')));
+    const shot = new File(['png'], 'image.png', { type: 'image/png' });
+
+    const input = document.body.appendChild(document.createElement('input'));
+    expect(paste(input, [shot]).defaultPrevented).toBe(false);
+    input.remove();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+
+    expect(paste(document.body, [shot]).defaultPrevented).toBe(true);
+    expect(mocks.enqueue).toHaveBeenCalledWith([shot], { dir: 'dir-1' });
+  });
+});

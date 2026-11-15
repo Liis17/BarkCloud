@@ -22,6 +22,7 @@ import { useToast } from '../hooks/useToast';
 import { useTextFileViewer } from '../hooks/useTextFileViewer';
 import { getTextFileKind, textContentUrl } from '../lib/textFiles';
 import { isTextEntry, overlayOpen } from '../lib/keyboard';
+import { ensureTree, treeFromPicked, type FolderTree } from '../lib/folderUpload';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { CLOUD_ITEMS_MIME, useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
@@ -368,12 +369,13 @@ export function FilesPage() {
   const audioPlayer = useAudioPlayer();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
-  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target) => doUpload(files, target));
+  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target, tree) => doUpload(files, target, tree));
   const fsel = useSelection();
   const [focusKey, setFocusKey] = React.useState<string | null>(null);
   const shellRef = React.useRef<HTMLDivElement | null>(null);
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const hotkeysRef = React.useRef<(e: KeyboardEvent) => void>(() => {});
+  const pasteRef = React.useRef<(e: ClipboardEvent) => void>(() => {});
   // Перетаскиваемые мышью записи (ключи выбора) и папка под курсором.
   const dragKeysRef = React.useRef<string[] | null>(null);
   const [moveOver, setMoveOver] = React.useState<string | null>(null);
@@ -694,10 +696,28 @@ export function FilesPage() {
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
     ];
   }
-  async function doUpload(dropped?: File[], target: FileDropTarget | null = null) {
+  async function doUpload(dropped?: File[], target: FileDropTarget | null = null, tree?: FolderTree) {
     const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
-    enqueue(files, { dir: target?.id || currentDir });
+    const baseDir = target?.id || currentDir;
+    if (tree) await uploadTree(files, tree, baseDir);
+    else enqueue(files, { dir: baseDir });
+  }
+  /** Папка целиком: сначала воссоздаём дерево папок, затем ставим файлы в очередь одной пачкой. */
+  async function uploadTree(files: File[], tree: FolderTree, baseDir: string) {
+    let dirs: string[];
+    try {
+      dirs = await ensureTree(tree, baseDir);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось создать папки', 'err');
+      return;
+    }
+    loadRef.current();
+    enqueue(files, { dir: baseDir }, dirs);
+  }
+  async function uploadFolder() {
+    const files = await pickFiles({ directory: true });
+    if (files.length) await uploadTree(files, treeFromPicked(files), currentDir);
   }
 
   const chosenDirs = () => (listing?.dirs || []).filter((d) => fsel.has(dirKey(d.id)));
@@ -857,6 +877,9 @@ export function FilesPage() {
           <button className="btn outlined" onClick={() => { setName(''); setCreating(true); }}>
             <Icon.plus size={16} /> Создать
           </button>
+          <button className="btn outlined" onClick={() => uploadFolder()}>
+            <Icon.folder size={16} /> Загрузить папку
+          </button>
           <button className="btn primary" onClick={() => doUpload()}>
             <Icon.upload size={16} /> Загрузить
           </button>
@@ -1011,10 +1034,25 @@ export function FilesPage() {
       startRename(item.target, item.isDir);
     }
   };
+  // Ctrl+V с файлами или скриншотом в буфере — загрузка в текущую папку (в тех же границах, что и горячие клавиши).
+  pasteRef.current = (e) => {
+    if (openSmart || searchQuery || isTextEntry(e.target) || overlayOpen()) return;
+    const t = e.target;
+    if (t !== document.body && !(t instanceof Node && shellRef.current?.contains(t))) return;
+    const pasted = Array.from(e.clipboardData?.files || []);
+    if (!pasted.length) return;
+    e.preventDefault();
+    enqueue(pasted, { dir: currentDir });
+  };
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => hotkeysRef.current(e);
+    const onPaste = (e: ClipboardEvent) => pasteRef.current(e);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('paste', onPaste);
+    };
   }, []);
 
   return (

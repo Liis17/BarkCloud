@@ -83,3 +83,36 @@ describe('useFileDrop', () => {
     expect(screen.getByTestId('state').textContent).toBe('out');
   });
 });
+
+describe('useFileDrop folders', () => {
+  const fileEntry = (f: File) => ({ isFile: true, isDirectory: false, name: f.name, file: (ok: (v: File) => void) => ok(f) });
+  const dirEntry = (name: string, children: unknown[], batch = 1) => ({
+    isFile: false, isDirectory: true, name,
+    createReader: () => {
+      let rest = [...children];
+      // readEntries отдаёт содержимое порциями, пустая порция — конец.
+      return { readEntries: (ok: (v: unknown[]) => void) => { ok(rest.splice(0, batch)); } };
+    },
+  });
+
+  it('обходит брошенную папку порциями и отдаёт файлы с путями, без псевдофайла папки', async () => {
+    const onFiles = vi.fn();
+    render(<Harness onFiles={onFiles} />);
+    const a = new File(['a'], 'a.txt');
+    const b = new File(['b'], 'b.txt');
+    const tree = dirEntry('Отпуск', [fileEntry(a), dirEntry('Пусто', []), dirEntry('Дни', [fileEntry(b)])]);
+    const folderTransfer = {
+      types: ['Files'],
+      files: [new File([], 'Отпуск')],
+      items: [{ kind: 'file', webkitGetAsEntry: () => tree }],
+    } as unknown as DataTransfer;
+
+    fireEvent.drop(screen.getByTestId('target'), { dataTransfer: folderTransfer });
+
+    await vi.waitFor(() => expect(onFiles).toHaveBeenCalledTimes(1));
+    expect(onFiles).toHaveBeenCalledWith([a, b], { id: 'folder-1', label: 'Документы' }, {
+      paths: ['Отпуск', 'Отпуск/Дни'],
+      dirs: ['Отпуск', 'Отпуск/Пусто', 'Отпуск/Дни'],
+    });
+  });
+});

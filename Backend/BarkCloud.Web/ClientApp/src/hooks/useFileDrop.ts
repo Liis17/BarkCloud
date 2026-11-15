@@ -1,4 +1,5 @@
 import React from 'react';
+import { walkEntries, type FolderTree } from '../lib/folderUpload';
 
 export interface FileDropTarget {
   id: string;
@@ -35,7 +36,8 @@ function hasFiles(event: React.DragEvent<HTMLElement>): boolean {
  * может не прислать его при выходе файла за окно приложения.
  */
 export function useFileDrop(
-  onFiles: (files: File[], target: FileDropTarget | null) => void,
+  /** tree — пути папок, если брошены папки; страницы без иерархии получают просто все файлы. */
+  onFiles: (files: File[], target: FileDropTarget | null, tree?: FolderTree) => void,
 ) {
   const [over, setOver] = React.useState(false);
   const [target, setTarget] = React.useState<FileDropTarget | null>(null);
@@ -74,6 +76,17 @@ export function useFileDrop(
 
     event.preventDefault();
     reset();
+    // Записи берутся синхронно: после обработчика drop DataTransfer уже пуст.
+    const entries = Array.from(event.dataTransfer.items || [])
+      .map((item) => (item.kind === 'file' ? item.webkitGetAsEntry?.() : null))
+      .filter((entry): entry is FileSystemEntry => !!entry);
+    if (entries.some((entry) => entry.isDirectory)) {
+      // Брошены папки: файлы приходят из обхода дерева (сама папка в files — пустая псевдозапись).
+      void walkEntries(entries).then(({ files, tree }) => {
+        if (files.length) onFiles(files, dropTarget, tree);
+      });
+      return;
+    }
     const files = Array.from(event.dataTransfer.files || []);
     if (files.length) onFiles(files, dropTarget);
   }, [onFiles, reset]);

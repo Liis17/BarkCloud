@@ -66,11 +66,13 @@ export const apiPut = <T = unknown>(path: string, body?: unknown) =>
   api<T>(path, { method: 'PUT', body: JSON.stringify(body || {}) });
 
 /** Открыть системный диалог выбора файлов. */
-export function pickFiles({ accept, multiple = true }: { accept?: string; multiple?: boolean } = {}): Promise<File[]> {
+/** directory — выбор папки целиком (webkitdirectory): путь каждого файла в webkitRelativePath. */
+export function pickFiles({ accept, multiple = true, directory = false }: { accept?: string; multiple?: boolean; directory?: boolean } = {}): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = multiple;
+    if (directory) input.webkitdirectory = true;
     if (accept) input.accept = accept;
     input.style.display = 'none';
     document.body.appendChild(input);
