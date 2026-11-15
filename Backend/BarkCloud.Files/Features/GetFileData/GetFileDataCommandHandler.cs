@@ -9,7 +9,6 @@ using MediatR;
 
 using CloudAccessDeniedException = BarkCloud.Shared.Exceptions.Files.CloudAccessDeniedException;
 using FileNotReadyException = BarkCloud.Shared.Exceptions.Files.FileNotReadyException;
-using UploadFileType = BarkCloud.Files.Domain.UploadFileType;
 
 namespace BarkCloud.Files.Features.GetFileData;
 
@@ -42,8 +41,9 @@ public class GetFileDataCommandHandler : IRequestHandler<GetFileDataCommand, Get
             throw new FileNotFoundException();
         }
 
-        // Аватары публичны; остальное — только владельцу (UserId = 0 ничего не открывает).
-        if (file.Type != UploadFileType.UserAvatar && !file.Uploaders.Contains(request.UserId))
+        // Только владельцу (UserId = 0 ничего не открывает), включая аватары: SetProfilePicture назначает
+        // аватар по этому ответу, а чужой файл освободит его владелец (StaleAvatarReleaser) — и он будет удалён.
+        if (!file.Uploaders.Contains(request.UserId))
         {
             _logger.LogWarning("Пользователь {UserId} запросил данные чужого файла {FileId}", request.UserId, request.FileId);
             throw new CloudAccessDeniedException();
