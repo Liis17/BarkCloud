@@ -42,6 +42,6 @@ foreach ($ruleset in @($rulesets | Where-Object { $obsolete -contains $_.name })
 }
 
 foreach ($branch in @('dev', 'master')) {
-    gh api "repos/$Repository/rules/branches/$branch" --jq '[.[] | .type] | join(",")'
+    gh api "repos/$Repository/rules/branches/$branch" --jq '.[].type'
     if ($LASTEXITCODE -ne 0) { throw "Cannot verify rules for $branch." }
 }
