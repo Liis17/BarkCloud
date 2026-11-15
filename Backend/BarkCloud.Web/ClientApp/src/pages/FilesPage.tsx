@@ -31,7 +31,7 @@ import { useUploadActions } from '../hooks/useUploadManager';
 import { DynamicFoldersSkeleton, DynamicFoldersStrip } from '../components/dynamic-folders/DynamicFoldersStrip';
 import { DynamicFolderDetail } from '../components/dynamic-folders/DynamicFolderDetail';
 import { DynamicFolderFormModal } from '../components/dynamic-folders/DynamicFolderFormModal';
-import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, pickFiles } from '../lib/api';
+import { apiGet, apiPost, deleteEntriesBatch, downloadArchive, downloadFile, pickFiles } from '../lib/api';
 import { createShare, createFolderShare } from '../lib/share';
 import { GRID_SIZES } from '../lib/format';
 import { FILES_VIEW_KEY, FILES_VIEWS, useStoredChoice } from '../lib/viewPrefs';
@@ -545,10 +545,7 @@ export function FilesPage() {
   }
   async function download(entry: Entry) {
     try {
-      const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(entry.fileId));
-      const url = d.urls && d.urls[entry.fileId];
-      if (url) window.open(url, '_blank');
-      else toast('Ссылка недоступна', 'err');
+      await downloadFile(entry.fileId);
     } catch (e) {
       toast((e as Error).message, 'err');
     }
