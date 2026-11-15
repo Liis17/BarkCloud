@@ -17,10 +17,12 @@ export interface PublicViewerFile {
   videoQualities?: VideoQuality[];
 }
 
-interface Props {
-  file: PublicViewerFile;
+interface Props<T extends PublicViewerFile> {
+  file: T;
   /** Фото и видео страницы по порядку: листание кнопками, стрелками и свайпом. */
-  items?: PublicViewerFile[];
+  items?: T[];
+  /** Показанный файл сменился листанием: страница обновляет заголовок вкладки. */
+  onChange?: (file: T) => void;
   onClose: () => void;
 }
 
@@ -30,7 +32,7 @@ const GESTURE_IGNORE = '.public-viewer-top, .public-viewer-actions, .video-playe
 /** Оверлей просмотра фото/видео на публичных страницах папки и альбома.
  *  Урезанные действия без авторизации: скачать, скопировать изображение (фото), копировать ссылку на страницу.
  *  Листание стрелками (на видео — Shift+стрелки) и свайпом, щипок зумит фото — как в Lightbox. */
-export function PublicViewer({ file: initial, items, onClose }: Props) {
+export function PublicViewer<T extends PublicViewerFile>({ file: initial, items, onChange, onClose }: Props<T>) {
   const list = items && items.includes(initial) ? items : [initial];
   const [i, setI] = React.useState(() => list.indexOf(initial));
   const file = list[Math.min(i, list.length - 1)];
@@ -46,9 +48,13 @@ export function PublicViewer({ file: initial, items, onClose }: Props) {
     (delta: number) => setI((prev) => Math.min(list.length - 1, Math.max(0, prev + delta))),
     [list.length],
   );
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
   React.useEffect(() => {
     setScale(1);
     setPan({ x: 0, y: 0 });
+    if (file !== initial) onChangeRef.current?.(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
   useViewerGestures(rootRef, { ignore: GESTURE_IGNORE, zoomable: !isVideo && !!imageSrc, scale, pan, setScale, setPan, go });
 

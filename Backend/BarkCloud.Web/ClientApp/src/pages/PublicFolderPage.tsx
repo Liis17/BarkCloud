@@ -151,7 +151,7 @@ export function PublicFolderPage() {
         </section>
       )}
 
-      {viewer && <PublicViewer file={viewer} items={d.files.filter((f) => isPublicMedia(f.mediaKind))} onClose={() => setViewer(null)} />}
+      {viewer && <PublicViewer file={viewer} onChange={setViewer} items={d.files.filter((f) => isPublicMedia(f.mediaKind))} onClose={() => setViewer(null)} />}
       {textViewer}
     </PublicShareShell>
   );

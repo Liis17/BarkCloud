@@ -115,3 +115,14 @@ describe('PublicViewer navigation and gestures', () => {
     expect(img(container)?.getAttribute('src')).toBe('/p2.jpg');
   });
 });
+
+describe('PublicViewer page title sync', () => {
+  it('сообщает странице о файле, показанном после листания', () => {
+    const items = [1, 2].map((n) => ({ name: `p${n}.jpg`, mediaKind: 'photo', downloadUrl: `/p${n}.jpg`, previewUrl: '', fileSize: 0 }));
+    const onChange = vi.fn();
+    render(<PublicViewer file={items[0]} items={items} onChange={onChange} onClose={vi.fn()} />);
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenCalledWith(items[1]);
+  });
+});

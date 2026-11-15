@@ -140,7 +140,7 @@ export function PublicAlbumPage() {
         </div>
       )}
 
-      {viewer && <PublicViewer file={viewer} items={items.filter((f) => isPublicMedia(f.mediaKind))} onClose={() => setViewer(null)} />}
+      {viewer && <PublicViewer file={viewer} onChange={setViewer} items={items.filter((f) => isPublicMedia(f.mediaKind))} onClose={() => setViewer(null)} />}
     </PublicShareShell>
   );
 }
