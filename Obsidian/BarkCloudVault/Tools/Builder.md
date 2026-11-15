@@ -62,7 +62,7 @@ Configuration получает внутренние порты Identity, Users, 
 
 ## Ограничения и важные детали
 
-- `.github/workflows/build-builder.yml` при push в `master` или в pull request с изменениями Builder, его тестов, общих build properties или самого workflow (и при ручном запуске) выполняет тесты и собирает два Release-варианта `win-x64`. Полные папки публикации с `BarkCloud.Builder.exe` упаковываются отдельно: `BarkCloud.Builder-win-x64-self-contained.zip` включает .NET runtime, а `BarkCloud.Builder-win-x64-framework-dependent.zip` требует установленного .NET 10 Desktop Runtime (x64). GitHub Release создаётся только при push или ручном запуске из `master`; pull request выполняет проверки без публикации релиза. Оба архива прикрепляются к одному GitHub Release с тегом `builder-<run_number>-<run_attempt>`, указывающим на собранный коммит. Релиз не получает статус Latest; публикация использует встроенный `GITHUB_TOKEN` с `contents: write`.
+- Логику Builder проверяет `BarkCloud.Builder.Tests` в backend-наборе PR; WPF-приложение собирается Windows-набором `test-clients.yml` при изменениях `Tools/BarkCloud.Builder/**`. Self-contained `win-x64` ZIP публикуется job `builder` в `ci.yml` в составе prerelease `dev` и стабильного релиза `master` (см. [[Platform/CI]]).
 
 - Все проверки модели выполняются до записи compose/env/config. Имена контейнеров должны соответствовать Docker, быть уникальными среди включённых сервисов и не совпадать с `cloud-*` alias другого сервиса, даже если он отключён.
 - Папка вывода должна существовать. Файлы записываются UTF-8 без BOM с переводами строк LF. При смене режима существующие `certs/` не удаляются.

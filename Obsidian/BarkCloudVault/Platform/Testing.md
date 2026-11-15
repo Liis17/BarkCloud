@@ -1,10 +1,10 @@
 # Тестирование
 
-Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[Backend/Users]] · [[Shared/SharedLibraries]]
+Parent: [[Architecture]] · See also: [[Platform/CI]] · [[Web/WebApp]] · [[Backend/Files]] · [[Backend/Users]] · [[Shared/SharedLibraries]]
 
 ## Назначение
 
-Автоматические проверки сгруппированы по backend-сервисам, общим библиотекам и Windows Drive; часть проверок использует настоящие PostgreSQL или RabbitMQ. GitHub Actions выбирает наборы по изменённым путям и запускает сборку образа после успешных тестов сервиса.
+Автоматические проверки сгруппированы по backend-сервисам, общим библиотекам и Windows Drive; часть проверок использует настоящие PostgreSQL или RabbitMQ. GitHub Actions выбирает наборы по изменённым путям PR в `dev`; сборка и публикация описаны в [[Platform/CI]].
 
 ## Источники
 
@@ -14,10 +14,7 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `Tests/BarkCloud.TestKit/` | общие test helpers | gRPC-контекст, вызовы и логгер для тестов |
 | `Tests/Drive/BarkCloud.Drive.Engine.Tests/` | тесты Windows Drive | Dokany callbacks, outbox/Upload 2.0, сессия, кеш, TLS, настройки и pipe |
 | `Mac/BarkCloudKit/Tests/BarkCloudKitTests/` | Swift package tests | Upload 2.0, восстановление частей, отмена, токены и реальные gRPC deadline-сценарии для iOS/macOS сетевого слоя |
-| `.github/workflows/tests.yml` | path filters, test jobs | Выбор тестов на PR и ручном запуске; на PR в `master` и при `force-all` — полный прогон, вызывается из `release.yml` через `workflow_call` |
-| `.github/workflows/release.yml` | релизный pipeline | Push в `master` или `dev`: полный прогон тестов → сборка APK/Drive ZIP/Builder ZIP (в `master` также IPA/DMG) → стабильный релиз `v1.x.y` или dev prerelease |
-| `.github/workflows/backend-service-ci.yml` | test/build jobs | Тесты сервиса перед сборкой и публикацией образа; общий version action использует registry SemVer для dev/master |
-| `.github/workflows/build-backend-transcoder.yml` | Transcoder CI/CD | Тесты нового sidecar, затем сборка и публикация его образа; ручной запуск на `dev` и `Backend/rebuild.trigger` тоже собирают образ |
+| `.github/workflows/test-backend.yml`, `test-clients.yml` | test jobs | Матрица .NET-тестов и клиентские наборы; выбор — `.github/scripts/pr_tests.py` |
 | `Backend/BarkCloud.Web/ClientApp/package.json` | npm scripts | Vitest-команда клиентских тестов и сборка SPA |
 
 ## Публичные контракты
@@ -33,28 +30,14 @@ Parent: [[Architecture]] · See also: [[Web/WebApp]] · [[Backend/Files]] · [[B
 | `npm test` в `Backend/BarkCloud.Web/ClientApp` | Запускает Vitest |
 | `dotnet test <project.csproj> -c Release` | Запуск указанного .NET test-проекта |
 
-## Релизы приложений
+## Релизы приложений и версии образов
 
-`release.yml` публикует для каждого push в `dev` отдельный prerelease
-`v1.x.y-dev.<run_number>.<run_attempt>+<short_sha>` на точный коммит сборки.
-Он содержит Android APK и манифест, Windows Drive и Builder ZIP
-и явно исключён из Latest. IPA и DMG собираются и публикуются только в `master`.
-Публикация ждёт успешных тестов и всех сборок выбранной ветки.
-Dev-запуски независимы и не отменяют друг друга; master-запуски сериализованы.
-Следующая стабильная версия выбирается только среди опубликованных стабильных
-релизов, поэтому prerelease не влияет на её автоинкремент.
+Релизы клиентов, версии backend-образов и перенос образов в master описаны в [[Platform/CI]].
 Android Gradle принимает `androidReleaseVersionName` в формате `major.minor.patch`
 или `major.minor.patch-dev.<run_number>.<run_attempt>+<short_sha>`; номера запуска
 и попытки положительные, short SHA — семь строчных hex-символов, как в workflow.
-Android использует код следующей стабильной версии; preview-сборки одного цикла
-имеют одинаковый `versionCode` и предназначены для ручной установки, а не
-последовательного автоматического обновления.
 
-## Версии backend-образов
-
-`.github/actions/docker-version/` вычисляет независимую SemVer-версию для каждого из восьми backend-образов. Сборка из `dev` выбирает максимум тегов master и dev и повышает patch, затем публикует `SemVer`, `latest` и SHA-теги в репозиторий `*-dev`. Сборка master использует последний SemVer dev-образа без повышения и публикует теги в master-репозиторий. Master workflow запускается только после слитого PR из `dev` в `master` с изменениями путей соответствующего сервиса. Изменение `Backend/rebuild.trigger` запускает все восемь dev-сборок.
-
-Локальная проверка выбора версии: `bash Tests/CI/docker-version.test.sh`.
+Локальная проверка CI-скриптов: `python3 -m unittest discover -s .github/tests -p 'test_*.py'`.
 
 ## Корреляция серверных логов
 
@@ -88,21 +71,16 @@ dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests -c Release
 dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests --filter "Category=WindowsIpc"
 ```
 
-В `.github/workflows/tests.yml` job `Drive (Windows)` запускается на `windows-latest`, когда фильтр `drive` находит изменения в `Drive/**`, `Tests/Drive/**`, `Shared/BarkCloud.Proto/**`, `Directory.Build.props`, `Tests/Directory.Build.props` или самом workflow. Job устанавливает .NET 10, собирает `Drive/BarkCloud.Drive.slnx` в Release и запускает тестовый проект целиком, в том числе категорию `WindowsIpc`.
+Windows-набор `.github/workflows/test-clients.yml` запускается на `windows-latest`, когда PR меняет `Drive/**`, `Tools/BarkCloud.Builder/**`, входы `BarkCloud.Drive.Engine.Tests` (в том числе `Shared/BarkCloud.Proto/**`) или общие `*.props`. Job собирает `Drive/BarkCloud.Drive.slnx` в Release, запускает тестовый проект целиком, в том числе категорию `WindowsIpc`, и собирает WPF Builder.
 
 ## Зависимости и взаимодействия
 
-- Workflow `tests.yml` запускается для pull request в `dev` и `master`, а также вручную, по вызову через `workflow_call` (вход `force-all`) из `release.yml`. Изменения в Shared запускают backend-проекты; тесты сервисов выбираются по путям их кода и тестов. PR в `master` всегда запускает полный набор тест-джоб независимо от путей.
-- Разработка ведётся в `dev`: рабочие ветки создаются от `dev`, PR направляются в `dev`. В `master` изменения продвигаются только PR из `dev` (или горячих фикс-веток от `master`); merge в `master` публикует релиз через `release.yml`.
-- В CI Files и Users получают PostgreSQL 18 и `BARKCLOUD_TEST_POSTGRES`. Интеграционный workflow Users также запускает RabbitMQ и передаёт `BARKCLOUD_TEST_RABBITMQ`.
+- Наборы выбирает `.github/scripts/pr_tests.py` на PR в `dev` по графу `.csproj`; PR в `master` тесты не повторяет (см. [[Platform/CI]]).
+- В CI `BarkCloud.Files.Tests`, `BarkCloud.Users.Tests` и `BarkCloud.Identity.IntegrationTests` получают PostgreSQL 18 и `BARKCLOUD_TEST_POSTGRES`; `BarkCloud.Users.IntegrationTests` также RabbitMQ и `BARKCLOUD_TEST_RABBITMQ`. Потребности задаёт `CONTAINERS` в `pr_tests.py`.
 - PostgreSQL и RabbitMQ в CI запускает composite action `.github/actions/test-containers` (скрипт `.github/scripts/start-test-containers.sh`: `postgres:18`, `rabbitmq:4.1`), а не `services:` — так `docker pull` повторяется до 5 раз с паузой 20 с × номер попытки: Docker Hub отдаёт таймауты и `toomanyrequests`. Образов `postgres`/`rabbitmq` в `docker.barkfluff.com` нет, поэтому логин `REGISTRY_*` для них не помогает.
-- Тесты сервиса запускаются и при изменении `Backend/BarkCloud.GrpcServer/**` — это общий хост всех сервисов. SDK во всех .NET-джобах ставится через `actions/setup-dotnet`.
-- Сборка backend-образа в `backend-service-ci.yml` зависит от успешного test job. Входы `runtime-paths` (тот же список путей, что `on.push.paths` вызывающего `build-backend-*.yml`) и `push-delay` определяют реакцию на изменения и паузу перед `docker buildx build --push`.
-- Образ собирается без отправки (слои остаются в кэше buildkit-билдера джобы), затем после паузы `push-delay` workflow запускает `docker buildx build --push` для всех тегов. Вход в реестр, команда отправки и опрос тегов повторяются до 3 раз через 15 с; конфигурация описывает попытки, а результат конкретной публикации виден в run workflow. `push-delay` растёт на 15 с по порядку файлов `build-backend-*.yml` (configuration 15 … web 105), чтобы одновременные сборки не пушили в реестр разом; новому сервису — следующее значение.
-- `paths` в `build-backend-*.yml` перечисляют `Shared/BarkCloud.Shared.*/**` и только нужные `.proto` по принципу сервиса-владельца; `configuration_api.proto` и `session_revocation_api.proto` компилируются в `BarkCloud.GrpcServer` и затрагивают все сервисы.
-- Telegram-уведомление шлёт `.github/scripts/send-telegram.sh`: при отказе Markdown повторяет текст без разметки, при неудаче пишет `::warning::` и не валит джобу.
-- Для Web CI выполняет `npm ci` и `npm run build` перед `dotnet publish`. Скрипт `npm test` существует, но в текущих workflows вызова Vitest нет.
-- Центральный test workflow также содержит Android unit job. Отдельные jobs для iOS и macOS не определены; для Windows Drive есть job `Drive (Windows)`.
+- SDK во всех .NET-джобах ставится через `actions/setup-dotnet` (`10.0.x`).
+- Набор Web ClientApp запускает `npm test` (Vitest) и `npm run build` при изменениях `Backend/BarkCloud.Web/ClientApp/**`.
+- Клиентские наборы: Android unit (`Android/**`), Swift-тесты `Mac/BarkCloudKit` (`Mac/BarkCloudKit/**`) и Windows. Тесты iOS-приложения в CI не запускаются.
 
 ## Ограничения и важные детали
 
@@ -149,10 +127,9 @@ immediate refire. Тест использует mock `IScheduler`, а не Postg
 
 `run-f18.sh` требует Docker Compose и .NET 10. Перед `up --wait` скрипт повторяет `docker compose pull` до пяти попыток. Версия `rabbitmq:latest` читается командой `docker compose exec -T --user rabbitmq rabbitmq rabbitmqctl version`; root entrypoint образа сохраняется для штатной настройки прав. Healthcheck запускает `rabbitmq-diagnostics -q ping` от пользователя `rabbitmq` через `gosu`. EXIT trap установлен до `up --wait`, сохраняет volumes и возвращает исходный код завершения, даже если `stop` завершился ошибкой. Фактическая версия RabbitMQ печатается runner-командой и acceptance test в TRX. Тест использует `BARKCLOUD_TEST_POSTGRES`, `BARKCLOUD_TEST_RABBITMQ` и `BARKCLOUD_TEST_RABBITMQ_CONTAINER`; `BARKCLOUD_TEST_RABBITMQ` — URI `rabbitmq://...` для MassTransit, а raw RabbitMQ.Client преобразует схему в `amqp`, сохраняя endpoint, credentials и vhost. Инструкции по прямому запуску приведены в `Tests/Backend/BarkCloud.Files.IntegrationTests/README.md`.
 
-`.github/workflows/files-upload-integration.yml` вызывается PR workflow
-`.github/workflows/tests.yml` и Files CI/CD workflow
-`.github/workflows/build-backend-files.yml`; CI использует быстрый вариант по умолчанию,
-а Files CI/CD ждёт успешной интеграционной проверки перед публикацией. Интеграционный
+`.github/workflows/files-upload-integration.yml` вызывается из `ci.yml` на PR в `dev`, когда
+выбор затрагивает `BarkCloud.Files.IntegrationTests` (изменения Files и его зависимостей);
+CI использует быстрый вариант по умолчанию. Интеграционный
 workflow всегда выводит `docker compose logs --no-color` и `docker compose ps --all`,
 затем сохраняет TRX artifact. Для ручного запуска полного production-сценария workflow
 поддерживает `workflow_dispatch` с `production-intervals=true`. Перед запуском проверь,

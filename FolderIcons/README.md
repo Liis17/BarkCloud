@@ -28,5 +28,5 @@
 
 ## Как пак попадает в сборки
 
-- Web: Vite подключает пак через alias `@folder-icons` (`Backend/BarkCloud.Web/ClientApp/vite.config.ts`) и встраивает SVG в бандл при каждой сборке. Изменение `FolderIcons/**` запускает CI веба (`.github/workflows/build-backend-web.yml`); Docker-сборка копирует пак в client-стадию (`Backend/BarkCloud.Web/Dockerfile`).
+- Web: Vite подключает пак через alias `@folder-icons` (`Backend/BarkCloud.Web/ClientApp/vite.config.ts`) и встраивает SVG в бандл при каждой сборке. Изменение `FolderIcons/**` пересобирает образ web при push в `dev` (`.github/scripts/ci_plan.py`); Docker-сборка копирует пак в client-стадию (`Backend/BarkCloud.Web/Dockerfile`).
 - Другие клиенты подключают `manifest.json` и `svg/` на этапе своей сборки тем же способом: читают файлы из корня репозитория, без копий внутри проекта.
