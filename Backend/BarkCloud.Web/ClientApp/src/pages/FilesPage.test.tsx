@@ -504,3 +504,71 @@ describe('FilesPage keyboard', () => {
     expect(screen.getByText('Выбранное (3) будет перемещено в корзину.')).toBeTruthy();
   });
 });
+
+describe('FilesPage drag-to-move', () => {
+  function dragData() {
+    const data = new Map<string, string>();
+    return {
+      get types() { return Array.from(data.keys()); },
+      setData: (type: string, value: string) => data.set(type, value),
+      getData: (type: string) => data.get(type) || '',
+      files: [] as File[],
+      effectAllowed: 'all',
+      dropEffect: 'none',
+    } as unknown as DataTransfer;
+  }
+  const rowOf = (text: string) => screen.getByText(text).closest('tr') as HTMLElement;
+
+  beforeEach(() => {
+    mockDirectoryListings({
+      '': {
+        dirs: [{ id: 'dir-1', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' }, { id: 'dir-2', name: 'Архив', updatedAt: '2026-01-01T00:00:00Z' }],
+        files: [fileEntry('entry-1', 'отчёт.pdf'), fileEntry('entry-2', 'план.txt')],
+      },
+    });
+  });
+
+  it('перемещает файл, брошенный на папку, без загрузки', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+    const dataTransfer = dragData();
+
+    fireEvent.dragStart(rowOf('отчёт.pdf'), { dataTransfer });
+    fireEvent.dragEnter(rowOf('Документы'), { dataTransfer });
+    await waitFor(() => expect(rowOf('Документы').className).toContain('drop-target'));
+    fireEvent.drop(rowOf('Документы'), { dataTransfer });
+
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-1', dir: 'dir-1' }));
+    expect(mocks.apiPost).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('тянет весь выбор и не бросает папку саму в себя', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+    fireEvent.click(within(rowOf('Архив')).getByRole('checkbox'));
+    fireEvent.click(within(rowOf('план.txt')).getByRole('checkbox'));
+
+    const self = dragData();
+    fireEvent.dragStart(rowOf('Архив'), { dataTransfer: self });
+    fireEvent.drop(rowOf('Архив'), { dataTransfer: self });
+    expect(mocks.apiPost).not.toHaveBeenCalled();
+
+    const dataTransfer = dragData();
+    fireEvent.dragStart(rowOf('план.txt'), { dataTransfer });
+    fireEvent.drop(rowOf('Документы'), { dataTransfer });
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledTimes(2));
+    expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/dir/move', { id: 'dir-2', parentId: 'dir-1' });
+    expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-2', dir: 'dir-1' });
+  });
+
+  it('перемещает в корень через хлебные крошки', async () => {
+    mockDirectoryListings({ 'dir-1': { dirs: [], files: [fileEntry('entry-9', 'внутри.txt')] } });
+    renderFilesHistory([{ pathname: '/files', state: { stack: [{ id: 'dir-1', name: 'Документы' }] } }]);
+    await screen.findByText('внутри.txt');
+    const dataTransfer = dragData();
+    fireEvent.dragStart(rowOf('внутри.txt'), { dataTransfer });
+    fireEvent.drop(screen.getByTitle('Корень облака'), { dataTransfer });
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-9', dir: '' }));
+  });
+});

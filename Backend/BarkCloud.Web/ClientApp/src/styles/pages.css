@@ -779,6 +779,7 @@ tr.selected .row-actions { opacity: 1; }
   transition: background var(--d-short), color var(--d-short); font-weight: 500; display: inline-flex; align-items: center;
 }
 .breadcrumb a:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+.breadcrumb a.drop-target { outline: 2px solid var(--md-primary); outline-offset: -2px; background: color-mix(in srgb, var(--md-primary) 12%, transparent); }
 .breadcrumb .sep { color: var(--md-outline); font-size: 16px; }
 .breadcrumb .cur { color: var(--md-on-secondary-container); font-weight: 500; padding: 6px 12px; background: var(--md-secondary-container); border-radius: var(--r-full); }
 

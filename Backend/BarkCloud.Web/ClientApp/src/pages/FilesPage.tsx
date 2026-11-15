@@ -23,7 +23,7 @@ import { useTextFileViewer } from '../hooks/useTextFileViewer';
 import { getTextFileKind, textContentUrl } from '../lib/textFiles';
 import { isTextEntry, overlayOpen } from '../lib/keyboard';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
-import { useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
+import { CLOUD_ITEMS_MIME, useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -63,8 +63,16 @@ type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 /** Ключ папки в общем выборе с файлами (файлы выбираются по entryId). */
 const dirKey = (id: string) => 'dir:' + id;
 
-/** Roving tabindex: Tab попадает в список на одну строку/плитку, дальше — стрелками. */
-type ItemNav = { 'data-fkey': string; tabIndex: number; onFocus: () => void };
+/** Общие свойства строки/плитки: roving tabindex (Tab попадает в список на один элемент, дальше — стрелками)
+ *  и перетаскивание мышью для перемещения в папку. */
+type ItemNav = {
+  'data-fkey': string;
+  tabIndex: number;
+  onFocus: () => void;
+  draggable: boolean;
+  onDragStart: (e: React.DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
+};
 
 function DirRow({ dir, nav, onOpen, onMenu, dropHandlers, active, checked, onToggle }: {
   dir: DirInfo;
@@ -366,6 +374,9 @@ export function FilesPage() {
   const shellRef = React.useRef<HTMLDivElement | null>(null);
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const hotkeysRef = React.useRef<(e: KeyboardEvent) => void>(() => {});
+  // Перетаскиваемые мышью записи (ключи выбора) и папка под курсором.
+  const dragKeysRef = React.useRef<string[] | null>(null);
+  const [moveOver, setMoveOver] = React.useState<string | null>(null);
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
   const selectedIconUrl = pickDocumentIcon(sel?.media);
@@ -722,12 +733,16 @@ export function FilesPage() {
     }
   }
 
-  async function bulkMove(targetDir: string) {
+  /** Перемещение выбранного (или перетащенных мышью ключей) в папку targetDir. */
+  async function bulkMove(targetDir: string, keys?: string[]) {
     if (moveProgress) return;
+    const picked = keys ? (k: string) => keys.includes(k) : fsel.has;
     const chosen = [
-      ...chosenDirs().map((d) => ({ name: d.name, move: () => apiPost('/api/cloud/dir/move', { id: d.id, parentId: targetDir }) })),
+      ...(listing?.dirs || [])
+        .filter((d) => picked(dirKey(d.id)))
+        .map((d) => ({ name: d.name, move: () => apiPost('/api/cloud/dir/move', { id: d.id, parentId: targetDir }) })),
       ...(listing?.files || [])
-        .filter((e) => fsel.has(e.entryId))
+        .filter((e) => picked(e.entryId))
         .map((e) => ({ name: e.name, move: () => apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir }) })),
     ];
     let ok = 0;
@@ -865,7 +880,58 @@ export function FilesPage() {
   const dropDirectoryName = dropTarget?.label || (stack.length ? stack[stack.length - 1].name : 'корень облака');
 
   const navKey = focusKey && orderedKeys.includes(focusKey) ? focusKey : orderedKeys[0];
-  const navOf = (key: string): ItemNav => ({ 'data-fkey': key, tabIndex: key === navKey ? 0 : -1, onFocus: () => setFocusKey(key) });
+  const navOf = (key: string): ItemNav => ({
+    'data-fkey': key,
+    tabIndex: key === navKey ? 0 : -1,
+    onFocus: () => setFocusKey(key),
+    draggable: !moveProgress,
+    onDragStart: (e) => {
+      // Отмеченная запись тянет за собой весь выбор, иначе — только себя.
+      const keys = fsel.has(key) ? orderedKeys.filter((k) => fsel.has(k)) : [key];
+      dragKeysRef.current = keys;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData(CLOUD_ITEMS_MIME, keys.join('\n'));
+    },
+    onDragEnd: () => {
+      dragKeysRef.current = null;
+      setMoveOver(null);
+    },
+  });
+  /** Папка-цель перемещения: принимает перетаскиваемые записи, кроме самой себя; файлы с диска — как раньше. */
+  function moveTargetHandlers(targetId: string, uploadHandlers?: FileDropHandlers): FileDropHandlers {
+    const accepts = (e: React.DragEvent<HTMLElement>) => {
+      const keys = dragKeysRef.current;
+      return !!keys && Array.from(e.dataTransfer.types || []).includes(CLOUD_ITEMS_MIME)
+        && targetId !== currentDir && !keys.includes(dirKey(targetId));
+    };
+    const internal = (e: React.DragEvent<HTMLElement>) => !!dragKeysRef.current && Array.from(e.dataTransfer.types || []).includes(CLOUD_ITEMS_MIME);
+    const over = (e: React.DragEvent<HTMLElement>) => {
+      if (!internal(e)) return false;
+      if (accepts(e)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setMoveOver(targetId);
+      }
+      return true;
+    };
+    return {
+      onDragEnter: (e) => { if (!over(e)) uploadHandlers?.onDragEnter(e); },
+      onDragOver: (e) => { if (!over(e)) uploadHandlers?.onDragOver(e); },
+      onDragLeave: (e) => {
+        if (!internal(e)) return uploadHandlers?.onDragLeave(e);
+        if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setMoveOver((cur) => (cur === targetId ? null : cur));
+      },
+      onDrop: (e) => {
+        if (!internal(e)) return uploadHandlers?.onDrop(e);
+        e.preventDefault();
+        e.stopPropagation();
+        const keys = accepts(e) ? dragKeysRef.current : null;
+        dragKeysRef.current = null;
+        setMoveOver(null);
+        if (keys) void bulkMove(targetId, keys);
+      },
+    };
+  }
   const itemOf = (key: string | null | undefined): RenameTarget | null => {
     if (!key) return null;
     const dir = dirs.find((d) => dirKey(d.id) === key);
@@ -993,7 +1059,7 @@ export function FilesPage() {
                 </div>
               ) : (
                 <div className="breadcrumb">
-                  <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
+                  <a onClick={() => gotoIndex(-1)} className={(stack.length ? '' : 'cur') + (moveOver === '' ? ' drop-target' : '')} style={{ cursor: 'pointer' }} title="Корень облака" {...moveTargetHandlers('')}>
                     <Icon.folder size={18} />
                   </a>
                   {stack.map((s, i) => (
@@ -1002,7 +1068,7 @@ export function FilesPage() {
                       {i === stack.length - 1 ? (
                         <span className="cur">{s.name}</span>
                       ) : (
-                        <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
+                        <a onClick={() => gotoIndex(i)} className={moveOver === s.id ? 'drop-target' : ''} style={{ cursor: 'pointer' }} {...moveTargetHandlers(s.id)}>
                           {s.name}
                         </a>
                       )}
@@ -1068,8 +1134,8 @@ export function FilesPage() {
                       key={d.id}
                       dir={d}
                       nav={navOf(dirKey(d.id))}
-                      active={dropTarget?.id === d.id}
-                      dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                      active={dropTarget?.id === d.id || moveOver === d.id}
+                      dropHandlers={moveTargetHandlers(d.id, getTargetHandlers({ id: d.id, label: d.name }))}
                       onOpen={openDir}
                       onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                       checked={fsel.has(dirKey(d.id))}
@@ -1114,8 +1180,8 @@ export function FilesPage() {
                         key={d.id}
                         dir={d}
                         nav={navOf(dirKey(d.id))}
-                        active={dropTarget?.id === d.id}
-                        dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                        active={dropTarget?.id === d.id || moveOver === d.id}
+                        dropHandlers={moveTargetHandlers(d.id, getTargetHandlers({ id: d.id, label: d.name }))}
                         onOpen={openDir}
                         onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                         checked={fsel.has(dirKey(d.id))}

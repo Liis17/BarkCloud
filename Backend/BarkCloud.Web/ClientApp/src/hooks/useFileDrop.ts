@@ -20,8 +20,13 @@ function contains(container: EventTarget | null, value: EventTarget | null): boo
   return isNode(container) && isNode(value) && container.contains(value);
 }
 
+/** Тип данных перетаскивания записей облака внутри страницы (перемещение, а не загрузка). */
+export const CLOUD_ITEMS_MIME = 'application/x-barkcloud-items';
+
 function hasFiles(event: React.DragEvent<HTMLElement>): boolean {
-  return Array.from(event.dataTransfer.types || []).includes('Files');
+  const types = Array.from(event.dataTransfer.types || []);
+  // Chrome добавляет «Files» и при перетаскивании превью-картинки со страницы: такой drag — перемещение, не загрузка.
+  return types.includes('Files') && !types.includes(CLOUD_ITEMS_MIME);
 }
 
 /**
