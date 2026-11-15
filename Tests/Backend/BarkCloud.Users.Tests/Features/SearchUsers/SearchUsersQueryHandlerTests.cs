@@ -45,6 +45,25 @@ public class SearchUsersQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_HiddenProfile_ReturnsOnlyIdAndUsername()
+    {
+        var hidden = MakeUser(1);
+        hidden.Bio = "bio";
+        hidden.ProfilePicturePreviewUrl = "preview.jpg";
+        hidden.Privacy = new UserPrivacy { ProfileVisibility = PrivacyVisibility.Nobody };
+        _users.Setup(s => s.SearchUsers("u1", 42, It.IsAny<int>())).ReturnsAsync(new List<User> { hidden, MakeUser(2) });
+
+        var response = await CreateSut(userId: 42).Handle(new SearchUsersQuery { Query = "u1", Limit = 10 }, default);
+
+        response.Users[0].Username.Should().Be("u1");
+        response.Users[0].FirstName.Should().BeEmpty();
+        response.Users[0].LastName.Should().BeEmpty();
+        response.Users[0].Bio.Should().BeEmpty();
+        response.Users[0].ProfilePicturePreview.Should().BeEmpty();
+        response.Users[1].FirstName.Should().Be("F");
+    }
+
+    [Fact]
     public async Task Handle_LimitClampedToMax()
     {
         _users.Setup(s => s.SearchUsers(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<int>()))

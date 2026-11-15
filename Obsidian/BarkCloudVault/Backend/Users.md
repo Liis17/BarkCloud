@@ -40,12 +40,12 @@ Parent: [[Index]] · See also: [[Api/UsersClientGuide]], [[Backend/AccountDeleti
 - `UsersContext` хранит `Users`, `UserContacts`, `UserDevices`, `UserPrivacies` и таблицы MassTransit outbox. Удаление пользователя каскадно удаляет контакт, устройства и privacy row.
 - Регистрационный draft — та же запись профиля с `IsDraft=true`; `ConfirmUser` снимает этот флаг. Identity вызывает Users для draft-flow и регистрации устройства.
 - Уникальные индексы обеспечивают username без учёта регистра для всех строк, включая drafts, и непустой email без учёта регистра. Конфликт записи преобразуется в `UsernameExistException` или `EmailExistException`.
-- `SearchUsers` ищет по username/first/last name без учёта регистра, исключает текущего пользователя и drafts, а также пользователей с `SearchableByUsername=false`. Результаты ограничиваются 50; запрос короче 2 символов даёт пустой список.
+- `SearchUsers` ищет по username/first/last name без учёта регистра, исключает текущего пользователя и drafts, а также пользователей с `SearchableByUsername=false`. По имени и фамилии находятся только пользователи с видимым профилем, иначе совпадение раскрывало бы скрытое имя. Результаты ограничиваются 50; запрос короче 2 символов даёт пустой список.
 - Зарезервированные имена читаются из `ReservedNames:Usernames` при создании `ReservedUsernamesService`; обновление списка требует обновить снимок конфигурации Users.
 - После изменения имени, username, bio или аватара публикуются `UserChanged*`; удаление публикует `UserDeleted`. Формы сообщений определены в [[Shared/SharedLibraries]].
 
 ## Ограничения и важные детали
 
-`ProfileVisibility`, `EmailVisibility` и `LastSeenVisibility` сохраняются как предпочтения, но обработчики чтения профиля их не применяют. В `SearchUsers` применяется только `SearchableByUsername`. `storage_limit_gb=0` означает использовать полный доступный объём хранилища.
+`ProfileVisibility` применяется в клиентских `GetUser` и `SearchUsers` (`ProfileVisibilityPolicy`, `UserMapping.ToGrpcForViewer`): чужой скрытый профиль отдаётся только с `id`, `username`, датой регистрации и лимитом, без имени, bio и аватара. Владелец всегда видит свой профиль полностью. Связи «контакт» в Users нет, поэтому `CONTACTS` для чужих равен `NOBODY`. Межсервисные `GetById` и `ListByIds` (service JWT) отдают полный профиль, поэтому Web резолвит владельцев и получателей шаринга через клиентский `GetUser` с токеном пользователя. `EmailVisibility` и `LastSeenVisibility` сохраняются как предпочтения и не применяются: email и last seen другим пользователям не выдаются. `storage_limit_gb=0` означает использовать полный доступный объём хранилища.
 
 Детали транзакции удаления аккаунта и доставки события — в [[Backend/AccountDeletionOutbox]].

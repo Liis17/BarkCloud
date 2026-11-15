@@ -39,7 +39,7 @@ Parent: [[Backend/Users]] · See also: [[Shared/Proto]], [[Api/FilesClientGuide]
 
 Для смены аватара сначала загрузи файл в Files с типом `USER_AVATAR`, затем передай возвращённый `file_id` в `SetProfilePicture`. Пустой `file_id` очищает аватар. Подробный upload flow: [[Api/FilesClientGuide]].
 
-Privacy request передаёт весь объект: `profile_visibility`, `email_visibility`, `last_seen_visibility`, `searchable_by_username`. Начальные значения: `EVERYONE`, `NOBODY`, `EVERYONE`, `true`. Сервер применяет `searchable_by_username` в `SearchUsers`; остальные visibility-поля сохраняются как настройки.
+Privacy request передаёт весь объект: `profile_visibility`, `email_visibility`, `last_seen_visibility`, `searchable_by_username`. Начальные значения: `EVERYONE`, `NOBODY`, `EVERYONE`, `true`. Сервер применяет `searchable_by_username` в `SearchUsers` и `profile_visibility` в `GetUser` и `SearchUsers`: для чужого скрытого профиля (`CONTACTS` или `NOBODY`; контактов пока нет) `first_name`, `last_name`, `bio`, `profile_picture` и `profile_picture_preview` приходят пустыми, а по имени такой пользователь не ищется. Клиенту стоит показывать `username` как запасное имя. Свой профиль приходит полностью. Остальные visibility-поля сохраняются как настройки.
 
 ## Ошибки и смежные операции
 
