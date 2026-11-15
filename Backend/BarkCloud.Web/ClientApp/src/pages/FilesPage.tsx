@@ -21,6 +21,7 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useTextFileViewer } from '../hooks/useTextFileViewer';
 import { getTextFileKind, textContentUrl } from '../lib/textFiles';
+import { isTextEntry, overlayOpen } from '../lib/keyboard';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
 import { useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
@@ -62,8 +63,12 @@ type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 /** Ключ папки в общем выборе с файлами (файлы выбираются по entryId). */
 const dirKey = (id: string) => 'dir:' + id;
 
-function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }: {
+/** Roving tabindex: Tab попадает в список на одну строку/плитку, дальше — стрелками. */
+type ItemNav = { 'data-fkey': string; tabIndex: number; onFocus: () => void };
+
+function DirRow({ dir, nav, onOpen, onMenu, dropHandlers, active, checked, onToggle }: {
   dir: DirInfo;
+  nav: ItemNav;
   onOpen: (d: DirInfo) => void;
   onMenu: (e: React.MouseEvent, d: DirInfo) => void;
   dropHandlers: FileDropHandlers;
@@ -73,6 +78,7 @@ function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }
 }) {
   return (
     <tr
+      {...nav}
       className={(active ? 'drop-target' : '') + (checked ? ' checked' : '')}
       {...dropHandlers}
       onClick={(e) => (e.shiftKey ? onToggle(true) : onOpen(dir))}
@@ -96,8 +102,9 @@ function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }
   );
 }
 
-function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onRename, onDelete, onDownload, onMenu }: {
+function FileRow({ entry, nav, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onRename, onDelete, onDownload, onMenu }: {
   entry: Entry;
+  nav: ItemNav;
   selected: boolean;
   bulkChecked: boolean;
   onBulkToggle: (e: Entry, shift: boolean) => void;
@@ -113,7 +120,7 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
   const hasPreview = (m?.previews || []).length > 0;
   return (
     <tr
-      tabIndex={-1}
+      {...nav}
       className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
       onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
       onDoubleClick={(e) => { e.currentTarget.focus(); onOpen(entry); }}
@@ -168,9 +175,10 @@ function TileSelbox({ checked, onToggle }: { checked: boolean; onToggle: (shift:
 }
 
 /** Плитка папки в режиме сетки: те же действия, что у DirRow. */
-function DirTile({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }: React.ComponentProps<typeof DirRow>) {
+function DirTile({ dir, nav, onOpen, onMenu, dropHandlers, active, checked, onToggle }: React.ComponentProps<typeof DirRow>) {
   return (
     <div
+      {...nav}
       className={'file-tile' + (active ? ' drop-target' : '') + (checked ? ' checked' : '')}
       {...dropHandlers}
       onClick={(e) => (e.shiftKey ? onToggle(true) : onOpen(dir))}
@@ -186,8 +194,9 @@ function DirTile({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle 
 }
 
 /** Плитка файла в режиме сетки: превью фото/видео или иконка типа из пака FolderIcons. */
-function FileTile({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onMenu }: {
+function FileTile({ entry, nav, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onMenu }: {
   entry: Entry;
+  nav: ItemNav;
   selected: boolean;
   bulkChecked: boolean;
   onBulkToggle: (e: Entry, shift: boolean) => void;
@@ -200,7 +209,7 @@ function FileTile({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen
   const hasPreview = (m?.previews || []).length > 0;
   return (
     <div
-      tabIndex={-1}
+      {...nav}
       className={'file-tile' + (selected ? ' selected' : '') + (bulkChecked ? ' checked' : '')}
       onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
       onDoubleClick={(e) => { e.currentTarget.focus(); onOpen(entry); }}
@@ -353,6 +362,10 @@ export function FilesPage() {
   const membership = useAlbumMembership(albums);
   const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target) => doUpload(files, target));
   const fsel = useSelection();
+  const [focusKey, setFocusKey] = React.useState<string | null>(null);
+  const shellRef = React.useRef<HTMLDivElement | null>(null);
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const hotkeysRef = React.useRef<(e: KeyboardEvent) => void>(() => {});
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
   const selectedIconUrl = pickDocumentIcon(sel?.media);
@@ -851,6 +864,93 @@ export function FilesPage() {
   const canArchive = !selectedDirs.length || !!archiveDir;
   const dropDirectoryName = dropTarget?.label || (stack.length ? stack[stack.length - 1].name : 'корень облака');
 
+  const navKey = focusKey && orderedKeys.includes(focusKey) ? focusKey : orderedKeys[0];
+  const navOf = (key: string): ItemNav => ({ 'data-fkey': key, tabIndex: key === navKey ? 0 : -1, onFocus: () => setFocusKey(key) });
+  const itemOf = (key: string | null | undefined): RenameTarget | null => {
+    if (!key) return null;
+    const dir = dirs.find((d) => dirKey(d.id) === key);
+    if (dir) return { isDir: true, target: dir };
+    const file = files.find((f) => f.entryId === key);
+    return file ? { isDir: false, target: file } : null;
+  };
+  const focusedKeyOf = (target: EventTarget | null) =>
+    target instanceof HTMLElement ? target.closest<HTMLElement>('[data-fkey]')?.dataset.fkey : undefined;
+  function focusItem(key: string) {
+    setFocusKey(key);
+    listRef.current?.querySelector<HTMLElement>(`[data-fkey="${key}"]`)?.focus();
+  }
+  function gridColumns(): number {
+    const grid = listRef.current?.querySelector('.files-grid');
+    return grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 1 : 1;
+  }
+
+  // Навигация по списку, когда фокус на самой строке/плитке (не на её чекбоксе или кнопке).
+  function onListKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const key = (e.target as HTMLElement).dataset?.fkey;
+    if (!key || e.ctrlKey || e.metaKey || e.altKey) return;
+    const i = orderedKeys.indexOf(key);
+    if (i < 0) return;
+    const cols = view === 'grid' ? gridColumns() : 1;
+    const moves: Record<string, number> = {
+      ArrowDown: cols,
+      ArrowUp: -cols,
+      ...(view === 'grid' ? { ArrowRight: 1, ArrowLeft: -1 } : {}),
+      Home: -i,
+      End: orderedKeys.length - 1 - i,
+    };
+    if (e.key in moves) {
+      e.preventDefault();
+      const next = Math.min(orderedKeys.length - 1, Math.max(0, i + moves[e.key]));
+      focusItem(orderedKeys[next]);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = itemOf(key);
+      if (item?.isDir) openDir(item.target as DirInfo);
+      else if (item) openEntry(item.target as Entry);
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      fsel.select(key, orderedKeys, e.shiftKey);
+    }
+  }
+
+  // Del, F2 и Ctrl+A — на всей странице, но не в полях ввода и не под открытым диалогом/просмотрщиком.
+  hotkeysRef.current = (e) => {
+    if (openSmart || !listing || e.altKey || isTextEntry(e.target) || overlayOpen()) return;
+    const t = e.target;
+    if (t !== document.body && !(t instanceof Node && shellRef.current?.contains(t))) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.code === 'KeyA') {
+      if (!orderedKeys.length) return;
+      e.preventDefault();
+      fsel.setAll(orderedKeys, true);
+      return;
+    }
+    if (mod) return;
+    const single = () => itemOf(focusedKeyOf(t)) ?? (sel ? { isDir: false, target: sel } : null);
+    if (e.key === 'Delete') {
+      if (fsel.count) {
+        e.preventDefault();
+        setBulkConfirm(true);
+        return;
+      }
+      const item = single();
+      if (!item) return;
+      e.preventDefault();
+      requestDelete(item.target, item.isDir);
+    } else if (e.key === 'F2') {
+      if (fsel.count > 1) return;
+      const item = fsel.count === 1 ? itemOf(fsel.list[0]) : single();
+      if (!item) return;
+      e.preventDefault();
+      startRename(item.target, item.isDir);
+    }
+  };
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => hotkeysRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <>
       {toastNode}
@@ -869,7 +969,7 @@ export function FilesPage() {
           { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) },
         ]}
       />
-      <div className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
+      <div ref={shellRef} className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
         {over && <FileDropOverlay detail={`Файлы будут загружены в папку «${dropDirectoryName}»`} />}
         <div className="files-main">
           {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading || smartFolders.length > 0) && (
@@ -939,7 +1039,7 @@ export function FilesPage() {
                 />
               </div>
             ) : (
-            <div className="files-list">
+            <div className="files-list" ref={listRef} onKeyDown={onListKeyDown}>
               {listing === null ? (
                 <Loading />
               ) : isEmpty ? (
@@ -967,6 +1067,7 @@ export function FilesPage() {
                     <DirTile
                       key={d.id}
                       dir={d}
+                      nav={navOf(dirKey(d.id))}
                       active={dropTarget?.id === d.id}
                       dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
                       onOpen={openDir}
@@ -979,6 +1080,7 @@ export function FilesPage() {
                     <FileTile
                       key={e.entryId}
                       entry={e}
+                      nav={navOf(e.entryId)}
                       selected={!!sel && sel.entryId === e.entryId}
                       bulkChecked={fsel.has(e.entryId)}
                       onBulkToggle={(t, shift) => fsel.select(t.entryId, orderedKeys, shift)}
@@ -1011,6 +1113,7 @@ export function FilesPage() {
                       <DirRow
                         key={d.id}
                         dir={d}
+                        nav={navOf(dirKey(d.id))}
                         active={dropTarget?.id === d.id}
                         dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
                         onOpen={openDir}
@@ -1023,6 +1126,7 @@ export function FilesPage() {
                       <FileRow
                         key={e.entryId}
                         entry={e}
+                        nav={navOf(e.entryId)}
                         selected={!!sel && sel.entryId === e.entryId}
                         bulkChecked={fsel.has(e.entryId)}
                         onBulkToggle={(t, shift) => fsel.select(t.entryId, orderedKeys, shift)}

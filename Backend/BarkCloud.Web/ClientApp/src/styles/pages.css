@@ -737,12 +737,15 @@ tr.selected .row-actions { opacity: 1; }
 .ftable .selcell input { vertical-align: middle; }
 .ftable tbody tr.checked { background: color-mix(in srgb, var(--md-primary) 12%, transparent); }
 .ftable tbody tr.checked .row-actions { opacity: 1; }
+.files-main .ftable tbody tr:focus { outline: none; }
+.files-main .ftable tbody tr:focus-visible { outline: 2px solid var(--md-primary); outline-offset: -2px; }
 
 /* Файлы сеткой: колонки как у .photo-grid, квадратное превью и подпись под ним. */
 .files-view { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 .files-select-all { display: inline-flex; align-items: center; padding: 0 8px; cursor: pointer; }
 .files-grid { padding: 16px 24px 24px; gap: 12px; }
 .file-tile { min-width: 0; cursor: pointer; border-radius: var(--r-md); outline: none; }
+.file-tile:focus-visible .tile-media { outline: 2px solid var(--md-primary); outline-offset: 2px; }
 .file-tile .tile-media {
   position: relative; aspect-ratio: 1/1; border-radius: var(--r-md); overflow: hidden;
   background: var(--md-surface-container-high);

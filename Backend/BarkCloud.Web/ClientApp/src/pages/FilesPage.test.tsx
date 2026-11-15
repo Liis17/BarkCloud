@@ -441,3 +441,66 @@ describe('FilesPage grid view', () => {
     expect(mocks.enqueue).toHaveBeenCalledWith(expect.any(Array), { dir: 'dir-1' });
   });
 });
+
+describe('FilesPage keyboard', () => {
+  beforeEach(() => {
+    mockDirectoryListings({
+      '': { dirs: [{ id: 'dir-1', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' }], files: [fileEntry('entry-1', 'отчёт.pdf'), fileEntry('entry-2', 'план.txt')] },
+      'dir-1': { dirs: [], files: [] },
+    });
+  });
+
+  const rowOf = (text: string) => screen.getByText(text).closest('tr') as HTMLElement;
+
+  it('строки доступны с Tab по одной и перемещаются стрелками, Enter открывает папку', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+    expect(rowOf('Документы').tabIndex).toBe(0);
+    expect(rowOf('отчёт.pdf').tabIndex).toBe(-1);
+
+    rowOf('Документы').focus();
+    fireEvent.keyDown(rowOf('Документы'), { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(rowOf('отчёт.pdf'));
+    expect(rowOf('отчёт.pdf').tabIndex).toBe(0);
+    fireEvent.keyDown(rowOf('отчёт.pdf'), { key: 'End' });
+    expect(document.activeElement).toBe(rowOf('план.txt'));
+    fireEvent.keyDown(rowOf('план.txt'), { key: ' ' });
+    expect((within(rowOf('план.txt')).getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.keyDown(rowOf('план.txt'), { key: 'Home' });
+    fireEvent.keyDown(rowOf('Документы'), { key: 'Enter' });
+    await waitFor(() => expect(mocks.apiGet).toHaveBeenCalledWith(expect.stringContaining('dir=dir-1')));
+  });
+
+  it('Del удаляет строку в фокусе после подтверждения, F2 переименовывает', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+
+    rowOf('отчёт.pdf').focus();
+    fireEvent.keyDown(rowOf('отчёт.pdf'), { key: 'F2' });
+    expect((screen.getByLabelText('Новое имя') as HTMLInputElement).value).toBe('отчёт.pdf');
+    // Под открытым диалогом клавиши страницы не работают.
+    fireEvent.keyDown(screen.getByLabelText('Новое имя'), { key: 'Delete' });
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+    expect(screen.queryByText('Удалить в корзину?')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    rowOf('отчёт.pdf').focus();
+    fireEvent.keyDown(rowOf('отчёт.pdf'), { key: 'Delete' });
+    expect(screen.getByText('«отчёт.pdf» будет перемещён в корзину.')).toBeTruthy();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Удалить' }));
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/delete', { entryId: 'entry-1' }));
+  });
+
+  it('Ctrl+A выбирает всё, Del предлагает удалить выбранное', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+
+    fireEvent.keyDown(document.body, { key: 'ф', code: 'KeyA', ctrlKey: true });
+    for (const name of ['Документы', 'отчёт.pdf', 'план.txt'])
+      expect((within(rowOf(name)).getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+    expect(screen.getByText('Выбранное (3) будет перемещено в корзину.')).toBeTruthy();
+  });
+});

@@ -6,6 +6,7 @@ import { SearchField } from '../ui/TextField';
 import { UploadIndicator } from '../upload/UploadIndicator';
 import { apiGet } from '../../lib/api';
 import { searchHitIconName, SECTION_LABEL, type SearchHit, type SearchResponse } from '../../lib/search';
+import { isTextEntry, overlayOpen } from '../../lib/keyboard';
 import type { PageHeader } from '../../hooks/usePageHeader';
 
 const LISTBOX_ID = 'global-search-results';
@@ -21,6 +22,19 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [active, setActive] = React.useState(-1);
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // «/» — переход в поиск с любой страницы приложения (code Slash — та же клавиша в русской раскладке).
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' && e.code !== 'Slash') return;
+      if (e.ctrlKey || e.metaKey || e.altKey || (e.shiftKey && e.key !== '/') || isTextEntry(e.target) || overlayOpen()) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const query = q.trim();
   // Ограничение дублируется на клиенте: даже ошибочный ответ API не раздует подсказку.
@@ -108,6 +122,7 @@ export function Topbar({ kicker, title, actions }: PageHeader) {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
       }}>
         <SearchField
+          ref={inputRef}
           containerClassName="tb-search-control"
           label="Поиск по BarkCloud"
           leading={<Icon.search size={20} />}
