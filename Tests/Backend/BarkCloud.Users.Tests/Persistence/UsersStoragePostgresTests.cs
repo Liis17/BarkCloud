@@ -39,6 +39,47 @@ public class UsersStoragePostgresTests
     }
 
     [PostgresFact]
+    public async Task GetById_UserWithPrivacy_LoadsPrivacy()
+    {
+        await using var database = await PostgresUsersDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var storage = new UsersStorage(context);
+        var user = await storage.CreateUser("hidden", "Hidden", "Person", "hidden@example.test");
+        await storage.UpdatePrivacy(user.Id, PrivacyVisibility.Nobody, PrivacyVisibility.Nobody,
+            PrivacyVisibility.Everyone, searchableByUsername: true);
+
+        await using var readContext = database.CreateContext();
+        var savedUser = await new UsersStorage(readContext).GetById(user.Id);
+
+        savedUser!.Privacy.Should().NotBeNull();
+        savedUser.Privacy!.ProfileVisibility.Should().Be(PrivacyVisibility.Nobody);
+    }
+
+    [PostgresFact]
+    public async Task SearchUsers_HiddenProfile_MatchesByUsernameOnlyAndLoadsPrivacy()
+    {
+        await using var database = await PostgresUsersDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+        var storage = new UsersStorage(context);
+        var hidden = await storage.CreateUser("hidden", "Secretname", "Person", "hidden@example.test");
+        var visible = await storage.CreateUser("visible", "Secretname", "Other", "visible@example.test");
+        await storage.ChangeDraftStatus(hidden.Id, false);
+        await storage.ChangeDraftStatus(visible.Id, false);
+        await storage.UpdatePrivacy(hidden.Id, PrivacyVisibility.Nobody, PrivacyVisibility.Nobody,
+            PrivacyVisibility.Everyone, searchableByUsername: true);
+
+        await using var readContext = database.CreateContext();
+        var readStorage = new UsersStorage(readContext);
+
+        var byName = await readStorage.SearchUsers("secretname", excludeUserId: 0, limit: 10);
+        var byUsername = await readStorage.SearchUsers("hidden", excludeUserId: 0, limit: 10);
+
+        byName.Select(u => u.Id).Should().Equal(visible.Id);
+        byUsername.Should().ContainSingle(u => u.Id == hidden.Id)
+            .Which.Privacy!.ProfileVisibility.Should().Be(PrivacyVisibility.Nobody);
+    }
+
+    [PostgresFact]
     public async Task Migrate_LegacyUser_CreatesIdAboveLegacyMaximumAndPreservesRelatedData()
     {
         await using var database = await PostgresUsersDatabase.CreateAsync(PreviousMigration);

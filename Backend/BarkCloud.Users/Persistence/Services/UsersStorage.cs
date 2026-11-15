@@ -36,7 +36,10 @@ public class UsersStorage : IUsersStorage
 
     public async Task<User?> GetById(long id)
     {
-        var user = await _usersContext.Users.Include(u => u.Contact).FirstOrDefaultAsync(x => x.Id == id);
+        var user = await _usersContext.Users
+            .Include(u => u.Contact)
+            .Include(u => u.Privacy)
+            .FirstOrDefaultAsync(x => x.Id == id);
 
         return user;
     }
@@ -205,12 +208,15 @@ public class UsersStorage : IUsersStorage
 
         return await _usersContext.Users
             .Include(u => u.Contact)
+            .Include(u => u.Privacy)
             .Where(u => !u.IsDraft && u.Id != excludeUserId)
             .Where(u => u.Privacy == null || u.Privacy.SearchableByUsername)
+            // По имени ищем только среди видимых профилей, иначе совпадение раскрывает скрытое имя.
             .Where(u =>
                 u.Username.ToLower().Contains(pattern) ||
-                u.FirstName.ToLower().Contains(pattern) ||
-                u.LastName.ToLower().Contains(pattern))
+                ((u.Privacy == null || u.Privacy.ProfileVisibility == PrivacyVisibility.Everyone) &&
+                 (u.FirstName.ToLower().Contains(pattern) ||
+                  u.LastName.ToLower().Contains(pattern))))
             .OrderBy(u => u.Username)
             .Take(limit)
             .ToListAsync();
