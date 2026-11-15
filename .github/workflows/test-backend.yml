@@ -1,0 +1,63 @@
+name: Backend tests
+
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: Comma-separated test project names; empty runs all backend test projects
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.projects.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - id: projects
+        env:
+          TEST_PROJECT: ${{ inputs.project }}
+        run: python3 .github/scripts/pr_tests.py --matrix "$TEST_PROJECT"
+
+  test:
+    name: ${{ matrix.name }}
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    env:
+      BARKCLOUD_TEST_POSTGRES: ${{ matrix.postgres && 'Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres' || '' }}
+      BARKCLOUD_TEST_RABBITMQ: ${{ matrix.rabbitmq && 'rabbitmq://integration:integration@127.0.0.1:5672/' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Контейнеры для тестов
+        if: ${{ matrix.postgres || matrix.rabbitmq }}
+        uses: ./.github/actions/test-containers
+        with:
+          postgres: ${{ matrix.postgres }}
+          rabbitmq: ${{ matrix.rabbitmq }}
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Кеш NuGet
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-tests-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.props') }}
+          restore-keys: nuget-tests-${{ runner.os }}-
+      - name: Run tests
+        env:
+          TEST_PROJECT: ${{ matrix.project }}
+        run: dotnet test "$TEST_PROJECT" -c Release --logger trx --results-directory test-results
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ !cancelled() }}
+        with:
+          name: backend-${{ matrix.name }}
+          path: test-results/*.trx

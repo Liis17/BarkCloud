@@ -1,0 +1,740 @@
+name: "🚀 BarkCloud CI/CD"
+
+# Один workflow на весь репозиторий.
+# - PR в dev: все проверки затронутых компонентов. Только так код попадает в dev.
+# - PR в master (только из dev): проверяется лишь ветка-источник,
+#   код уже прошёл тесты на пути в dev.
+# - push в dev/master: только сборка и публикация, без повторных тестов.
+#   dev собирает изменённые backend-образы и выпускает prerelease клиентов;
+#   master копирует проверенные dev-образы по digest и выпускает стабильный релиз v1.x.y.
+
+on:
+  pull_request:
+    branches: [dev, master]
+    # edited: смена целевой ветки PR должна заново пройти проверку ветки-источника.
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [dev, master]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "build — собрать и опубликовать всё для ветки; tests — прогнать все проверки"
+        type: choice
+        options: [build, tests]
+        default: build
+
+permissions:
+  contents: read
+
+# Очередь без отмены: пропущенный push-запуск потерял бы свой diff, а queue: max
+# несовместим с cancel-in-progress. Устаревшие PR-запуски просто доработают.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  #  Проверки PR
+  # ═══════════════════════════════════════════════════════════════
+  guard:
+    name: "🔒 Ветка-источник"
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверка схемы dev → master
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          case "$BASE_REF" in
+            dev) exit 0 ;;
+            master) expected=dev ;;
+            *) echo "::error::Неизвестная целевая ветка"; exit 1 ;;
+          esac
+          if [ "$HEAD_REF" != "$expected" ] || [ "$HEAD_REPO" != "$REPOSITORY" ]; then
+            echo "::error::PR в $BASE_REF принимается только из $expected этого репозитория"
+            exit 1
+          fi
+
+  changes:
+    name: "🧭 Выбор проверок"
+    if: ${{ (github.event_name == 'pull_request' && github.base_ref == 'dev') || inputs.mode == 'tests' }}
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.select.outputs.backend }}
+      backend_projects: ${{ steps.select.outputs.backend_projects }}
+      files_integration: ${{ steps.select.outputs.files_integration }}
+      platforms: ${{ steps.select.outputs.platforms }}
+      frontend: ${{ steps.select.outputs.frontend }}
+      scripts: ${{ steps.select.outputs.scripts }}
+      selected: ${{ steps.select.outputs.selected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 2
+      - id: select
+        run: python3 .github/scripts/pr_tests.py
+
+  backend-tests:
+    name: "🧪 Backend"
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    uses: ./.github/workflows/test-backend.yml
+    with:
+      project: ${{ needs.changes.outputs.backend_projects }}
+
+  files-integration:
+    name: "🧪 Files: durable upload"
+    needs: changes
+    if: ${{ needs.changes.outputs.files_integration == 'true' }}
+    uses: ./.github/workflows/files-upload-integration.yml
+
+  client-tests:
+    name: "🧪 Клиенты"
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.changes.outputs.platforms) }}
+    uses: ./.github/workflows/test-clients.yml
+    with:
+      platform: ${{ matrix.platform }}
+
+  frontend-checks:
+    name: "🧹 Web ClientApp"
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend/BarkCloud.Web/ClientApp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Backend/BarkCloud.Web/ClientApp/package-lock.json
+      - run: npm ci
+      - name: Vitest
+        run: npm test
+      - name: Typecheck и сборка
+        run: npm run build
+
+  script-tests:
+    name: "🧪 Скрипты CI"
+    needs: changes
+    if: ${{ needs.changes.outputs.scripts == 'true' }}
+    uses: ./.github/workflows/test-scripts.yml
+
+  required:
+    name: Tests passed
+    if: ${{ always() && (github.event_name == 'pull_request' || inputs.mode == 'tests') }}
+    needs: [guard, changes, backend-tests, files-integration, client-tests, frontend-checks, script-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Все выбранные проверки должны пройти
+        env:
+          GUARD: ${{ github.event_name == 'pull_request' && needs.guard.result || 'success' }}
+          SELECTION_RESULT: ${{ needs.changes.result }}
+          SELECTED_JOBS: ${{ needs.changes.outputs.selected }}
+          BACKEND: ${{ needs.backend-tests.result }}
+          FILES_INTEGRATION: ${{ needs.files-integration.result }}
+          CLIENTS: ${{ needs.client-tests.result }}
+          FRONTEND: ${{ needs.frontend-checks.result }}
+          SCRIPTS: ${{ needs.script-tests.result }}
+        run: python3 .github/scripts/pr_tests.py --check
+
+  notify-pr:
+    name: "📣 Уведомление о проверках"
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    needs: [required, guard, backend-tests, files-integration, client-tests, frontend-checks, script-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Telegram
+        continue-on-error: true
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REQUIRED: ${{ needs.required.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+          GUARD: ${{ needs.guard.result }}
+          BACKEND: ${{ needs.backend-tests.result }}
+          FILES_INTEGRATION: ${{ needs.files-integration.result }}
+          CLIENTS: ${{ needs.client-tests.result }}
+          FRONTEND: ${{ needs.frontend-checks.result }}
+          SCRIPTS: ${{ needs.script-tests.result }}
+        run: python3 .github/scripts/ci_notify.py pr
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Сборка и публикация (push / ручной запуск build)
+  # ═══════════════════════════════════════════════════════════════
+  plan:
+    name: "🧭 Состав сборки"
+    if: ${{ github.event_name == 'push' || inputs.mode == 'build' }}
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.plan.outputs.backend }}
+      has_backend: ${{ steps.plan.outputs.has_backend }}
+      promote: ${{ steps.plan.outputs.promote }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: python3 .github/scripts/ci_plan.py
+
+  backend:
+    name: "🐳 ${{ matrix.name }}"
+    needs: plan
+    if: ${{ needs.plan.outputs.has_backend == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Ограничение одновременных push в реестр; можно поднять, если реестр выдерживает.
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.backend) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Кеш NuGet
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('**/*.csproj', '**/*.props') }}
+          restore-keys: nuget-${{ runner.os }}-${{ matrix.name }}-
+
+      - name: Set up Node.js
+        if: ${{ matrix.node_dir != '' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.node_dir }}/package-lock.json
+
+      - name: Сборка React-SPA (Vite → wwwroot)
+        if: ${{ matrix.node_dir != '' }}
+        working-directory: ${{ matrix.node_dir }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: "⚙️ dotnet publish (Linux Release)"
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: |
+          dotnet publish "$PROJECT" -c Release -o ./publish /p:UseAppHost=false
+          mkdir -p ./publish/logs
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Версия образа
+        id: vars
+        uses: ./.github/actions/docker-version
+        with:
+          image: ${{ matrix.image }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: "📤 Сборка образа и отправка в реестр"
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          VERSION: ${{ steps.vars.outputs.version }}
+          TAGS: ${{ steps.vars.outputs.tags }}
+          REVISION: ${{ github.sha }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: bash .github/scripts/push-docker-image.sh
+
+      - name: Итог
+        if: ${{ always() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: backend-${{ matrix.name }}
+          status: ${{ job.status }}
+          label: "🐳 ${{ matrix.name }}"
+          detail: ${{ steps.vars.outputs.version }}
+
+  promote:
+    name: "🔁 Перенос backend-образов"
+    needs: plan
+    if: ${{ needs.plan.outputs.promote == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Копирование проверенных образов по digest
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          RESULTS_DIR: ${{ runner.temp }}/ci-results
+        run: python3 .github/scripts/promote_backend.py
+      - name: Итог
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ci-result-promote
+          path: ${{ runner.temp }}/ci-results/
+          if-no-files-found: ignore
+          retention-days: 3
+
+  version:
+    name: "🏷 Версия релиза"
+    needs: plan
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_code: ${{ steps.version.outputs.version_code }}
+    steps:
+      - name: Вычисление следующей версии v1.x.y
+        id: version
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          releases="$(gh release list --exclude-drafts --limit 1000 --json tagName,isPrerelease)"
+          latest="$(printf '%s' "$releases" | jq -r '.[] | select(.isPrerelease | not) | .tagName' \
+            | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            | sort -V | tail -n 1 || true)"
+          RELEASES="$releases" python3 - "$latest" >> "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+
+          latest = sys.argv[1]
+          if latest:
+              match = re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", latest)
+              if not match:
+                  raise SystemExit(f"Некорректный предыдущий тег: {latest}")
+              major, minor, patch = map(int, match.groups())
+              patch += 1
+          else:
+              major, minor, patch = 1, 0, 0
+
+          if minor > 999 or patch > 999:
+              raise SystemExit("Minor и patch версии не могут превышать 999.")
+          version = f"v{major}.{minor}.{patch}"
+          # versionCode = (major*1e6 + minor*1e3 + patch) * 1000 + build. Стабильный build = 999,
+          # dev-сборка берёт порядковый номер prerelease этой версии, чтобы каждая
+          # следующая dev-сборка обновлялась поверх предыдущей.
+          build = 999
+          if os.environ["RELEASE_BRANCH"] == "dev":
+              previous = [r for r in json.loads(os.environ["RELEASES"]) if r["tagName"].startswith(f"{version}-dev.")]
+              build = len(previous) + 1
+              if build > 998:
+                  raise SystemExit("Для версии выпущено слишком много dev-сборок (максимум 998).")
+          version_code = (major * 1_000_000 + minor * 1_000 + patch) * 1_000 + build
+          if version_code <= 0 or version_code > 2_147_483_647:
+              raise SystemExit("versionCode выходит за допустимый диапазон Android.")
+          print(f"version={version}")
+          print(f"version_code={version_code}")
+          PY
+
+          version="$(sed -n 's/^version=//p' "$GITHUB_OUTPUT" | tail -n 1)"
+          version_code="$(sed -n 's/^version_code=//p' "$GITHUB_OUTPUT" | tail -n 1)"
+          if [ "$RELEASE_BRANCH" = dev ]; then
+            version="${version}-dev.${RUN_NUMBER}.${RUN_ATTEMPT}+${SHA:0:7}"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$latest" ]; then
+            previous_assets="$(gh release view "$latest" --json assets --jq '.assets[].name')"
+            if printf '%s\n' "$previous_assets" | grep -Fxq 'android-update.json'; then
+              previous_dir="$RUNNER_TEMP/previous-android-release"
+              mkdir -p "$previous_dir"
+              gh release download "$latest" --pattern android-update.json --dir "$previous_dir"
+              python3 - "$previous_dir/android-update.json" "$version_code" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as manifest_file:
+              manifest = json.load(manifest_file)
+          if manifest.get("schemaVersion") != 1:
+              raise SystemExit("Манифест предыдущего Android-релиза имеет неизвестную схему.")
+          previous_code = manifest.get("versionCode")
+          if not isinstance(previous_code, int) or isinstance(previous_code, bool):
+              raise SystemExit("Манифест предыдущего Android-релиза содержит неверный versionCode.")
+          if int(sys.argv[2]) <= previous_code:
+              raise SystemExit("Новый Android versionCode должен быть больше кода предыдущего манифеста.")
+          PY
+            else
+              echo "Предыдущий релиз $latest не содержит android-update.json; он будет обновляться вручную."
+            fi
+          fi
+          echo "Коммит: ${SHA}, релиз: ${version}, Android versionCode: ${version_code}"
+
+      - name: Итог
+        if: ${{ failure() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: version
+          status: ${{ job.status }}
+          label: "🏷 Версия релиза"
+
+  android:
+    name: "📱 Android"
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+
+      - name: Сборка release APK
+        working-directory: Android/BarkCloud.Android
+        env:
+          ANDROID_RELEASE_VERSION_NAME: ${{ needs.version.outputs.version }}
+          ANDROID_RELEASE_VERSION_CODE: ${{ needs.version.outputs.version_code }}
+          BARKCLOUD_ANDROID_KEYSTORE_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEYSTORE_BASE64 }}
+          BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEYSTORE_PASSWORD_BASE64 }}
+          BARKCLOUD_ANDROID_KEY_ALIAS_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEY_ALIAS_BASE64 }}
+          BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64: ${{ secrets.BARKCLOUD_ANDROID_KEY_PASSWORD_BASE64 }}
+        run: |
+          ./gradlew :app:printReleaseCertificateFingerprint --stacktrace
+          version_name="${ANDROID_RELEASE_VERSION_NAME#v}"
+          ./gradlew :app:assembleRelease \
+            -PandroidReleaseVersionName="$version_name" \
+            -PandroidReleaseVersionCode="$ANDROID_RELEASE_VERSION_CODE" \
+            --stacktrace
+          apk="app/build/outputs/apk/release/app-release.apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)"
+          test -n "$build_tools"
+          aapt2="$ANDROID_HOME/build-tools/$build_tools/aapt2"
+          apksigner="$ANDROID_HOME/build-tools/$build_tools/apksigner"
+          badging="$("$aapt2" dump badging "$apk")"
+          printf '%s\n' "$badging" | grep -F "package: name='com.barkfluff.BarkCloud' versionCode='$ANDROID_RELEASE_VERSION_CODE' versionName='$version_name'"
+          "$apksigner" verify --verbose --print-certs "$apk"
+          apk_size="$(stat -c '%s' "$apk")"
+          apk_sha256="$(sha256sum "$apk" | cut -d' ' -f1)"
+          cat > android-update.json <<JSON
+          {
+            "schemaVersion": 1,
+            "tag": "$ANDROID_RELEASE_VERSION_NAME",
+            "versionName": "$version_name",
+            "versionCode": $ANDROID_RELEASE_VERSION_CODE,
+            "apk": {
+              "fileName": "BarkCloud.Android-$ANDROID_RELEASE_VERSION_NAME.apk",
+              "size": $apk_size,
+              "sha256": "$apk_sha256"
+            }
+          }
+          JSON
+          python3 -m json.tool android-update.json >/dev/null
+          mkdir -p android-apk
+          cp "$apk" android-apk/
+          cp android-update.json android-apk/
+
+      - name: "Артефакт: APK"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-apk
+          path: Android/BarkCloud.Android/android-apk/*
+
+      - name: Итог
+        if: ${{ always() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: android
+          status: ${{ job.status }}
+          label: "📱 Android"
+          detail: ${{ needs.version.outputs.version }}
+
+  ios:
+    name: "📱 iOS"
+    if: ${{ github.ref_name == 'master' }}
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Архив Xcode
+        run: |
+          xcodebuild \
+            -project Ios/BarkCloud/BarkCloud.xcodeproj \
+            -scheme BarkCloud \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/BarkCloud.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            archive
+
+      - name: Упаковка IPA
+        run: |
+          mkdir -p Payload
+          cp -R "$RUNNER_TEMP/BarkCloud.xcarchive/Products/Applications/BarkCloud.app" Payload/
+          zip -qry BarkCloud.iOS.ipa Payload
+
+      - name: "Артефакт: IPA"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ios-ipa
+          path: BarkCloud.iOS.ipa
+
+      - name: Итог
+        if: ${{ always() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: ios
+          status: ${{ job.status }}
+          label: "📱 iOS"
+          detail: ${{ needs.version.outputs.version }}
+
+  macos:
+    name: "🍎 macOS"
+    if: ${{ github.ref_name == 'master' }}
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Архив Xcode
+        run: |
+          xcodebuild \
+            -project Mac/BarkCloudDrive/BarkCloudDrive.xcodeproj \
+            -scheme BarkCloudDrive \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/BarkCloudDrive.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            archive
+
+      - name: Сборка DMG
+        run: |
+          mkdir -p "$RUNNER_TEMP/dmg"
+          cp -R "$RUNNER_TEMP/BarkCloudDrive.xcarchive/Products/Applications/BarkCloud Drive.app" "$RUNNER_TEMP/dmg/"
+          hdiutil create -volname BarkCloud -srcfolder "$RUNNER_TEMP/dmg" -ov -format UDZO BarkCloud.Mac.dmg
+
+      - name: "Артефакт: DMG"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: macos-dmg
+          path: BarkCloud.Mac.dmg
+
+      - name: Итог
+        if: ${{ always() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: macos
+          status: ${{ job.status }}
+          label: "🍎 macOS"
+          detail: ${{ needs.version.outputs.version }}
+
+  drive:
+    name: "🪟 Drive"
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # Прод-раскладка: App и Engine кладутся в одну папку (side-by-side),
+      # см. Drive/BarkCloud.Drive.App/EngineLauncher.cs
+      - name: Publish App и Engine
+        run: |
+          dotnet publish Drive/BarkCloud.Drive.App/BarkCloud.Drive.App.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP/Drive"
+          dotnet publish Drive/BarkCloud.Drive.Engine/BarkCloud.Drive.Engine.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP/Drive"
+
+      - name: Проверка сборки и ZIP
+        run: |
+          foreach ($exe in @("$env:RUNNER_TEMP/Drive/BarkCloud.Drive.App.exe", "$env:RUNNER_TEMP/Drive/BarkCloud.Drive.Engine.exe")) {
+            if (-not (Test-Path -LiteralPath $exe)) { throw "Not published: $exe" }
+          }
+          Compress-Archive -Path "$env:RUNNER_TEMP/Drive/*" -DestinationPath "$env:RUNNER_TEMP/BarkCloud.Drive-windows-x64.zip"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: drive-zip
+          path: ${{ runner.temp }}/BarkCloud.Drive-windows-x64.zip
+
+      - name: Итог
+        if: ${{ always() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: drive
+          status: ${{ job.status }}
+          label: "🪟 Drive"
+          detail: ${{ needs.version.outputs.version }}
+
+  builder:
+    name: "🧰 Builder"
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Builder (self-contained)
+        run: dotnet publish Tools/BarkCloud.Builder/BarkCloud.Builder.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP/Builder"
+
+      - name: Проверка сборки и ZIP
+        run: |
+          if (-not (Test-Path -LiteralPath "$env:RUNNER_TEMP/Builder/BarkCloud.Builder.exe")) {
+            throw "BarkCloud.Builder.exe was not published."
+          }
+          Compress-Archive -Path "$env:RUNNER_TEMP/Builder/*" -DestinationPath "$env:RUNNER_TEMP/BarkCloud.Builder-windows-x64.zip"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: builder-zip
+          path: ${{ runner.temp }}/BarkCloud.Builder-windows-x64.zip
+
+      - name: Итог
+        if: ${{ always() }}
+        uses: ./.github/actions/ci-result
+        with:
+          key: builder
+          status: ${{ job.status }}
+          label: "🧰 Builder"
+          detail: ${{ needs.version.outputs.version }}
+
+  release:
+    name: "📦 Публикация релиза"
+    needs: [version, android, ios, macos, drive, builder]
+    if: >-
+      ${{ !cancelled() &&
+          needs.version.result == 'success' &&
+          needs.android.result == 'success' &&
+          needs.drive.result == 'success' &&
+          needs.builder.result == 'success' &&
+          ((github.ref_name == 'dev' && needs.ios.result == 'skipped' && needs.macos.result == 'skipped') ||
+           (github.ref_name == 'master' && needs.ios.result == 'success' && needs.macos.result == 'success')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Скачивание артефактов
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: Artifacts
+
+      - name: Именование артефактов
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mv Artifacts/android-apk/*.apk        "Artifacts/BarkCloud.Android-${VERSION}.apk"
+          mv Artifacts/android-apk/android-update.json "Artifacts/android-update.json"
+          if [ "$RELEASE_BRANCH" = master ]; then
+            mv Artifacts/ios-ipa/*.ipa          "Artifacts/BarkCloud.iOS-${VERSION}.ipa"
+            mv Artifacts/macos-dmg/*.dmg        "Artifacts/BarkCloud.Mac-${VERSION}.dmg"
+          fi
+          mv Artifacts/drive-zip/*.zip          "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip"
+          mv Artifacts/builder-zip/*.zip        "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip"
+          find Artifacts -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+          ls -lh Artifacts
+
+      - name: Создание релиза
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          SHA: ${{ github.sha }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          release_flags=()
+          apple_assets=()
+          if [ "$RELEASE_BRANCH" = dev ]; then
+            release_flags+=(--prerelease --latest=false)
+          else
+            apple_assets+=("Artifacts/BarkCloud.iOS-${VERSION}.ipa" "Artifacts/BarkCloud.Mac-${VERSION}.dmg")
+          fi
+          gh release create "$VERSION" \
+            "Artifacts/BarkCloud.Android-${VERSION}.apk" \
+            "Artifacts/android-update.json" \
+            "Artifacts/BarkCloud.Drive-Windows-${VERSION}.zip" \
+            "Artifacts/BarkCloud.Builder-Windows-${VERSION}.zip" \
+            "${apple_assets[@]}" \
+            --target "$SHA" \
+            --title "BarkCloud $VERSION" \
+            --generate-notes "${release_flags[@]}"
+
+      - name: Итог
+        if: ${{ always() }}
+        env:
+          STATUS: ${{ job.status }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-results"
+          printf '%s|%s|%s\n' "$STATUS" "📦 Релиз" "$VERSION" > "$RUNNER_TEMP/ci-results/release.txt"
+
+      - name: Итог — загрузка
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ci-result-release
+          path: ${{ runner.temp }}/ci-results/release.txt
+          retention-days: 3
+
+  notify:
+    name: "📣 Уведомление о сборке"
+    if: ${{ always() && (github.event_name == 'push' || inputs.mode == 'build') }}
+    needs: [plan, backend, promote, version, android, ios, macos, drive, builder, release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        continue-on-error: true
+        with:
+          pattern: ci-result-*
+          path: ${{ runner.temp }}/ci-results
+          merge-multiple: true
+      - name: Telegram
+        continue-on-error: true
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          TG_ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PLAN_RESULT: ${{ needs.plan.result }}
+          NEEDS: ${{ toJSON(needs) }}
+          RESULTS_DIR: ${{ runner.temp }}/ci-results
+        run: python3 .github/scripts/ci_notify.py push
