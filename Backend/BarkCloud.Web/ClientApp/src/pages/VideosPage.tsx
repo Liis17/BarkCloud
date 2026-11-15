@@ -144,8 +144,8 @@ export function VideosPage() {
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [deepMedia, setDeepMedia] = React.useState<MediaItem | null>(null);
   const resolvedOpenId = React.useRef('');
-  // Выбирается в Настройки → Внешний вид; страница читает значение при открытии.
-  const [layout] = useStoredChoice(VIDEO_LAYOUT_KEY, VIDEO_LAYOUTS, 'cards');
+  // Переключатель на странице; то же значение доступно в Настройки → Внешний вид.
+  const [layout, setLayout] = useStoredChoice(VIDEO_LAYOUT_KEY, VIDEO_LAYOUTS, 'cards');
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
@@ -278,6 +278,14 @@ export function VideosPage() {
             <Icon.check size={16} /> Все видео
             <span className="count">{mediaStats ? mediaStats.totalCount : '—'}</span>
           </span>
+        </div>
+        <div className="right">
+          <button className={'icon-btn' + (layout === 'cards' ? ' active' : '')} title="Карточками" aria-pressed={layout === 'cards'} onClick={() => setLayout('cards')}>
+            <Icon.list size={18} />
+          </button>
+          <button className={'icon-btn' + (layout === 'grid' ? ' active' : '')} title="Сеткой как в «Фото»" aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>
+            <Icon.grid size={18} />
+          </button>
         </div>
       </div>
 
