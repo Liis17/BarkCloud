@@ -21,4 +21,23 @@ public static class UserMapping
             Bio = domainUser.Bio ?? string.Empty,
         };
     }
+
+    /// <summary>Профиль глазами <paramref name="viewerId"/>: при скрытом профиле без имени, bio и аватара.</summary>
+    public static User ToGrpcForViewer(this Domain.User domainUser, long viewerId)
+    {
+        var user = domainUser.ToGrpc();
+
+        if (Domain.ProfileVisibilityPolicy.IsVisibleTo(domainUser, viewerId))
+        {
+            return user;
+        }
+
+        user.FirstName = string.Empty;
+        user.LastName = string.Empty;
+        user.Bio = string.Empty;
+        user.ProfilePicture = string.Empty;
+        user.ProfilePicturePreview = string.Empty;
+
+        return user;
+    }
 }

@@ -124,7 +124,7 @@ export interface ArchivePayload {
 export async function downloadArchive(payload: ArchivePayload): Promise<void> {
   const d = await apiPost<{ url?: string; fileName?: string }>('/api/cloud/archive', payload);
   if (!d.url) throw new Error('Ссылка на архив недоступна');
-  window.open(d.url, '_blank');
+  startDownload(d.url);
 }
 
 /** Скачать оригинал своего файла по временной ссылке. */
@@ -132,7 +132,19 @@ export async function downloadFile(fileId: string): Promise<void> {
   const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(fileId));
   const url = d.urls && d.urls[fileId];
   if (!url) throw new Error('Ссылка недоступна');
-  window.open(url, '_blank');
+  startDownload(url);
+}
+
+/** Запустить скачивание в текущей вкладке. window.open после await Safari блокирует как всплывающее окно;
+ *  ссылки /download/{id} отдаются с Content-Disposition: attachment, поэтому страница не уходит. */
+function startDownload(url: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 /** Проверка наличия контента по SHA256 (без побочных эффектов): есть ли уже такой файл

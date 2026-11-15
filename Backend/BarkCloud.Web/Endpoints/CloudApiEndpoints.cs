@@ -697,12 +697,12 @@ public static class CloudApiEndpoints
             }));
 
         api.MapGet("/music/shared/outgoing", async (HttpContext http, AuthGateway auth, MusicApi.MusicApiClient music,
-            UsersServerApi.UsersServerApiClient usersServer, string playlistId) =>
+            UsersApi.UsersApiClient users, string playlistId) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await music.ListMyOutgoingPlaylistSharesAsync(
                     new ListMyOutgoingMusicPlaylistSharesRequest { PlaylistId = playlistId }, token);
-                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                var byId = await ResolveUsers(users, token, resp.Items.Select(i => i.RecipientUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -934,11 +934,11 @@ public static class CloudApiEndpoints
 
         // С кем поделён файл (управление).
         api.MapGet("/shared/outgoing", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            UsersServerApi.UsersServerApiClient usersServer, string fileId) =>
+            UsersApi.UsersApiClient users, string fileId) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await cloud.ListMyOutgoingSharesAsync(new ListMyOutgoingSharesRequest { FileId = fileId }, token);
-                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                var byId = await ResolveUsers(users, token, resp.Items.Select(i => i.RecipientUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -952,7 +952,7 @@ public static class CloudApiEndpoints
 
         // Я поделился: все мои исходящие гранты (файлы + кому), от новых к старым.
         api.MapGet("/shared/i-shared", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            UsersServerApi.UsersServerApiClient usersServer, int? limit, string? cursorAt, string? cursorId) =>
+            UsersApi.UsersApiClient users, int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
                 var req = new ListMyOutgoingSharesAllRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
@@ -962,7 +962,7 @@ public static class CloudApiEndpoints
                     req.CursorGrantId = cursorId;
 
                 var resp = await cloud.ListMyOutgoingSharesAllAsync(req, token);
-                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                var byId = await ResolveUsers(users, token, resp.Items.Select(i => i.RecipientUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -979,7 +979,7 @@ public static class CloudApiEndpoints
 
         // Доступные мне файлы (раздел «мне доступны»).
         api.MapGet("/shared/with-me", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            UsersServerApi.UsersServerApiClient usersServer, int? limit, string? cursorAt, string? cursorId) =>
+            UsersApi.UsersApiClient users, int? limit, string? cursorAt, string? cursorId) =>
             await Guarded(http, auth, async token =>
             {
                 var req = new ListSharedWithMeRequest { Limit = limit is > 0 and <= 200 ? limit.Value : 60 };
@@ -989,7 +989,7 @@ public static class CloudApiEndpoints
                     req.CursorGrantId = cursorId;
 
                 var resp = await cloud.ListSharedWithMeAsync(req, token);
-                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.OwnerUserId));
+                var byId = await ResolveUsers(users, token, resp.Items.Select(i => i.OwnerUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -1044,11 +1044,11 @@ public static class CloudApiEndpoints
 
         // Я поделился (папки): какие папки и кому я отдал.
         api.MapGet("/shared/i-shared-folders", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            UsersServerApi.UsersServerApiClient usersServer) =>
+            UsersApi.UsersApiClient users) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await cloud.ListMyOutgoingFolderSharesAsync(new ListMyOutgoingFolderSharesRequest(), token);
-                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.RecipientUserId));
+                var byId = await ResolveUsers(users, token, resp.Items.Select(i => i.RecipientUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -1064,11 +1064,11 @@ public static class CloudApiEndpoints
 
         // Мне доступны (папки): какие папки расшарили мне.
         api.MapGet("/shared/folders-with-me", async (HttpContext http, AuthGateway auth, CloudApi.CloudApiClient cloud,
-            UsersServerApi.UsersServerApiClient usersServer) =>
+            UsersApi.UsersApiClient users) =>
             await Guarded(http, auth, async token =>
             {
                 var resp = await cloud.ListSharedFoldersWithMeAsync(new ListSharedFoldersWithMeRequest(), token);
-                var byId = await ResolveUsers(usersServer, resp.Items.Select(i => i.OwnerUserId));
+                var byId = await ResolveUsers(users, token, resp.Items.Select(i => i.OwnerUserId));
                 return Results.Json(new
                 {
                     items = resp.Items.Select(i => new
@@ -1699,20 +1699,28 @@ public static class CloudApiEndpoints
         };
     }
 
-    /// <summary>Резолв id пользователей → User через UsersServerApi (имена «от кого / кому»).</summary>
+    /// <summary>Резолв id пользователей → User (имена «от кого / кому»).</summary>
+    /// <remarks>Через клиентский <c>GetUser</c> с токеном пользователя, а не служебный <c>ListByIds</c>:
+    /// так Users применяет видимость профиля к смотрящему, как и для Android/iOS.</remarks>
     private static async Task<Dictionary<long, User>> ResolveUsers(
-        UsersServerApi.UsersServerApiClient usersServer, IEnumerable<long> ids)
+        UsersApi.UsersApiClient users, Metadata token, IEnumerable<long> ids)
     {
-        var distinct = ids.Distinct().ToList();
-        if (distinct.Count == 0)
-            return new Dictionary<long, User>();
+        var resolved = await Task.WhenAll(ids.Distinct().Select(async id =>
+        {
+            try
+            {
+                return (await users.GetUserAsync(new GetUserRequest { UserId = id }, token)).User;
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.FailedPrecondition)
+            {
+                // Пользователь удалён — вызывающий код подставит MinimalUserJson.
+                return null;
+            }
+        }));
 
-        var req = new ListByIdsRequest();
-        req.Ids.AddRange(distinct);
-        var resp = await usersServer.ListByIdsAsync(req);
-        return resp.Users
-            .GroupBy(u => u.Id)
-            .ToDictionary(g => g.Key, g => g.First());
+        return resolved
+            .OfType<User>()
+            .ToDictionary(u => u.Id);
     }
 
     private static async Task<object> RunIdBatch(string[]? rawIds, Func<string, Task> action)

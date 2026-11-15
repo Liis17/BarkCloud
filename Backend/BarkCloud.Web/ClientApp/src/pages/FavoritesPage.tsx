@@ -9,7 +9,7 @@ import { textContentUrl } from '../lib/textFiles';
 import { useMediaActions } from '../hooks/useMediaActions';
 import { useBulkMedia } from '../hooks/useBulkMedia';
 import { usePageHeader } from '../hooks/usePageHeader';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, downloadFile } from '../lib/api';
 import { GRID_SIZES, plural, groupByDate } from '../lib/format';
 import type { Album, CardFile, Page } from '../lib/types';
 
@@ -101,10 +101,7 @@ export function FavoritesPage() {
 
   async function download(m: CardFile) {
     try {
-      const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(m.id));
-      const url = d.urls && d.urls[m.id];
-      if (url) window.open(url, '_blank');
-      else toast('Ссылка недоступна', 'err');
+      await downloadFile(m.id);
     } catch (e) {
       toast((e as Error).message, 'err');
     }
