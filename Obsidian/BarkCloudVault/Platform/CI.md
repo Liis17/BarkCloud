@@ -35,8 +35,8 @@ Parent: [[Architecture]] · See also: [[Platform/Testing]] · [[Platform/Infrast
 ## Ограничения и решения
 
 - Слияние `dev` → `master` только merge-коммитом: перенос образов требует, чтобы коммит dev-образа был предком master; squash это ломает и разводит истории веток. Hotfix-ветки в `master` не принимаются — исправление идёт PR в `dev`, затем продвижение.
-- Android `versionCode` = `(major·1e6 + minor·1e3 + patch)·1000 + build`; стабильный build = 999, dev — порядковый номер prerelease этой версии (до 998), поэтому каждая следующая dev-сборка обновляется поверх предыдущей.
-- Образы, собранные до перехода на `ci.yml`, не имеют revision-метки: первый перенос в master требует пересобрать dev (`Backend/rebuild.trigger` или dispatch `build`).
+- Android `versionCode` = `(major·1e6 + minor·1e3 + patch)·1000 + build`; стабильный build = 999, dev — следующий после `versionCode` последнего prerelease этой версии (из его `android-update.json`, иначе порядковый номер; до 998), поэтому каждая следующая dev-сборка обновляется поверх предыдущей.
+- Образы, собранные до перехода на `ci.yml`, не имеют revision-метки, а перенос в master её требует. Push с этим переходом меняет version/push-скрипты и потому пересобирает все dev-образы; при сбое пересоберите dev через `Backend/rebuild.trigger` или dispatch `build`.
 - Rulesets: `dev` — PR и строгий `Tests passed`; `master` — PR, `Tests passed`, только merge. Удаление веток и force push запрещены, обход не разрешён никому. `set-required-tests.ps1` применяет их, только когда `ci.yml` уже есть в обеих ветках, и удаляет прежний ruleset `main rules`.
 - Concurrency — очередь без отмены (`queue: max`): пропущенный push-запуск потерял бы свой diff.
 - Сборка iOS/macOS выполняется только в `master`; PR не проверяет их компиляцию, только Swift-тесты `BarkCloudKit`.

@@ -305,6 +305,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       version_code: ${{ steps.version.outputs.version_code }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Вычисление следующей версии v1.x.y
         id: version
         env:
@@ -324,6 +326,7 @@ jobs:
           import json
           import os
           import re
+          import subprocess
           import sys
 
           latest = sys.argv[1]
@@ -340,15 +343,26 @@ jobs:
               raise SystemExit("Minor и patch версии не могут превышать 999.")
           version = f"v{major}.{minor}.{patch}"
           # versionCode = (major*1e6 + minor*1e3 + patch) * 1000 + build. Стабильный build = 999,
-          # dev-сборка берёт порядковый номер prerelease этой версии, чтобы каждая
-          # следующая dev-сборка обновлялась поверх предыдущей.
+          # dev-сборка берёт следующий build после последнего prerelease этой версии,
+          # чтобы каждая следующая dev-сборка обновлялась поверх предыдущей.
+          base = major * 1_000_000 + minor * 1_000 + patch
           build = 999
           if os.environ["RELEASE_BRANCH"] == "dev":
-              previous = [r for r in json.loads(os.environ["RELEASES"]) if r["tagName"].startswith(f"{version}-dev.")]
+              # gh release list отдаёт релизы от новых к старым.
+              previous = [r["tagName"] for r in json.loads(os.environ["RELEASES"])
+                          if r["tagName"].startswith(f"{version}-dev.")]
               build = len(previous) + 1
+              if previous:
+                  manifest = subprocess.run(["gh", "release", "download", previous[0], "--pattern",
+                                             "android-update.json", "--output", "-"],
+                                            capture_output=True, text=True)
+                  if manifest.returncode == 0:
+                      code = json.loads(manifest.stdout).get("versionCode")
+                      if isinstance(code, int) and not isinstance(code, bool) and code // 1000 == base:
+                          build = max(build, code % 1000 + 1)
               if build > 998:
                   raise SystemExit("Для версии выпущено слишком много dev-сборок (максимум 998).")
-          version_code = (major * 1_000_000 + minor * 1_000 + patch) * 1_000 + build
+          version_code = base * 1_000 + build
           if version_code <= 0 or version_code > 2_147_483_647:
               raise SystemExit("versionCode выходит за допустимый диапазон Android.")
           print(f"version={version}")
