@@ -28,7 +28,7 @@ RUN set -eu; \
     tar -xzf "$archive"; test -f lognara-agent; chmod 755 lognara-agent; mkdir -p /spool
 
 # Alpine + docker-cli/compose: веб управляет обновлением бэкенда через смонтированный docker.sock
-# (см. Infrastructure/DockerService.cs). Этот Dockerfile.slim использует prod-CI (build-backend-web.yml).
+# (см. Infrastructure/DockerService.cs). Этот Dockerfile.slim использует prod-CI (.github/workflows/ci.yml).
 # Контейнер запускается под root (доступ к docker.sock) — задаётся в docker-compose.yml.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 RUN apk add --no-cache docker-cli docker-cli-compose icu-libs tzdata

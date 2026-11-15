@@ -26,6 +26,6 @@ Parent: [[Architecture]] · See also: [[Backend/FilesCloud]] · [[Web/WebApp]] �
 ## Сборка
 
 - Web подключает пак через alias `@folder-icons` и `import.meta.glob` (`Backend/BarkCloud.Web/ClientApp/vite.config.ts`, `src/lib/folderIcons.ts`); SVG встраиваются в бандл, отдельных запросов нет. На Windows alias задаётся путём без ведущего `/` перед буквой диска, иначе glob ничего не находит.
-- Изменение `FolderIcons/**` запускает CI веба (`.github/workflows/build-backend-web.yml`); полный `Backend/BarkCloud.Web/Dockerfile` копирует пак в client-стадию, повторяя структуру репозитория.
+- Изменение `FolderIcons/**` пересобирает образ web при push в `dev` (`.github/scripts/ci_plan.py`); полный `Backend/BarkCloud.Web/Dockerfile` копирует пак в client-стадию, повторяя структуру репозитория.
 - `src/lib/folderIcons.test.ts` сверяет манифест с файлами, формат ключей и отсутствие опасной разметки в SVG (они вставляются в DOM как разметка). Vitest в CI пока не запускается — тест нужно прогонять локально.
 - Android, iOS, Windows Drive и macOS пак пока не используют.

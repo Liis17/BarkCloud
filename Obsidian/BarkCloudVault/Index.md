@@ -7,6 +7,7 @@
 - [[Architecture|Архитектура]] — компоненты, стек, основные потоки, соглашения
 - [[Platform/Infrastructure|Инфраструктура]] — docker-compose, nginx, PostgreSQL, RabbitMQ, MinIO, Seq
 - [[Platform/Testing|Тестирование]] — тестовые проекты, стек, CI
+- [[Platform/CI|CI/CD]] — ci.yml, выбор тестов, сборка, перенос образов, релизы, защита веток
 
 ## Backend
 

@@ -1,49 +1,36 @@
-name: "BarkCloud Docker version"
-description: "Вычисляет SemVer-тег образа с учётом ветки BarkCloud"
+name: "Docker semver version"
+description: "Повышает dev-версию или переносит версию dev → master и формирует теги для push"
+
 inputs:
   image:
-    description: "Имя образа без registry и branch suffix"
+    description: "Базовое имя образа без суффикса окружения (например barkcloud-files)"
     required: true
-  registry:
-    description: "Docker Registry"
-    required: false
-    default: "docker.barkfluff.com"
-  username:
-    description: "Registry username для чтения тегов"
-    required: false
-    default: ""
-  password:
-    description: "Registry password для чтения тегов"
-    required: false
-    default: ""
+  registry-username:
+    description: "Логин к docker-реестру"
+    required: true
+  registry-password:
+    description: "Пароль к docker-реестру"
+    required: true
+
 outputs:
   version:
-    description: "SemVer-версия публикуемого образа"
-    value: ${{ steps.version.outputs.version }}
-  repository:
-    description: "Репозиторий с branch suffix"
-    value: ${{ steps.version.outputs.repository }}
+    description: "Новая версия (например 1.0.5)"
+    value: ${{ steps.compute.outputs.version }}
   tags:
-    description: "Версионный, latest и SHA-теги"
-    value: ${{ steps.version.outputs.tags }}
-  tag_sha:
-    description: "SHA-тег образа"
-    value: ${{ steps.version.outputs.tag_sha }}
+    description: "Строка тегов для docker/build-push-action (версия + latest)"
+    value: ${{ steps.compute.outputs.tags }}
   tag_version:
-    description: "Полный тег с SemVer-версией"
-    value: ${{ steps.version.outputs.tag_version }}
+    description: "Полный тег с версией (для уведомлений)"
+    value: ${{ steps.compute.outputs.tag_version }}
+
 runs:
-  using: composite
+  using: "composite"
   steps:
-    - name: "Вычислить SemVer-версию образа"
-      id: version
+    - name: Compute next version
+      id: compute
       shell: bash
       env:
         IMAGE: ${{ inputs.image }}
-        REGISTRY: ${{ inputs.registry }}
-        REGISTRY_USERNAME: ${{ inputs.username }}
-        REGISTRY_PASSWORD: ${{ inputs.password }}
-        REF_NAME: ${{ github.ref_name }}
-        SHA: ${{ github.sha }}
-        GITHUB_ACTION_PATH: ${{ github.action_path }}
-      run: bash "$GITHUB_ACTION_PATH/resolve-version.sh"
+        REG_USER: ${{ inputs.registry-username }}
+        REG_PASS: ${{ inputs.registry-password }}
+      run: bash "${{ github.action_path }}/compute-version.sh"
