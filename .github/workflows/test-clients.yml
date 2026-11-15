@@ -28,9 +28,11 @@ jobs:
         run: dotnet build Drive/BarkCloud.Drive.slnx -c Release
       - name: Drive — тесты
         run: dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests -c Release --no-build --logger trx --results-directory test-results
-      # WPF-часть Builder собирается только на Windows; её логику покрывает Builder.Tests в backend-наборе.
+      # Builder — WPF-приложение, а его тесты проверяют Windows-пути, поэтому оба идут только здесь.
       - name: Builder — сборка
         run: dotnet build Tools/BarkCloud.Builder/BarkCloud.Builder.csproj -c Release
+      - name: Builder — тесты
+        run: dotnet test Tests/Tools/BarkCloud.Builder.Tests -c Release --logger trx --results-directory test-results
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() }}
         with:

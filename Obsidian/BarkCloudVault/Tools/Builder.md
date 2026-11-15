@@ -62,7 +62,7 @@ Configuration получает внутренние порты Identity, Users, 
 
 ## Ограничения и важные детали
 
-- Логику Builder проверяет `BarkCloud.Builder.Tests` в backend-наборе PR; WPF-приложение собирается Windows-набором `test-clients.yml` при изменениях `Tools/BarkCloud.Builder/**`. Self-contained `win-x64` ZIP публикуется job `builder` в `ci.yml` в составе prerelease `dev` и стабильного релиза `master` (см. [[Platform/CI]]).
+- `BarkCloud.Builder.Tests` (тесты используют Windows-пути) и сборка WPF-приложения идут в Windows-наборе `test-clients.yml` при изменениях `Tools/BarkCloud.Builder/**` и встроенных скриптов. Self-contained `win-x64` ZIP публикуется job `builder` в `ci.yml` в составе prerelease `dev` и стабильного релиза `master` (см. [[Platform/CI]]).
 
 - Все проверки модели выполняются до записи compose/env/config. Имена контейнеров должны соответствовать Docker, быть уникальными среди включённых сервисов и не совпадать с `cloud-*` alias другого сервиса, даже если он отключён.
 - Папка вывода должна существовать. Файлы записываются UTF-8 без BOM с переводами строк LF. При смене режима существующие `certs/` не удаляются.

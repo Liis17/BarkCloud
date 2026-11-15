@@ -29,6 +29,8 @@ CONTAINERS = {
 }
 # Built only on Windows; tests link the few files they need, so other changes here need no backend run.
 WINDOWS_ONLY = ('Drive/', 'Tools/BarkCloud.Builder/')
+# net10.0 projects whose tests assume Windows paths (Builder stores D:\ paths); they run in the Windows suite.
+WINDOWS_TESTS = {'BarkCloud.Builder.Tests'}
 # Code outside any known test input: run the whole backend suite rather than miss a test.
 BACKEND_FALLBACK = ('Backend/', 'Shared/', 'Tests/', 'Tools/')
 
@@ -43,7 +45,8 @@ def test_projects(root=ROOT):
             continue
         inputs = set()
         project_inputs(root, relative, inputs, set())
-        projects[csproj.stem] = (relative, '-windows' in csproj.read_text(encoding='utf-8'), inputs)
+        windows = csproj.stem in WINDOWS_TESTS or '-windows' in csproj.read_text(encoding='utf-8')
+        projects[csproj.stem] = (relative, windows, inputs)
     return projects
 
 

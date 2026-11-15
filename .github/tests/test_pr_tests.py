@@ -25,6 +25,9 @@ class PrTestSelectionTests(unittest.TestCase):
             ('Drive/BarkCloud.Drive.App/App.xaml.cs', ['windows']),
             ('Tests/Drive/BarkCloud.Drive.Engine.Tests/Example.cs', ['windows']),
             ('Tools/BarkCloud.Builder/MainWindow.xaml', ['windows']),
+            ('Tools/BarkCloud.Builder/BuilderModel.cs', ['windows']),
+            # Builder embeds provisioning scripts into its output.
+            ('Backend/provision-isolation.sh', ['windows']),
             ('Mac/BarkCloudKit/Sources/Example.swift', ['apple']),
         ]:
             with self.subTest(path=path):
@@ -45,9 +48,6 @@ class PrTestSelectionTests(unittest.TestCase):
             (['Backend/BarkCloud.Torrent/Program.cs'], {'BarkCloud.Torrent.Tests'}),
             (['Backend/BarkCloud.Users/Program.cs', 'Tests/Backend/BarkCloud.Users.Tests/T.cs'],
              {'BarkCloud.Users.Tests', 'BarkCloud.Users.IntegrationTests'}),
-            (['Tools/BarkCloud.Builder/BuilderModel.cs'], {'BarkCloud.Builder.Tests'}),
-            # Builder embeds provisioning scripts into its output.
-            (['Backend/provision-isolation.sh'], {'BarkCloud.Builder.Tests'}),
         ]:
             with self.subTest(paths=paths):
                 self.assertEqual(set(select(paths)[1]), expected | {COMMON_BACKEND_TESTS})
@@ -90,7 +90,7 @@ class PrTestSelectionTests(unittest.TestCase):
         self.assertNotIn('BarkCloud.Files.IntegrationTests', matrix)
         self.assertNotIn('BarkCloud.Drive.Engine.Tests', matrix)
         self.assertNotIn('BarkCloud.TestKit', matrix)
-        self.assertIn('BarkCloud.Builder.Tests', matrix)
+        self.assertNotIn('BarkCloud.Builder.Tests', matrix)
         self.assertEqual((matrix['BarkCloud.Users.IntegrationTests']['postgres'],
                           matrix['BarkCloud.Users.IntegrationTests']['rabbitmq']), (True, True))
         self.assertEqual((matrix['BarkCloud.Files.Tests']['postgres'],
