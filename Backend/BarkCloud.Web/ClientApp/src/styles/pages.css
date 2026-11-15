@@ -1340,6 +1340,9 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .public-shell {
   min-height: 100vh;
   height: 100vh;
+  /* На телефоне 100vh включает скрываемую панель браузера — низ страницы уезжал бы под неё */
+  min-height: 100dvh;
+  height: 100dvh;
   overflow-y: auto;
   color: var(--md-on-surface);
   background: var(--md-surface);
@@ -1940,6 +1943,7 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
 .public-music-player {
   position: sticky;
   bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -2025,8 +2029,11 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   flex-direction: column;
   box-sizing: border-box;
   padding: 16px 24px 28px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   color: #fff;
   background: rgba(12,8,6,.94);
+  /* Щипок и свайп обрабатывает просмотрщик (useViewerGestures), а не браузер */
+  touch-action: none;
 }
 .public-viewer-top {
   display: flex;
@@ -2056,12 +2063,30 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   background: rgba(255,255,255,.12);
 }
 .public-viewer-stage {
+  position: relative;
   flex: 1;
   display: grid;
   place-items: center;
   min-height: 0;
   padding: 12px 0 24px;
 }
+.public-viewer-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-top: -24px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255,255,255,.12);
+}
+.public-viewer-nav.is-prev { left: 0; }
+.public-viewer-nav.is-next { right: 0; }
+.public-viewer-nav.is-prev svg { transform: rotate(180deg); }
 .public-viewer-media { display: grid; place-items: center; max-width: 100%; }
 .public-viewer-placeholder {
   padding: 24px;
@@ -2073,6 +2098,7 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   display: block;
   max-width: 100%;
   max-height: max(160px, calc(100vh - 230px));
+  max-height: max(160px, calc(100dvh - 230px));
   border-radius: 20px;
   object-fit: contain;
 }
@@ -2112,7 +2138,54 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   .public-grid.is-album { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .public-music-row { grid-template-columns: 28px 48px minmax(0, 1fr) 44px; gap: 12px; }
   .public-music-album { display: none; }
-  .public-viewer { padding: 12px 12px 20px; }
+  .public-viewer { padding: 12px 12px 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .public-viewer-media img { max-height: max(160px, calc(100dvh - 200px)); border-radius: 16px; }
+  .public-viewer-media .video-player { min-width: calc(100vw - 24px); }
+  .public-viewer-nav { width: 40px; height: 40px; margin-top: -20px; background: rgba(0,0,0,.35); }
+  .public-stage { padding: 8px; border-radius: 28px; }
+  .public-stage-media { min-height: 200px; border-radius: 20px; }
+  .public-stage-media img,
+  .public-stage-media video { max-height: 64vh; max-height: 64dvh; }
+  .public-stage-media .video-player { min-width: 100%; }
+  .public-nopreview { min-height: 320px; padding: 36px 20px; gap: 24px; border-radius: 28px; }
+  .public-crumb { max-width: 200px; }
+}
+
+/* Телефон: компактная шапка, две колонки плиток, действия на всю ширину */
+@media (max-width: 480px) {
+  .public-topbar { padding: 10px 16px; gap: 12px; }
+  .public-brand { gap: 10px; font-size: 18px; }
+  .public-brand-mark { width: 36px; height: 36px; border-radius: 12px; }
+  .public-toplink { height: 36px; padding: 0 12px 0 14px; font-size: 13px; }
+  .public-main { gap: 20px; padding-bottom: 40px; }
+  .public-hero-main { flex-basis: 100%; gap: 16px; }
+  .public-hero-tile { width: 56px; height: 56px; border-radius: 20px; }
+  .public-hero p { font-size: 14px; }
+  .public-hero-actions { width: 100%; flex-wrap: nowrap; }
+  .public-hero-actions .public-pill { flex: 1; min-width: 0; }
+  .public-hero.is-folder { padding: 16px; border-radius: 28px; }
+  .public-hero.is-folder .public-hero-main { flex-wrap: wrap; }
+  .public-hero.is-collection .public-hero-main { gap: 16px; }
+  .public-cover { width: 120px; height: 120px; border-radius: 30px; }
+  .public-grid,
+  .public-grid.is-album { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .public-tile { padding: 6px; border-radius: 22px; }
+  .public-tile-media { border-radius: 16px; }
+  .public-tile-title { padding: 8px 6px 0; font-size: 14px; }
+  .public-tile-sub { padding: 2px 6px 4px; font-size: 12px; }
+  .public-track-cover { min-width: 0; }
+  .public-track-body { gap: 20px; }
+  .public-music-list { padding: 4px; border-radius: 24px; }
+  .public-music-row { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 12px; min-height: 64px; padding: 8px 12px 8px 8px; border-radius: 20px; }
+  .public-music-idx { display: none; }
+  .public-music-title { font-size: 15px; }
+  .public-music-player { padding: 10px 12px 12px 10px; border-radius: 24px; }
+  .public-status { padding: 32px 20px; border-radius: 28px; }
+  .public-viewer-top { height: 48px; }
+  .public-viewer-close { width: 44px; height: 44px; }
+  .public-viewer-actions { gap: 2px; padding: 6px; }
+  .public-viewer-actions .public-pill { height: 44px; }
+  .public-viewer-btn { width: 44px; height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
