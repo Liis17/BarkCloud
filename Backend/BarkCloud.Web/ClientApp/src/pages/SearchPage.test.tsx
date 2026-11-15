@@ -81,16 +81,19 @@ describe('SearchPage', () => {
     });
 
     it('файл: «Скачать» открывает временную ссылку на оригинал', async () => {
-      const open = vi.fn();
-      vi.stubGlobal('open', open);
+      const hrefs: string[] = [];
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        hrefs.push(this.href);
+      });
       const { fetchMock } = mockSearch('files', [first], { urls: { 'file-1': 'https://files.test/d/1' } });
       renderSearch();
 
       fireEvent.contextMenu(await screen.findByText('Отчёт'));
       fireEvent.click(screen.getByText('Скачать'));
 
-      await waitFor(() => expect(open).toHaveBeenCalledWith('https://files.test/d/1', '_blank'));
+      await waitFor(() => expect(hrefs).toEqual(['https://files.test/d/1']));
       expect(fetchMock.mock.calls.map(([url]) => url)).toContain('/api/files/download?ids=file-1');
+      click.mockRestore();
     });
 
     it('файл: переименование обновляет название в выдаче', async () => {
