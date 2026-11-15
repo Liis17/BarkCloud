@@ -124,6 +124,7 @@ public class Program
         builder.Services.AddSingleton<VideoTranscodeLeaseManager>();
         builder.Services.AddHostedService<VideoVariantWorker>();
         builder.Services.AddScoped<ITrashPurgeService, TrashPurgeService>();
+        builder.Services.AddScoped<StaleAvatarReleaser>();
         builder.Services.AddSingleton<IPhysicalStorageStatsProvider, PhysicalStorageStatsProvider>();
         builder.Services.AddSingleton<IS3StorageStatsProvider, S3StorageStatsProvider>();
         builder.Services.AddHostedService<StorageStatsWarmupService>();

@@ -104,7 +104,7 @@ public sealed class ResumableAvatarPipelineTests
         var response = await new GetFileDataCommandHandler(
             files, new RunSettings { Host = "http://localhost", Http1Port = 7026 }, TestConfiguration.Empty(),
             NullLogger<GetFileDataCommandHandler>.Instance)
-            .Handle(new GetFileDataCommand { FileId = created.FileId, UserId = 0 }, default);
+            .Handle(new GetFileDataCommand { FileId = created.FileId, UserId = 42 }, default);
         response.FileInfo.Id.Should().Be(created.FileId.ToString());
         response.FileInfo.Type.Should().Be(BarkCloud.Proto.Files.UploadFileType.UserAvatar);
         response.FileInfo.FileSize.Should().Be(originalBytes.Length);

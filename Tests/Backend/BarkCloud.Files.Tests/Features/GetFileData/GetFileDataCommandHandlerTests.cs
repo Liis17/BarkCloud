@@ -73,12 +73,24 @@ public class GetFileDataCommandHandlerTests
     [Theory]
     [InlineData(0)]
     [InlineData(OtherUserId)]
-    public async Task Handle_Avatar_IsReturnedToAnyone(long userId)
+    public async Task Handle_ForeignAvatar_ThrowsAccessDenied(long userId)
+    {
+        // Чужой аватар нельзя назначить себе: его владелец освободит файл при смене аватара.
+        var fileId = Guid.NewGuid();
+        SetupFile(ReadyFile(fileId, UploadFileType.UserAvatar, OwnerId));
+
+        var act = () => CreateSut().Handle(new GetFileDataCommand { FileId = fileId, UserId = userId }, default);
+
+        await act.Should().ThrowAsync<CloudAccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task Handle_OwnAvatar_IsReturned()
     {
         var fileId = Guid.NewGuid();
         SetupFile(ReadyFile(fileId, UploadFileType.UserAvatar, OwnerId));
 
-        var response = await CreateSut().Handle(new GetFileDataCommand { FileId = fileId, UserId = userId }, default);
+        var response = await CreateSut().Handle(new GetFileDataCommand { FileId = fileId, UserId = OwnerId }, default);
 
         response.FileInfo.Id.Should().Be(fileId.ToString());
     }

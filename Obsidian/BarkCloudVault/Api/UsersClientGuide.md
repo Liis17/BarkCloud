@@ -37,7 +37,7 @@ Parent: [[Backend/Users]] · See also: [[Shared/Proto]], [[Api/FilesClientGuide]
 
 `Device` содержит `device_id`, `user_id`, `original_name`, `custom_name`, `authorized_at`, `app_name`, `operation_system` и `location`. Push token в ответ не включается.
 
-Для смены аватара сначала загрузи файл в Files с типом `USER_AVATAR`, затем передай возвращённый `file_id` в `SetProfilePicture`. Пустой `file_id` очищает аватар. Подробный upload flow: [[Api/FilesClientGuide]].
+Для смены аватара сначала загрузи файл в Files с типом `USER_AVATAR`, затем передай возвращённый `file_id` в `SetProfilePicture`. Пустой `file_id` очищает аватар. Назначить можно только собственный файл; загруженный, но не назначенный в течение 24 ч, а также прежний аватар сервер освобождает и удаляет. Подробный upload flow: [[Api/FilesClientGuide]].
 
 Privacy request передаёт весь объект: `profile_visibility`, `email_visibility`, `last_seen_visibility`, `searchable_by_username`. Начальные значения: `EVERYONE`, `NOBODY`, `EVERYONE`, `true`. Сервер применяет `searchable_by_username` в `SearchUsers`; остальные visibility-поля сохраняются как настройки.
 
