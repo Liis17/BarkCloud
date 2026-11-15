@@ -21,8 +21,10 @@ import { SelectionBar } from '../components/ui/SelectionBar';
 import { useToast } from '../hooks/useToast';
 import { useTextFileViewer } from '../hooks/useTextFileViewer';
 import { getTextFileKind, textContentUrl } from '../lib/textFiles';
+import { isTextEntry, overlayOpen } from '../lib/keyboard';
+import { ensureTree, treeFromPicked, type FolderTree } from '../lib/folderUpload';
 import { useAlbumMembership } from '../hooks/useAlbumMembership';
-import { useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
+import { CLOUD_ITEMS_MIME, useFileDrop, type FileDropHandlers, type FileDropTarget } from '../hooks/useFileDrop';
 import { useSelection } from '../hooks/useSelection';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -62,8 +64,20 @@ type RenameTarget = { isDir: boolean; target: DirInfo | Entry };
 /** Ключ папки в общем выборе с файлами (файлы выбираются по entryId). */
 const dirKey = (id: string) => 'dir:' + id;
 
-function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }: {
+/** Общие свойства строки/плитки: roving tabindex (Tab попадает в список на один элемент, дальше — стрелками)
+ *  и перетаскивание мышью для перемещения в папку. */
+type ItemNav = {
+  'data-fkey': string;
+  tabIndex: number;
+  onFocus: () => void;
+  draggable: boolean;
+  onDragStart: (e: React.DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
+};
+
+function DirRow({ dir, nav, onOpen, onMenu, dropHandlers, active, checked, onToggle }: {
   dir: DirInfo;
+  nav: ItemNav;
   onOpen: (d: DirInfo) => void;
   onMenu: (e: React.MouseEvent, d: DirInfo) => void;
   dropHandlers: FileDropHandlers;
@@ -73,6 +87,7 @@ function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }
 }) {
   return (
     <tr
+      {...nav}
       className={(active ? 'drop-target' : '') + (checked ? ' checked' : '')}
       {...dropHandlers}
       onClick={(e) => (e.shiftKey ? onToggle(true) : onOpen(dir))}
@@ -96,8 +111,9 @@ function DirRow({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }
   );
 }
 
-function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onRename, onDelete, onDownload, onMenu }: {
+function FileRow({ entry, nav, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onRename, onDelete, onDownload, onMenu }: {
   entry: Entry;
+  nav: ItemNav;
   selected: boolean;
   bulkChecked: boolean;
   onBulkToggle: (e: Entry, shift: boolean) => void;
@@ -113,7 +129,7 @@ function FileRow({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen,
   const hasPreview = (m?.previews || []).length > 0;
   return (
     <tr
-      tabIndex={-1}
+      {...nav}
       className={(selected ? 'selected' : '') + (bulkChecked ? ' checked' : '')}
       onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
       onDoubleClick={(e) => { e.currentTarget.focus(); onOpen(entry); }}
@@ -168,9 +184,10 @@ function TileSelbox({ checked, onToggle }: { checked: boolean; onToggle: (shift:
 }
 
 /** Плитка папки в режиме сетки: те же действия, что у DirRow. */
-function DirTile({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle }: React.ComponentProps<typeof DirRow>) {
+function DirTile({ dir, nav, onOpen, onMenu, dropHandlers, active, checked, onToggle }: React.ComponentProps<typeof DirRow>) {
   return (
     <div
+      {...nav}
       className={'file-tile' + (active ? ' drop-target' : '') + (checked ? ' checked' : '')}
       {...dropHandlers}
       onClick={(e) => (e.shiftKey ? onToggle(true) : onOpen(dir))}
@@ -186,8 +203,9 @@ function DirTile({ dir, onOpen, onMenu, dropHandlers, active, checked, onToggle 
 }
 
 /** Плитка файла в режиме сетки: превью фото/видео или иконка типа из пака FolderIcons. */
-function FileTile({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onMenu }: {
+function FileTile({ entry, nav, selected, bulkChecked, onBulkToggle, onSelect, onOpen, onMenu }: {
   entry: Entry;
+  nav: ItemNav;
   selected: boolean;
   bulkChecked: boolean;
   onBulkToggle: (e: Entry, shift: boolean) => void;
@@ -200,7 +218,7 @@ function FileTile({ entry, selected, bulkChecked, onBulkToggle, onSelect, onOpen
   const hasPreview = (m?.previews || []).length > 0;
   return (
     <div
-      tabIndex={-1}
+      {...nav}
       className={'file-tile' + (selected ? ' selected' : '') + (bulkChecked ? ' checked' : '')}
       onClick={(e) => (e.shiftKey ? onBulkToggle(entry, true) : onSelect(entry))}
       onDoubleClick={(e) => { e.currentTarget.focus(); onOpen(entry); }}
@@ -351,8 +369,16 @@ export function FilesPage() {
   const audioPlayer = useAudioPlayer();
   const { menu, openAt } = useContextMenu();
   const membership = useAlbumMembership(albums);
-  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target) => doUpload(files, target));
+  const { over, target: dropTarget, dropHandlers, getTargetHandlers } = useFileDrop((files, target, tree) => doUpload(files, target, tree));
   const fsel = useSelection();
+  const [focusKey, setFocusKey] = React.useState<string | null>(null);
+  const shellRef = React.useRef<HTMLDivElement | null>(null);
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const hotkeysRef = React.useRef<(e: KeyboardEvent) => void>(() => {});
+  const pasteRef = React.useRef<(e: ClipboardEvent) => void>(() => {});
+  // Перетаскиваемые мышью записи (ключи выбора) и папка под курсором.
+  const dragKeysRef = React.useRef<string[] | null>(null);
+  const [moveOver, setMoveOver] = React.useState<string | null>(null);
 
   const currentDir = stack.length ? stack[stack.length - 1].id : '';
   const selectedIconUrl = pickDocumentIcon(sel?.media);
@@ -667,10 +693,28 @@ export function FilesPage() {
       { label: 'Удалить', icon: 'trash', danger: true, onClick: () => requestDelete(dir, true) },
     ];
   }
-  async function doUpload(dropped?: File[], target: FileDropTarget | null = null) {
+  async function doUpload(dropped?: File[], target: FileDropTarget | null = null, tree?: FolderTree) {
     const files = dropped && dropped.length ? dropped : await pickFiles({});
     if (!files.length) return;
-    enqueue(files, { dir: target?.id || currentDir });
+    const baseDir = target?.id || currentDir;
+    if (tree) await uploadTree(files, tree, baseDir);
+    else enqueue(files, { dir: baseDir });
+  }
+  /** Папка целиком: сначала воссоздаём дерево папок, затем ставим файлы в очередь одной пачкой. */
+  async function uploadTree(files: File[], tree: FolderTree, baseDir: string) {
+    let dirs: string[];
+    try {
+      dirs = await ensureTree(tree, baseDir);
+    } catch (e) {
+      toast((e as Error).message || 'Не удалось создать папки', 'err');
+      return;
+    }
+    loadRef.current();
+    enqueue(files, { dir: baseDir }, dirs);
+  }
+  async function uploadFolder() {
+    const files = await pickFiles({ directory: true });
+    if (files.length) await uploadTree(files, treeFromPicked(files), currentDir);
   }
 
   const chosenDirs = () => (listing?.dirs || []).filter((d) => fsel.has(dirKey(d.id)));
@@ -706,12 +750,16 @@ export function FilesPage() {
     }
   }
 
-  async function bulkMove(targetDir: string) {
+  /** Перемещение выбранного (или перетащенных мышью ключей) в папку targetDir. */
+  async function bulkMove(targetDir: string, keys?: string[]) {
     if (moveProgress) return;
+    const picked = keys ? (k: string) => keys.includes(k) : fsel.has;
     const chosen = [
-      ...chosenDirs().map((d) => ({ name: d.name, move: () => apiPost('/api/cloud/dir/move', { id: d.id, parentId: targetDir }) })),
+      ...(listing?.dirs || [])
+        .filter((d) => picked(dirKey(d.id)))
+        .map((d) => ({ name: d.name, move: () => apiPost('/api/cloud/dir/move', { id: d.id, parentId: targetDir }) })),
       ...(listing?.files || [])
-        .filter((e) => fsel.has(e.entryId))
+        .filter((e) => picked(e.entryId))
         .map((e) => ({ name: e.name, move: () => apiPost('/api/cloud/entry/move', { entryId: e.entryId, dir: targetDir }) })),
     ];
     let ok = 0;
@@ -826,6 +874,9 @@ export function FilesPage() {
           <button className="btn outlined" onClick={() => { setName(''); setCreating(true); }}>
             <Icon.plus size={16} /> Создать
           </button>
+          <button className="btn outlined" onClick={() => uploadFolder()}>
+            <Icon.folder size={16} /> Загрузить папку
+          </button>
           <button className="btn primary" onClick={() => doUpload()}>
             <Icon.upload size={16} /> Загрузить
           </button>
@@ -848,6 +899,159 @@ export function FilesPage() {
   const canArchive = !selectedDirs.length || !!archiveDir;
   const dropDirectoryName = dropTarget?.label || (stack.length ? stack[stack.length - 1].name : 'корень облака');
 
+  const navKey = focusKey && orderedKeys.includes(focusKey) ? focusKey : orderedKeys[0];
+  const navOf = (key: string): ItemNav => ({
+    'data-fkey': key,
+    tabIndex: key === navKey ? 0 : -1,
+    onFocus: () => setFocusKey(key),
+    draggable: !moveProgress,
+    onDragStart: (e) => {
+      // Отмеченная запись тянет за собой весь выбор, иначе — только себя.
+      const keys = fsel.has(key) ? orderedKeys.filter((k) => fsel.has(k)) : [key];
+      dragKeysRef.current = keys;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData(CLOUD_ITEMS_MIME, keys.join('\n'));
+    },
+    onDragEnd: () => {
+      dragKeysRef.current = null;
+      setMoveOver(null);
+    },
+  });
+  /** Папка-цель перемещения: принимает перетаскиваемые записи, кроме самой себя; файлы с диска — как раньше. */
+  function moveTargetHandlers(targetId: string, uploadHandlers?: FileDropHandlers): FileDropHandlers {
+    const accepts = (e: React.DragEvent<HTMLElement>) => {
+      const keys = dragKeysRef.current;
+      return !!keys && Array.from(e.dataTransfer.types || []).includes(CLOUD_ITEMS_MIME)
+        && targetId !== currentDir && !keys.includes(dirKey(targetId));
+    };
+    const internal = (e: React.DragEvent<HTMLElement>) => !!dragKeysRef.current && Array.from(e.dataTransfer.types || []).includes(CLOUD_ITEMS_MIME);
+    const over = (e: React.DragEvent<HTMLElement>) => {
+      if (!internal(e)) return false;
+      if (accepts(e)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setMoveOver(targetId);
+      }
+      return true;
+    };
+    return {
+      onDragEnter: (e) => { if (!over(e)) uploadHandlers?.onDragEnter(e); },
+      onDragOver: (e) => { if (!over(e)) uploadHandlers?.onDragOver(e); },
+      onDragLeave: (e) => {
+        if (!internal(e)) return uploadHandlers?.onDragLeave(e);
+        if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setMoveOver((cur) => (cur === targetId ? null : cur));
+      },
+      onDrop: (e) => {
+        if (!internal(e)) return uploadHandlers?.onDrop(e);
+        e.preventDefault();
+        e.stopPropagation();
+        const keys = accepts(e) ? dragKeysRef.current : null;
+        dragKeysRef.current = null;
+        setMoveOver(null);
+        if (keys) void bulkMove(targetId, keys);
+      },
+    };
+  }
+  const itemOf = (key: string | null | undefined): RenameTarget | null => {
+    if (!key) return null;
+    const dir = dirs.find((d) => dirKey(d.id) === key);
+    if (dir) return { isDir: true, target: dir };
+    const file = files.find((f) => f.entryId === key);
+    return file ? { isDir: false, target: file } : null;
+  };
+  const focusedKeyOf = (target: EventTarget | null) =>
+    target instanceof HTMLElement ? target.closest<HTMLElement>('[data-fkey]')?.dataset.fkey : undefined;
+  function focusItem(key: string) {
+    setFocusKey(key);
+    listRef.current?.querySelector<HTMLElement>(`[data-fkey="${key}"]`)?.focus();
+  }
+  function gridColumns(): number {
+    const grid = listRef.current?.querySelector('.files-grid');
+    return grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 1 : 1;
+  }
+
+  // Навигация по списку, когда фокус на самой строке/плитке (не на её чекбоксе или кнопке).
+  function onListKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const key = (e.target as HTMLElement).dataset?.fkey;
+    if (!key || e.ctrlKey || e.metaKey || e.altKey) return;
+    const i = orderedKeys.indexOf(key);
+    if (i < 0) return;
+    const cols = view === 'grid' ? gridColumns() : 1;
+    const moves: Record<string, number> = {
+      ArrowDown: cols,
+      ArrowUp: -cols,
+      ...(view === 'grid' ? { ArrowRight: 1, ArrowLeft: -1 } : {}),
+      Home: -i,
+      End: orderedKeys.length - 1 - i,
+    };
+    if (e.key in moves) {
+      e.preventDefault();
+      const next = Math.min(orderedKeys.length - 1, Math.max(0, i + moves[e.key]));
+      focusItem(orderedKeys[next]);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = itemOf(key);
+      if (item?.isDir) openDir(item.target as DirInfo);
+      else if (item) openEntry(item.target as Entry);
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      fsel.select(key, orderedKeys, e.shiftKey);
+    }
+  }
+
+  // Del, F2 и Ctrl+A — на всей странице, но не в полях ввода и не под открытым диалогом/просмотрщиком.
+  hotkeysRef.current = (e) => {
+    if (openSmart || !listing || e.altKey || isTextEntry(e.target) || overlayOpen()) return;
+    const t = e.target;
+    if (t !== document.body && !(t instanceof Node && shellRef.current?.contains(t))) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.code === 'KeyA') {
+      if (!orderedKeys.length) return;
+      e.preventDefault();
+      fsel.setAll(orderedKeys, true);
+      return;
+    }
+    if (mod) return;
+    const single = () => itemOf(focusedKeyOf(t)) ?? (sel ? { isDir: false, target: sel } : null);
+    if (e.key === 'Delete') {
+      if (fsel.count) {
+        e.preventDefault();
+        setBulkConfirm(true);
+        return;
+      }
+      const item = single();
+      if (!item) return;
+      e.preventDefault();
+      requestDelete(item.target, item.isDir);
+    } else if (e.key === 'F2') {
+      if (fsel.count > 1) return;
+      const item = fsel.count === 1 ? itemOf(fsel.list[0]) : single();
+      if (!item) return;
+      e.preventDefault();
+      startRename(item.target, item.isDir);
+    }
+  };
+  // Ctrl+V с файлами или скриншотом в буфере — загрузка в текущую папку (в тех же границах, что и горячие клавиши).
+  pasteRef.current = (e) => {
+    if (openSmart || searchQuery || isTextEntry(e.target) || overlayOpen()) return;
+    const t = e.target;
+    if (t !== document.body && !(t instanceof Node && shellRef.current?.contains(t))) return;
+    const pasted = Array.from(e.clipboardData?.files || []);
+    if (!pasted.length) return;
+    e.preventDefault();
+    enqueue(pasted, { dir: currentDir });
+  };
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => hotkeysRef.current(e);
+    const onPaste = (e: ClipboardEvent) => pasteRef.current(e);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('paste', onPaste);
+    };
+  }, []);
+
   return (
     <>
       {toastNode}
@@ -866,7 +1070,7 @@ export function FilesPage() {
           { label: 'Удалить', icon: 'trash', danger: true, onClick: () => setBulkConfirm(true) },
         ]}
       />
-      <div className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
+      <div ref={shellRef} className={'files-shell' + (over ? ' drop-over' : '')} {...dropHandlers}>
         {over && <FileDropOverlay detail={`Файлы будут загружены в папку «${dropDirectoryName}»`} />}
         <div className="files-main">
           {!openSmart && !searchQuery && !currentDir && (smartFoldersLoading || smartFolders.length > 0) && (
@@ -890,7 +1094,7 @@ export function FilesPage() {
                 </div>
               ) : (
                 <div className="breadcrumb">
-                  <a onClick={() => gotoIndex(-1)} className={stack.length ? '' : 'cur'} style={{ cursor: 'pointer' }}>
+                  <a onClick={() => gotoIndex(-1)} className={(stack.length ? '' : 'cur') + (moveOver === '' ? ' drop-target' : '')} style={{ cursor: 'pointer' }} title="Корень облака" {...moveTargetHandlers('')}>
                     <Icon.folder size={18} />
                   </a>
                   {stack.map((s, i) => (
@@ -899,7 +1103,7 @@ export function FilesPage() {
                       {i === stack.length - 1 ? (
                         <span className="cur">{s.name}</span>
                       ) : (
-                        <a onClick={() => gotoIndex(i)} style={{ cursor: 'pointer' }}>
+                        <a onClick={() => gotoIndex(i)} className={moveOver === s.id ? 'drop-target' : ''} style={{ cursor: 'pointer' }} {...moveTargetHandlers(s.id)}>
                           {s.name}
                         </a>
                       )}
@@ -936,7 +1140,7 @@ export function FilesPage() {
                 />
               </div>
             ) : (
-            <div className="files-list">
+            <div className="files-list" ref={listRef} onKeyDown={onListKeyDown}>
               {listing === null ? (
                 <Loading />
               ) : isEmpty ? (
@@ -964,8 +1168,9 @@ export function FilesPage() {
                     <DirTile
                       key={d.id}
                       dir={d}
-                      active={dropTarget?.id === d.id}
-                      dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                      nav={navOf(dirKey(d.id))}
+                      active={dropTarget?.id === d.id || moveOver === d.id}
+                      dropHandlers={moveTargetHandlers(d.id, getTargetHandlers({ id: d.id, label: d.name }))}
                       onOpen={openDir}
                       onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                       checked={fsel.has(dirKey(d.id))}
@@ -976,6 +1181,7 @@ export function FilesPage() {
                     <FileTile
                       key={e.entryId}
                       entry={e}
+                      nav={navOf(e.entryId)}
                       selected={!!sel && sel.entryId === e.entryId}
                       bulkChecked={fsel.has(e.entryId)}
                       onBulkToggle={(t, shift) => fsel.select(t.entryId, orderedKeys, shift)}
@@ -1008,8 +1214,9 @@ export function FilesPage() {
                       <DirRow
                         key={d.id}
                         dir={d}
-                        active={dropTarget?.id === d.id}
-                        dropHandlers={getTargetHandlers({ id: d.id, label: d.name })}
+                        nav={navOf(dirKey(d.id))}
+                        active={dropTarget?.id === d.id || moveOver === d.id}
+                        dropHandlers={moveTargetHandlers(d.id, getTargetHandlers({ id: d.id, label: d.name }))}
                         onOpen={openDir}
                         onMenu={(ev, t) => openAt(ev, dirMenu(t))}
                         checked={fsel.has(dirKey(d.id))}
@@ -1020,6 +1227,7 @@ export function FilesPage() {
                       <FileRow
                         key={e.entryId}
                         entry={e}
+                        nav={navOf(e.entryId)}
                         selected={!!sel && sel.entryId === e.entryId}
                         bulkChecked={fsel.has(e.entryId)}
                         onBulkToggle={(t, shift) => fsel.select(t.entryId, orderedKeys, shift)}

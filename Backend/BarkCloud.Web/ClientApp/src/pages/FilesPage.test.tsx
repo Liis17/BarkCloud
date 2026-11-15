@@ -441,3 +441,157 @@ describe('FilesPage grid view', () => {
     expect(mocks.enqueue).toHaveBeenCalledWith(expect.any(Array), { dir: 'dir-1' });
   });
 });
+
+describe('FilesPage keyboard', () => {
+  beforeEach(() => {
+    mockDirectoryListings({
+      '': { dirs: [{ id: 'dir-1', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' }], files: [fileEntry('entry-1', 'отчёт.pdf'), fileEntry('entry-2', 'план.txt')] },
+      'dir-1': { dirs: [], files: [] },
+    });
+  });
+
+  const rowOf = (text: string) => screen.getByText(text).closest('tr') as HTMLElement;
+
+  it('строки доступны с Tab по одной и перемещаются стрелками, Enter открывает папку', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+    expect(rowOf('Документы').tabIndex).toBe(0);
+    expect(rowOf('отчёт.pdf').tabIndex).toBe(-1);
+
+    rowOf('Документы').focus();
+    fireEvent.keyDown(rowOf('Документы'), { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(rowOf('отчёт.pdf'));
+    expect(rowOf('отчёт.pdf').tabIndex).toBe(0);
+    fireEvent.keyDown(rowOf('отчёт.pdf'), { key: 'End' });
+    expect(document.activeElement).toBe(rowOf('план.txt'));
+    fireEvent.keyDown(rowOf('план.txt'), { key: ' ' });
+    expect((within(rowOf('план.txt')).getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.keyDown(rowOf('план.txt'), { key: 'Home' });
+    fireEvent.keyDown(rowOf('Документы'), { key: 'Enter' });
+    await waitFor(() => expect(mocks.apiGet).toHaveBeenCalledWith(expect.stringContaining('dir=dir-1')));
+  });
+
+  it('Del удаляет строку в фокусе после подтверждения, F2 переименовывает', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+
+    rowOf('отчёт.pdf').focus();
+    fireEvent.keyDown(rowOf('отчёт.pdf'), { key: 'F2' });
+    expect((screen.getByLabelText('Новое имя') as HTMLInputElement).value).toBe('отчёт.pdf');
+    // Под открытым диалогом клавиши страницы не работают.
+    fireEvent.keyDown(screen.getByLabelText('Новое имя'), { key: 'Delete' });
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+    expect(screen.queryByText('Удалить в корзину?')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    rowOf('отчёт.pdf').focus();
+    fireEvent.keyDown(rowOf('отчёт.pdf'), { key: 'Delete' });
+    expect(screen.getByText('«отчёт.pdf» будет перемещён в корзину.')).toBeTruthy();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Удалить' }));
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/delete', { entryId: 'entry-1' }));
+  });
+
+  it('Ctrl+A выбирает всё, Del предлагает удалить выбранное', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+
+    fireEvent.keyDown(document.body, { key: 'ф', code: 'KeyA', ctrlKey: true });
+    for (const name of ['Документы', 'отчёт.pdf', 'план.txt'])
+      expect((within(rowOf(name)).getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+    expect(screen.getByText('Выбранное (3) будет перемещено в корзину.')).toBeTruthy();
+  });
+});
+
+describe('FilesPage drag-to-move', () => {
+  function dragData() {
+    const data = new Map<string, string>();
+    return {
+      get types() { return Array.from(data.keys()); },
+      setData: (type: string, value: string) => data.set(type, value),
+      getData: (type: string) => data.get(type) || '',
+      files: [] as File[],
+      effectAllowed: 'all',
+      dropEffect: 'none',
+    } as unknown as DataTransfer;
+  }
+  const rowOf = (text: string) => screen.getByText(text).closest('tr') as HTMLElement;
+
+  beforeEach(() => {
+    mockDirectoryListings({
+      '': {
+        dirs: [{ id: 'dir-1', name: 'Документы', updatedAt: '2026-01-01T00:00:00Z' }, { id: 'dir-2', name: 'Архив', updatedAt: '2026-01-01T00:00:00Z' }],
+        files: [fileEntry('entry-1', 'отчёт.pdf'), fileEntry('entry-2', 'план.txt')],
+      },
+    });
+  });
+
+  it('перемещает файл, брошенный на папку, без загрузки', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+    const dataTransfer = dragData();
+
+    fireEvent.dragStart(rowOf('отчёт.pdf'), { dataTransfer });
+    fireEvent.dragEnter(rowOf('Документы'), { dataTransfer });
+    await waitFor(() => expect(rowOf('Документы').className).toContain('drop-target'));
+    fireEvent.drop(rowOf('Документы'), { dataTransfer });
+
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-1', dir: 'dir-1' }));
+    expect(mocks.apiPost).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('тянет весь выбор и не бросает папку саму в себя', async () => {
+    render(<MemoryRouter initialEntries={['/files']}><FilesPage /></MemoryRouter>);
+    await screen.findByText('отчёт.pdf');
+    fireEvent.click(within(rowOf('Архив')).getByRole('checkbox'));
+    fireEvent.click(within(rowOf('план.txt')).getByRole('checkbox'));
+
+    const self = dragData();
+    fireEvent.dragStart(rowOf('Архив'), { dataTransfer: self });
+    fireEvent.drop(rowOf('Архив'), { dataTransfer: self });
+    expect(mocks.apiPost).not.toHaveBeenCalled();
+
+    const dataTransfer = dragData();
+    fireEvent.dragStart(rowOf('план.txt'), { dataTransfer });
+    fireEvent.drop(rowOf('Документы'), { dataTransfer });
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledTimes(2));
+    expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/dir/move', { id: 'dir-2', parentId: 'dir-1' });
+    expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-2', dir: 'dir-1' });
+  });
+
+  it('перемещает в корень через хлебные крошки', async () => {
+    mockDirectoryListings({ 'dir-1': { dirs: [], files: [fileEntry('entry-9', 'внутри.txt')] } });
+    renderFilesHistory([{ pathname: '/files', state: { stack: [{ id: 'dir-1', name: 'Документы' }] } }]);
+    await screen.findByText('внутри.txt');
+    const dataTransfer = dragData();
+    fireEvent.dragStart(rowOf('внутри.txt'), { dataTransfer });
+    fireEvent.drop(screen.getByTitle('Корень облака'), { dataTransfer });
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledWith('/api/cloud/entry/move', { entryId: 'entry-9', dir: '' }));
+  });
+});
+
+describe('FilesPage paste upload', () => {
+  function paste(target: EventTarget, files: File[]) {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files } });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  it('загружает файлы из буфера в текущую папку, но не перехватывает вставку в поле', async () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/files', state: { stack: [{ id: 'dir-1', name: 'Документы' }] } }]}><FilesPage /></MemoryRouter>);
+    await waitFor(() => expect(mocks.apiGet).toHaveBeenCalledWith(expect.stringContaining('dir=dir-1')));
+    const shot = new File(['png'], 'image.png', { type: 'image/png' });
+
+    const input = document.body.appendChild(document.createElement('input'));
+    expect(paste(input, [shot]).defaultPrevented).toBe(false);
+    input.remove();
+    expect(mocks.enqueue).not.toHaveBeenCalled();
+
+    expect(paste(document.body, [shot]).defaultPrevented).toBe(true);
+    expect(mocks.enqueue).toHaveBeenCalledWith([shot], { dir: 'dir-1' });
+  });
+});
