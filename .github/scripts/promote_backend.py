@@ -58,7 +58,8 @@ def check_revision(revision, sources, head='HEAD'):
 class Registry:
     def __init__(self, user, password):
         token = base64.b64encode(f'{user}:{password}'.encode()).decode()
-        self.headers = {'Authorization': f'Basic {token}', 'Accept': ACCEPT}
+        # Cloudflare перед реестром отвечает 403 на User-Agent Python-urllib.
+        self.headers = {'Authorization': f'Basic {token}', 'Accept': ACCEPT, 'User-Agent': 'barkcloud-ci'}
 
     def request(self, path, method='GET', attempts=6, delay=15):
         request = urllib.request.Request(f'https://{REGISTRY}/v2/{path}', headers=self.headers, method=method)
