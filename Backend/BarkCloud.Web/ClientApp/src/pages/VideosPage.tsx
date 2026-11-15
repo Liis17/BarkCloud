@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
 import { MediaThumb } from '../components/media/MediaThumb';
+import { PhotoTile } from '../components/media/PhotoTile';
 import { Lightbox } from '../components/media/Lightbox';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { FileDropOverlay } from '../components/ui/FileDropOverlay';
@@ -17,6 +18,7 @@ import { useUploadActions } from '../hooks/useUploadManager';
 import { apiGet, pickFiles } from '../lib/api';
 import { plural, dateLabel, groupByDate } from '../lib/format';
 import { searchHitToCardFile, type SearchHit } from '../lib/search';
+import { useStoredChoice, VIDEO_LAYOUT_KEY, VIDEO_LAYOUTS } from '../lib/viewPrefs';
 import type { Album, MediaItem, VideoMeta } from '../lib/types';
 
 function fmtSize(bytes: number): string {
@@ -142,6 +144,8 @@ export function VideosPage() {
   const [lightbox, setLightbox] = React.useState<number | null>(null);
   const [deepMedia, setDeepMedia] = React.useState<MediaItem | null>(null);
   const resolvedOpenId = React.useRef('');
+  // Переключатель на странице; то же значение доступно в Настройки → Внешний вид.
+  const [layout, setLayout] = useStoredChoice(VIDEO_LAYOUT_KEY, VIDEO_LAYOUTS, 'cards');
   const [toastNode, toast] = useToast();
   const { enqueue, attachVersion } = useUploadActions();
 
@@ -275,6 +279,14 @@ export function VideosPage() {
             <span className="count">{mediaStats ? mediaStats.totalCount : '—'}</span>
           </span>
         </div>
+        <div className="right">
+          <button className={'icon-btn' + (layout === 'cards' ? ' active' : '')} title="Карточками" aria-pressed={layout === 'cards'} onClick={() => setLayout('cards')}>
+            <Icon.list size={18} />
+          </button>
+          <button className={'icon-btn' + (layout === 'grid' ? ' active' : '')} title="Сеткой как в «Фото»" aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')}>
+            <Icon.grid size={18} />
+          </button>
+        </div>
       </div>
 
       {(loading && videos.length === 0 ? (
@@ -334,18 +346,20 @@ export function VideosPage() {
                     </span>
                   </div>
                 </div>
-                <div className="vid-grid">
-                  {g.items.map((m) => (
-                    <VideoCard
-                      key={m.id}
-                      m={m}
-                      selecting={bulk.active}
-                      checked={bulk.isSelected(m.id)}
-                      onToggle={(shift) => bulk.toggle(m.id, shift)}
-                      onOpen={(mm) => { bulk.setAnchor(mm.id); setLightbox(videos.findIndex((v) => v.id === mm.id)); }}
-                      onMenu={actionsCtx.openMenu}
-                    />
-                  ))}
+                <div className={layout === 'grid' ? 'photo-grid' : 'vid-grid'}>
+                  {g.items.map((m) => {
+                    const props = {
+                      m,
+                      selecting: bulk.active,
+                      checked: bulk.isSelected(m.id),
+                      onToggle: (shift: boolean) => bulk.toggle(m.id, shift),
+                      onOpen: (mm: MediaItem) => { bulk.setAnchor(mm.id); setLightbox(videos.findIndex((v) => v.id === mm.id)); },
+                      onMenu: actionsCtx.openMenu,
+                    };
+                    return layout === 'grid'
+                      ? <PhotoTile key={m.id} {...props} badge={m.video?.duration ? <><Icon.play size={10} /> {fmtDuration(m.video.duration)}</> : null} />
+                      : <VideoCard key={m.id} {...props} />;
+                  })}
                 </div>
               </div>
             ))}

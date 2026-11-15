@@ -73,7 +73,7 @@ dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests -c Release
 dotnet test Tests/Drive/BarkCloud.Drive.Engine.Tests --filter "Category=WindowsIpc"
 ```
 
-GitHub Actions запускает job `Drive (Windows)` на `windows-latest` при изменениях `Drive/**`, `Tests/Drive/**`, `Shared/BarkCloud.Proto/**`, `Directory.Build.props`, `Tests/Directory.Build.props` или `.github/workflows/tests.yml`. Job собирает решение и запускает весь тестовый проект, включая `WindowsIpc`.
+На PR в `dev` Windows-набор `.github/workflows/test-clients.yml` запускается на `windows-latest` при изменениях `Drive/**`, входов `Tests/Drive/**` (в том числе `Shared/BarkCloud.Proto/**`) или общих `*.props`. Job собирает решение и запускает весь тестовый проект, включая `WindowsIpc`.
 
 ## Известные ограничения
 

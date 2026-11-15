@@ -11,7 +11,7 @@ import { useSelection } from '../../hooks/useSelection';
 import { useConfirm } from '../../hooks/useDialog';
 import { useTextFileViewer } from '../../hooks/useTextFileViewer';
 import { textContentUrl } from '../../lib/textFiles';
-import { apiGet, apiPost, deleteEntriesBatch, deleteMediaBatch } from '../../lib/api';
+import { apiGet, apiPost, deleteEntriesBatch, deleteMediaBatch, downloadFile } from '../../lib/api';
 import { GRID_SIZES, kindRu, fmtFull, plural } from '../../lib/format';
 import { useDocumentHead } from '../../hooks/useDocumentHead';
 import type { Album, DynamicFolder, MediaItem, Page } from '../../lib/types';
@@ -80,9 +80,7 @@ export function DynamicFolderDetail({ folder, onBack, onChanged, toast, albums, 
 
   async function download(id: string) {
     try {
-      const d = await apiGet<{ urls: Record<string, string> }>('/api/files/download?ids=' + id);
-      const url = d.urls[id];
-      if (url) window.open(url, '_blank');
+      await downloadFile(id);
     } catch (e) {
       toast((e as Error).message, 'err');
     }

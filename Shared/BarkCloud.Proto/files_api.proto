@@ -36,6 +36,7 @@ service CloudApi {
   rpc GetDirectoryProperties (GetDirectoryPropertiesRequest) returns (DirectoryProperties);   // Свойства папки: даты, счётчики поддерева, видимость
   rpc SetDirectoryVisibility (SetDirectoryVisibilityRequest) returns (DirectoryProperties);  // Скрыть папку из галереи/поиска и изменить наследование
   rpc RenameDirectory      (RenameDirectoryRequest)      returns (CloudEmpty);               // Переименовать папку
+  rpc SetDirectoryAppearance (SetDirectoryAppearanceRequest) returns (DirectoryInfo);       // Иконка и цвет подложки папки; пустые поля — сброс
   rpc MoveDirectory        (MoveDirectoryRequest)        returns (CloudEmpty);               // Переместить папку
   rpc DeleteDirectory      (DeleteDirectoryRequest)      returns (CloudEmpty);               // Удалить папку рекурсивно
   rpc ListDirectory        (ListDirectoryRequest)        returns (DirectoryListing);         // Листинг содержимого папки (только метаданные)
@@ -479,6 +480,14 @@ message DirectoryInfo {
   string name = 3; // Имя папки
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  string icon_key = 6;   // Ключ иконки из пака FolderIcons; пусто или неизвестный клиенту ключ — стандартная папка
+  string icon_color = 7; // Цвет подложки #RRGGBB; пусто — цвет темы клиента
+}
+
+message SetDirectoryAppearanceRequest {
+  string directory_id = 1;
+  string icon_key = 2;   // [a-z0-9-], до 64 символов; пусто — сброс
+  string icon_color = 3; // #RRGGBB; пусто — сброс
 }
 
 message GetDirectoryPropertiesRequest { string directory_id = 1; }

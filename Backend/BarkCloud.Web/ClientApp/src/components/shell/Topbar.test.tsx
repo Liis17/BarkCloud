@@ -107,3 +107,19 @@ describe('Topbar global search', () => {
     expect(image?.getAttribute('src')).toBe(previewUrl);
   });
 });
+
+describe('Topbar search hotkey', () => {
+  it('«/» переводит фокус в поиск, но не перехватывается в полях ввода', () => {
+    renderTopbar();
+    const input = screen.getByRole('combobox');
+    const other = document.body.appendChild(document.createElement('input'));
+    other.focus();
+    fireEvent.keyDown(other, { key: '/', code: 'Slash' });
+    expect(document.activeElement).toBe(other);
+
+    other.blur();
+    fireEvent.keyDown(document.body, { key: '.', code: 'Slash' });
+    expect(document.activeElement).toBe(input);
+    other.remove();
+  });
+});

@@ -45,7 +45,7 @@ public class SearchUsersQueryHandler : IRequestHandler<SearchUsersQuery, SearchU
         var users = await _usersStorage.SearchUsers(query, _userContext.UserId, limit);
 
         var response = new SearchUsersResponse();
-        response.Users.AddRange(users.Select(u => u.ToGrpc()));
+        response.Users.AddRange(users.Select(u => u.ToGrpcForViewer(_userContext.UserId)));
 
         return response;
     }

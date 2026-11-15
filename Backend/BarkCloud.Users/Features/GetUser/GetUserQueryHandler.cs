@@ -1,6 +1,7 @@
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Users;
 using BarkCloud.Shared.Exceptions.Identity;
+using BarkCloud.Shared.Identity;
 using BarkCloud.Users.Mapping;
 using BarkCloud.Users.Persistence.Services;
 
@@ -51,6 +52,11 @@ public class GetUserQueryHandler : IRequestHandler<GetUserQuery, GetUserResponse
             user.Username
         );
 
-        return new GetUserResponse { User = user.ToGrpc() };
+        // Видимость профиля применяется к клиентским запросам; межсервисный GetById получает полный профиль.
+        var grpcUser = _userContext.TokenType == TokenType.User
+            ? user.ToGrpcForViewer(_userContext.UserId)
+            : user.ToGrpc();
+
+        return new GetUserResponse { User = grpcUser };
     }
 }

@@ -1,0 +1,1009 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "media",
+      "label": "Медиа"
+    },
+    {
+      "id": "documents",
+      "label": "Документы"
+    },
+    {
+      "id": "archives",
+      "label": "Архивы и данные"
+    },
+    {
+      "id": "dev",
+      "label": "Разработка"
+    },
+    {
+      "id": "design",
+      "label": "Дизайн и иконки"
+    },
+    {
+      "id": "games",
+      "label": "Игры"
+    },
+    {
+      "id": "work",
+      "label": "Работа и учёба"
+    },
+    {
+      "id": "life",
+      "label": "Жизнь"
+    },
+    {
+      "id": "private",
+      "label": "Личное и 18+"
+    },
+    {
+      "id": "misc",
+      "label": "Разное"
+    }
+  ],
+  "icons": [
+    {
+      "key": "music",
+      "label": "Музыка",
+      "category": "media",
+      "keywords": [
+        "песни",
+        "треки",
+        "аудио",
+        "mp3",
+        "flac"
+      ],
+      "source": "lucide:music"
+    },
+    {
+      "key": "headphones",
+      "label": "Наушники",
+      "category": "media",
+      "keywords": [
+        "аудио",
+        "подкасты",
+        "плейлист"
+      ],
+      "source": "lucide:headphones"
+    },
+    {
+      "key": "microphone",
+      "label": "Микрофон",
+      "category": "media",
+      "keywords": [
+        "запись",
+        "голос",
+        "вокал"
+      ],
+      "source": "lucide:mic"
+    },
+    {
+      "key": "podcast",
+      "label": "Подкасты",
+      "category": "media",
+      "keywords": [
+        "аудио",
+        "эфир"
+      ],
+      "source": "lucide:podcast"
+    },
+    {
+      "key": "radio",
+      "label": "Радио",
+      "category": "media",
+      "keywords": [
+        "эфир",
+        "трансляция"
+      ],
+      "source": "lucide:radio"
+    },
+    {
+      "key": "video",
+      "label": "Видео",
+      "category": "media",
+      "keywords": [
+        "ролики",
+        "запись",
+        "mp4"
+      ],
+      "source": "lucide:video"
+    },
+    {
+      "key": "film",
+      "label": "Фильмы",
+      "category": "media",
+      "keywords": [
+        "кино",
+        "плёнка"
+      ],
+      "source": "lucide:film"
+    },
+    {
+      "key": "subtitles",
+      "label": "Субтитры",
+      "category": "media",
+      "keywords": [
+        "srt",
+        "vtt",
+        "ass",
+        "титры"
+      ],
+      "source": "lucide:captions"
+    },
+    {
+      "key": "clapperboard",
+      "label": "Кино",
+      "category": "media",
+      "keywords": [
+        "съёмка",
+        "монтаж",
+        "хлопушка"
+      ],
+      "source": "lucide:clapperboard"
+    },
+    {
+      "key": "tv",
+      "label": "Сериалы",
+      "category": "media",
+      "keywords": [
+        "телевизор",
+        "шоу"
+      ],
+      "source": "lucide:tv"
+    },
+    {
+      "key": "image",
+      "label": "Картинки",
+      "category": "media",
+      "keywords": [
+        "изображения",
+        "фото"
+      ],
+      "source": "lucide:image"
+    },
+    {
+      "key": "images",
+      "label": "Фотографии",
+      "category": "media",
+      "keywords": [
+        "галерея",
+        "снимки"
+      ],
+      "source": "lucide:images"
+    },
+    {
+      "key": "camera",
+      "label": "Камера",
+      "category": "media",
+      "keywords": [
+        "фото",
+        "съёмка"
+      ],
+      "source": "lucide:camera"
+    },
+    {
+      "key": "aperture",
+      "label": "Фотосъёмка",
+      "category": "media",
+      "keywords": [
+        "объектив",
+        "диафрагма"
+      ],
+      "source": "lucide:aperture"
+    },
+    {
+      "key": "document",
+      "label": "Документ",
+      "category": "documents",
+      "keywords": [
+        "текст",
+        "файл",
+        "doc"
+      ],
+      "source": "lucide:file-text"
+    },
+    {
+      "key": "documents",
+      "label": "Документы",
+      "category": "documents",
+      "keywords": [
+        "файлы",
+        "бумаги"
+      ],
+      "source": "lucide:files"
+    },
+    {
+      "key": "file",
+      "label": "Файл",
+      "category": "documents",
+      "keywords": [
+        "файл",
+        "прочее",
+        "бинарный"
+      ],
+      "source": "lucide:file"
+    },
+    {
+      "key": "book",
+      "label": "Книга",
+      "category": "documents",
+      "keywords": [
+        "чтение"
+      ],
+      "source": "lucide:book"
+    },
+    {
+      "key": "book-open",
+      "label": "Книги",
+      "category": "documents",
+      "keywords": [
+        "чтение",
+        "библиотека",
+        "epub"
+      ],
+      "source": "lucide:book-open"
+    },
+    {
+      "key": "library",
+      "label": "Библиотека",
+      "category": "documents",
+      "keywords": [
+        "книги",
+        "коллекция"
+      ],
+      "source": "lucide:library"
+    },
+    {
+      "key": "notebook",
+      "label": "Заметки",
+      "category": "documents",
+      "keywords": [
+        "блокнот",
+        "записи"
+      ],
+      "source": "lucide:notebook"
+    },
+    {
+      "key": "newspaper",
+      "label": "Статьи",
+      "category": "documents",
+      "keywords": [
+        "новости",
+        "журналы"
+      ],
+      "source": "lucide:newspaper"
+    },
+    {
+      "key": "presentation",
+      "label": "Презентации",
+      "category": "documents",
+      "keywords": [
+        "слайды",
+        "доклад"
+      ],
+      "source": "lucide:presentation"
+    },
+    {
+      "key": "spreadsheet",
+      "label": "Таблицы",
+      "category": "documents",
+      "keywords": [
+        "excel",
+        "csv"
+      ],
+      "source": "lucide:sheet"
+    },
+    {
+      "key": "receipt",
+      "label": "Чеки",
+      "category": "documents",
+      "keywords": [
+        "счета",
+        "квитанции"
+      ],
+      "source": "lucide:receipt"
+    },
+    {
+      "key": "scan",
+      "label": "Сканы",
+      "category": "documents",
+      "keywords": [
+        "скан",
+        "распознавание"
+      ],
+      "source": "lucide:scan-text"
+    },
+    {
+      "key": "archive",
+      "label": "Архив",
+      "category": "archives",
+      "keywords": [
+        "zip",
+        "rar",
+        "7z"
+      ],
+      "source": "lucide:archive"
+    },
+    {
+      "key": "package",
+      "label": "Пакеты",
+      "category": "archives",
+      "keywords": [
+        "установщики",
+        "дистрибутивы"
+      ],
+      "source": "lucide:package"
+    },
+    {
+      "key": "box",
+      "label": "Коробка",
+      "category": "archives",
+      "keywords": [
+        "хранилище",
+        "всякое"
+      ],
+      "source": "lucide:box"
+    },
+    {
+      "key": "file-archive",
+      "label": "Сжатые файлы",
+      "category": "archives",
+      "keywords": [
+        "zip",
+        "rar",
+        "архив"
+      ],
+      "source": "lucide:file-archive"
+    },
+    {
+      "key": "disc",
+      "label": "Образы дисков",
+      "category": "archives",
+      "keywords": [
+        "iso",
+        "img",
+        "dmg",
+        "диск",
+        "образ"
+      ],
+      "source": "lucide:disc"
+    },
+    {
+      "key": "hard-drive",
+      "label": "Бэкапы",
+      "category": "archives",
+      "keywords": [
+        "диск",
+        "резервные",
+        "копии"
+      ],
+      "source": "lucide:hard-drive"
+    },
+    {
+      "key": "database",
+      "label": "Базы данных",
+      "category": "archives",
+      "keywords": [
+        "дамп",
+        "sql"
+      ],
+      "source": "lucide:database"
+    },
+    {
+      "key": "save",
+      "label": "Сохранения",
+      "category": "archives",
+      "keywords": [
+        "сейвы",
+        "дискета"
+      ],
+      "source": "lucide:save"
+    },
+    {
+      "key": "code",
+      "label": "Код",
+      "category": "dev",
+      "keywords": [
+        "исходники",
+        "программирование"
+      ],
+      "source": "lucide:code"
+    },
+    {
+      "key": "terminal",
+      "label": "Скрипты",
+      "category": "dev",
+      "keywords": [
+        "консоль",
+        "shell"
+      ],
+      "source": "lucide:terminal"
+    },
+    {
+      "key": "git",
+      "label": "Репозитории",
+      "category": "dev",
+      "keywords": [
+        "git",
+        "ветки",
+        "проекты"
+      ],
+      "source": "lucide:git-branch"
+    },
+    {
+      "key": "bug",
+      "label": "Отладка",
+      "category": "dev",
+      "keywords": [
+        "баги",
+        "логи"
+      ],
+      "source": "lucide:bug"
+    },
+    {
+      "key": "cpu",
+      "label": "Железо",
+      "category": "dev",
+      "keywords": [
+        "процессор",
+        "драйверы"
+      ],
+      "source": "lucide:cpu"
+    },
+    {
+      "key": "server",
+      "label": "Сервер",
+      "category": "dev",
+      "keywords": [
+        "конфиги",
+        "хостинг"
+      ],
+      "source": "lucide:server"
+    },
+    {
+      "key": "app-window",
+      "label": "Программы",
+      "category": "dev",
+      "keywords": [
+        "приложения",
+        "софт"
+      ],
+      "source": "lucide:app-window"
+    },
+    {
+      "key": "smartphone",
+      "label": "Телефон",
+      "category": "dev",
+      "keywords": [
+        "мобильный",
+        "apk"
+      ],
+      "source": "lucide:smartphone"
+    },
+    {
+      "key": "monitor",
+      "label": "Компьютер",
+      "category": "dev",
+      "keywords": [
+        "пк",
+        "обои",
+        "скриншоты"
+      ],
+      "source": "lucide:monitor"
+    },
+    {
+      "key": "puzzle",
+      "label": "Плагины",
+      "category": "dev",
+      "keywords": [
+        "моды",
+        "расширения"
+      ],
+      "source": "lucide:puzzle"
+    },
+    {
+      "key": "shapes",
+      "label": "Иконки",
+      "category": "design",
+      "keywords": [
+        "значки",
+        "фигуры",
+        "svg"
+      ],
+      "source": "lucide:shapes"
+    },
+    {
+      "key": "palette",
+      "label": "Палитры",
+      "category": "design",
+      "keywords": [
+        "цвета",
+        "рисование",
+        "арт"
+      ],
+      "source": "lucide:palette"
+    },
+    {
+      "key": "pen-tool",
+      "label": "Векторы",
+      "category": "design",
+      "keywords": [
+        "вектор",
+        "иллюстрации"
+      ],
+      "source": "lucide:pen-tool"
+    },
+    {
+      "key": "brush",
+      "label": "Рисунки",
+      "category": "design",
+      "keywords": [
+        "арт",
+        "кисть"
+      ],
+      "source": "lucide:brush"
+    },
+    {
+      "key": "sticker",
+      "label": "Стикеры",
+      "category": "design",
+      "keywords": [
+        "наклейки",
+        "эмодзи"
+      ],
+      "source": "lucide:sticker"
+    },
+    {
+      "key": "smile",
+      "label": "Мемы",
+      "category": "design",
+      "keywords": [
+        "юмор",
+        "смайлы"
+      ],
+      "source": "lucide:smile"
+    },
+    {
+      "key": "font",
+      "label": "Шрифты",
+      "category": "design",
+      "keywords": [
+        "типографика",
+        "ttf",
+        "otf"
+      ],
+      "source": "lucide:type"
+    },
+    {
+      "key": "layers",
+      "label": "Макеты",
+      "category": "design",
+      "keywords": [
+        "слои",
+        "psd",
+        "figma"
+      ],
+      "source": "lucide:layers"
+    },
+    {
+      "key": "gamepad",
+      "label": "Игры",
+      "category": "games",
+      "keywords": [
+        "геймпад",
+        "консоль"
+      ],
+      "source": "lucide:gamepad-2"
+    },
+    {
+      "key": "joystick",
+      "label": "Ретро-игры",
+      "category": "games",
+      "keywords": [
+        "эмуляторы",
+        "ромы"
+      ],
+      "source": "lucide:joystick"
+    },
+    {
+      "key": "dices",
+      "label": "Настольные игры",
+      "category": "games",
+      "keywords": [
+        "кубики"
+      ],
+      "source": "lucide:dices"
+    },
+    {
+      "key": "trophy",
+      "label": "Достижения",
+      "category": "games",
+      "keywords": [
+        "награды",
+        "кубок"
+      ],
+      "source": "lucide:trophy"
+    },
+    {
+      "key": "swords",
+      "label": "RPG",
+      "category": "games",
+      "keywords": [
+        "мечи",
+        "ролевые"
+      ],
+      "source": "lucide:swords"
+    },
+    {
+      "key": "briefcase",
+      "label": "Работа",
+      "category": "work",
+      "keywords": [
+        "проекты",
+        "офис"
+      ],
+      "source": "lucide:briefcase"
+    },
+    {
+      "key": "graduation-cap",
+      "label": "Учёба",
+      "category": "work",
+      "keywords": [
+        "университет",
+        "курсы"
+      ],
+      "source": "lucide:graduation-cap"
+    },
+    {
+      "key": "chart",
+      "label": "Отчёты",
+      "category": "work",
+      "keywords": [
+        "графики",
+        "аналитика"
+      ],
+      "source": "lucide:chart-column"
+    },
+    {
+      "key": "calendar",
+      "label": "Планы",
+      "category": "work",
+      "keywords": [
+        "события",
+        "даты"
+      ],
+      "source": "lucide:calendar"
+    },
+    {
+      "key": "mail",
+      "label": "Почта",
+      "category": "work",
+      "keywords": [
+        "письма",
+        "вложения"
+      ],
+      "source": "lucide:mail"
+    },
+    {
+      "key": "wallet",
+      "label": "Финансы",
+      "category": "work",
+      "keywords": [
+        "деньги",
+        "бюджет"
+      ],
+      "source": "lucide:wallet"
+    },
+    {
+      "key": "banknote",
+      "label": "Налоги",
+      "category": "work",
+      "keywords": [
+        "деньги",
+        "платежи"
+      ],
+      "source": "lucide:banknote"
+    },
+    {
+      "key": "home",
+      "label": "Дом",
+      "category": "life",
+      "keywords": [
+        "семья",
+        "квартира"
+      ],
+      "source": "lucide:house"
+    },
+    {
+      "key": "heart",
+      "label": "Любимое",
+      "category": "life",
+      "keywords": [
+        "избранное"
+      ],
+      "source": "lucide:heart"
+    },
+    {
+      "key": "users",
+      "label": "Семья",
+      "category": "life",
+      "keywords": [
+        "друзья",
+        "люди"
+      ],
+      "source": "lucide:users"
+    },
+    {
+      "key": "baby",
+      "label": "Дети",
+      "category": "life",
+      "keywords": [
+        "малыш"
+      ],
+      "source": "lucide:baby"
+    },
+    {
+      "key": "dog",
+      "label": "Собака",
+      "category": "life",
+      "keywords": [
+        "питомцы",
+        "животные"
+      ],
+      "source": "lucide:dog"
+    },
+    {
+      "key": "cat",
+      "label": "Кошка",
+      "category": "life",
+      "keywords": [
+        "питомцы",
+        "животные"
+      ],
+      "source": "lucide:cat"
+    },
+    {
+      "key": "plane",
+      "label": "Путешествия",
+      "category": "life",
+      "keywords": [
+        "отпуск",
+        "поездки"
+      ],
+      "source": "lucide:plane"
+    },
+    {
+      "key": "map",
+      "label": "Карты",
+      "category": "life",
+      "keywords": [
+        "маршруты",
+        "места"
+      ],
+      "source": "lucide:map"
+    },
+    {
+      "key": "car",
+      "label": "Авто",
+      "category": "life",
+      "keywords": [
+        "машина",
+        "документы"
+      ],
+      "source": "lucide:car"
+    },
+    {
+      "key": "shopping-bag",
+      "label": "Покупки",
+      "category": "life",
+      "keywords": [
+        "магазин"
+      ],
+      "source": "lucide:shopping-bag"
+    },
+    {
+      "key": "utensils",
+      "label": "Рецепты",
+      "category": "life",
+      "keywords": [
+        "еда",
+        "кухня"
+      ],
+      "source": "lucide:utensils"
+    },
+    {
+      "key": "dumbbell",
+      "label": "Спорт",
+      "category": "life",
+      "keywords": [
+        "тренировки",
+        "фитнес"
+      ],
+      "source": "lucide:dumbbell"
+    },
+    {
+      "key": "leaf",
+      "label": "Природа",
+      "category": "life",
+      "keywords": [
+        "растения",
+        "сад"
+      ],
+      "source": "lucide:leaf"
+    },
+    {
+      "key": "gift",
+      "label": "Праздники",
+      "category": "life",
+      "keywords": [
+        "подарки",
+        "день",
+        "рождения"
+      ],
+      "source": "lucide:gift"
+    },
+    {
+      "key": "adult",
+      "label": "Для взрослых",
+      "category": "private",
+      "keywords": [
+        "18+",
+        "nsfw",
+        "взрослое"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "flame",
+      "label": "Горячее",
+      "category": "private",
+      "keywords": [
+        "nsfw",
+        "18+"
+      ],
+      "source": "lucide:flame"
+    },
+    {
+      "key": "eye-off",
+      "label": "Скрытое",
+      "category": "private",
+      "keywords": [
+        "приватное",
+        "невидимое"
+      ],
+      "source": "lucide:eye-off"
+    },
+    {
+      "key": "lock",
+      "label": "Личное",
+      "category": "private",
+      "keywords": [
+        "приватное",
+        "закрытое"
+      ],
+      "source": "lucide:lock"
+    },
+    {
+      "key": "folder-lock",
+      "label": "Секретное",
+      "category": "private",
+      "keywords": [
+        "защищённое"
+      ],
+      "source": "lucide:folder-lock"
+    },
+    {
+      "key": "mask",
+      "label": "Анонимно",
+      "category": "private",
+      "keywords": [
+        "маска",
+        "инкогнито"
+      ],
+      "source": "lucide:venetian-mask"
+    },
+    {
+      "key": "shield-alert",
+      "label": "Чувствительное",
+      "category": "private",
+      "keywords": [
+        "осторожно"
+      ],
+      "source": "lucide:shield-alert"
+    },
+    {
+      "key": "wine",
+      "label": "Вечеринки",
+      "category": "private",
+      "keywords": [
+        "алкоголь",
+        "праздники"
+      ],
+      "source": "lucide:wine"
+    },
+    {
+      "key": "key",
+      "label": "Ключи",
+      "category": "private",
+      "keywords": [
+        "пароли",
+        "лицензии"
+      ],
+      "source": "lucide:key-round"
+    },
+    {
+      "key": "star",
+      "label": "Избранное",
+      "category": "misc",
+      "keywords": [
+        "важное"
+      ],
+      "source": "lucide:star"
+    },
+    {
+      "key": "bookmark",
+      "label": "Закладки",
+      "category": "misc",
+      "keywords": [
+        "сохранённое"
+      ],
+      "source": "lucide:bookmark"
+    },
+    {
+      "key": "cloud",
+      "label": "Облако",
+      "category": "misc",
+      "keywords": [
+        "синхронизация"
+      ],
+      "source": "lucide:cloud"
+    },
+    {
+      "key": "download",
+      "label": "Загрузки",
+      "category": "misc",
+      "keywords": [
+        "скачанное"
+      ],
+      "source": "lucide:download"
+    },
+    {
+      "key": "sparkles",
+      "label": "Новое",
+      "category": "misc",
+      "keywords": [
+        "ии",
+        "генерация"
+      ],
+      "source": "lucide:sparkles"
+    },
+    {
+      "key": "flag",
+      "label": "Важное",
+      "category": "misc",
+      "keywords": [
+        "отметка"
+      ],
+      "source": "lucide:flag"
+    },
+    {
+      "key": "tag",
+      "label": "Метки",
+      "category": "misc",
+      "keywords": [
+        "теги"
+      ],
+      "source": "lucide:tag"
+    },
+    {
+      "key": "shield",
+      "label": "Безопасность",
+      "category": "misc",
+      "keywords": [
+        "защита"
+      ],
+      "source": "lucide:shield"
+    }
+  ]
+}

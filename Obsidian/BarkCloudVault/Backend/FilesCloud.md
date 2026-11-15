@@ -26,7 +26,7 @@ See also: [[Backend/OriginalLifetime]] · [[Backend/DynamicFolders]] · [[Api/Fi
 | Группа | RPC |
 |---|---|
 | Дерево | `CreateDirectory`, `RenameDirectory`, `MoveDirectory`, `DeleteDirectory`, `ListDirectory`, `ListDirectoryDetailed`, `GetPath`, `SearchFiles` |
-| Свойства и видимость | `GetDirectoryProperties`, `SetDirectoryVisibility` |
+| Свойства, видимость и значок | `GetDirectoryProperties`, `SetDirectoryVisibility`, `SetDirectoryAppearance` |
 | Записи | `AttachFile`, `RenameFileEntry`, `MoveFileEntry`, `MoveFileEntries`, `DeleteFileEntry`, `DeleteFileEntries` |
 | Галерея | `ListUserMedia`, `GetUserMediaStats`, `DeleteUserMedia`, `SetVideoThumbnail` |
 | Корзина | `ListTrash`, `GetTrashSummary`, `RestoreFromTrash`, `DeleteFromTrash`, `EmptyTrash` |
@@ -51,6 +51,10 @@ effective = (InheritVisibility && ParentId != null) ? parent.effective : own
 ```
 
 Корневая папка владельца не материализована и всегда видима. Верхнеуровневая папка (`ParentId=null`) не наследует виртуальный корень. При включении наследования сервер сбрасывает собственные `HideFromGallery` и `HideFromSearch` в `false`, так как они не участвуют в итоговой видимости. При сохранении настроек верхнеуровневой папки сервер устанавливает `InheritVisibility = !(HideFromGallery || HideFromSearch)`: если включено хотя бы одно скрытие, папка сохранит собственные настройки при переносе; если оба флага выключены, она сможет унаследовать настройки нового родителя. Перенос папки в корень применяет то же правило к её собственным флагам.
+
+### Значок папки
+
+`CloudDirectory.IconKey` (ключ из [[Shared/FolderIcons]], ≤ 64) и `IconColor` (`#RRGGBB`) — оформление папки; null — стандартная иконка и цвет темы. Поля приходят в `DirectoryInfo.icon_key`/`icon_color` из `ListDirectory`, `ListDirectoryDetailed` и `GetDirectoryProperties`. `SetDirectoryAppearance` (только владелец) проверяет лишь формат: пак серверу неизвестен; пустые поля сбрасывают значок. Некорректный ввод — `DirectoryAppearanceInvalidException`. Изменение значка не меняет `UpdatedAt`.
 
 `SetDirectoryVisibility` и `MoveDirectory` выполняют изменение и пересчёт поддерева сверху вниз под `CloudHierarchyStorage.LockTree`. `CreateDirectory` также использует этот lock и инициализирует итоговые флаги новой папки значениями родителя. `DirectoryVisibility.RecomputeSubtreeAsync` пересчитывает effective-флаги перемещённого поддерева и поддерева после смены настроек.
 

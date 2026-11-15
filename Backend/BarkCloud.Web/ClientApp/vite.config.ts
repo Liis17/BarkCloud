@@ -7,16 +7,26 @@ import react from '@vitejs/plugin-react';
 const BACKEND = 'http://localhost:5148';
 const FILES_HTTP1 = 'http://localhost:7026';
 const clientFile = (path: string) => decodeURI(new URL(path, import.meta.url).pathname);
+// Общий пак иконок папок в корне репозитория (FolderIcons/) — собирается в бандл при каждой сборке SPA.
+// Файловый путь без ведущего «/» перед буквой диска: иначе на Windows glob по alias и server.fs.allow не работают.
+const clientDir = (path: string) => clientFile(path).replace(/^\/([A-Za-z]:)/, '$1');
+const folderIcons = clientDir('../../../FolderIcons');
 const backendRoutes = ['/api', '/login', '/register', '/forgot', '/logout', '/healthz', '/updating', '/restarting', '/maintenance-status', '/maintenance-wait.js'];
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: { '@folder-icons': folderIcons },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
   },
   server: {
     port: 5173,
+    fs: {
+      allow: [clientDir('./'), folderIcons],
+    },
     proxy: {
       ...Object.fromEntries(
         backendRoutes.map((p) => [p, { target: BACKEND, changeOrigin: false }]),

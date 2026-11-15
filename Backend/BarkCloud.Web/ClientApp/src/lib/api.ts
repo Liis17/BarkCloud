@@ -66,11 +66,13 @@ export const apiPut = <T = unknown>(path: string, body?: unknown) =>
   api<T>(path, { method: 'PUT', body: JSON.stringify(body || {}) });
 
 /** Открыть системный диалог выбора файлов. */
-export function pickFiles({ accept, multiple = true }: { accept?: string; multiple?: boolean } = {}): Promise<File[]> {
+/** directory — выбор папки целиком (webkitdirectory): путь каждого файла в webkitRelativePath. */
+export function pickFiles({ accept, multiple = true, directory = false }: { accept?: string; multiple?: boolean; directory?: boolean } = {}): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = multiple;
+    if (directory) input.webkitdirectory = true;
     if (accept) input.accept = accept;
     input.style.display = 'none';
     document.body.appendChild(input);
@@ -122,7 +124,7 @@ export interface ArchivePayload {
 export async function downloadArchive(payload: ArchivePayload): Promise<void> {
   const d = await apiPost<{ url?: string; fileName?: string }>('/api/cloud/archive', payload);
   if (!d.url) throw new Error('Ссылка на архив недоступна');
-  window.open(d.url, '_blank');
+  startDownload(d.url);
 }
 
 /** Скачать оригинал своего файла по временной ссылке. */
@@ -130,7 +132,19 @@ export async function downloadFile(fileId: string): Promise<void> {
   const d = await apiGet<{ urls: Record<string, string | null> }>('/api/files/download?ids=' + encodeURIComponent(fileId));
   const url = d.urls && d.urls[fileId];
   if (!url) throw new Error('Ссылка недоступна');
-  window.open(url, '_blank');
+  startDownload(url);
+}
+
+/** Запустить скачивание в текущей вкладке. window.open после await Safari блокирует как всплывающее окно;
+ *  ссылки /download/{id} отдаются с Content-Disposition: attachment, поэтому страница не уходит. */
+function startDownload(url: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 /** Проверка наличия контента по SHA256 (без побочных эффектов): есть ли уже такой файл

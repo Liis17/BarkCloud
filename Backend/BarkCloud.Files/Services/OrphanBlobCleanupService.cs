@@ -12,7 +12,8 @@ namespace BarkCloud.Files.Services;
 /// </summary>
 /// <remarks>
 /// Покрывает пути, которые лишь декрементят Uploaders, но не чистят S3 немедленно — удаление
-/// аккаунта (<see cref="Consumers.UserDeletedConsumer"/>) и удаление медиа из галереи. Также
+/// аккаунта (<see cref="Consumers.UserDeletedConsumer"/>), удаление медиа из галереи и замену аватара
+/// (перед зачисткой владельца с устаревших аватаров снимает <see cref="StaleAvatarReleaser"/>). Также
 /// повторяет попытку для блобов, чьё удаление из S3 ранее не удалось.
 /// </remarks>
 public class OrphanBlobCleanupService : BackgroundService
@@ -40,6 +41,20 @@ public class OrphanBlobCleanupService : BackgroundService
             {
                 try
                 {
+                    await ReleaseStaleAvatarsAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Сбой сверки аватаров (например, Users недоступен) не должен блокировать зачистку.
+                    _logger.LogWarning(ex, "Не удалось освободить устаревшие аватары");
+                }
+
+                try
+                {
                     await PurgeOrphansAsync(stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -61,6 +76,13 @@ public class OrphanBlobCleanupService : BackgroundService
                 break;
             }
         }
+    }
+
+    private async Task ReleaseStaleAvatarsAsync(CancellationToken stoppingToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var releaser = scope.ServiceProvider.GetRequiredService<StaleAvatarReleaser>();
+        await releaser.ReleaseAsync(DateTime.UtcNow - StaleAvatarReleaser.Grace, stoppingToken);
     }
 
     private async Task PurgeOrphansAsync(CancellationToken stoppingToken)

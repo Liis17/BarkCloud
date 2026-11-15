@@ -74,7 +74,7 @@ object AndroidReleaseParser {
     const val MAX_APK_BYTES = 512L * 1024 * 1024
     private const val STABLE_BUILD = 999L
     private const val MAX_DEV_BUILD = 998L
-    // v1.2.3 или v1.2.3-dev.<run_number>.<run_attempt>+<short_sha> (как в release.yml)
+    // v1.2.3 или v1.2.3-dev.<run_number>.<run_attempt>+<short_sha> (как в .github/workflows/ci.yml)
     private val releaseTag = Regex(
         "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)" +
             "(?:-dev\\.([1-9][0-9]*)\\.([1-9][0-9]*)\\+[0-9a-f]{7})?$",

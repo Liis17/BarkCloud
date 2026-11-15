@@ -7,6 +7,7 @@
 - [[Architecture|Архитектура]] — компоненты, стек, основные потоки, соглашения
 - [[Platform/Infrastructure|Инфраструктура]] — docker-compose, nginx, PostgreSQL, RabbitMQ, MinIO, Seq
 - [[Platform/Testing|Тестирование]] — тестовые проекты, стек, CI
+- [[Platform/CI|CI/CD]] — ci.yml, выбор тестов, сборка, перенос образов, релизы, защита веток
 
 ## Backend
 
@@ -45,6 +46,7 @@
 |---------|------------|
 | [[Shared/Proto]] | gRPC-контракты |
 | [[Shared/SharedLibraries]] | Auth, Exceptions, Identity, Queue, SecurityUtilities |
+| [[Shared/FolderIcons]] | Общий пак иконок папок и типов файлов (`FolderIcons/`) |
 | [[Api/UsersClientGuide]] | Гайд по Users API для клиентов |
 | [[Api/FilesClientGuide]] | Гайд по Files API для клиентов |
 

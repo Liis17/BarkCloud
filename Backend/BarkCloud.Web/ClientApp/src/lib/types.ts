@@ -76,6 +76,10 @@ export interface DirInfo {
   updatedAt: string | null;
   /** Размер поддерева, отформатированный сервером; null — в ответе не запрашивали. */
   sizeLabel?: string | null;
+  /** Ключ иконки из пака FolderIcons; null или неизвестный ключ — обычная папка. */
+  iconKey?: string | null;
+  /** Цвет подложки #RRGGBB; null — цвет темы. */
+  iconColor?: string | null;
 }
 
 /** Свойства каталога и его собственные/итоговые настройки видимости. */

@@ -9,6 +9,7 @@ import type { VideoQuality } from './MediaPlayer';
 import { pickDocumentIcon, useDocumentHead } from '../../hooks/useDocumentHead';
 import { isSvgFileName, selectPhotoViewSource } from '../../lib/imagePreviewSource';
 import type { MediaActionsApi } from '../../hooks/useMediaActions';
+import { MAX_SCALE, useViewerGestures } from '../../hooks/useViewerGestures';
 import type { CardFile, MediaItem } from '../../lib/types';
 
 interface DownloadResponse {
@@ -27,20 +28,6 @@ interface LightboxProps {
 
 /** Касания, начатые на элементах управления, не превращаются в жесты просмотра. */
 const GESTURE_IGNORE = '.lb-actions, .video-player-bar, .ctx-backdrop, .ctx-menu, button, a, input, select';
-const SWIPE_MIN_PX = 50;
-const MAX_SCALE = 5;
-
-type TouchGesture =
-  | { kind: 'swipe'; x: number; y: number }
-  | { kind: 'pan'; x: number; y: number; px: number; py: number }
-  | { kind: 'pinch'; dist: number; scale: number }
-  /** Щипок закончился не всеми пальцами сразу: оставшийся палец не должен листать. */
-  | { kind: 'done' };
-
-function touchDistance(t: TouchList): number {
-  return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-}
-
 function isTextEntry(target: EventTarget | null): boolean {
   if (target instanceof HTMLTextAreaElement) return true;
   if (target instanceof HTMLInputElement) return target.type !== 'range';
@@ -64,9 +51,6 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   // Запросы временных ссылок по id: общий промис не даёт дублировать запрос, если перешли на соседа во время предзагрузки.
   const urlRequestsRef = React.useRef(new Map<string, Promise<void>>());
-  const gestureRef = React.useRef<TouchGesture | null>(null);
-  const viewRef = React.useRef({ scale: 1, pan: { x: 0, y: 0 } });
-  viewRef.current = { scale, pan };
   const dragRef = React.useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const pausedMusicRef = React.useRef(false);
   const { menu, openAt } = useContextMenu();
@@ -213,66 +197,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
     return () => el.removeEventListener('wheel', onWheel);
   }, [isVideo]);
 
-  // Касания: свайп листает (без зума), щипок зумит фото, одним пальцем двигается увеличенное фото.
-  // Нативные слушатели с passive: false — иначе preventDefault не отменит прокрутку и зум страницы.
-  React.useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const onStart = (e: TouchEvent) => {
-      if (e.target instanceof Element && e.target.closest(GESTURE_IGNORE)) {
-        gestureRef.current = null;
-        return;
-      }
-      const { scale: s, pan: p } = viewRef.current;
-      if (e.touches.length >= 2) {
-        gestureRef.current = isVideo ? { kind: 'done' } : { kind: 'pinch', dist: touchDistance(e.touches), scale: s };
-      } else if (e.touches.length === 1) {
-        const t = e.touches[0];
-        gestureRef.current = !isVideo && s > 1
-          ? { kind: 'pan', x: t.clientX, y: t.clientY, px: p.x, py: p.y }
-          : { kind: 'swipe', x: t.clientX, y: t.clientY };
-      }
-    };
-    const onMove = (e: TouchEvent) => {
-      const g = gestureRef.current;
-      if (!g || g.kind === 'done') return;
-      e.preventDefault();
-      if (g.kind === 'pinch' && e.touches.length >= 2) {
-        const next = Math.min(MAX_SCALE, Math.max(1, g.scale * (touchDistance(e.touches) / g.dist)));
-        setScale(next);
-        if (next === 1) setPan({ x: 0, y: 0 });
-      } else if (g.kind === 'pan' && e.touches.length === 1) {
-        setPan({ x: g.px + (e.touches[0].clientX - g.x), y: g.py + (e.touches[0].clientY - g.y) });
-      }
-    };
-    const onEnd = (e: TouchEvent) => {
-      const g = gestureRef.current;
-      if (!g) return;
-      if (e.touches.length > 0) {
-        if (g.kind === 'pinch') gestureRef.current = { kind: 'done' };
-        return;
-      }
-      gestureRef.current = null;
-      if (g.kind !== 'swipe') return;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - g.x;
-      const dy = t.clientY - g.y;
-      if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
-    };
-    const onCancel = () => {
-      gestureRef.current = null;
-    };
-    el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: false });
-    el.addEventListener('touchend', onEnd);
-    el.addEventListener('touchcancel', onCancel);
-    return () => {
-      el.removeEventListener('touchstart', onStart);
-      el.removeEventListener('touchmove', onMove);
-      el.removeEventListener('touchend', onEnd);
-      el.removeEventListener('touchcancel', onCancel);
-    };
-  }, [isVideo, go]);
+  useViewerGestures(rootRef, { ignore: GESTURE_IGNORE, zoomable: !isVideo, scale, pan, setScale, setPan, go });
 
   if (!cur) return null;
   // Оригинал (временная ссылка) — для скачивания, видео и фолбэка фото.

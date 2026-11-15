@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaItem } from '../lib/types';
@@ -165,5 +165,41 @@ describe('gallery media statistics', () => {
       expect(statValue(container, 'Всего видео')).toBe('0');
       expect(statValue(container, 'Занято видео')).toBe('0 Б');
     });
+  });
+});
+
+describe('video layout preference', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('рисует видео сеткой «Фото» с длительностью, если выбрана сетка', () => {
+    vi.stubGlobal('localStorage', { getItem: (key: string) => (key === 'bark_video_layout' ? 'grid' : null), setItem: vi.fn() });
+    mocks.items = makeItems('video').map((item) => ({ ...item, video: { duration: 75 } }));
+    const { container } = render(<MemoryRouter><VideosPage /></MemoryRouter>);
+
+    expect(container.querySelector('.vid-grid')).toBeNull();
+    const tiles = container.querySelectorAll('.photo-grid .photo');
+    expect(tiles).toHaveLength(60);
+    expect(tiles[0].querySelector('.vbadge')?.textContent).toContain('1:15');
+  });
+
+  it('переключает раскладку кнопкой на странице и запоминает выбор', () => {
+    const setItem = vi.fn();
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem });
+    mocks.items = makeItems('video');
+    const { container, getByTitle } = render(<MemoryRouter><VideosPage /></MemoryRouter>);
+
+    fireEvent.click(getByTitle('Сеткой как в «Фото»'));
+    expect(container.querySelector('.vid-grid')).toBeNull();
+    expect(container.querySelectorAll('.photo-grid .photo')).toHaveLength(60);
+    expect(setItem).toHaveBeenCalledWith('bark_video_layout', 'grid');
+  });
+
+  it('по умолчанию оставляет карточки', () => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn() });
+    mocks.items = makeItems('video');
+    const { container } = render(<MemoryRouter><VideosPage /></MemoryRouter>);
+
+    expect(container.querySelector('.photo-grid')).toBeNull();
+    expect(container.querySelectorAll('.vid-grid .vcard')).toHaveLength(60);
   });
 });

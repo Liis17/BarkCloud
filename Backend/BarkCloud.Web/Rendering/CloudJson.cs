@@ -90,7 +90,9 @@ public static class CloudJson
         name = d.Name,
         createdAt = Iso(d.CreatedAt),
         updatedAt = Iso(d.UpdatedAt),
-        sizeLabel = sizeBytes is { } bytes ? Format.Size(bytes) : null
+        sizeLabel = sizeBytes is { } bytes ? Format.Size(bytes) : null,
+        iconKey = string.IsNullOrEmpty(d.IconKey) ? null : d.IconKey,
+        iconColor = string.IsNullOrEmpty(d.IconColor) ? null : d.IconColor
     };
 
     public static object DirProperties(DirectoryProperties p) => new

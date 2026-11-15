@@ -87,7 +87,8 @@ interface DupPromptReq {
 }
 
 interface ActionsValue {
-  enqueue: (files: File[], attachOptions: AttachOptions) => void;
+  /** dirs — папка для каждого файла по индексу (загрузка дерева папок одной пачкой, с общим решением по дубликатам). */
+  enqueue: (files: File[], attachOptions: AttachOptions, dirs?: string[]) => void;
   attachVersion: number;
 }
 
@@ -440,10 +441,10 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
     return () => { disposed = true; };
   }, [bump]);
 
-  const enqueue = React.useCallback((files: File[], attachOptions: AttachOptions) => {
+  const enqueue = React.useCallback((files: File[], attachOptions: AttachOptions, dirs?: string[]) => {
     const now = Date.now();
     const batchId = randomId();
-    const newTasks = files.map<UploadTask>((file) => ({
+    const newTasks = files.map<UploadTask>((file, index) => ({
       id: randomId(),
       idempotencyKey: randomId(),
       file,
@@ -457,7 +458,7 @@ export function UploadManagerProvider({ children }: { children: React.ReactNode 
       status: pausedRef.current ? 'paused' : 'hashing',
       progress: 0,
       error: null,
-      attachOptions: { ...attachOptions },
+      attachOptions: dirs ? { ...attachOptions, dir: dirs[index] } : { ...attachOptions },
       batchId,
       createdAt: now,
       updatedAt: now,

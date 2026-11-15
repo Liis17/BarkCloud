@@ -6,18 +6,62 @@ set -euo pipefail
 : "${TG_MESSAGE:?TG_MESSAGE is required}"
 : "${TG_ACTION_URL:?TG_ACTION_URL is required}"
 
-# send <text> [curl args...]: печатает ответ Telegram, при ошибке API возвращает не 0
-send() {
-  local text="$1"
-  shift
-  curl -sS --fail-with-body --retry 3 -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-    --data-urlencode "chat_id=${TG_CHAT}" \
-    --data-urlencode "text=${text}" \
-    --data-urlencode "reply_markup={\"inline_keyboard\":[[{\"text\":\"Открыть GitHub Action\",\"url\":\"${TG_ACTION_URL}\"}]]}" \
-    "$@" && echo
+tmp_dir=$(mktemp -d)
+cleanup() {
+  local exit_status=$?
+  rm -rf "$tmp_dir"
+  exit "$exit_status"
+}
+trap cleanup EXIT
+
+message_file="$tmp_dir/message.txt"
+reply_markup_file="$tmp_dir/reply_markup.json"
+
+printf '%s' "$TG_MESSAGE" > "$message_file"
+
+button_text='Открыть GitHub Action'
+button_url="$TG_ACTION_URL"
+if [[ -n "${TG_DOWNLOAD_URL:-}" ]]; then
+  button_text='Скачать последнюю версию'
+  button_url="$TG_DOWNLOAD_URL"
+fi
+
+json_escape() {
+  local value="$1"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  printf '%s' "$value"
 }
 
-# `_` или `*` в имени ветки/автора ломают Markdown (HTTP 400) — тогда шлём тот же текст без разметки
-send "$TG_MESSAGE" --data-urlencode "parse_mode=Markdown" \
-  || send "${TG_MESSAGE//[\*\`]/}" \
-  || echo "::warning::Не удалось отправить уведомление в Telegram"
+printf '{"inline_keyboard":[[{"text":"%s","url":"%s"}]]}' \
+  "$(json_escape "$button_text")" \
+  "$(json_escape "$button_url")" > "$reply_markup_file"
+
+curl_message_file="$message_file"
+curl_reply_markup_file="$reply_markup_file"
+set --
+if command -v cygpath >/dev/null 2>&1; then
+  curl_message_file=$(cygpath -w "$message_file")
+  curl_reply_markup_file=$(cygpath -w "$reply_markup_file")
+  set -- --ssl-revoke-best-effort
+fi
+
+response=$(curl "$@" --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+  -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+  --data-urlencode "chat_id=${TG_CHAT}" \
+  --data-urlencode "parse_mode=Markdown" \
+  --data-urlencode "text@${curl_message_file}" \
+  --data-urlencode "reply_markup@${curl_reply_markup_file}")
+
+python_command=$(command -v python3 || command -v python)
+printf '%s' "$response" | "$python_command" -c '
+import json, sys
+try:
+    response = json.load(sys.stdin)
+    if not isinstance(response, dict) or response.get("ok") is not True:
+        raise ValueError("Telegram API не подтвердил отправку")
+except (ValueError, TypeError) as error:
+    sys.exit(f"Уведомление не отправлено: {error}")
+'

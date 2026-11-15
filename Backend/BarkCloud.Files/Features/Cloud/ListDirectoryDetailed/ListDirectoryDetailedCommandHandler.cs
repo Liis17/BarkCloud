@@ -97,7 +97,9 @@ public class ListDirectoryDetailedCommandHandler : IRequestHandler<ListDirectory
                 ParentId = d.ParentId?.ToString() ?? string.Empty,
                 Name = d.Name,
                 CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(d.CreatedAt, DateTimeKind.Utc)),
-                UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(d.UpdatedAt, DateTimeKind.Utc))
+                UpdatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(d.UpdatedAt, DateTimeKind.Utc)),
+                IconKey = d.IconKey ?? string.Empty,
+                IconColor = d.IconColor ?? string.Empty
             });
         }
 
