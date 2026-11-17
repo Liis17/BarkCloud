@@ -68,7 +68,7 @@ effective = (InheritVisibility && ParentId != null) ? parent.effective : own
 
 `HideFromGallery` исключает файл из `ListUserMedia`, `GetUserMediaStats`, устаревшего `ListUserImages`, `GetMemories`, `ListMediaLocations` и `MusicApi.ListTracks`. `SearchFiles` применяет этот фильтр только при `exclude_hidden_from_gallery=true` (веб передаёт флаг для поиска фото и видео). `SearchApi.Search` использует `HideFromSearch` для принадлежащих владельцу файловых секций и обычных результатов-папок.
 
-Остальные пути сохраняют содержимое: `ListDirectory*`, умные папки, альбомы и их элементы, плейлисты и их треки, `ListSharedDirectory`, корзина и `ResolveHit`. Секция Shared глобального поиска также не использует настройки видимости владельца. В том числе скрытые файлы остаются доступными в альбомах и плейлистах.
+Остальные пути сохраняют содержимое: `ListDirectory*`, динамические папки, альбомы и их элементы, плейлисты и их треки, `ListSharedDirectory`, корзина и `ResolveHit`. Секция Shared глобального поиска также не использует настройки видимости владельца. В том числе скрытые файлы остаются доступными в альбомах и плейлистах.
 
 ## Ограничения и важные детали
 
@@ -81,7 +81,7 @@ effective = (InheritVisibility && ParentId != null) ? parent.effective : own
 - `DeleteUserMedia(file_id)` переносит все живые записи этого блоба в корзину. Если записей ещё не было, создаёт запись сразу в корзине, чтобы удаление оставалось восстановимым.
 - `DeleteFromTrash`, `EmptyTrash` и фоновый `TrashCleanupService` передают записи в `TrashPurgeService`; окончательное удаление блоба и инварианты владения описаны в [[Backend/OriginalLifetime]].
 - `ListUserImages` в proto помечен deprecated; для фото и видео предназначен `ListUserMedia`. Листинг использует пару курсора `(cursor_created_at, cursor_file_id)`.
-- Умные папки рассчитываются отдельно и не являются каталогами дерева — [[Backend/DynamicFolders]].
+- Динамические папки рассчитываются отдельно и не являются каталогами дерева — [[Backend/DynamicFolders]].
 
 ## Зависимости и взаимодействия
 

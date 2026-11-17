@@ -1,4 +1,4 @@
-# Android — возобновляемая загрузка
+# Android — Upload 2.0
 
 Parent: [[Android/AndroidApp]] · Серверный контракт: [[Backend/ResumableUpload]] · Файловые операции: [[Backend/Files]]
 

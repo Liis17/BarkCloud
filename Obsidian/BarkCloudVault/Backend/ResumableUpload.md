@@ -1,4 +1,4 @@
-# Files — возобновляемая загрузка
+# Files — Upload 2.0
 
 Parent: [[Backend/Files]]
 See also: [[Web/WebApp]] · [[Backend/Torrent]] · [[Shared/SharedLibraries]] · [[Api/FilesClientGuide]]

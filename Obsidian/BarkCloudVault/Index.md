@@ -5,6 +5,7 @@
 ## Архитектура
 
 - [[Architecture|Архитектура]] — компоненты, стек, основные потоки, соглашения
+- [[Glossary|Словарь терминов]] — понятия предметной области и их основные названия
 - [[Platform/Infrastructure|Инфраструктура]] — docker-compose, nginx, PostgreSQL, RabbitMQ, MinIO, Seq
 - [[Platform/Testing|Тестирование]] — тестовые проекты, стек, CI
 - [[Platform/CI|CI/CD]] — ci.yml, выбор тестов, сборка, перенос образов, релизы, защита веток
@@ -24,8 +25,8 @@
 | [[Backend/Files]] | Файлы, медиа, альбомы, API Files |
 | [[Backend/VideoVariants]] | AV1/WebM-варианты, очередь транскодирования и выбор качества |
 | [[Backend/FilesCloud]] | Облачная иерархия папок |
-| [[Backend/DynamicFolders]] | Умные (динамические) папки |
-| [[Backend/ResumableUpload]] | Возобновляемая загрузка частями |
+| [[Backend/DynamicFolders]] | Динамические папки |
+| [[Backend/ResumableUpload]] | Upload 2.0 — загрузка частями с возобновлением |
 | [[Backend/OriginalLifetime]] | Жизнь оригинала и облачные ссылки |
 | [[Backend/ImagePlaceholders]] | Цветовые плейсхолдеры превью |
 | [[Backend/Torrent]] | Торренты на хост-диск, стриминг, импорт |
@@ -56,7 +57,7 @@
 |---------|------------|
 | [[Android/AndroidApp]] | Android-приложение |
 | [[Android/Authentication]] | Первый запуск и авторизация на Android |
-| [[Android/ResumableUpload]] | Возобновляемая загрузка на Android |
+| [[Android/ResumableUpload]] | Upload 2.0 на Android |
 | [[Android/Widgets]] | Виджеты хранилища, корзины и фото из альбома |
 | [[Ios/IosApp]] | iOS-приложение |
 | [[Ios/BackgroundUpload]] | Фоновая загрузка и Live Activity |
