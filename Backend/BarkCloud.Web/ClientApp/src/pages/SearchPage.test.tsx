@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SearchPage } from './SearchPage';
 
@@ -49,6 +49,54 @@ function renderSearchWithRoutes() {
 }
 
 describe('SearchPage', () => {
+  describe('переключатель разделов', () => {
+    const folder = { ...first, kind: 'folder', id: 'dir-1', fileId: '', entryId: '', title: 'Поездка', mediaKind: '' };
+    const sectionsBody = { query: 'от', sections: [
+      { key: 'folders', items: [folder], nextCursor: '', hasMore: false, unavailable: false },
+      { key: 'files', items: [first], nextCursor: 'c', hasMore: true, unavailable: false },
+      { key: 'tracks', items: [], nextCursor: '', hasMore: false, unavailable: false },
+    ] };
+
+    function HistoryProbe() {
+      const navigate = useNavigate();
+      const location = useLocation();
+      return <><span data-testid="location">{location.search}</span><button data-testid="probe-back" onClick={() => navigate(-1)} /></>;
+    }
+
+    function renderAt(url: string) {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(response(sectionsBody))));
+      render(<MemoryRouter initialEntries={[url]}><SearchPage /><HistoryProbe /></MemoryRouter>);
+    }
+
+    it('показывает только разделы с результатами и фильтрует выдачу, сохраняя раздел в URL', async () => {
+      renderAt('/search?q=от');
+      const group = await screen.findByRole('group', { name: 'Раздел поиска' });
+      expect(Array.from(group.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['Все', 'Файлы1+', 'Папки1']);
+
+      fireEvent.click(screen.getByRole('button', { name: /^Папки/ }));
+      expect(screen.getByTestId('location').textContent).toBe('?q=%D0%BE%D1%82&section=folders');
+      expect(screen.getByText('Поездка')).toBeTruthy();
+      expect(screen.queryByText('Отчёт')).toBeNull();
+
+      fireEvent.click(screen.getByTestId('probe-back'));
+      expect(await screen.findByText('Отчёт')).toBeTruthy();
+      expect(screen.getByText('Поездка')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Все' }).getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('открывает выборку раздела из URL', async () => {
+      renderAt('/search?q=от&section=files');
+      expect(await screen.findByText('Отчёт')).toBeTruthy();
+      expect(screen.queryByText('Поездка')).toBeNull();
+    });
+
+    it('раздел из URL без результатов показывает все разделы', async () => {
+      renderAt('/search?q=от&section=tracks');
+      expect(await screen.findByText('Отчёт')).toBeTruthy();
+      expect(screen.getByText('Поездка')).toBeTruthy();
+    });
+  });
+
   it('запрашивает следующую страницу только для выбранной группы', async () => {
     const fetchMock = vi.fn((url: string) => Promise.resolve(response(url.includes('section=files')
       ? { query: 'от', sections: [{ key: 'files', items: [second], nextCursor: '', hasMore: false, unavailable: false }] }
