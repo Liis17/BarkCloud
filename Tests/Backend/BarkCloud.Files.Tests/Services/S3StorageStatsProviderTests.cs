@@ -219,7 +219,7 @@ public sealed class S3StorageStatsProviderTests
         var sut = CreateProvider([(Profile("universal-v1", "shared", active: true), client.Object)], timeProvider: time);
 
         var initial = await sut.GetStatsAsync();
-        time.Advance(TimeSpan.FromMinutes(6));
+        time.Advance(TimeSpan.FromMinutes(31));
         var refreshed = await sut.GetStatsAsync();
         var cached = await sut.GetStatsAsync();
 

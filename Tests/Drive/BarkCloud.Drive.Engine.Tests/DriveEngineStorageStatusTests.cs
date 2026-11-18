@@ -76,7 +76,7 @@ public sealed class DriveEngineStorageStatusTests
         ], options => options.WithStrictOrdering());
 
         // TTL кеша истёк, обновление не удалось: цифры остаются, ошибка передаётся отдельно.
-        harness.Time.Advance(TimeSpan.FromSeconds(11));
+        harness.Time.Advance(CloudGateway.StorageTtl + TimeSpan.FromSeconds(1));
         var stale = await harness.Engine.GetStatusAsync();
         storageCalls.Should().Be(2);
         stale.DiskTotalBytes.Should().Be(1000);
