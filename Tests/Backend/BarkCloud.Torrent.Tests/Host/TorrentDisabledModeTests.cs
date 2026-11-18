@@ -70,6 +70,14 @@ public class TorrentDisabledModeTests
             .Should().Contain([typeof(TorrentStartupService), typeof(TorrentPersistenceService), typeof(RevocationSyncService)]);
         services.Should().Contain(d => d.ServiceType == typeof(TorrentImportService));
         services.Should().Contain(d => d.ServiceType == typeof(UserDeletedConsumer));
+
+        // Hosted-сервисы стартуют по порядку: шина — только после восстановления торрентов из БД.
+        var hosted = services.Where(d => d.ServiceType == typeof(IHostedService)).ToList();
+        var startup = hosted.FindIndex(d => d.ImplementationType == typeof(TorrentStartupService));
+        var bus = hosted.FindIndex(d => (d.ImplementationType ?? d.ImplementationFactory?.Method.ReturnType)?.Namespace?
+            .StartsWith("MassTransit", StringComparison.Ordinal) == true
+            || d.ImplementationFactory?.Method.DeclaringType?.Namespace?.StartsWith("MassTransit", StringComparison.Ordinal) == true);
+        bus.Should().BeGreaterThan(startup);
     }
 
     [Fact]

@@ -444,7 +444,8 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
       const enabled = data?.enabled ?? next;
       const done = enabled ? 'Торренты включены' : 'Торренты отключены';
       setTorrentEnabled(enabled);
-      void shell?.reload?.();
+      // Выключение скрывает меню сразу; включённый раздел показываем, когда Torrent уже перезапущен.
+      if (!enabled || !data?.jobId) void shell?.reload?.();
       if (!data?.jobId) {
         flash('ok', done);
         return;
@@ -452,6 +453,7 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
 
       // Torrent читает флаг только при старте — ждём его перезапуска.
       const job = await waitForJob('Перезапуск Torrent', data.jobId, true);
+      if (enabled) void shell?.reload?.();
       if (job) flash(job.state === 'Completed' ? 'ok' : 'err',
         job.state === 'Completed' ? done : `${done}, но перезапуск Torrent не удался: ${job.error || 'ошибка'}`);
     } finally {
@@ -692,7 +694,7 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
           end={
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
               {torrentBusy && <span className="spin" />}
-              <Toggle label="Торренты" on={torrentEnabled} onChange={toggleTorrent} disabled={torrentBusy} />
+              <Toggle label="Торренты" on={torrentEnabled} onChange={toggleTorrent} disabled={torrentBusy || hasActiveJob} />
             </div>
           }
         >

@@ -87,6 +87,11 @@ public class Program
         // только для торрентов из реестра, который в этом режиме пуст.
         services.AddSingleton<TorrentEngineService>();
 
+        if (enabled)
+            AddEngineAndApi(services, configuration);
+
+        // Шина регистрируется последней: hosted-сервисы стартуют по порядку, и UserDeleted не должен
+        // обрабатываться до восстановления торрентов из БД в TorrentStartupService.
         services.AddMassTransit(x =>
         {
             x.AddConsumer<UserDeletedConsumer>();
@@ -106,10 +111,10 @@ public class Program
                 });
             });
         });
+    }
 
-        if (!enabled)
-            return;
-
+    private static void AddEngineAndApi(IServiceCollection services, IConfiguration configuration)
+    {
         services.AddBarkCloudGrpc();
         services.AddGrpcReflection();
 
