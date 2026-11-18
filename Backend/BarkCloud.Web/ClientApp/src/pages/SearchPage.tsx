@@ -37,6 +37,8 @@ export function SearchPage() {
   /** Открытый в Lightbox файл и его секция: листание идёт по уже загруженным результатам этой секции. */
   const [lightbox, setLightbox] = React.useState<{ section: SearchSectionKey; fileId: string } | null>(null);
   const [toastNode, toast] = useToast();
+  /** Контроллер текущей фразы: дозагрузка секций отменяется и игнорируется вместе с основным поиском. */
+  const searchController = React.useRef<AbortController | null>(null);
 
   function patchHit(hit: SearchHit, patch: Partial<SearchHit>) {
     setSections((current) => current?.map((section) => ({ ...section, items: section.items.map((item) => sameHit(item, hit) ? { ...item, ...patch } : item) })) || null);
@@ -81,6 +83,7 @@ export function SearchPage() {
       return;
     }
     const controller = new AbortController();
+    searchController.current = controller;
     setSections(null);
     setError(null);
     setLightbox(null);
@@ -98,16 +101,19 @@ export function SearchPage() {
   }, [q]);
 
   async function loadMore(section: SectionState) {
-    if (section.loadingMore || !section.hasMore || !section.nextCursor) return;
+    const controller = searchController.current;
+    if (!controller || controller.signal.aborted || section.loadingMore || !section.hasMore || !section.nextCursor) return;
     setSections((current) => current?.map((item) => item.key === section.key ? { ...item, loadingMore: true, error: undefined } : item) || null);
     try {
-      const response = await apiGet<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}&section=${encodeURIComponent(section.key)}&cursor=${encodeURIComponent(section.nextCursor)}`);
+      const response = await apiGet<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}&section=${encodeURIComponent(section.key)}&cursor=${encodeURIComponent(section.nextCursor)}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       const updated = response.sections.find((item) => item.key === section.key);
       if (!updated) throw new Error('Секция поиска недоступна');
       setSections((current) => current?.map((item) => item.key === section.key
         ? { ...updated, items: [...item.items, ...updated.items], loadingMore: false }
         : item) || null);
     } catch (e) {
+      if (controller.signal.aborted) return;
       setSections((current) => current?.map((item) => item.key === section.key
         ? { ...item, loadingMore: false, error: (e as Error).message || 'Не удалось загрузить ещё результаты' }
         : item) || null);
