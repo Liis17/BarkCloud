@@ -88,6 +88,7 @@ public sealed class PageDataBuilder
         var storageTask = includeStorage
             ? _files.GetUserStorageInfoAsync(new GetUserStorageInfoRequest(), token, cancellationToken: http.RequestAborted)
             : null;
+        var torrentEnabledTask = _features.TorrentEnabledAsync(http.RequestAborted);
 
         User? profile = null;
 
@@ -109,6 +110,8 @@ public sealed class PageDataBuilder
             _logger.LogWarning("GetUser не выполнен: {Status}", ex.StatusCode);
             if (!includeStorage) throw;
         }
+
+        vars["features.torrent_enabled"] = (await torrentEnabledTask).ToString().ToLowerInvariant();
 
         if (storageTask is null) return vars;
 
@@ -222,7 +225,8 @@ public sealed class PageDataBuilder
         version = _config.Value("App:Version", AppVersion.Current),
         edition = _config.Value("App:Edition", "self-host"),
         emailEnabled = _config.EmailEnabled(),
-        registrationEnabled = await _features.RegistrationEnabledAsync(cancellationToken)
+        registrationEnabled = await _features.RegistrationEnabledAsync(cancellationToken),
+        torrentEnabled = await _features.TorrentEnabledAsync(cancellationToken)
     };
 
     // ───────────────────────── Settings ─────────────────────────
@@ -289,6 +293,7 @@ public sealed class PageDataBuilder
 
         var (storageBlock, _) = await BuildStorageAsync(token, profile, devicesCount);
         var registrationEnabled = await _features.RegistrationEnabledAsync(http.RequestAborted);
+        var torrentEnabled = await _features.TorrentEnabledAsync(http.RequestAborted);
 
         var displayName = $"{profile?.FirstName} {profile?.LastName}".Trim();
 
@@ -326,7 +331,8 @@ public sealed class PageDataBuilder
                 version = _config.Value("App:Version", AppVersion.Current),
                 edition = _config.Value("App:Edition", "self-host"),
                 emailEnabled = _config.EmailEnabled(),
-                registrationEnabled
+                registrationEnabled,
+                torrentEnabled
             }
         };
 

@@ -38,6 +38,7 @@ public static class SettingsEndpoints
     public sealed record ReauthBeginBody(int Action, string? CredentialId, string? Password, string? OtpCode, string? ChallengeId);
     public sealed record ReauthCompleteBody(string? ChallengeId, JsonElement Assertion, string? EmailCode);
     public sealed record RegistrationBody(bool Enabled);
+    public sealed record TorrentBody(bool Enabled);
     public sealed record ServerValueBody(int ServiceId, string? Section, string? Key, string? Value);
     public sealed record ServerRollbackBody(long RevisionId, int ServiceId, string? Section, string? Key);
     public sealed record ServerStorageProfileBody(
@@ -106,6 +107,25 @@ public static class SettingsEndpoints
                 return response.Success
                     ? Results.Ok(new { enabled = body.Enabled })
                     : Results.BadRequest(new { message = response.Message });
+            }));
+
+        api.MapPost("/system/torrent", (HttpContext http, AuthGateway auth, AdminGate admin, FeatureConfigurationGateway features,
+                DeploymentJobService jobs, TorrentBody body) =>
+            Do(http, auth, async (user, _) =>
+            {
+                if (!admin.IsUnlocked(http)) return Results.Forbid();
+
+                var response = await features.SetTorrentEnabledAsync(
+                    body.Enabled,
+                    $"user:{user.UserId}",
+                    "web-settings",
+                    http.RequestAborted);
+                if (!response.Success)
+                    return Results.BadRequest(new { message = response.Message });
+
+                // Torrent читает флаг только при старте — перезапускаем, чтобы он проснулся или уснул.
+                var job = jobs.EnqueueRestart(["torrent"]);
+                return Results.Ok(new { enabled = body.Enabled, jobId = job.Id });
             }));
 
         // ───────── Настройки сервера (обычная сессия + AdminGate) ─────────

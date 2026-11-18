@@ -19,7 +19,9 @@ import type { Shell, SidebarStorage } from '../../lib/types';
 export function AppShell() {
   const profile = useApiResource<Shell>('/api/me?includeStorage=false');
   const storage = useApiResource<SidebarStorage>('/api/storage', true, storagePending);
-  const shell = React.useMemo(() => profile.data ? { ...profile.data, storage: storage.data } : null, [profile.data, storage.data]);
+  const shell = React.useMemo(() => profile.data
+    ? { ...profile.data, storage: storage.data, reload: profile.reload }
+    : null, [profile.data, storage.data, profile.reload]);
   const [sidebarCollapsed, toggleSidebar] = useSidebarCollapsed();
   const [header, setHeader] = React.useState<PageHeader>({ title: '' });
   const { pathname } = useLocation();

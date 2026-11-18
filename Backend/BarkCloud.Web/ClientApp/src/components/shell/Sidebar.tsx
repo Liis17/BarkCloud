@@ -56,6 +56,9 @@ export function Sidebar({ collapsed, onToggle, profileError = false, storageErro
   const s3State = storageError ? 'error' : storage?.allS3State ?? (storage ? storage.allS3StatsAvailable ? 'ready' : 'error' : 'loading');
   const s3Pending = ['loading', 'refreshing'].includes(s3State);
   const app = shell?.app;
+  const primary = shell?.features?.torrentEnabled === false
+    ? NAV_PRIMARY.filter((i) => i.key !== 'torrents')
+    : NAV_PRIMARY;
 
   return (
     <aside className={'sidebar' + (collapsed ? ' collapsed' : '')}>
@@ -80,7 +83,7 @@ export function Sidebar({ collapsed, onToggle, profileError = false, storageErro
         <div>
           <div className="sb-items"><NavRow item={NAV_SEARCH} /></div>
           <div className="sb-section-label">Библиотека</div>
-          <div className="sb-items">{NAV_PRIMARY.map((i) => <NavRow key={i.key} item={i} />)}</div>
+          <div className="sb-items">{primary.map((i) => <NavRow key={i.key} item={i} />)}</div>
         </div>
         <div>
           <div className="sb-section-label">Совместное</div>

@@ -23,6 +23,15 @@ public class PageDataBuilderTests
     private readonly Mock<UsersApi.UsersApiClient> _users = new();
     private readonly Mock<UsersServerApi.UsersServerApiClient> _usersServer = new();
     private readonly Mock<FilesApi.FilesApiClient> _files = new();
+    private readonly Mock<ConfigurationApi.ConfigurationApiClient> _configuration = new();
+    private readonly GetConfigurationResponse _features = new();
+
+    public PageDataBuilderTests()
+    {
+        _configuration.Setup(client => client.GetConfigurationAsync(It.IsAny<GetConfigurationRequest>(),
+                It.IsAny<Metadata>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .Returns(() => GrpcCallHelpers.AsyncUnary(_features));
+    }
     private static readonly WebUser User = new() { UserId = 42, AccessToken = "user-token", IssuedAt = DateTime.UtcNow };
 
     [Fact]
@@ -44,6 +53,7 @@ public class PageDataBuilderTests
             var profile = await sut.BuildProfileAsync(User, default).WaitAsync(TimeSpan.FromSeconds(1));
 
             shell["user.display_name"].Should().Be("Test User");
+            shell["features.torrent_enabled"].Should().Be("true");
             JsonSerializer.Serialize(context).Should().Contain("\"unlocked\":false");
             JsonSerializer.Serialize(profile).Should().Contain("test@example.com");
             stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
@@ -99,6 +109,17 @@ public class PageDataBuilderTests
     }
 
     [Fact]
+    public async Task LeanShell_WhenTorrentsDisabledInConfiguration_ReportsFlag()
+    {
+        SetProfile();
+        _features.Configurations.Add(new ConfigurationItem { Section = "Features", Key = "TorrentEnabled", Value = "false" });
+
+        var shell = await Create().BuildShellAsync(User, new DefaultHttpContext(), includeStorage: false);
+
+        shell["features.torrent_enabled"].Should().Be("false");
+    }
+
+    [Fact]
     public async Task LeanShell_WhenProfileFails_DoesNotReturnFictitiousUser()
     {
         _users.Setup(client => client.GetUserAsync(It.IsAny<GetUserRequest>(),
@@ -130,7 +151,7 @@ public class PageDataBuilderTests
             ["App:AdminPassword"] = "admin", ["App:AdminCookieKey"] = "test-admin-cookie-key-at-least-32-bytes"
         }).Build();
         return new(_users.Object, _usersServer.Object, _files.Object, new Mock<IdentityApi.IdentityApiClient>().Object,
-            new AdminGate(config), config, new FeatureConfigurationGateway(new Mock<ConfigurationApi.ConfigurationApiClient>().Object,
+            new AdminGate(config), config, new FeatureConfigurationGateway(_configuration.Object,
                 config, NullLogger<FeatureConfigurationGateway>.Instance), NullLogger<PageDataBuilder>.Instance);
     }
 

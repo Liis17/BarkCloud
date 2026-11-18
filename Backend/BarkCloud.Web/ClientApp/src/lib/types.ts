@@ -314,7 +314,10 @@ export interface Shell {
   storage: SidebarStorage | null;
   app: { version: string; edition: string };
   server: { host: string };
+  features?: { torrentEnabled: boolean };
   sync: { status: string; lastAt: string };
+  /** Перечитать /api/me, например после смены флагов в настройках. */
+  reload?: () => Promise<void>;
 }
 
 // ───────────────────────── Настройки (GET /api/settings/full) ─────────────────────────
@@ -384,5 +387,5 @@ export interface SettingsState {
   sessions: Session[];
   sessionsHeader: string;
   admin: { enabled: boolean; unlocked: boolean };
-  system: { version: string; edition: string; emailEnabled: boolean; registrationEnabled: boolean };
+  system: { version: string; edition: string; emailEnabled: boolean; registrationEnabled: boolean; torrentEnabled: boolean };
 }

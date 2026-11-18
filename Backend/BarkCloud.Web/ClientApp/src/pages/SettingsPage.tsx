@@ -5,6 +5,7 @@ import { StorageStatsStatus } from '../components/ui/StorageStatsStatus';
 import { SearchField, TextAreaField, TextField } from '../components/ui/TextField';
 import { useApiResource } from '../hooks/useApiResource';
 import { usePageHeader } from '../hooks/usePageHeader';
+import { useShell } from '../hooks/useShell';
 import { plural } from '../lib/format';
 import { maintenanceWaitPath } from '../lib/maintenance';
 import { applyTheme, getTheme, type Theme } from '../lib/theme';
@@ -287,6 +288,9 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
   const [progress, setProgress] = React.useState<ProgressState | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = React.useState(system.registrationEnabled);
   const [registrationBusy, setRegistrationBusy] = React.useState(false);
+  const shell = useShell();
+  const [torrentEnabled, setTorrentEnabled] = React.useState(system.torrentEnabled ?? true);
+  const [torrentBusy, setTorrentBusy] = React.useState(false);
   const trackedJobs = React.useRef(new Set<string>());
   const resumedJobs = React.useRef(false);
   const [confirmNode, confirm] = useConfirm();
@@ -425,6 +429,35 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
       flash('ok', (data?.enabled ?? next) ? 'Регистрация включена' : 'Регистрация отключена');
     } else {
       flash('err', data?.message || 'Не удалось изменить регистрацию');
+    }
+  }
+
+  async function toggleTorrent(next: boolean) {
+    setTorrentBusy(true);
+    try {
+      const { ok, data } = await sPost<{ enabled?: boolean; jobId?: string; message?: string }>('/api/settings/system/torrent', { enabled: next });
+      if (!ok) {
+        flash('err', data?.message || 'Не удалось изменить торренты');
+        return;
+      }
+
+      const enabled = data?.enabled ?? next;
+      const done = enabled ? 'Торренты включены' : 'Торренты отключены';
+      setTorrentEnabled(enabled);
+      // Выключение скрывает меню сразу; включённый раздел показываем, когда Torrent уже перезапущен.
+      if (!enabled || !data?.jobId) void shell?.reload?.();
+      if (!data?.jobId) {
+        flash('ok', done);
+        return;
+      }
+
+      // Torrent читает флаг только при старте — ждём его перезапуска.
+      const job = await waitForJob('Перезапуск Torrent', data.jobId, true);
+      if (enabled) void shell?.reload?.();
+      if (job) flash(job.state === 'Completed' ? 'ok' : 'err',
+        job.state === 'Completed' ? done : `${done}, но перезапуск Torrent не удался: ${job.error || 'ошибка'}`);
+    } finally {
+      setTorrentBusy(false);
     }
   }
 
@@ -653,6 +686,20 @@ function SystemSection({ admin, system, onUnlockedChange, active }: {
         >
           <span className={'pill-info ' + (registrationEnabled ? 'ok' : 'warn')}>
             {registrationEnabled ? 'Разрешена' : 'Запрещена'}
+          </span>
+        </Field>
+        <Field
+          label="Торренты"
+          help="Выключенный сервис Torrent ничего не скачивает и не раздаёт, раздел скрыт из меню. Переключение перезапускает Torrent"
+          end={
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              {torrentBusy && <span className="spin" />}
+              <Toggle label="Торренты" on={torrentEnabled} onChange={toggleTorrent} disabled={torrentBusy || hasActiveJob} />
+            </div>
+          }
+        >
+          <span className={'pill-info ' + (torrentEnabled ? 'ok' : 'warn')}>
+            {torrentEnabled ? 'Включены' : 'Отключены'}
           </span>
         </Field>
 

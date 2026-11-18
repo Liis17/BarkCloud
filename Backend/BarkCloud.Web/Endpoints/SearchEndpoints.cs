@@ -70,15 +70,16 @@ public static class SearchEndpoints
         });
         var api = app.MapGroup("/api/search");
 
-        api.MapGet("/suggest", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, TorrentApi.TorrentApiClient torrents, string? q) =>
-            await Search(http, auth, files, torrents, q, null, null, suggestion: true));
+        api.MapGet("/suggest", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, TorrentApi.TorrentApiClient torrents,
+            FeatureConfigurationGateway features, string? q) =>
+            await Search(http, auth, files, torrents, features, q, null, null, suggestion: true));
 
         api.MapGet("", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, TorrentApi.TorrentApiClient torrents,
-            string? q, string? section, string? cursor) =>
-            await Search(http, auth, files, torrents, q, section, cursor, suggestion: false));
+            FeatureConfigurationGateway features, string? q, string? section, string? cursor) =>
+            await Search(http, auth, files, torrents, features, q, section, cursor, suggestion: false));
 
         api.MapGet("/hit", async (HttpContext http, AuthGateway auth, SearchApi.SearchApiClient files, TorrentApi.TorrentApiClient torrents,
-            string? kind, string? id) =>
+            FeatureConfigurationGateway features, string? kind, string? id) =>
         {
             var user = await auth.AuthenticateAsync(http);
             if (user is null)
@@ -91,6 +92,8 @@ public static class SearchEndpoints
                 var token = BrowserContext.UserToken(user.AccessToken);
                 if (kind.Equals("torrent", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (!await features.TorrentEnabledAsync(http.RequestAborted))
+                        return Results.Json(new { error = "Результат больше недоступен" }, Json, statusCode: 404);
                     var torrent = await torrents.GetTorrentAsync(new TorrentIdRequest { Id = id }, token,
                         deadline: DateTime.UtcNow.AddSeconds(5), cancellationToken: http.RequestAborted);
                     return Results.Json(ToTorrentJson(torrent), Json);
@@ -162,6 +165,7 @@ public static class SearchEndpoints
         AuthGateway auth,
         SearchApi.SearchApiClient files,
         TorrentApi.TorrentApiClient torrents,
+        FeatureConfigurationGateway features,
         string? rawQuery,
         string? rawSection,
         string? cursor,
@@ -210,11 +214,16 @@ public static class SearchEndpoints
             }
         }
 
+        // Выключенные торренты не попадают в выдачу: раздела нет, а не «недоступен».
+        // Флаг читаем параллельно с поиском Files.
+        var torrentEnabledTask = section is null || onlyTorrents
+            ? features.TorrentEnabledAsync(http.RequestAborted)
+            : Task.FromResult(false);
         var deadline = DateTime.UtcNow.AddSeconds(suggestion ? 2 : 5);
         var filesTask = onlyTorrents
             ? Task.FromResult(new SearchResponse())
             : files.SearchAsync(filesRequest, token, deadline: deadline, cancellationToken: http.RequestAborted).ResponseAsync;
-        var includeTorrents = section is null || onlyTorrents;
+        var includeTorrents = await torrentEnabledTask;
         var torrentTask = includeTorrents
             ? torrents.SearchTorrentsAsync(new SearchTorrentsRequest
             {

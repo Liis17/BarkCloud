@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.SessionRevocation;
@@ -36,59 +37,9 @@ public class Program
             o.Limits.MinRequestBodyDataRate = null;
         });
 
-        builder.Services.AddBarkCloudGrpc();
-        builder.Services.AddBarkCloudMetrics("BarkCloud.Torrent");
-        builder.Services.AddGrpcReflection();
-
-        builder.Services.AddControllers();
-
-        builder.Services.AddXAuth(builder.Configuration, ServiceId.Torrent);
-        builder.Services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
-
-        // Сервисный токен Torrent — только чтение отзыва сессий (см. ServicePermissions).
-        builder.Services.AddServiceTokenClient(builder.Configuration);
-        builder.Services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
-            {
-                o.Address = new Uri(builder.Configuration["IdentityService:Host"]!);
-            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
-                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Identity))
-            .AddInterceptor(() => new ExceptionClientInterceptor());
-
-        builder.Services.AddDbContext<TorrentContext>(c =>
-            c.UseNpgsql(builder.Configuration["TorrentDb"]));
-
-        builder.Services.AddScoped<ITorrentStore, TorrentStore>();
-        builder.Services.AddSingleton<TorrentEngineService>();
-        builder.Services.AddScoped<TorrentImportService>();
-
-        // gRPC-клиенты Files для импорта в облако (токен пользователя пробрасывается per-call).
-        var filesAddress = builder.Configuration["FilesService:Host"];
-        builder.Services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress!));
-        builder.Services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress!));
-        TorrentImportService.AddFilesUploadClient(builder.Services);
-
-        builder.Services.AddHostedService<TorrentStartupService>();
-        builder.Services.AddHostedService<TorrentPersistenceService>();
-
-        builder.Services.AddMassTransit(x =>
-        {
-            x.AddConsumer<UserDeletedConsumer>();
-
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(builder.Configuration["RabbitMQ:Host"], builder.Configuration["RabbitMQ:VirtualHost"], h =>
-                {
-                    h.Username(builder.Configuration["RabbitMQ:Username"]);
-                    h.Password(builder.Configuration["RabbitMQ:Password"]);
-                });
-                cfg.OverrideDefaultBusEndpointQueueName("bark-torrent-bus-" + Guid.NewGuid().ToString("N"));
-
-                cfg.ReceiveEndpoint("user-deleted-torrent", e =>
-                {
-                    e.ConfigureConsumer<UserDeletedConsumer>(context);
-                });
-            });
-        });
+        // Флаг читается только при старте: изменение применяется перезапуском сервиса.
+        var enabled = builder.Configuration.TorrentEnabled();
+        AddTorrentServices(builder.Services, builder.Configuration, enabled);
 
         var app = builder.Build();
 
@@ -98,14 +49,99 @@ public class Program
             ctx.Database.Migrate();
         }
 
-        app.MapGrpcReflectionService();
+        if (enabled)
+        {
+            app.MapGrpcReflectionService();
 
-        app.UseRouting();
-        app.UseXAuth();
+            app.UseRouting();
+            app.UseXAuth();
 
-        app.MapControllers();
-        app.MapGrpcService<TorrentApiService>();
+            app.MapControllers();
+            app.MapGrpcService<TorrentApiService>();
+        }
+        else
+        {
+            app.Logger.LogInformation(
+                "Торренты отключены (Features:TorrentEnabled=false): движок, API и фоновые задачи не запускаются");
+        }
 
         await app.RunAsync();
+    }
+
+    /// <summary>
+    /// Выключенный сервис держит только БД и consumer удаления аккаунта, чтобы данные удалённых
+    /// пользователей очищались и без движка; API, движок, метрики и фоновые задачи не регистрируются.
+    /// </summary>
+    internal static void AddTorrentServices(IServiceCollection services, IConfiguration configuration, bool enabled)
+    {
+        // Выключенному сервису нужен только счётчик для consumer, без периодического цикла отправки метрик.
+        if (enabled)
+            services.AddBarkCloudMetrics("BarkCloud.Torrent");
+        else
+            services.AddSingleton<MetricsCollector>();
+
+        services.AddDbContext<TorrentContext>(c =>
+            c.UseNpgsql(configuration["TorrentDb"]));
+
+        // Без TorrentStartupService движок не инициализируется; consumer обращается к нему
+        // только для торрентов из реестра, который в этом режиме пуст.
+        services.AddSingleton<TorrentEngineService>();
+
+        if (enabled)
+            AddEngineAndApi(services, configuration);
+
+        // Шина регистрируется последней: hosted-сервисы стартуют по порядку, и UserDeleted не должен
+        // обрабатываться до восстановления торрентов из БД в TorrentStartupService.
+        services.AddMassTransit(x =>
+        {
+            x.AddConsumer<UserDeletedConsumer>();
+
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(configuration["RabbitMQ:Host"], configuration["RabbitMQ:VirtualHost"], h =>
+                {
+                    h.Username(configuration["RabbitMQ:Username"]);
+                    h.Password(configuration["RabbitMQ:Password"]);
+                });
+                cfg.OverrideDefaultBusEndpointQueueName("bark-torrent-bus-" + Guid.NewGuid().ToString("N"));
+
+                cfg.ReceiveEndpoint("user-deleted-torrent", e =>
+                {
+                    e.ConfigureConsumer<UserDeletedConsumer>(context);
+                });
+            });
+        });
+    }
+
+    private static void AddEngineAndApi(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddBarkCloudGrpc();
+        services.AddGrpcReflection();
+
+        services.AddControllers();
+
+        services.AddXAuth(configuration, ServiceId.Torrent);
+        services.AddSingleton<IRevocationFeed, GrpcRevocationFeed>();
+
+        // Сервисный токен Torrent — только чтение отзыва сессий (см. ServicePermissions).
+        services.AddServiceTokenClient(configuration);
+        services.AddGrpcClient<SessionRevocationApi.SessionRevocationApiClient>(o =>
+            {
+                o.Address = new Uri(configuration["IdentityService:Host"]!);
+            }).AddInterceptor(sp => new ServiceTokenClientInterceptor(
+                sp.GetRequiredService<ServiceTokenProvider>(), ServiceId.Identity))
+            .AddInterceptor(() => new ExceptionClientInterceptor());
+
+        services.AddScoped<ITorrentStore, TorrentStore>();
+        services.AddScoped<TorrentImportService>();
+
+        // gRPC-клиенты Files для импорта в облако (токен пользователя пробрасывается per-call).
+        var filesAddress = configuration["FilesService:Host"];
+        services.AddGrpcClient<FilesApi.FilesApiClient>(o => o.Address = new Uri(filesAddress!));
+        services.AddGrpcClient<CloudApi.CloudApiClient>(o => o.Address = new Uri(filesAddress!));
+        TorrentImportService.AddFilesUploadClient(services);
+
+        services.AddHostedService<TorrentStartupService>();
+        services.AddHostedService<TorrentPersistenceService>();
     }
 }

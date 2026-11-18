@@ -52,6 +52,7 @@ HTTP `GET /download/{torrentId}?file={index}` проверяет владель�
 
 ## Ограничения и важные детали
 
+- Глобальный флаг `Features:TorrentEnabled` (по умолчанию `true`) читается только при старте (`Program.AddTorrentServices`). При `false` сервис применяет миграции и держит лишь MassTransit-consumer `UserDeleted`: gRPC/HTTP API, XAuth и синхронизация отзывов, MonoTorrent engine (peer-порт, DHT), отправка метрик, `TorrentStartupService` и `TorrentPersistenceService` не регистрируются. Consumer удаляет строки БД и папку пользователя без движка; fast-resume данные в cache directory при этом остаются. Переключатель в Web перезапускает контейнер — [[Web/Settings]].
 - `Torrent:DownloadPath` по умолчанию равен `/mnt/torrents`; путь пользователя — подкаталог с его ID. `Torrent:PeerPort` по умолчанию `6881`.
 - Configuration задаёт `RunSettings.Port` по умолчанию `7027`, `RunSettings.Http1Port` — `7028`, а ключ БД `TorrentDb` использует имя `torrent` по умолчанию.
 - В compose-сервисе настроен peer port для engine, но он не опубликован секцией Docker `ports`; volume загрузок монтируется в `/mnt/torrents`.

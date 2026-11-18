@@ -29,6 +29,7 @@ Parent: [[Web/WebApp]] · See also: [[Backend/Configuration]] · [[Backend/Ident
 | `/api/settings/security/*`, `GET /api/settings/sessions`, `POST /api/settings/sessions/revoke*` | Пароль, 2FA, WebAuthn, список сессий и отзыв сессий |
 | `POST /api/settings/security/reauth/begin`, `POST /api/settings/security/reauth/complete` | Свежая повторная аутентификация для управления passkey и отдельных операций с факторами |
 | `POST /api/settings/system/registration` | Включить или отключить регистрацию; требуется AdminGate |
+| `POST /api/settings/system/torrent` | `{enabled}` — включить или отключить торренты; требуется AdminGate. Сохраняет `Features:TorrentEnabled` и ставит в очередь перезапуск `torrent`, ответ содержит `jobId` |
 | `/api/settings/server/*` | Чтение и изменение серверной конфигурации, версий настроек, storage-профилей и зарезервированных имён |
 | `POST /api/settings/server/storage/groups/save` | Создать или изменить группу: `{id?, name, quotaValue, quotaUnit, buckets[{serviceUrl, bucketName}]}` |
 | `POST /api/settings/server/storage/groups/delete` | Удалить группу: `{id}`; её бакеты остаются без группы |
@@ -45,6 +46,8 @@ API миграции S3 принадлежит [[Web/S3Migration]]. API обсл
 - `GET /api/settings/server` возвращает `storageGroups` с квотой в байтах и членами, а также `storageBuckets` — уникальные нормализованные endpoint/bucket с ролями и статусами. Credentials не возвращаются. Роль `video-variants` показана в списке как «Варианты видео». В «Группах S3» квота задаётся в ГБ, ТБ или ПБ; новые бакеты выбираются из доступных профилей, а сохранение и удаление группы требуют перезапуска Files.
 
 ## Ограничения и важные детали
+
+`FeatureConfigurationGateway` перечитывает `Features:RegistrationEnabled` на каждый запрос, а `Features:TorrentEnabled` берёт из снимка Features не старше 10 секунд; сохранение флага через Web видно сразу, а при недоступности Configuration отдаётся последнее известное значение (без него — значение по умолчанию). Включённый раздел появляется в меню после завершения перезапуска Torrent, выключенный скрывается сразу. При выключенных торрентах `/api/me` возвращает `features.torrentEnabled=false`: пункт «Торренты» скрыт из бокового меню, `/torrents` перенаправляет на `/photos`, `/api/torrents/*` отвечает 404 без обращения к Torrent, а поиск не возвращает раздел `torrents`.
 
 Административные маршруты не становятся публичными после разблокировки: каждый запрос по-прежнему проходит проверку обычной пользовательской сессии.
 
