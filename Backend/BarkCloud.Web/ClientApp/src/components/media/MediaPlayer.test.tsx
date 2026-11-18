@@ -24,7 +24,7 @@ describe('VideoPlayer quality selection', () => {
 
     render(<VideoPlayer src="/original.webm" qualities={qualities} />);
 
-    expect(canPlayType).toHaveBeenCalledWith('video/webm; codecs="av01, opus"');
+    expect(canPlayType).toHaveBeenCalledWith('video/webm; codecs="av01.0.08M.10, opus"');
     expect(screen.queryByRole('combobox', { name: 'Качество видео' })).toBeNull();
   });
 
