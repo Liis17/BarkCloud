@@ -1,4 +1,5 @@
 using BarkCloud.GrpcServer;
+using BarkCloud.GrpcServer.Metrics;
 using BarkCloud.GrpcServer.ServiceAuth;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.SessionRevocation;
@@ -69,11 +70,15 @@ public class Program
 
     /// <summary>
     /// Выключенный сервис держит только БД и consumer удаления аккаунта, чтобы данные удалённых
-    /// пользователей очищались и без движка; API, движок и фоновые задачи не регистрируются.
+    /// пользователей очищались и без движка; API, движок, метрики и фоновые задачи не регистрируются.
     /// </summary>
     internal static void AddTorrentServices(IServiceCollection services, IConfiguration configuration, bool enabled)
     {
-        services.AddBarkCloudMetrics("BarkCloud.Torrent");
+        // Выключенному сервису нужен только счётчик для consumer, без периодического цикла отправки метрик.
+        if (enabled)
+            services.AddBarkCloudMetrics("BarkCloud.Torrent");
+        else
+            services.AddSingleton<MetricsCollector>();
 
         services.AddDbContext<TorrentContext>(c =>
             c.UseNpgsql(configuration["TorrentDb"]));
