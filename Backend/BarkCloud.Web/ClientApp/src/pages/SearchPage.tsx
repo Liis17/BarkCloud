@@ -28,7 +28,10 @@ export function SearchPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const player = useAudioPlayer();
-  const q = new URLSearchParams(location.search).get('q')?.trim() || '';
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q')?.trim() || '';
+  /** Выбранный раздел живёт в URL (`section`), чтобы «Назад» возвращал к той же выборке. */
+  const sectionParam = params.get('section');
   const [sections, setSections] = React.useState<SectionState[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   /** Открытый в Lightbox файл и его секция: листание идёт по уже загруженным результатам этой секции. */
@@ -141,12 +144,34 @@ export function SearchPage() {
   if (visible.length === 0) {
     return <><div className="search-page-empty"><Icon.search size={34} /><h2>Ничего не найдено</h2><p>Попробуйте другое имя, тег или имя исполнителя.</p></div>{overlay}{toastNode}</>;
   }
+  // Переключатель — только по разделам с результатами; раздел из URL без результатов показывает «Все».
+  const filterable = visible.filter((section) => section.items.length > 0);
+  const activeKey = filterable.some((section) => section.key === sectionParam) ? sectionParam as SearchSectionKey : null;
+  const shown = activeKey ? visible.filter((section) => section.key === activeKey) : visible;
+
+  function selectSection(key: SearchSectionKey | null) {
+    if (key === activeKey) return;
+    const next = new URLSearchParams(location.search);
+    if (key) next.set('section', key);
+    else next.delete('section');
+    navigate({ search: '?' + next.toString() });
+  }
 
   return (
     <>
       <div className="search-page">
         <div className="search-page-summary">Результаты по «{q}»</div>
-        {visible.map((section) => (
+        {filterable.length > 1 && (
+          <div className="chip-row search-section-filter" role="group" aria-label="Раздел поиска">
+            <button type="button" className={'chip' + (activeKey === null ? ' active' : '')} aria-pressed={activeKey === null} onClick={() => selectSection(null)}>Все</button>
+            {filterable.map((section) => (
+              <button type="button" key={section.key} className={'chip' + (activeKey === section.key ? ' active' : '')} aria-pressed={activeKey === section.key} onClick={() => selectSection(section.key)}>
+                {SECTION_LABEL[section.key]}<span className="count">{section.items.length}{section.hasMore ? '+' : ''}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {shown.map((section) => (
           <section className="search-section" key={section.key}>
             <div className="search-section-head"><h2>{SECTION_LABEL[section.key]}</h2><span>{section.items.length}{section.hasMore ? '+' : ''}</span></div>
             {section.unavailable ? (
