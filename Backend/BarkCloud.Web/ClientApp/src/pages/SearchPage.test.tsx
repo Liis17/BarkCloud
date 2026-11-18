@@ -63,6 +63,30 @@ describe('SearchPage', () => {
     expect(fetchMock.mock.calls[1][0]).toContain('cursor=cursor-1');
   });
 
+  it.each([
+    ['ответ', (more: { resolve: (r: unknown) => void }) => more.resolve(response({ query: 'от', sections: [{ key: 'files', items: [second], nextCursor: '', hasMore: false, unavailable: false }] }))],
+    ['ошибка', (more: { reject: (e: Error) => void }) => more.reject(new Error('Старая ошибка'))],
+  ])('запоздавшая дозагрузка прежнего запроса не меняет новую выдачу (%s)', async (_name, finish) => {
+    const more = {} as { resolve: (r: unknown) => void; reject: (e: Error) => void };
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => url.includes('cursor=')
+      ? new Promise((resolve, reject) => Object.assign(more, { resolve, reject }))
+      : Promise.resolve(response({ query: '', sections: [{ key: 'files', items: [url.includes('q=%D0%BD%D0%BE') ? { ...first, id: 'entry-3', title: 'Новый' } : first], nextCursor: 'cursor-1', hasMore: true, unavailable: false }] })));
+    vi.stubGlobal('fetch', fetchMock);
+    renderSearchWithRoutes();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Показать ещё' }));
+    fireEvent.click(screen.getByTestId('probe-new-query'));
+    expect(await screen.findByText('Новый')).toBeTruthy();
+    expect(fetchMock.mock.calls.find(([url]) => url.includes('cursor='))?.[1]?.signal?.aborted).toBe(true);
+
+    finish(more as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText('Второй отчёт')).toBeNull();
+    expect(screen.queryByText('Старая ошибка')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Показать ещё' }).hasAttribute('disabled')).toBe(false);
+  });
+
   describe('контекстное меню', () => {
     it('файл: меню как в «Файлах», удаление идёт по записи, а не по файлу', async () => {
       const { posts } = mockSearch('files', [first]);
