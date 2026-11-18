@@ -70,6 +70,17 @@ public class SettingsCatalogTests
     }
 
     [Fact]
+    public void Resolve_TorrentEnabled_IsGlobalBooleanThatRestartsOnlyTorrent()
+    {
+        var entry = SettingsCatalog.Resolve(ServiceId.Unknown, "Features", "TorrentEnabled");
+
+        entry.ValueKind.Should().Be(SettingValueKind.Boolean);
+        entry.RestartTargets.Should().Equal("torrent");
+        entry.IsEnvironmentManaged.Should().BeFalse();
+        entry.IsComputed.Should().BeFalse();
+    }
+
+    [Fact]
     public void All_DoesNotExposeLegacyS3RowsOrReservedNamesAsScalarSettings()
     {
         SettingsCatalog.All.Should().NotContain(x => x.Section.StartsWith("S3Buckets:", StringComparison.Ordinal));

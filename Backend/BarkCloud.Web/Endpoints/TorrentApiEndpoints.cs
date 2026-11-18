@@ -23,6 +23,13 @@ public static class TorrentApiEndpoints
     {
         var api = app.MapGroup("/api/torrents");
 
+        // Торренты выключены — отвечаем 404, не обращаясь к спящему сервису Torrent.
+        api.AddEndpointFilter(async (context, next) =>
+            await context.HttpContext.RequestServices.GetRequiredService<FeatureConfigurationGateway>()
+                .TorrentEnabledAsync(context.HttpContext.RequestAborted)
+                ? await next(context)
+                : Results.Json(new { error = "Торренты отключены" }, Json, statusCode: 404));
+
         // Список торрентов пользователя.
         api.MapGet("", async (HttpContext http, AuthGateway auth, TorrentApi.TorrentApiClient t) =>
             await Guarded(http, auth, async token =>

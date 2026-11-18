@@ -28,6 +28,14 @@ import { PublicAlbumPage } from './pages/PublicAlbumPage';
 import { PublicMusicTrackPage } from './pages/PublicMusicTrackPage';
 import { PublicMusicPlaylistPage } from './pages/PublicMusicPlaylistPage';
 import { DocumentHeadProvider } from './hooks/useDocumentHead';
+import { useShell } from './hooks/useShell';
+
+/** Выключенные торренты: прямая ссылка на /torrents ведёт на главную. */
+function TorrentsRoute() {
+  const shell = useShell();
+  if (shell?.features?.torrentEnabled === false) return <Navigate to="/photos" replace />;
+  return <TorrentsPage />;
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -46,7 +54,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="music" element={<MusicPage />} />
             <Route path="albums" element={<AlbumsPage />} />
             <Route path="files" element={<FilesPage />} />
-            <Route path="torrents" element={<TorrentsPage />} />
+            <Route path="torrents" element={<TorrentsRoute />} />
             <Route path="favorites" element={<FavoritesPage />} />
             <Route path="trash" element={<TrashPage />} />
             <Route path="shared" element={<SharedPage />} />

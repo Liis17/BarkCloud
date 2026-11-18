@@ -218,7 +218,7 @@ public class ConfigurationDefaultsPopulator
         }
         if (entry.Section == "Seq" && entry.Key == "ServerUrl")
             return "http://cloud-seq:5341";
-        if (entry.Section == "Features" && entry.Key == "RegistrationEnabled")
+        if (entry.Section == "Features" && entry.Key is "RegistrationEnabled" or "TorrentEnabled")
             return "true";
         if (entry.ServiceId == ServiceId.Files && entry.Section == "VideoVariants" && entry.Key == "Enabled")
             return "false";

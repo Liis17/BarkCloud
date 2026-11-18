@@ -89,6 +89,7 @@ public static class CloudApiEndpoints
             double.TryParse(v.GetValueOrDefault("storage.other_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var otherPct);
             double.TryParse(v.GetValueOrDefault("storage.s3_pct"), NumberStyles.Float, CultureInfo.InvariantCulture, out var s3Pct);
             bool.TryParse(v.GetValueOrDefault("storage.all_s3_stats_available"), out var allS3StatsAvailable);
+            var torrentEnabled = !bool.TryParse(v.GetValueOrDefault("features.torrent_enabled"), out var parsedTorrent) || parsedTorrent;
 
             return Results.Json(new
             {
@@ -114,6 +115,7 @@ public static class CloudApiEndpoints
                     edition = v.GetValueOrDefault("app.edition")
                 },
                 server = new { host = v.GetValueOrDefault("server.host") },
+                features = new { torrentEnabled },
                 sync = new
                 {
                     status = v.GetValueOrDefault("sync.status"),

@@ -83,6 +83,9 @@ public static class SettingsCatalog
         Add(entries, ServiceId.Unknown, "Seq", "ServerUrl", SettingValueKind.Url);
         Add(entries, ServiceId.Unknown, "Features", "RegistrationEnabled", SettingValueKind.Boolean,
             restartTargets: []);
+        // Web читает флаг на каждый запрос; Torrent — только при старте.
+        Add(entries, ServiceId.Unknown, "Features", "TorrentEnabled", SettingValueKind.Boolean,
+            restartTargets: ["torrent"]);
         Add(entries, ServiceId.Unknown, "Features", "EmailEnabled", SettingValueKind.Boolean,
             environmentManaged: true, computed: true);
 

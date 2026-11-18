@@ -18,4 +18,11 @@ public static class ConfigurationFeatureExtensions
     /// </summary>
     public static bool RegistrationEnabled(this IConfiguration configuration)
         => configuration.GetValue("Features:RegistrationEnabled", true);
+
+    /// <summary>
+    /// Включены ли торренты. Хранится в Configuration как Features:TorrentEnabled; по умолчанию
+    /// включены для обратной совместимости. Torrent читает флаг только при старте.
+    /// </summary>
+    public static bool TorrentEnabled(this IConfiguration configuration)
+        => configuration.GetValue("Features:TorrentEnabled", true);
 }
