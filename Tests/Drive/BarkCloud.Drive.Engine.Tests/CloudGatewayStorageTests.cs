@@ -35,7 +35,7 @@ public sealed class CloudGatewayStorageTests
         var before = DateTime.UtcNow;
         var first = Task.Run(gateway.GetStorage);
         await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        time.Advance(TimeSpan.FromSeconds(11));
+        time.Advance(CloudGateway.StorageTtl + TimeSpan.FromSeconds(1));
         var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var second = Task.Run(() =>
         {
@@ -76,7 +76,7 @@ public sealed class CloudGatewayStorageTests
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
 
         gateway.GetStorage().Info.StorageLimit.Should().Be(500);
-        time.Advance(TimeSpan.FromSeconds(11));
+        time.Advance(CloudGateway.StorageTtl + TimeSpan.FromSeconds(1));
 
         gateway.GetStorage().Info.StorageLimit.Should().Be(500);
         gateway.GetStorage().Info.StorageLimit.Should().Be(500);
@@ -162,7 +162,7 @@ public sealed class CloudGatewayStorageTests
         using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
 
         gateway.GetStorage().Info.StorageLimit.Should().Be(100);
-        time.Advance(TimeSpan.FromSeconds(11));
+        time.Advance(CloudGateway.StorageTtl + TimeSpan.FromSeconds(1));
         var oldRequest = StartLongRunning(gateway.GetStorage);
         await failureStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         gateway.ClearCache();
@@ -215,7 +215,7 @@ public sealed class CloudGatewayStorageTests
         fresh.Info.StorageLimit.Should().Be(101);
         fresh.RefreshError.Should().BeNull();
 
-        time.Advance(TimeSpan.FromSeconds(11));
+        time.Advance(CloudGateway.StorageTtl + TimeSpan.FromSeconds(1));
         var stale = gateway.GetStorage();
         stale.Info.StorageLimit.Should().Be(101);
         stale.RefreshError.Should().NotBeNull();
@@ -225,11 +225,34 @@ public sealed class CloudGatewayStorageTests
         gateway.GetStorage().Info.StorageLimit.Should().Be(101);
         calls.Should().Be(2);
 
+        // После ошибки повтор — по окончании негативного кеша, а не через полный TTL.
         time.Advance(TimeSpan.FromSeconds(11));
         var recovered = gateway.GetStorage();
         recovered.Info.StorageLimit.Should().Be(103);
         recovered.RefreshError.Should().BeNull();
         calls.Should().Be(3);
+    }
+
+    [Fact]
+    public void GetStorage_serves_tray_polling_from_cache_until_ttl_expires()
+    {
+        using var temp = new TestDirectory();
+        var cloud = new FakeCloud();
+        var time = new FakeTimeProvider();
+        var calls = 0;
+        cloud.Invoker.Handle<GetUserStorageInfoRequest, GetUserStorageInfoResponse>(
+            FakeCloudMethods.GetUserStorageInfo, _ => new GetUserStorageInfoResponse { StorageLimit = Interlocked.Increment(ref calls) });
+        using var gateway = cloud.CreateGateway(temp.Path("cache"), time);
+
+        // Трей со скрытым окном опрашивает статус раз в 30 с.
+        for (var elapsed = TimeSpan.Zero; elapsed < CloudGateway.StorageTtl; elapsed += TimeSpan.FromSeconds(30))
+        {
+            gateway.GetStorage().Info.StorageLimit.Should().Be(1);
+            time.Advance(TimeSpan.FromSeconds(30));
+        }
+
+        gateway.GetStorage().Info.StorageLimit.Should().Be(2);
+        calls.Should().Be(2);
     }
 
     private static Task<T> StartLongRunning<T>(Func<T> action)

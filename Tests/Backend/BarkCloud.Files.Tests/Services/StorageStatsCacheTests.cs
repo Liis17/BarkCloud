@@ -45,7 +45,7 @@ public class StorageStatsCacheTests
         var cache = Create(_ => Interlocked.Increment(ref calls) == 1
             ? Task.FromResult(new Reading(17)) : refresh.Task, time);
         var initial = await cache.GetAsync(false, default);
-        time.Advance(TimeSpan.FromMinutes(6));
+        time.Advance(StorageStatsCache<Reading>.RefreshInterval + TimeSpan.FromMinutes(1));
 
         var stale = await cache.GetAsync(true, default).WaitAsync(TimeSpan.FromSeconds(1));
         stale.State.Should().Be("refreshing");
@@ -68,13 +68,43 @@ public class StorageStatsCacheTests
         var cache = Create(_ => Interlocked.Increment(ref calls) == 1
             ? Task.FromResult(new Reading(17)) : Task.FromException<Reading>(new IOException("offline")), time);
         var initial = await cache.GetAsync(false, default);
-        time.Advance(TimeSpan.FromMinutes(6));
+        time.Advance(StorageStatsCache<Reading>.RefreshInterval + TimeSpan.FromMinutes(1));
 
         var failed = await cache.GetAsync(false, default);
         failed.State.Should().Be("error");
         failed.Value.Should().Be(initial.Value);
         failed.UpdatedAt.Should().Be(initial.UpdatedAt);
         await cache.GetAsync(true, default);
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task SuccessfulMeasurement_IsNotRepeatedBeforeRefreshInterval()
+    {
+        var time = new MutableTimeProvider();
+        var calls = 0;
+        var cache = Create(_ => Task.FromResult(new Reading(Interlocked.Increment(ref calls))), time);
+        await cache.GetAsync(false, default);
+
+        time.Advance(StorageStatsCache<Reading>.RefreshInterval - TimeSpan.FromMinutes(1));
+        (await cache.GetAsync(false, default)).State.Should().Be("ready");
+
+        calls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task FailedMeasurement_IsRetriedSoonerThanRefreshInterval()
+    {
+        var time = new MutableTimeProvider();
+        var calls = 0;
+        var cache = Create(_ => Interlocked.Increment(ref calls) == 1
+            ? Task.FromException<Reading>(new IOException("offline")) : Task.FromResult(new Reading(5)), time);
+        (await cache.GetAsync(false, default)).State.Should().Be("error");
+
+        time.Advance(StorageStatsCache<Reading>.RetryAfterError + TimeSpan.FromSeconds(1));
+        var retried = await cache.GetAsync(false, default);
+
+        retried.State.Should().Be("ready");
         calls.Should().Be(2);
     }
 

@@ -11,6 +11,13 @@ internal sealed class StorageStatsCache<T>(
     ILogger logger,
     CancellationToken stoppingToken) where T : class
 {
+    /// <summary>
+    /// Замер дорогой (обход данных MinIO и листинг всех бакетов), поэтому успешный снимок
+    /// живёт долго; после ошибки повторяем раньше.
+    /// </summary>
+    internal static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(30);
+    internal static readonly TimeSpan RetryAfterError = TimeSpan.FromMinutes(5);
+
     private readonly object _gate = new();
     private T? _value;
     private DateTimeOffset? _updatedAt;
@@ -28,7 +35,8 @@ internal sealed class StorageStatsCache<T>(
         lock (_gate)
         {
             if ((_refresh is null || _refresh.IsCompleted)
-                && (_attemptedAt is null || time.GetUtcNow() - _attemptedAt >= TimeSpan.FromMinutes(5))
+                && (_attemptedAt is null
+                    || time.GetUtcNow() - _attemptedAt >= (_state == "error" ? RetryAfterError : RefreshInterval))
                 && !stoppingToken.IsCancellationRequested)
             {
                 _state = _value is null ? "loading" : "refreshing";

@@ -61,7 +61,9 @@ internal sealed partial class CloudGateway : IDisposable
     private static readonly TimeSpan ListStaleTtl = TimeSpan.FromSeconds(60);
     private const int MaxListingPatches = 10_000;
     private const int MaxReplayedListingPatches = 256;
-    private static readonly TimeSpan StorageTtl = TimeSpan.FromSeconds(10);
+    // Трей опрашивает статус каждые 5–30 с, а сервер обновляет статистику хранилища редко:
+    // чаще спрашивать не нужно.
+    internal static readonly TimeSpan StorageTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StorageFailureCache = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan StorageRpcTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan HttpTransferIdleLimit = TimeSpan.FromSeconds(60);
