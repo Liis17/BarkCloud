@@ -8,7 +8,7 @@ import { useToast } from '../hooks/useToast';
 import { useConfirm } from '../hooks/useDialog';
 import { usePageHeader } from '../hooks/usePageHeader';
 import { useSelection } from '../hooks/useSelection';
-import { apiGet, apiPost, type BatchSummary } from '../lib/api';
+import { ApiError, apiGet, apiPost, type BatchSummary } from '../lib/api';
 import { plural } from '../lib/format';
 import type { Page, TrashItem } from '../lib/types';
 
@@ -29,6 +29,20 @@ function purgeLeft(iso: string | null): string {
   if (days >= 1) return `через ${days} ${plural(days, 'день', 'дня', 'дней')}`;
   const hours = Math.max(1, Math.floor(ms / 3600000));
   return `через ${hours} ${plural(hours, 'час', 'часа', 'часов')}`;
+}
+
+type TrashCursor = { at: string; id: string } | null;
+
+function cursorOf(d: Page<TrashItem>): TrashCursor {
+  return d.nextCursorAt && d.nextCursorId ? { at: d.nextCursorAt, id: d.nextCursorId } : null;
+}
+function trashUrl(c: TrashCursor): string {
+  return c ? `/api/cloud/trash?cursorAt=${encodeURIComponent(c.at)}&cursorId=${encodeURIComponent(c.id)}` : '/api/cloud/trash';
+}
+
+/* fetch при обрыве соединения бросает TypeError с техническим текстом — показываем понятный. */
+function loadErrorText(e: unknown): string {
+  return e instanceof ApiError ? e.message : 'Нет связи с сервером. Проверьте подключение и повторите.';
 }
 
 function TrashRow({ item, bulkChecked, onBulkToggle, onRestore, onPurge, opened }: {
@@ -78,26 +92,60 @@ export function TrashPage() {
   const location = useLocation();
   const openEntryId = new URLSearchParams(location.search).get('open') || '';
   const [items, setItems] = React.useState<TrashItem[] | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [cursor, setCursor] = React.useState<TrashCursor>(null);
+  const [moreBusy, setMoreBusy] = React.useState(false);
   const [bulkPurgeConfirm, setBulkPurgeConfirm] = React.useState(false);
   const [toastNode, toast] = useToast();
   const [confirmNode, confirm] = useConfirm();
   const fsel = useSelection();
+  /* Номер текущей загрузки: ответы устаревших запросов (в т.ч. «Показать ещё» до перезагрузки) отбрасываются. */
+  const generation = React.useRef(0);
 
   const load = React.useCallback(() => {
+    const gen = ++generation.current;
     setItems(null);
+    setLoadError(null);
+    setCursor(null);
+    setMoreBusy(false);
     fsel.clear();
-    apiGet<Page<TrashItem>>('/api/cloud/trash')
-      .then((d) => setItems(d.items || []))
+    apiGet<Page<TrashItem>>(trashUrl(null))
+      .then((d) => {
+        if (gen !== generation.current) return;
+        setItems(d.items || []);
+        setCursor(cursorOf(d));
+      })
       .catch((e) => {
-        toast((e as Error).message, 'err');
-        setItems([]);
+        if (gen !== generation.current) return;
+        setLoadError(loadErrorText(e));
       });
-  }, [toast, fsel.clear]);
+  }, [fsel.clear]);
   React.useEffect(load, [load]);
   React.useEffect(() => {
     if (!openEntryId || !items?.some((item) => item.entryId === openEntryId)) return;
     document.getElementById(`search-open-${openEntryId}`)?.scrollIntoView({ block: 'center' });
   }, [openEntryId, items]);
+
+  function loadMore() {
+    if (!cursor || moreBusy) return;
+    const gen = generation.current;
+    setMoreBusy(true);
+    apiGet<Page<TrashItem>>(trashUrl(cursor))
+      .then((d) => {
+        if (gen !== generation.current) return;
+        setItems((prev) => {
+          const seen = new Set((prev || []).map((i) => i.entryId));
+          return [...(prev || []), ...(d.items || []).filter((i) => !seen.has(i.entryId))];
+        });
+        setCursor(cursorOf(d));
+      })
+      .catch((e) => {
+        if (gen === generation.current) toast(loadErrorText(e), 'err');
+      })
+      .finally(() => {
+        if (gen === generation.current) setMoreBusy(false);
+      });
+  }
 
   async function restore(item: TrashItem) {
     try {
@@ -202,7 +250,18 @@ export function TrashPage() {
             <span>Удалённые файлы хранятся 14 дней, затем удаляются навсегда.</span>
           </div>
           <div className="trash-list">
-            {items === null ? (
+            {loadError ? (
+              <EmptyState
+                icon="trash"
+                title="Не удалось загрузить корзину"
+                hint={loadError}
+                action={
+                  <button className="btn outlined" onClick={load}>
+                    <Icon.refresh size={16} /> Повторить
+                  </button>
+                }
+              />
+            ) : items === null ? (
               <Loading />
             ) : isEmpty ? (
               <EmptyState icon="trash" title="Корзина пуста" hint="Удалённые файлы появятся здесь и будут храниться 14 дней." />
@@ -238,6 +297,13 @@ export function TrashPage() {
                   ))}
                 </tbody>
               </table>
+            )}
+            {items && items.length > 0 && cursor && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn outlined" onClick={loadMore} disabled={moreBusy}>
+                  {moreBusy ? 'Загрузка…' : 'Показать ещё'}
+                </button>
+              </div>
             )}
           </div>
         </div>
