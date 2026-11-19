@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -35,6 +34,8 @@ public class CreateAlbumShareCommandHandler : IRequestHandler<CreateAlbumShareCo
     public async Task<AlbumShareInfo> Handle(CreateAlbumShareCommand request, CancellationToken cancellationToken)
     {
         var ownerId = _userContext.UserId;
+        var now = DateTime.UtcNow;
+        var expiresAt = ShareExpiry.Validate(request.ExpiresAt, now);
 
         // Публиковать можно только свой альбом.
         var album = await _albums.GetAlbum(request.AlbumId, cancellationToken);
@@ -43,20 +44,25 @@ public class CreateAlbumShareCommandHandler : IRequestHandler<CreateAlbumShareCo
         if (album.OwnerId != ownerId)
             throw new CloudAccessDeniedException();
 
-        // Идемпотентность: один публичный шар на альбом — вернём существующий.
+        // Идемпотентность: один публичный шар на альбом — вернём существующий, при необходимости с новым сроком.
         var existing = await _storage.GetByAlbum(ownerId, request.AlbumId, cancellationToken);
         if (existing is not null)
+        {
+            if (ShareExpiry.Republish(existing, expiresAt, request.ReplaceExpiry, now))
+                await _storage.Update(existing, cancellationToken);
             return ToGrpc(existing);
+        }
 
         var share = new DomainAlbumShareLink
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
             AlbumId = request.AlbumId,
-            Token = GenerateToken(),
+            Token = ShareExpiry.GenerateToken(),
             Name = string.IsNullOrWhiteSpace(request.Name) ? album.Name : request.Name,
-            CreatedAt = DateTime.UtcNow,
-            ClickCount = 0
+            CreatedAt = now,
+            ClickCount = 0,
+            ExpiresAt = expiresAt
         };
 
         await _storage.Add(share, cancellationToken);
@@ -65,15 +71,6 @@ public class CreateAlbumShareCommandHandler : IRequestHandler<CreateAlbumShareCo
             share.Id, request.AlbumId, ownerId);
 
         return ToGrpc(share);
-    }
-
-    private static string GenerateToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(16);
-        return Convert.ToBase64String(bytes)
-            .Replace('+', '-')
-            .Replace('/', '_')
-            .TrimEnd('=');
     }
 
     internal static AlbumShareInfo ToGrpc(DomainAlbumShareLink share, string? coverPreviewUrl = null)
@@ -86,7 +83,8 @@ public class CreateAlbumShareCommandHandler : IRequestHandler<CreateAlbumShareCo
             Name = share.Name,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(share.CreatedAt, DateTimeKind.Utc)),
             ClickCount = share.ClickCount,
-            CoverPreviewUrl = coverPreviewUrl ?? ""
+            CoverPreviewUrl = coverPreviewUrl ?? "",
+            ExpiresAt = ShareExpiry.ToTimestamp(share.ExpiresAt)
         };
     }
 }

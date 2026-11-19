@@ -5,6 +5,7 @@ namespace BarkCloud.Files.Persistence;
 public interface IAlbumShareStorage
 {
     Task Add(AlbumShareLink item, CancellationToken cancellationToken = default);
+    Task Update(AlbumShareLink item, CancellationToken cancellationToken = default);
     Task<AlbumShareLink?> GetByToken(string token, CancellationToken cancellationToken = default);
     Task<AlbumShareLink?> GetByAlbum(long ownerId, Guid albumId, CancellationToken cancellationToken = default);
     Task<AlbumShareLink?> GetById(long ownerId, Guid id, CancellationToken cancellationToken = default);

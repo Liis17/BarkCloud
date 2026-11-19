@@ -68,6 +68,77 @@ public class CreateFolderShareCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ActiveShareWithReplaceExpiry_KeepsTokenAndSavesNewExpiry()
+    {
+        var dirId = Guid.NewGuid();
+        var expiresAt = DateTime.UtcNow.AddDays(7);
+        SetupOwnDirectory(dirId);
+        _shares.Setup(s => s.GetByDirectory(OwnerId, dirId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FolderShareLink { Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = dirId, Token = "t", ClickCount = 3 });
+
+        var response = await CreateSut().Handle(
+            new CreateFolderShareCommand { DirectoryId = dirId, ExpiresAt = expiresAt, ReplaceExpiry = true }, default);
+
+        response.Token.Should().Be("t");
+        response.ClickCount.Should().Be(3);
+        response.ExpiresAt.ToDateTime().Should().Be(expiresAt);
+        _shares.Verify(s => s.Update(It.Is<FolderShareLink>(l => l.ExpiresAt == expiresAt), It.IsAny<CancellationToken>()), Times.Once);
+        _treeLock.Verify(l => l.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ActiveShareWithoutReplaceExpiry_KeepsExpiry()
+    {
+        var dirId = Guid.NewGuid();
+        var existingExpiry = DateTime.UtcNow.AddDays(1);
+        SetupOwnDirectory(dirId);
+        _shares.Setup(s => s.GetByDirectory(OwnerId, dirId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FolderShareLink { Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = dirId, Token = "t", ExpiresAt = existingExpiry });
+
+        var response = await CreateSut().Handle(new CreateFolderShareCommand { DirectoryId = dirId }, default);
+
+        response.ExpiresAt.ToDateTime().Should().Be(existingExpiry);
+        _shares.Verify(s => s.Update(It.IsAny<FolderShareLink>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_ExpiredShare_IssuesNewTokenSoOldUrlStaysDead()
+    {
+        var dirId = Guid.NewGuid();
+        SetupOwnDirectory(dirId);
+        _shares.Setup(s => s.GetByDirectory(OwnerId, dirId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FolderShareLink
+            {
+                Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = dirId, Token = "old", ClickCount = 5,
+                ExpiresAt = DateTime.UtcNow.AddDays(-1)
+            });
+
+        var response = await CreateSut().Handle(new CreateFolderShareCommand { DirectoryId = dirId }, default);
+
+        response.Token.Should().NotBe("old");
+        response.ClickCount.Should().Be(0);
+        response.ExpiresAt.Should().BeNull();
+        _shares.Verify(s => s.Update(It.IsAny<FolderShareLink>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ExpiryInPast_ThrowsBeforeTouchingStorage()
+    {
+        var dirId = Guid.NewGuid();
+        SetupOwnDirectory(dirId);
+
+        var act = () => CreateSut().Handle(
+            new CreateFolderShareCommand { DirectoryId = dirId, ExpiresAt = DateTime.UtcNow.AddMinutes(-1) }, default);
+
+        await act.Should().ThrowAsync<ShareExpiryInvalidException>();
+        _hierarchy.Verify(s => s.LockTree(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private void SetupOwnDirectory(Guid dirId) =>
+        _hierarchy.Setup(s => s.GetDirectoryAsNoTracking(dirId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CloudDirectory { Id = dirId, OwnerId = OwnerId, Name = "Docs" });
+
+    [Fact]
     public async Task Handle_HappyPath_LocksTreeBeforeCheckingDirectoryAndCommitsAfterAdd()
     {
         var dirId = Guid.NewGuid();

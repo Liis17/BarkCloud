@@ -8,7 +8,7 @@ namespace BarkCloud.Files.Domain;
 /// элементы альбома (фото/видео) отдаются всегда актуальными. Один публичный шар на альбом
 /// (уникальность по владельцу+альбому).
 /// </summary>
-public class AlbumShareLink
+public class AlbumShareLink : IPublicShareLink
 {
     [Key]
     public Guid Id { get; set; }
@@ -30,4 +30,7 @@ public class AlbumShareLink
 
     /// <summary>Сколько раз открывали публичный альбом.</summary>
     public long ClickCount { get; set; }
+
+    /// <summary>Когда ссылка перестаёт открываться (UTC); <c>null</c> — бессрочно.</summary>
+    public DateTime? ExpiresAt { get; set; }
 }

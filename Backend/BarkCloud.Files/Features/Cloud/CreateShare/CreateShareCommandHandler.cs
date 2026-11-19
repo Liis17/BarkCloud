@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Persistence;
 using BarkCloud.Files.Services;
@@ -41,6 +39,8 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
     public async Task<ShareInfo> Handle(CreateShareCommand request, CancellationToken cancellationToken)
     {
         var ownerId = _userContext.UserId;
+        var now = DateTime.UtcNow;
+        var expiresAt = ShareExpiry.Validate(request.ExpiresAt, now);
 
         // Ссылку можно создать только на свой файл.
         var file = await _filesStorage.GetFile(request.FileId);
@@ -54,10 +54,11 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
             FileId = request.FileId,
-            Token = GenerateToken(),
+            Token = ShareExpiry.GenerateToken(),
             Name = request.Name,
-            CreatedAt = DateTime.UtcNow,
-            ClickCount = 0
+            CreatedAt = now,
+            ClickCount = 0,
+            ExpiresAt = expiresAt
         };
 
         await _storage.Add(share, cancellationToken);
@@ -77,16 +78,6 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
         return ToGrpc(share);
     }
 
-    /// <summary>URL-safe токен из 16 случайных байт (base64url без паддинга).</summary>
-    private static string GenerateToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(16);
-        return Convert.ToBase64String(bytes)
-            .Replace('+', '-')
-            .Replace('/', '_')
-            .TrimEnd('=');
-    }
-
     internal static ShareInfo ToGrpc(DomainShareLink share)
     {
         return new ShareInfo
@@ -96,7 +87,8 @@ public class CreateShareCommandHandler : IRequestHandler<CreateShareCommand, Sha
             FileId = share.FileId.ToString(),
             Name = share.Name,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(share.CreatedAt, DateTimeKind.Utc)),
-            ClickCount = share.ClickCount
+            ClickCount = share.ClickCount,
+            ExpiresAt = ShareExpiry.ToTimestamp(share.ExpiresAt)
         };
     }
 }

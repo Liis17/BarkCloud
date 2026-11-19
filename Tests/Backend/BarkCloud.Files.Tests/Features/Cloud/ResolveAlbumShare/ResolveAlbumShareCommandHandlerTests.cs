@@ -56,7 +56,7 @@ public class ResolveAlbumShareCommandHandlerTests
             });
         hierarchy.Setup(x => x.GetEffectivelyTrashedFileIds(ownerId, It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new HashSet<Guid>());
-        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>
             {
                 new() { Id = originalTempId, OriginalFileId = fileId },

@@ -477,7 +477,8 @@ public class CloudApiService : CloudApi.CloudApiBase
         var command = new CreateShareCommand
         {
             FileId = Guid.Parse(request.FileId),
-            Name = request.Name
+            Name = request.Name,
+            ExpiresAt = request.ExpiresAt?.ToDateTime()
         };
 
         return _mediator.Send(command);
@@ -513,7 +514,9 @@ public class CloudApiService : CloudApi.CloudApiBase
         return _mediator.Send(new CreateFolderShareCommand
         {
             DirectoryId = Guid.Parse(request.DirectoryId),
-            Name = request.Name
+            Name = request.Name,
+            ExpiresAt = request.ExpiresAt?.ToDateTime(),
+            ReplaceExpiry = request.ReplaceExpiry
         });
     }
 
@@ -545,7 +548,9 @@ public class CloudApiService : CloudApi.CloudApiBase
         return _mediator.Send(new CreateAlbumShareCommand
         {
             AlbumId = Guid.Parse(request.AlbumId),
-            Name = request.Name
+            Name = request.Name,
+            ExpiresAt = request.ExpiresAt?.ToDateTime(),
+            ReplaceExpiry = request.ReplaceExpiry
         });
     }
 

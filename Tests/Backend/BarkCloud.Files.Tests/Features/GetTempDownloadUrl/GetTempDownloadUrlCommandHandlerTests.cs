@@ -58,7 +58,7 @@ public class GetTempDownloadUrlCommandHandlerTests
             ReadyFile(fileId1, OwnerId),
             ReadyFile(fileId2, OwnerId, OtherUserId)
         });
-        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>
             {
                 new() { Id = tempId1, OriginalFileId = fileId1 },
@@ -97,7 +97,7 @@ public class GetTempDownloadUrlCommandHandlerTests
             });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(
                 It.Is<IEnumerable<Guid>>(ids => ids.ToHashSet().SetEquals(new[] { fileId, variantId })),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([
                 new TempFile { Id = originalTempId, OriginalFileId = fileId },
                 new TempFile { Id = variantTempId, OriginalFileId = variantId }
@@ -116,7 +116,7 @@ public class GetTempDownloadUrlCommandHandlerTests
         fileData.VideoQualities[1].Url.Should().Contain(variantTempId.ToString());
         fileData.VideoQualities.Should().NotContain(quality => quality.Url.Contains(variantId.ToString()));
         _temp.Verify(s => s.CreateTempFilesBatchAsync(
-            It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class GetTempDownloadUrlCommandHandlerTests
             new GetTempDownloadUrlCommand { FileIds = new List<Guid> { foreignId } }, default);
 
         await act.Should().ThrowAsync<CloudAccessDeniedException>();
-        _temp.Verify(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _temp.Verify(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class GetTempDownloadUrlCommandHandlerTests
             new GetTempDownloadUrlCommand { FileIds = new List<Guid> { ownId, foreignId } }, default);
 
         await act.Should().ThrowAsync<CloudAccessDeniedException>();
-        _temp.Verify(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _temp.Verify(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class GetTempDownloadUrlCommandHandlerTests
             new() { Id = notReadyId, Uploaders = new List<long> { OtherUserId } } // UploadedAt/Etag не заданы → не готов
         });
         _temp.Setup(s => s.CreateTempFilesBatchAsync(
-                It.Is<IEnumerable<Guid>>(ids => ids.SequenceEqual(new[] { ownId })), It.IsAny<CancellationToken>()))
+                It.Is<IEnumerable<Guid>>(ids => ids.SequenceEqual(new[] { ownId })), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile> { new() { Id = tempId, OriginalFileId = ownId } });
 
         var response = await CreateSut().Handle(

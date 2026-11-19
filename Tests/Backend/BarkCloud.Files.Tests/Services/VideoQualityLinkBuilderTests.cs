@@ -36,7 +36,7 @@ public sealed class VideoQualityLinkBuilderTests
         var tempFiles = new Mock<ITempFilesStorage>();
         tempFiles.Setup(storage => storage.CreateTempFilesBatchAsync(
                 It.Is<IEnumerable<Guid>>(ids => ids.ToHashSet().SetEquals(new[] { originalId, variantId })),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>
             {
                 new() { Id = originalTempId, OriginalFileId = originalId },
@@ -66,6 +66,6 @@ public sealed class VideoQualityLinkBuilderTests
             Url = $"https://files.example/web/download/{variantTempId}"
         });
         tempFiles.Verify(storage => storage.CreateTempFilesBatchAsync(
-            It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

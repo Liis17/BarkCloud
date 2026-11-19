@@ -38,6 +38,45 @@ public class ResolveShareCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ExpiredShare_ReturnsNotFoundWithoutCountingClick()
+    {
+        var share = new DomainShareLink
+        {
+            Id = Guid.NewGuid(), FileId = Guid.NewGuid(), Token = "t", ExpiresAt = DateTime.UtcNow.AddMinutes(-1)
+        };
+        _storage.Setup(s => s.GetByToken("t", It.IsAny<CancellationToken>())).ReturnsAsync(share);
+
+        var response = await CreateSut().Handle(new ResolveShareCommand { Token = "t" }, default);
+
+        response.Found.Should().BeFalse();
+        _storage.Verify(s => s.IncrementClicks(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _files.Verify(s => s.GetFile(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_ExpiringShare_LimitsDownloadLinkLifetimeToShareExpiry()
+    {
+        var fileId = Guid.NewGuid();
+        var expiresAt = DateTime.UtcNow.AddMinutes(5);
+        var share = new DomainShareLink { Id = Guid.NewGuid(), FileId = fileId, Token = "t", ExpiresAt = expiresAt };
+        _storage.Setup(s => s.GetByToken("t", It.IsAny<CancellationToken>())).ReturnsAsync(share);
+        _files.Setup(s => s.GetFile(fileId)).ReturnsAsync(new UploadFileEntity
+        {
+            Id = fileId, Type = DomainUploadFileType.CloudFile, Etag = "etag", UploadedAt = DateTime.UtcNow
+        });
+        _files.Setup(s => s.GetPreviewsForFile(fileId, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), expiresAt, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new TempFileEntity { Id = Guid.NewGuid(), OriginalFileId = fileId }]);
+
+        var response = await CreateSut().Handle(new ResolveShareCommand { Token = "t" }, default);
+
+        response.Found.Should().BeTrue();
+        _temp.Verify(
+            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), expiresAt, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_FileDeleted_ReturnsNotFound()
     {
         var share = new DomainShareLink { Id = Guid.NewGuid(), FileId = Guid.NewGuid(), Token = "t" };
@@ -62,7 +101,7 @@ public class ResolveShareCommandHandlerTests
         response.Found.Should().BeFalse();
         _storage.Verify(s => s.IncrementClicks(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         _temp.Verify(
-            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -93,7 +132,7 @@ public class ResolveShareCommandHandlerTests
             {
                 [fileId] = [new(variantId, 360, 640, 360, 300)]
             });
-        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFileEntity>
             {
                 new() { Id = tempId, OriginalFileId = fileId },

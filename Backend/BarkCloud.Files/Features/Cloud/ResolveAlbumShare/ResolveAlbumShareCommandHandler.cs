@@ -52,7 +52,7 @@ public class ResolveAlbumShareCommandHandler : IRequestHandler<ResolveAlbumShare
     public async Task<ResolveAlbumShareResponse> Handle(ResolveAlbumShareCommand request, CancellationToken cancellationToken)
     {
         var share = await _albumShares.GetByToken(request.Token, cancellationToken);
-        if (share is null)
+        if (share is null || ShareExpiry.IsExpired(share.ExpiresAt, DateTime.UtcNow))
             return new ResolveAlbumShareResponse { Found = false };
 
         var album = await _albums.GetAlbum(share.AlbumId, cancellationToken);
@@ -91,7 +91,8 @@ public class ResolveAlbumShareCommandHandler : IRequestHandler<ResolveAlbumShare
                 _tempFilesStorage,
                 files.Values.Where(file => !trashed.Contains(file.Id)),
                 baseUrl,
-                cancellationToken);
+                cancellationToken,
+                share.ExpiresAt);
 
             foreach (var item in page)
             {

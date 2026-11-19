@@ -5,6 +5,7 @@ namespace BarkCloud.Files.Persistence;
 public interface IFolderShareStorage
 {
     Task Add(FolderShareLink item, CancellationToken cancellationToken = default);
+    Task Update(FolderShareLink item, CancellationToken cancellationToken = default);
     Task<FolderShareLink?> GetByToken(string token, CancellationToken cancellationToken = default);
     Task<FolderShareLink?> GetByDirectory(long ownerId, Guid directoryId, CancellationToken cancellationToken = default);
     Task<FolderShareLink?> GetById(long ownerId, Guid id, CancellationToken cancellationToken = default);

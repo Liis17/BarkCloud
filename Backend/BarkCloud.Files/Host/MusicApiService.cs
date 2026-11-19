@@ -92,7 +92,12 @@ public class MusicApiService : MusicApi.MusicApiBase
 
     public override Task<MusicPlaylistShareInfo> CreatePlaylistShare(CreateMusicPlaylistShareRequest request, ServerCallContext context)
     {
-        return _music.CreatePlaylistShare(Guid.Parse(request.PlaylistId), request.Name, context.CancellationToken);
+        return _music.CreatePlaylistShare(
+            Guid.Parse(request.PlaylistId),
+            request.Name,
+            request.ExpiresAt?.ToDateTime(),
+            request.ReplaceExpiry,
+            context.CancellationToken);
     }
 
     public override Task<ListMyMusicPlaylistSharesResponse> ListMyPlaylistShares(ListMyMusicPlaylistSharesRequest request, ServerCallContext context)
