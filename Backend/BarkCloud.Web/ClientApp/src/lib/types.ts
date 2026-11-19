@@ -312,7 +312,8 @@ export interface SidebarStorage {
 }
 
 export interface Shell {
-  user: { initials: string; displayName: string; role: string; avatarUrl: string };
+  /** id — идентификатор пользователя строкой (ключ локальных настроек вроде «Продолжить просмотр»). */
+  user: { id?: string; initials: string; displayName: string; role: string; avatarUrl: string };
   storage: SidebarStorage | null;
   app: { version: string; edition: string };
   server: { host: string };

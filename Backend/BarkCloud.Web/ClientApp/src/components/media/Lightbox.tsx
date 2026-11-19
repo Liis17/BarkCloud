@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from '../Icon';
 import { useContextMenu } from '../ui/ContextMenu';
 import { useOptionalAudioPlayer } from '../../hooks/useAudioPlayer';
+import { useShell } from '../../hooks/useShell';
 import { apiGet, fetchClipboardImage, proxiedImageUrl } from '../../lib/api';
 import { persistVolumeRef } from '../../lib/volume';
 import { VideoPlayer } from './MediaPlayer';
@@ -55,6 +56,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
   const pausedMusicRef = React.useRef(false);
   const { menu, openAt } = useContextMenu();
   const musicPlayer = useOptionalAudioPlayer();
+  const userId = useShell()?.user.id;
 
   const cur = list[i] || null;
   const fileId = cur && cur.id;
@@ -299,6 +301,7 @@ export function Lightbox({ items, index = 0, media, onClose, actions }: Lightbox
             }}
             src={url!}
             qualities={videoQualities[fileId!]}
+            resume={userId && fileId ? { userId, fileId } : undefined}
             autoPlay
           />
         )}

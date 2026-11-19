@@ -967,6 +967,14 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
 .video-player-bar .icon-btn.active { background: rgba(255,255,255,.24); color: #fff; }
 .video-player-bar .media-time { color: rgba(255,255,255,.85); }
 .video-player-bar .m3-slider { --active: #fff; --inactive: rgba(255,255,255,.3); }
+/* «Продолжить с …» над контролами */
+.video-resume { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.video-resume-continue {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 10px;
+  border: 0; border-radius: 999px; background: rgba(255,255,255,.92); color: #111;
+  font: inherit; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.video-resume-continue:hover { background: #fff; }
 /* Узкий плеер (вертикальное видео): таймлайн — отдельной строкой на всю ширину, громкость скрыта (остаётся mute) */
 @container (max-width: 520px) {
   .media-controls { flex-wrap: wrap; row-gap: 0; }
