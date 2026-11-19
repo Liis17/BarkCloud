@@ -95,6 +95,7 @@ public static class CloudApiEndpoints
             {
                 user = new
                 {
+                    id = user.UserId.ToString(CultureInfo.InvariantCulture),
                     initials = v.GetValueOrDefault("user.initials"),
                     displayName = v.GetValueOrDefault("user.display_name"),
                     role = v.GetValueOrDefault("user.role"),

@@ -3,6 +3,7 @@ import { Icon } from '../Icon';
 import { Slider } from '../ui/Slider';
 import { formatDuration } from '../../lib/format';
 import { decodeSubtitleBytes, toWebVtt } from '../../lib/subtitles';
+import { clearResumePosition, readResumePosition, saveResumePosition, type ResumeTarget } from '../../lib/playbackResume';
 
 interface MediaState {
   playing: boolean;
@@ -15,6 +16,7 @@ interface MediaState {
 const IDLE: MediaState = { playing: false, time: 0, duration: 0, volume: 1, muted: false };
 const VIDEO_QUALITY_COOKIE = 'bc_video_quality';
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const RESUME_SAVE_INTERVAL_MS = 5000;
 
 export interface VideoQuality {
   height: number;
@@ -142,13 +144,15 @@ interface VideoPlayerProps {
   className?: string;
   /** Крупная кнопка Play по центру кадра, пока видео не играет (публичная страница файла). */
   bigPlay?: boolean;
+  /** Запоминать позицию и предлагать «Продолжить с …» при повторном открытии этого файла. */
+  resume?: ResumeTarget;
   onMediaRef?: (el: HTMLVideoElement | null) => void;
 }
 
 /** Видеоплеер с M3-контролами поверх кадра (вместо нативных controls).
  *  Клавиши при фокусе на плеере: Space/K — пауза, M — звук, F — полный экран.
  *  Есть выбор скорости, картинка-в-картинке (где браузер поддерживает) и локальные субтитры .vtt/.srt. */
-export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPlay, onMediaRef }: VideoPlayerProps) {
+export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPlay, resume, onMediaRef }: VideoPlayerProps) {
   const [el, ref] = useMediaElement<HTMLVideoElement>(onMediaRef);
   const state = useMediaState(el);
   const wrap = React.useRef<HTMLDivElement>(null);
@@ -165,6 +169,10 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
   const [subtitlesUrl, setSubtitlesUrl] = React.useState<string | null>(null);
   const subtitlesInput = React.useRef<HTMLInputElement>(null);
   const [inPip, setInPip] = React.useState(false);
+  // Позиция, с которой предлагаем продолжить; null — предложения нет.
+  const [resumeOffer, setResumeOffer] = React.useState<number | null>(null);
+  const resumeUserId = resume?.userId;
+  const resumeFileId = resume?.fileId;
   const pipSupported = typeof document !== 'undefined' && !!document.pictureInPictureEnabled;
   const originalQuality = qualities?.find((quality) => quality.isOriginal);
   const qualityOptions: VideoQuality[] = [
@@ -208,6 +216,60 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
       el.removeEventListener('leavepictureinpicture', leave);
     };
   }, [el]);
+
+  // «Продолжить просмотр»: отметка читается при открытии файла, пишется раз в несколько секунд,
+  // на паузе, при закрытии плеера и страницы; после окончания ролика удаляется.
+  React.useEffect(() => {
+    if (!el || !resumeUserId || !resumeFileId) {
+      setResumeOffer(null);
+      return;
+    }
+    const target = { userId: resumeUserId, fileId: resumeFileId };
+    setResumeOffer(readResumePosition(target));
+    // Последняя известная позиция: при смене src load() обнуляет currentTime раньше, чем сработает очистка эффекта.
+    const last = { time: 0, duration: 0 };
+    let savedAt = 0;
+    const persist = () => saveResumePosition(target, last.time, last.duration);
+    // Во время смены качества позиция временно сброшена — её не записываем.
+    const capture = () => {
+      if (pendingPlayback.current) return false;
+      last.time = el.currentTime;
+      last.duration = Number.isFinite(el.duration) ? el.duration : 0;
+      return true;
+    };
+    const onTime = () => {
+      const now = Date.now();
+      if (capture() && now - savedAt >= RESUME_SAVE_INTERVAL_MS) {
+        savedAt = now;
+        persist();
+      }
+    };
+    const onPause = () => {
+      if (capture()) persist();
+    };
+    const onEnded = () => {
+      clearResumePosition(target);
+      setResumeOffer(null);
+    };
+    el.addEventListener('timeupdate', onTime);
+    el.addEventListener('pause', onPause);
+    el.addEventListener('ended', onEnded);
+    window.addEventListener('pagehide', persist);
+    return () => {
+      el.removeEventListener('timeupdate', onTime);
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('ended', onEnded);
+      window.removeEventListener('pagehide', persist);
+      persist();
+    };
+  }, [el, resumeUserId, resumeFileId]);
+
+  const continuePlayback = () => {
+    if (!el || resumeOffer === null) return;
+    el.currentTime = resumeOffer;
+    void el.play().catch(() => {});
+    setResumeOffer(null);
+  };
 
   React.useEffect(() => {
     const onChange = () => setIsFull(document.fullscreenElement === wrap.current);
@@ -298,6 +360,16 @@ export function VideoPlayer({ src, qualities, poster, autoPlay, className, bigPl
         </button>
       )}
       <div className="video-player-bar">
+        {resumeOffer !== null && (
+          <div className="video-resume">
+            <button className="video-resume-continue" onClick={continuePlayback}>
+              <Icon.play size={16} /> Продолжить с {formatDuration(resumeOffer)}
+            </button>
+            <button className="icon-btn" onClick={() => setResumeOffer(null)} title="Смотреть сначала" aria-label="Смотреть сначала">
+              <Icon.x size={18} />
+            </button>
+          </div>
+        )}
         <MediaControls
           el={el}
           state={state}
