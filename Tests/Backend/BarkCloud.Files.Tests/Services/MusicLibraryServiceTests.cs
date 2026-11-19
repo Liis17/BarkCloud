@@ -30,7 +30,7 @@ public class MusicLibraryServiceTests : IDisposable
         files.Setup(x => x.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
         var tempFiles = new Mock<ITempFilesStorage>();
-        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>());
         var service = new MusicLibraryService(
             _db.Context,
@@ -87,7 +87,7 @@ public class MusicLibraryServiceTests : IDisposable
         files.Setup(x => x.GetPreviewsForFile(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<FilePreview>());
         var tempFiles = new Mock<ITempFilesStorage>();
-        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>());
         var service = new MusicLibraryService(
             _db.Context, files.Object, tempFiles.Object, UserContextFactory.Create(OwnerId),

@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-
 using BarkCloud.Files.Persistence;
+using BarkCloud.Files.Services;
 using BarkCloud.GrpcServer.XAuth;
 using BarkCloud.Proto.Files;
 using BarkCloud.Shared.Exceptions.Files;
@@ -36,6 +35,8 @@ public class CreateFolderShareCommandHandler : IRequestHandler<CreateFolderShare
     public async Task<FolderShareInfo> Handle(CreateFolderShareCommand request, CancellationToken cancellationToken)
     {
         var ownerId = _userContext.UserId;
+        var now = DateTime.UtcNow;
+        var expiresAt = ShareExpiry.Validate(request.ExpiresAt, now);
 
         // Проверка папки и сохранение ссылки на неё — одна граница: параллельное удаление папки
         // оставило бы публичную ссылку на несуществующую папку.
@@ -48,20 +49,29 @@ public class CreateFolderShareCommandHandler : IRequestHandler<CreateFolderShare
         if (dir.OwnerId != ownerId)
             throw new CloudAccessDeniedException();
 
-        // Идемпотентность: один публичный шар на папку — вернём существующий.
+        // Идемпотентность: один публичный шар на папку — вернём существующий, при необходимости с новым сроком.
         var existing = await _storage.GetByDirectory(ownerId, request.DirectoryId, cancellationToken);
         if (existing is not null)
+        {
+            if (ShareExpiry.Republish(existing, expiresAt, request.ReplaceExpiry, now))
+            {
+                await _storage.Update(existing, cancellationToken);
+                await treeLock.CommitAsync(cancellationToken);
+            }
+
             return ToGrpc(existing);
+        }
 
         var share = new DomainFolderShareLink
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
             DirectoryId = request.DirectoryId,
-            Token = GenerateToken(),
+            Token = ShareExpiry.GenerateToken(),
             Name = string.IsNullOrWhiteSpace(request.Name) ? dir.Name : request.Name,
-            CreatedAt = DateTime.UtcNow,
-            ClickCount = 0
+            CreatedAt = now,
+            ClickCount = 0,
+            ExpiresAt = expiresAt
         };
 
         await _storage.Add(share, cancellationToken);
@@ -73,15 +83,6 @@ public class CreateFolderShareCommandHandler : IRequestHandler<CreateFolderShare
         return ToGrpc(share);
     }
 
-    private static string GenerateToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(16);
-        return Convert.ToBase64String(bytes)
-            .Replace('+', '-')
-            .Replace('/', '_')
-            .TrimEnd('=');
-    }
-
     internal static FolderShareInfo ToGrpc(DomainFolderShareLink share)
     {
         return new FolderShareInfo
@@ -91,7 +92,8 @@ public class CreateFolderShareCommandHandler : IRequestHandler<CreateFolderShare
             DirectoryId = share.DirectoryId.ToString(),
             Name = share.Name,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(share.CreatedAt, DateTimeKind.Utc)),
-            ClickCount = share.ClickCount
+            ClickCount = share.ClickCount,
+            ExpiresAt = ShareExpiry.ToTimestamp(share.ExpiresAt)
         };
     }
 }

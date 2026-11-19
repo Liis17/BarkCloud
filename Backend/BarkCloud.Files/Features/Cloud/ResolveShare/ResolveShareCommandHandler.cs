@@ -37,7 +37,7 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
     public async Task<ResolveShareResponse> Handle(ResolveShareCommand request, CancellationToken cancellationToken)
     {
         var share = await _storage.GetByToken(request.Token, cancellationToken);
-        if (share is null)
+        if (share is null || ShareExpiry.IsExpired(share.ExpiresAt, DateTime.UtcNow))
             return new ResolveShareResponse { Found = false };
 
         // Файл мог быть удалён владельцем после создания ссылки — отдадим 404 вместо мёртвой temp-ссылки.
@@ -55,7 +55,7 @@ public class ResolveShareCommandHandler : IRequestHandler<ResolveShareCommand, R
 
         var baseUrl = FileUrlHelper.GetPublicBaseUrl(_configuration, _runSettings);
         var links = await VideoQualityLinkBuilder.CreateAsync(
-            _filesStorage, _tempFilesStorage, [file], baseUrl, cancellationToken);
+            _filesStorage, _tempFilesStorage, [file], baseUrl, cancellationToken, share.ExpiresAt);
         var fileLinks = links[share.FileId];
         var downloadUrl = fileLinks.OriginalUrl;
 

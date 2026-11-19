@@ -6,7 +6,7 @@ namespace BarkCloud.Files.Domain;
 /// Постоянная публичная ссылка на файл (<see cref="UploadFile"/>). Создаётся владельцем,
 /// резолвится по <see cref="Token"/> анонимно (через сервисный RPC) в публичный URL скачивания.
 /// </summary>
-public class ShareLink
+public class ShareLink : IPublicShareLink
 {
     [Key]
     public Guid Id { get; set; }
@@ -28,4 +28,7 @@ public class ShareLink
 
     /// <summary>Сколько раз по ссылке переходили.</summary>
     public long ClickCount { get; set; }
+
+    /// <summary>Когда ссылка перестаёт открываться (UTC); <c>null</c> — бессрочно.</summary>
+    public DateTime? ExpiresAt { get; set; }
 }

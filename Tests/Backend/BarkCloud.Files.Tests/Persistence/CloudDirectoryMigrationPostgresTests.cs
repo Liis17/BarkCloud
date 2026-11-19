@@ -44,20 +44,21 @@ public sealed class CloudDirectoryMigrationPostgresTests
         await InsertLegacyDirectory(context, photos);
         await InsertLegacyDirectory(context, child);
         CloudFileEntryFixtures.AddOriginals(context, [entry]);
-        context.FolderShareLinks.Add(new FolderShareLink
+        var share = new FolderShareLink
         {
             Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = photos.Id, Token = "roundtrip-folder-share",
             Name = photos.Name, CreatedAt = DateTime.UtcNow
-        });
+        };
         context.DirectoryGrants.Add(new DirectoryGrant
         {
             Id = Guid.NewGuid(), OwnerId = OwnerId, DirectoryId = photos.Id, RecipientId = 77, CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
         await InsertLegacyEntry(context, entry);
+        await InsertLegacyFolderShare(context, share);
         var legacyDirectories = await LegacyDirectoryRows(context);
         var entries = await context.CloudFileEntries.AsNoTracking().ToListAsync();
-        var shares = await context.FolderShareLinks.AsNoTracking().ToListAsync();
+        var shares = await LegacyFolderShareRows(context);
         var grants = await context.DirectoryGrants.AsNoTracking().ToListAsync();
 
         await context.Database.MigrateAsync();
@@ -76,7 +77,7 @@ public sealed class CloudDirectoryMigrationPostgresTests
         await AssertVisibilityDefaults(context);
         (await LegacyDirectoryRows(context)).Should().Equal(legacyDirectories);
         (await context.CloudFileEntries.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(entries);
-        (await context.FolderShareLinks.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(shares);
+        (await LegacyFolderShareRows(context)).Should().Equal(shares);
         (await context.DirectoryGrants.AsNoTracking().ToListAsync()).Should().BeEquivalentTo(grants);
     }
 
@@ -128,10 +129,10 @@ public sealed class CloudDirectoryMigrationPostgresTests
         await InsertLegacyDirectory(context, second);
         await InsertLegacyDirectory(context, child);
         CloudFileEntryFixtures.AddOriginals(context, [entry]);
-        context.FolderShareLinks.Add(share);
         context.DirectoryGrants.Add(grant);
         await context.SaveChangesAsync();
         await InsertLegacyEntry(context, entry);
+        await InsertLegacyFolderShare(context, share);
         var before = await LegacyDirectoryRows(context);
 
         var migrate = () => context.Database.MigrateAsync();
@@ -145,7 +146,7 @@ public sealed class CloudDirectoryMigrationPostgresTests
         (await LegacyDirectoryRows(context)).Should().Equal(before);
         var storage = new CloudHierarchyStorage(context);
         (await storage.GetFileEntry(entry.Id))!.DirectoryId.Should().Be(second.Id);
-        (await context.FolderShareLinks.AsNoTracking().SingleAsync()).DirectoryId.Should().Be(second.Id);
+        (await LegacyFolderShareRows(context)).Should().ContainSingle().Which.Should().Contain($"|{second.Id}|");
         (await context.DirectoryGrants.AsNoTracking().SingleAsync()).DirectoryId.Should().Be(second.Id);
 
         // Исправление выполняет оператор; миграция сама не переименовывает и не объединяет папки.
@@ -184,6 +185,21 @@ public sealed class CloudDirectoryMigrationPostgresTests
             VALUES ({entry.Id}, {entry.OwnerId}, {entry.DirectoryId}, {entry.FileId}, {entry.Name}, {entry.CreatedAt},
                 {entry.IsDeleted}, {entry.DeletedAt}, {entry.PurgeAt})
             """);
+
+    // Публичные ссылки на папки тоже пишем и читаем сырым SQL: в легаси-схеме нет колонок текущей модели (ExpiresAt).
+    private static Task<int> InsertLegacyFolderShare(FilesContext context, FolderShareLink share) =>
+        context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "FolderShareLinks" ("Id", "OwnerId", "DirectoryId", "Token", "Name", "CreatedAt", "ClickCount")
+            VALUES ({share.Id}, {share.OwnerId}, {share.DirectoryId}, {share.Token}, {share.Name}, {share.CreatedAt}, {share.ClickCount})
+            """);
+
+    private static Task<List<string>> LegacyFolderShareRows(FilesContext context) =>
+        context.Database.SqlQuery<string>($"""
+            SELECT "Id"::text || '|' || "OwnerId"::text || '|' || "DirectoryId"::text || '|' || "Token" || '|'
+                || "Name" || '|' || "CreatedAt"::text || '|' || "ClickCount"::text AS "Value"
+            FROM "FolderShareLinks"
+            ORDER BY "Id"
+            """).ToListAsync();
 
     private static Task<List<string>> LegacyDirectoryRows(FilesContext context) =>
         context.Database.SqlQuery<string>($"""

@@ -994,11 +994,14 @@ message MusicPlaylistShareInfo {
   google.protobuf.Timestamp created_at = 5;
   int64 click_count = 6;
   string cover_preview_url = 7;
+  google.protobuf.Timestamp expires_at = 8; // Когда ссылка перестанет открываться; не задано — бессрочно
 }
 
 message CreateMusicPlaylistShareRequest {
   string playlist_id = 1;
   string name = 2;
+  google.protobuf.Timestamp expires_at = 3; // Срок действия (в будущем); не задано — бессрочно
+  bool replace_expiry = 4;                  // Ссылка уже есть: true — заменить её срок на expires_at, false — оставить прежний
 }
 
 message ListMyMusicPlaylistSharesRequest {
@@ -1352,11 +1355,13 @@ message ShareInfo {
   int64 click_count = 6;                    // Сколько раз по ссылке переходили
   MediaKind media_kind = 7;                 // Тип медиа файла (для отрисовки карточки)
   string preview_url = 8;                   // Публичный URL превью (фото/видео); пусто — превью нет
+  google.protobuf.Timestamp expires_at = 9; // Когда ссылка перестанет открываться; не задано — бессрочно
 }
 
 message CreateShareRequest {
   string file_id = 1; // Идентификатор файла, на который создаётся ссылка
   string name = 2;    // Имя файла (для отображения в списке)
+  google.protobuf.Timestamp expires_at = 3; // Срок действия (в будущем); не задано — бессрочно
 }
 
 message ListMySharesRequest {
@@ -1473,11 +1478,14 @@ message FolderShareInfo {
   string name = 4;                          // Имя папки на момент публикации
   google.protobuf.Timestamp created_at = 5; // Когда опубликована
   int64 click_count = 6;                    // Сколько раз открывали
+  google.protobuf.Timestamp expires_at = 7; // Когда ссылка перестанет открываться; не задано — бессрочно
 }
 
 message CreateFolderShareRequest {
   string directory_id = 1;
   string name = 2;
+  google.protobuf.Timestamp expires_at = 3; // Срок действия (в будущем); не задано — бессрочно
+  bool replace_expiry = 4;                  // Ссылка уже есть: true — заменить её срок на expires_at, false — оставить прежний
 }
 
 message ListMyFolderSharesRequest {
@@ -1537,11 +1545,14 @@ message AlbumShareInfo {
   google.protobuf.Timestamp created_at = 5; // Когда опубликован
   int64 click_count = 6;                    // Сколько раз открывали
   string cover_preview_url = 7;             // URL превью обложки альбома (пусто, если нет)
+  google.protobuf.Timestamp expires_at = 8; // Когда ссылка перестанет открываться; не задано — бессрочно
 }
 
 message CreateAlbumShareRequest {
   string album_id = 1;
   string name = 2;
+  google.protobuf.Timestamp expires_at = 3; // Срок действия (в будущем); не задано — бессрочно
+  bool replace_expiry = 4;                  // Ссылка уже есть: true — заменить её срок на expires_at, false — оставить прежний
 }
 
 message ListMyAlbumSharesRequest {

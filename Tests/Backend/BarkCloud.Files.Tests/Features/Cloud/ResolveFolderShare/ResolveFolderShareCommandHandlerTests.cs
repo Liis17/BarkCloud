@@ -57,7 +57,7 @@ public class ResolveFolderShareCommandHandlerTests
             {
                 [fileId] = [new(variantId, 360, 640, 360, 300)]
             });
-        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>
             {
                 new() { Id = originalTempId, OriginalFileId = fileId },
@@ -109,7 +109,7 @@ public class ResolveFolderShareCommandHandlerTests
         files.Setup(x => x.GetFiles(It.IsAny<List<Guid>>())).ReturnsAsync(new List<UploadFileEntity>());
         files.Setup(x => x.GetPreviewsForFiles(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, List<FilePreview>>());
-        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        tempFiles.Setup(x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFile>());
 
         var handler = new ResolveFolderShareCommandHandler(
@@ -126,7 +126,7 @@ public class ResolveFolderShareCommandHandlerTests
         response.Found.Should().BeTrue();
         response.Files.Should().BeEmpty();
         tempFiles.Verify(
-            x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            x => x.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon';
 import { EmptyState, Loading } from '../components/ui/EmptyState';
 import { SharedFolderModal } from '../components/ui/SharedFolderModal';
 import { Modal } from '../components/ui/Modal';
+import { formatLinkExpiry } from '../components/ui/PublicLinkModal';
 import { VideoPlayer, type VideoQuality } from '../components/media/MediaPlayer';
 import { useToast } from '../hooks/useToast';
 import { useTextFileViewer } from '../hooks/useTextFileViewer';
@@ -104,6 +105,7 @@ function groupIFolders(items: IFolderShareItem[]): IFolderGroup[] {
 }
 
 function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: ShareLink) => void; onRevoke: (l: ShareLink) => void }) {
+  const expired = !!link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now();
   return (
     <div className="link-card">
       <div className="link-icon" style={link.previewUrl ? { overflow: 'hidden' } : undefined}>
@@ -133,9 +135,19 @@ function LinkCard({ link, onCopy, onRevoke }: { link: ShareLink; onCopy: (l: Sha
         <div className="meta-line">
           <span className="k">Создана</span> <span style={{ color: 'var(--md-on-surface)' }}>{fmtDate(link.createdAt)}</span>
         </div>
+        <div className="meta-line">
+          {expired ? (
+            <span style={{ color: 'var(--md-error)', fontWeight: 500 }}>Истекла</span>
+          ) : (
+            <>
+              <span className="k">Действует до</span>{' '}
+              <span style={{ color: 'var(--md-on-surface)' }}>{link.expiresAt ? formatLinkExpiry(link.expiresAt) : 'бессрочно'}</span>
+            </>
+          )}
+        </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-        <button className="icon-btn" title="Скопировать ссылку" onClick={() => onCopy(link)}>
+        <button className="icon-btn" title={expired ? 'Срок ссылки истёк' : 'Скопировать ссылку'} disabled={expired} onClick={() => onCopy(link)}>
           <Icon.link size={18} />
         </button>
         <button className="icon-btn" title="Отозвать ссылку" onClick={() => onRevoke(link)}>

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 
 using BarkCloud.Files.Domain;
 using BarkCloud.Files.Helpers;
@@ -347,23 +346,30 @@ public class MusicLibraryService
         return new CloudEmpty();
     }
 
-    public async Task<MusicPlaylistShareInfo> CreatePlaylistShare(Guid playlistId, string? name, CancellationToken cancellationToken)
+    public async Task<MusicPlaylistShareInfo> CreatePlaylistShare(
+        Guid playlistId, string? name, DateTime? expiresAt, bool replaceExpiry, CancellationToken cancellationToken)
     {
+        var now = DateTime.UtcNow;
+        expiresAt = ShareExpiry.Validate(expiresAt, now);
         var playlist = await GetOwnedPlaylist(playlistId, cancellationToken);
         var existing = await _context.MusicPlaylistShareLinks
-            .AsNoTracking()
             .FirstOrDefaultAsync(x => x.OwnerId == playlist.OwnerId && x.PlaylistId == playlistId, cancellationToken);
         if (existing is not null)
+        {
+            if (ShareExpiry.Republish(existing, expiresAt, replaceExpiry, now))
+                await _context.SaveChangesAsync(cancellationToken);
             return await ToShareInfo(existing, cancellationToken);
+        }
 
         var share = new MusicPlaylistShareLink
         {
             Id = Guid.NewGuid(),
             OwnerId = playlist.OwnerId,
             PlaylistId = playlist.Id,
-            Token = GenerateToken(),
+            Token = ShareExpiry.GenerateToken(),
             Name = string.IsNullOrWhiteSpace(name) ? playlist.Name : name.Trim(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now,
+            ExpiresAt = expiresAt
         };
 
         _context.MusicPlaylistShareLinks.Add(share);
@@ -514,7 +520,7 @@ public class MusicLibraryService
         var share = await _context.MusicPlaylistShareLinks
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Token == token, cancellationToken);
-        if (share is null)
+        if (share is null || ShareExpiry.IsExpired(share.ExpiresAt, DateTime.UtcNow))
             return new ResolveMusicPlaylistShareResponse { Found = false };
 
         var playlist = await _context.MusicPlaylists
@@ -533,7 +539,7 @@ public class MusicLibraryService
             .OrderBy(x => x.Position)
             .ToListAsync(cancellationToken);
         var files = await _filesStorage.GetFiles(items.Select(x => x.FileId).Distinct().ToList());
-        var tracks = await BuildTracks(files, playlist.OwnerId, cancellationToken);
+        var tracks = await BuildTracks(files, playlist.OwnerId, cancellationToken, share.ExpiresAt);
 
         var response = new ResolveMusicPlaylistShareResponse
         {
@@ -563,7 +569,8 @@ public class MusicLibraryService
     private async Task<List<MusicTrackInfo>> BuildTracks(
         IReadOnlyCollection<UploadFile> files,
         long? entryOwnerId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DateTime? linksNotAfter = null)
     {
         if (files.Count == 0)
             return new List<MusicTrackInfo>();
@@ -597,7 +604,7 @@ public class MusicLibraryService
             .Where(x => ids.Contains(x.FileId))
             .ToDictionaryAsync(x => x.FileId, cancellationToken);
         var previews = await _filesStorage.GetPreviewsForFiles(ids, cancellationToken);
-        var tempFiles = await _tempFiles.CreateTempFilesBatchAsync(ids, cancellationToken);
+        var tempFiles = await _tempFiles.CreateTempFilesBatchAsync(ids, linksNotAfter, cancellationToken);
         var tempByFile = tempFiles
             .GroupBy(x => x.OriginalFileId)
             .ToDictionary(x => x.Key, x => x.First().Id);
@@ -699,7 +706,8 @@ public class MusicLibraryService
             Name = share.Name,
             CreatedAt = Timestamp.FromDateTime(DateTime.SpecifyKind(share.CreatedAt, DateTimeKind.Utc)),
             ClickCount = share.ClickCount,
-            CoverPreviewUrl = playlist is null ? string.Empty : await ResolvePlaylistCoverUrl(playlist, cancellationToken)
+            CoverPreviewUrl = playlist is null ? string.Empty : await ResolvePlaylistCoverUrl(playlist, cancellationToken),
+            ExpiresAt = ShareExpiry.ToTimestamp(share.ExpiresAt)
         };
     }
 
@@ -766,14 +774,5 @@ public class MusicLibraryService
             .FirstOrDefault();
 
         return preview is null ? string.Empty : FileUrlHelper.GenerateDownloadUrl(BaseUrl(), preview.PreviewFileId);
-    }
-
-    private static string GenerateToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(16);
-        return Convert.ToBase64String(bytes)
-            .Replace('+', '-')
-            .Replace('/', '_')
-            .TrimEnd('=');
     }
 }

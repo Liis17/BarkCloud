@@ -8,7 +8,7 @@ namespace BarkCloud.Files.Domain;
 /// содержимое папки (подпапки + файлы) отдаётся всегда актуальным, отдельные публичные ссылки
 /// на каждый файл не создаются. Один публичный шар на папку (уникальность по владельцу+папке).
 /// </summary>
-public class FolderShareLink
+public class FolderShareLink : IPublicShareLink
 {
     [Key]
     public Guid Id { get; set; }
@@ -30,4 +30,7 @@ public class FolderShareLink
 
     /// <summary>Сколько раз открывали публичную папку.</summary>
     public long ClickCount { get; set; }
+
+    /// <summary>Когда ссылка перестаёт открываться (UTC); <c>null</c> — бессрочно.</summary>
+    public DateTime? ExpiresAt { get; set; }
 }

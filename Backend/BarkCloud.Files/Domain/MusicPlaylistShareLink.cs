@@ -5,7 +5,7 @@ namespace BarkCloud.Files.Domain;
 /// <summary>
 /// Публичная ссылка на музыкальный плейлист.
 /// </summary>
-public class MusicPlaylistShareLink
+public class MusicPlaylistShareLink : IPublicShareLink
 {
     [Key]
     public Guid Id { get; set; }
@@ -21,4 +21,7 @@ public class MusicPlaylistShareLink
     public DateTime CreatedAt { get; set; }
 
     public long ClickCount { get; set; }
+
+    /// <summary>Когда ссылка перестаёт открываться (UTC); <c>null</c> — бессрочно.</summary>
+    public DateTime? ExpiresAt { get; set; }
 }

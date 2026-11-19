@@ -43,7 +43,7 @@ public class GetSharedFileDownloadUrlCommandHandlerTests
         var act = () => CreateSut().Handle(new GetSharedFileDownloadUrlCommand { FileId = fileId }, default);
 
         await act.Should().ThrowAsync<CloudAccessDeniedException>();
-        _temp.Verify(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _temp.Verify(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class GetSharedFileDownloadUrlCommandHandlerTests
             {
                 [fileId] = [new(variantId, 360, 640, 360, 300)]
             });
-        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+        _temp.Setup(s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TempFileEntity>
             {
                 new() { Id = tempId, OriginalFileId = fileId },
@@ -98,7 +98,7 @@ public class GetSharedFileDownloadUrlCommandHandlerTests
 
         await act.Should().ThrowAsync<FileNotReadyException>();
         _temp.Verify(
-            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            s => s.CreateTempFilesBatchAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

@@ -44,7 +44,7 @@ public class ResolveFolderShareCommandHandler : IRequestHandler<ResolveFolderSha
     public async Task<ResolveFolderShareResponse> Handle(ResolveFolderShareCommand request, CancellationToken cancellationToken)
     {
         var share = await _folderShares.GetByToken(request.Token, cancellationToken);
-        if (share is null)
+        if (share is null || ShareExpiry.IsExpired(share.ExpiresAt, DateTime.UtcNow))
             return new ResolveFolderShareResponse { Found = false };
 
         var ownerId = share.OwnerId;
@@ -92,7 +92,7 @@ public class ResolveFolderShareCommandHandler : IRequestHandler<ResolveFolderSha
             var files = (await _filesStorage.GetFiles(fileIds)).ToDictionary(f => f.Id);
             var previewsByFile = await _filesStorage.GetPreviewsForFiles(files.Keys, cancellationToken);
             var downloadLinks = await VideoQualityLinkBuilder.CreateAsync(
-                _filesStorage, _tempFilesStorage, files.Values, baseUrl, cancellationToken);
+                _filesStorage, _tempFilesStorage, files.Values, baseUrl, cancellationToken, share.ExpiresAt);
 
             foreach (var e in entries)
             {

@@ -35,9 +35,12 @@ public class TempFilesStorage : ITempFilesStorage
     /// Пакетное создание временных ссылок одним SaveChangesAsync.
     /// Избавляет от N round-trip'ов к БД при запросе ссылок на множество файлов.
     /// </summary>
-    public async Task<List<TempFile>> CreateTempFilesBatchAsync(IEnumerable<Guid> fileIds, CancellationToken cancellationToken = default)
+    public async Task<List<TempFile>> CreateTempFilesBatchAsync(
+        IEnumerable<Guid> fileIds, DateTime? notAfter = null, CancellationToken cancellationToken = default)
     {
         var expiresAt = GetExpiresAt();
+        if (notAfter is { } limit && limit < expiresAt)
+            expiresAt = limit;
 
         var tempFiles = fileIds
             .Select(id => new TempFile { OriginalFileId = id, ExpiresAt = expiresAt })

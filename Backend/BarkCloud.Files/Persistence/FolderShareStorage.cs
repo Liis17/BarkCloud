@@ -23,6 +23,13 @@ public class FolderShareStorage : IFolderShareStorage
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>Сохранить токен, срок и счётчик ссылки после повторной публикации.</summary>
+    public async Task Update(FolderShareLink item, CancellationToken cancellationToken = default)
+    {
+        _context.FolderShareLinks.Update(item);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<FolderShareLink?> GetByToken(string token, CancellationToken cancellationToken = default)
     {
         return await _context.FolderShareLinks

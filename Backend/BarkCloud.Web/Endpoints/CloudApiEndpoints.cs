@@ -670,7 +670,13 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 var info = await music.CreatePlaylistShareAsync(
-                    new CreateMusicPlaylistShareRequest { PlaylistId = body.PlaylistId, Name = body.Name ?? "" }, token);
+                    new CreateMusicPlaylistShareRequest
+                    {
+                        PlaylistId = body.PlaylistId,
+                        Name = body.Name ?? "",
+                        ExpiresAt = ExpiryTimestamp(body.ExpiresAt),
+                        ReplaceExpiry = true
+                    }, token);
                 return Results.Json(MusicPlaylistShareJson(http, info), Json);
             }));
 
@@ -820,7 +826,7 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 var info = await cloud.CreateShareAsync(
-                    new CreateShareRequest { FileId = body.FileId, Name = body.Name ?? "" }, token);
+                    new CreateShareRequest { FileId = body.FileId, Name = body.Name ?? "", ExpiresAt = ExpiryTimestamp(body.ExpiresAt) }, token);
                 return Results.Json(ShareJson(http, info), Json);
             }));
 
@@ -856,7 +862,13 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 var info = await cloud.CreateFolderShareAsync(
-                    new CreateFolderShareRequest { DirectoryId = body.DirectoryId, Name = body.Name ?? "" }, token);
+                    new CreateFolderShareRequest
+                    {
+                        DirectoryId = body.DirectoryId,
+                        Name = body.Name ?? "",
+                        ExpiresAt = ExpiryTimestamp(body.ExpiresAt),
+                        ReplaceExpiry = true
+                    }, token);
                 return Results.Json(FolderShareJson(http, info), Json);
             }));
 
@@ -892,7 +904,13 @@ public static class CloudApiEndpoints
             await Guarded(http, auth, async token =>
             {
                 var info = await cloud.CreateAlbumShareAsync(
-                    new CreateAlbumShareRequest { AlbumId = body.AlbumId, Name = body.Name ?? "" }, token);
+                    new CreateAlbumShareRequest
+                    {
+                        AlbumId = body.AlbumId,
+                        Name = body.Name ?? "",
+                        ExpiresAt = ExpiryTimestamp(body.ExpiresAt),
+                        ReplaceExpiry = true
+                    }, token);
                 return Results.Json(AlbumShareJson(http, info), Json);
             }));
 
@@ -1564,11 +1582,16 @@ public static class CloudApiEndpoints
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
             clickCount = s.ClickCount,
             mediaKind,
-            previewUrl = s.PreviewUrl
+            previewUrl = s.PreviewUrl,
+            expiresAt = s.ExpiresAt?.ToDateTimeOffset()
         };
     }
 
     /// <summary>JSON-представление публичной папки. URL `/f/{token}` собирается из App:PublicHost либо хоста запроса.</summary>
+    /// <summary>Срок публичной ссылки из тела запроса; <c>null</c> — бессрочно.</summary>
+    private static Timestamp? ExpiryTimestamp(DateTimeOffset? expiresAt) =>
+        expiresAt is { } value ? Timestamp.FromDateTimeOffset(value.ToUniversalTime()) : null;
+
     private static object FolderShareJson(HttpContext http, FolderShareInfo s)
     {
         var origin = ResolveOrigin(http);
@@ -1581,7 +1604,8 @@ public static class CloudApiEndpoints
             directoryId = s.DirectoryId,
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
-            clickCount = s.ClickCount
+            clickCount = s.ClickCount,
+            expiresAt = s.ExpiresAt?.ToDateTimeOffset()
         };
     }
 
@@ -1599,7 +1623,8 @@ public static class CloudApiEndpoints
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
             clickCount = s.ClickCount,
-            previewUrl = s.CoverPreviewUrl
+            previewUrl = s.CoverPreviewUrl,
+            expiresAt = s.ExpiresAt?.ToDateTimeOffset()
         };
     }
 
@@ -1698,7 +1723,8 @@ public static class CloudApiEndpoints
             name = s.Name,
             createdAt = s.CreatedAt?.ToDateTimeOffset(),
             clickCount = s.ClickCount,
-            previewUrl = s.CoverPreviewUrl
+            previewUrl = s.CoverPreviewUrl,
+            expiresAt = s.ExpiresAt?.ToDateTimeOffset()
         };
     }
 
@@ -1956,17 +1982,17 @@ public static class CloudApiEndpoints
         string? ContentType,
         string Sha256);
     private sealed record VideoThumbReq(string VideoFileId, string ImageFileId);
-    private sealed record ShareCreateReq(string FileId, string? Name);
+    private sealed record ShareCreateReq(string FileId, string? Name, DateTimeOffset? ExpiresAt);
     private sealed record ShareIdReq(string ShareId);
-    private sealed record FolderShareCreateReq(string DirectoryId, string? Name);
+    private sealed record FolderShareCreateReq(string DirectoryId, string? Name, DateTimeOffset? ExpiresAt);
     private sealed record FolderShareIdReq(string FolderShareId);
-    private sealed record AlbumShareCreateReq(string AlbumId, string? Name);
+    private sealed record AlbumShareCreateReq(string AlbumId, string? Name, DateTimeOffset? ExpiresAt);
     private sealed record AlbumShareIdReq(string AlbumShareId);
     private sealed record MusicPlaylistCreate(string Name, string? Description);
     private sealed record MusicPlaylistUpdate(string PlaylistId, string? Name, string? Description, string? CoverFileId);
     private sealed record MusicPlaylistIdReq(string PlaylistId);
     private sealed record MusicPlaylistItemsReq(string PlaylistId, string[]? FileIds);
-    private sealed record MusicPlaylistShareCreate(string PlaylistId, string? Name);
+    private sealed record MusicPlaylistShareCreate(string PlaylistId, string? Name, DateTimeOffset? ExpiresAt);
     private sealed record MusicPlaylistShareIdReq(string ShareId);
     private sealed record MusicPlaylistUserGrant(string PlaylistId, long RecipientUserId);
     private sealed record MusicPlaylistGrantIdReq(string GrantId);

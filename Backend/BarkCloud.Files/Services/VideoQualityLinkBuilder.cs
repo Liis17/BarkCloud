@@ -13,7 +13,8 @@ internal static class VideoQualityLinkBuilder
         ITempFilesStorage tempFilesStorage,
         IEnumerable<UploadFile> sourceFiles,
         string baseUrl,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DateTime? notAfter = null)
     {
         var files = sourceFiles.DistinctBy(file => file.Id).ToList();
         if (files.Count == 0)
@@ -29,7 +30,7 @@ internal static class VideoQualityLinkBuilder
             .Concat(variantsByOriginal.Values.SelectMany(variants => variants).Select(variant => variant.FileId))
             .Distinct()
             .ToList();
-        var tempFiles = await tempFilesStorage.CreateTempFilesBatchAsync(allFileIds, cancellationToken);
+        var tempFiles = await tempFilesStorage.CreateTempFilesBatchAsync(allFileIds, notAfter, cancellationToken);
         var urlsByFileId = tempFiles.ToDictionary(
             tempFile => tempFile.OriginalFileId,
             tempFile => FileUrlHelper.GenerateDownloadUrl(baseUrl, tempFile.Id));
