@@ -41,11 +41,11 @@ public static class WebEndpoints
                 var resp = await filesServer.ResolveShareAsync(new ResolveShareRequest { Token = token });
                 return resp.Found
                     ? Results.Redirect(resp.DownloadUrl)
-                    : Results.NotFound("Ссылка не найдена или была отозвана.");
+                    : Results.NotFound("Ссылка не найдена, отозвана или истёк срок её действия.");
             }
             catch (RpcException)
             {
-                return Results.NotFound("Ссылка не найдена или была отозвана.");
+                return Results.NotFound("Ссылка не найдена, отозвана или истёк срок её действия.");
             }
         });
 

@@ -114,7 +114,7 @@ export function PublicMusicPlaylistPage() {
     return (
       <PublicStatus
         title="Плейлист недоступен"
-        text="Плейлист не найден или владелец отозвал доступ."
+        text="Плейлист не найден, владелец отозвал доступ или истёк срок ссылки."
       />
     );
   }

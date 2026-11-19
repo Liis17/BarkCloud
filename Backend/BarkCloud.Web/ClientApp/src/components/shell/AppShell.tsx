@@ -12,6 +12,7 @@ import { MiniPlayer } from '../music/MiniPlayer';
 import { useApiResource } from '../../hooks/useApiResource';
 import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed';
 import { storagePending } from '../ui/StorageStatsStatus';
+import { PublicLinkDialogHost } from '../ui/PublicLinkModal';
 import type { Shell, SidebarStorage } from '../../lib/types';
 
 /** Каркас приложения: layout-route. Грузит /api/me один раз, держит Sidebar/Topbar/Footbar
@@ -59,6 +60,7 @@ export function AppShell() {
               </div>
             </div>
             <MiniPlayer />
+            <PublicLinkDialogHost />
           </PageHeaderContext.Provider>
         </AudioPlayerProvider>
       </UploadManagerProvider>

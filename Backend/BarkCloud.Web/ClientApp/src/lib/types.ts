@@ -245,6 +245,8 @@ export interface ShareLink {
   name: string;
   createdAt: string | null;
   clickCount: number;
+  /** Окончание срока действия; `null`/нет — бессрочно. */
+  expiresAt?: string | null;
   kind?: 'file' | 'folder' | 'album' | 'musicPlaylist';
   mediaKind?: string;
   previewUrl?: string;

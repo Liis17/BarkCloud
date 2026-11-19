@@ -73,7 +73,7 @@ export function PublicMusicTrackPage() {
     return (
       <PublicStatus
         title="Трек недоступен"
-        text="Трек не найден или владелец отозвал доступ."
+        text="Трек не найден, владелец отозвал доступ или истёк срок ссылки."
       />
     );
   }

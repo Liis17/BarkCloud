@@ -1,50 +1,48 @@
 import { apiPost } from './api';
 import type { ShareLink } from './types';
 import type { ToastPush } from '../hooks/useToast';
+import { formatLinkExpiry, openPublicLinkDialog } from '../components/ui/PublicLinkModal';
 
 /**
- * Создать постоянную публичную ссылку на файл и скопировать её в буфер.
+ * Спросить срок действия, создать публичную ссылку и скопировать её в буфер.
+ * Ошибка показывается тостом, диалог при этом остаётся открытым.
+ */
+function createWithExpiry(title: string, url: string, body: object, copiedText: string, errorText: string, toast: ToastPush): void {
+  openPublicLinkDialog({
+    title,
+    create: async (expiresAt) => {
+      let link: ShareLink;
+      try {
+        link = await apiPost<ShareLink>(url, { ...body, expiresAt });
+        await navigator.clipboard.writeText(link.url);
+      } catch (e) {
+        toast((e as Error).message || errorText, 'err');
+        throw e;
+      }
+      toast(link.expiresAt ? `${copiedText} · действует до ${formatLinkExpiry(link.expiresAt)}` : copiedText);
+    },
+  });
+}
+
+/**
+ * Создать публичную ссылку на файл и скопировать её в буфер.
  * Используется из контекстных меню «Файлы» и галерей «Фото»/«Видео».
  */
-export async function createShare(fileId: string, name: string, toast: ToastPush): Promise<void> {
-  try {
-    const link = await apiPost<ShareLink>('/api/shares', { fileId, name });
-    await navigator.clipboard.writeText(link.url);
-    toast('Публичная ссылка скопирована');
-  } catch (e) {
-    toast((e as Error).message || 'Не удалось создать ссылку', 'err');
-  }
+export function createShare(fileId: string, name: string, toast: ToastPush): void {
+  createWithExpiry('Публичная ссылка на файл', '/api/shares', { fileId, name }, 'Публичная ссылка скопирована', 'Не удалось создать ссылку', toast);
 }
 
-/** Сделать папку публичной (идемпотентно) и скопировать ссылку /f/{token} в буфер. */
-export async function createFolderShare(directoryId: string, name: string, toast: ToastPush): Promise<void> {
-  try {
-    const link = await apiPost<{ url: string }>('/api/folder-shares', { directoryId, name });
-    await navigator.clipboard.writeText(link.url);
-    toast('Ссылка на папку скопирована');
-  } catch (e) {
-    toast((e as Error).message || 'Не удалось сделать папку публичной', 'err');
-  }
+/** Сделать папку публичной (идемпотентно, срок заменяется выбранным) и скопировать ссылку /f/{token}. */
+export function createFolderShare(directoryId: string, name: string, toast: ToastPush): void {
+  createWithExpiry('Публичная ссылка на папку', '/api/folder-shares', { directoryId, name }, 'Ссылка на папку скопирована', 'Не удалось сделать папку публичной', toast);
 }
 
-/** Сделать альбом публичным (идемпотентно) и скопировать ссылку /al/{token} в буфер. */
-export async function createAlbumShare(albumId: string, name: string, toast: ToastPush): Promise<void> {
-  try {
-    const link = await apiPost<{ url: string }>('/api/album-shares', { albumId, name });
-    await navigator.clipboard.writeText(link.url);
-    toast('Ссылка на альбом скопирована');
-  } catch (e) {
-    toast((e as Error).message || 'Не удалось сделать альбом публичным', 'err');
-  }
+/** Сделать альбом публичным (идемпотентно, срок заменяется выбранным) и скопировать ссылку /al/{token}. */
+export function createAlbumShare(albumId: string, name: string, toast: ToastPush): void {
+  createWithExpiry('Публичная ссылка на альбом', '/api/album-shares', { albumId, name }, 'Ссылка на альбом скопирована', 'Не удалось сделать альбом публичным', toast);
 }
 
-/** Сделать музыкальный плейлист публичным (идемпотентно) и скопировать ссылку /mpl/{token} в буфер. */
-export async function createMusicPlaylistShare(playlistId: string, name: string, toast: ToastPush): Promise<void> {
-  try {
-    const link = await apiPost<{ url: string }>('/api/music/playlist-shares', { playlistId, name });
-    await navigator.clipboard.writeText(link.url);
-    toast('Ссылка на плейлист скопирована');
-  } catch (e) {
-    toast((e as Error).message || 'Не удалось сделать плейлист публичным', 'err');
-  }
+/** Сделать музыкальный плейлист публичным (идемпотентно, срок заменяется выбранным) и скопировать ссылку /mpl/{token}. */
+export function createMusicPlaylistShare(playlistId: string, name: string, toast: ToastPush): void {
+  createWithExpiry('Публичная ссылка на плейлист', '/api/music/playlist-shares', { playlistId, name }, 'Ссылка на плейлист скопирована', 'Не удалось сделать плейлист публичным', toast);
 }
