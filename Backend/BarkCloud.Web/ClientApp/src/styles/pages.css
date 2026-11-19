@@ -4,6 +4,7 @@
 /* ─────────── Единый поиск ─────────── */
 .search-page { padding-bottom: 48px; }
 .search-page-summary { color: var(--md-on-surface-variant); margin-bottom: 26px; }
+.search-section-filter { margin: -12px 0 26px; }
 .search-section { margin-bottom: 42px; }
 .search-section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
 .search-section-head h2 { font-size: 22px; font-weight: 500; }

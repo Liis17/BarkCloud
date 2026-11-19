@@ -28,12 +28,17 @@ export function SearchPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const player = useAudioPlayer();
-  const q = new URLSearchParams(location.search).get('q')?.trim() || '';
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q')?.trim() || '';
+  /** Выбранный раздел живёт в URL (`section`), чтобы «Назад» возвращал к той же выборке. */
+  const sectionParam = params.get('section');
   const [sections, setSections] = React.useState<SectionState[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   /** Открытый в Lightbox файл и его секция: листание идёт по уже загруженным результатам этой секции. */
   const [lightbox, setLightbox] = React.useState<{ section: SearchSectionKey; fileId: string } | null>(null);
   const [toastNode, toast] = useToast();
+  /** Контроллер текущей фразы: дозагрузка секций отменяется и игнорируется вместе с основным поиском. */
+  const searchController = React.useRef<AbortController | null>(null);
 
   function patchHit(hit: SearchHit, patch: Partial<SearchHit>) {
     setSections((current) => current?.map((section) => ({ ...section, items: section.items.map((item) => sameHit(item, hit) ? { ...item, ...patch } : item) })) || null);
@@ -78,6 +83,7 @@ export function SearchPage() {
       return;
     }
     const controller = new AbortController();
+    searchController.current = controller;
     setSections(null);
     setError(null);
     setLightbox(null);
@@ -95,16 +101,19 @@ export function SearchPage() {
   }, [q]);
 
   async function loadMore(section: SectionState) {
-    if (section.loadingMore || !section.hasMore || !section.nextCursor) return;
+    const controller = searchController.current;
+    if (!controller || controller.signal.aborted || section.loadingMore || !section.hasMore || !section.nextCursor) return;
     setSections((current) => current?.map((item) => item.key === section.key ? { ...item, loadingMore: true, error: undefined } : item) || null);
     try {
-      const response = await apiGet<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}&section=${encodeURIComponent(section.key)}&cursor=${encodeURIComponent(section.nextCursor)}`);
+      const response = await apiGet<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}&section=${encodeURIComponent(section.key)}&cursor=${encodeURIComponent(section.nextCursor)}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       const updated = response.sections.find((item) => item.key === section.key);
       if (!updated) throw new Error('Секция поиска недоступна');
       setSections((current) => current?.map((item) => item.key === section.key
         ? { ...updated, items: [...item.items, ...updated.items], loadingMore: false }
         : item) || null);
     } catch (e) {
+      if (controller.signal.aborted) return;
       setSections((current) => current?.map((item) => item.key === section.key
         ? { ...item, loadingMore: false, error: (e as Error).message || 'Не удалось загрузить ещё результаты' }
         : item) || null);
@@ -135,12 +144,34 @@ export function SearchPage() {
   if (visible.length === 0) {
     return <><div className="search-page-empty"><Icon.search size={34} /><h2>Ничего не найдено</h2><p>Попробуйте другое имя, тег или имя исполнителя.</p></div>{overlay}{toastNode}</>;
   }
+  // Переключатель — только по разделам с результатами; раздел из URL без результатов показывает «Все».
+  const filterable = visible.filter((section) => section.items.length > 0);
+  const activeKey = filterable.some((section) => section.key === sectionParam) ? sectionParam as SearchSectionKey : null;
+  const shown = activeKey ? visible.filter((section) => section.key === activeKey) : visible;
+
+  function selectSection(key: SearchSectionKey | null) {
+    if (key === activeKey) return;
+    const next = new URLSearchParams(location.search);
+    if (key) next.set('section', key);
+    else next.delete('section');
+    navigate({ search: '?' + next.toString() });
+  }
 
   return (
     <>
       <div className="search-page">
         <div className="search-page-summary">Результаты по «{q}»</div>
-        {visible.map((section) => (
+        {filterable.length > 1 && (
+          <div className="chip-row search-section-filter" role="group" aria-label="Раздел поиска">
+            <button type="button" className={'chip' + (activeKey === null ? ' active' : '')} aria-pressed={activeKey === null} onClick={() => selectSection(null)}>Все</button>
+            {filterable.map((section) => (
+              <button type="button" key={section.key} className={'chip' + (activeKey === section.key ? ' active' : '')} aria-pressed={activeKey === section.key} onClick={() => selectSection(section.key)}>
+                {SECTION_LABEL[section.key]}<span className="count">{section.items.length}{section.hasMore ? '+' : ''}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {shown.map((section) => (
           <section className="search-section" key={section.key}>
             <div className="search-section-head"><h2>{SECTION_LABEL[section.key]}</h2><span>{section.items.length}{section.hasMore ? '+' : ''}</span></div>
             {section.unavailable ? (
