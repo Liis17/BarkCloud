@@ -132,3 +132,88 @@ describe('VideoPlayer extra controls', () => {
     delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
   });
 });
+
+describe('VideoPlayer continue watching', () => {
+  const resume = { userId: '7', fileId: 'f1' };
+  const stored = () => JSON.parse(localStorage.getItem('bark_video_resume:7') || '{}');
+
+  function mockVideo(video: HTMLVideoElement, time: number, duration: number) {
+    Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: time });
+    Object.defineProperty(video, 'duration', { configurable: true, value: duration });
+    video.play = vi.fn().mockResolvedValue(undefined);
+  }
+
+  const storedValues = new Map<string, string>();
+  beforeEach(() => {
+    storedValues.clear();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storedValues.get(key) ?? null,
+      setItem: (key: string, value: string) => storedValues.set(key, value),
+      removeItem: (key: string) => storedValues.delete(key),
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('offers to continue from the saved position and seeks there', () => {
+    localStorage.setItem('bark_video_resume:7', JSON.stringify({ f1: { t: 1122, at: 1 } }));
+    const { container } = render(<VideoPlayer src="/a.webm" resume={resume} />);
+    const video = container.querySelector('video')!;
+    mockVideo(video, 0, 3600);
+
+    fireEvent.click(screen.getByRole('button', { name: /Продолжить с 18:42/ }));
+
+    expect(video.currentTime).toBe(1122);
+    expect(video.play).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: /Продолжить/ })).toBeNull();
+  });
+
+  it('saves the position on close and clears it after the video ends', () => {
+    const { container, unmount } = render(<VideoPlayer src="/a.webm" resume={resume} />);
+    const video = container.querySelector('video')!;
+    mockVideo(video, 300.4, 3600);
+    fireEvent.timeUpdate(video);
+    video.currentTime = 420;
+    fireEvent.timeUpdate(video);
+    unmount();
+    expect(stored().f1.t).toBe(420);
+
+    const second = render(<VideoPlayer src="/a.webm" resume={resume} />);
+    expect(screen.getByRole('button', { name: /Продолжить с 7:00/ })).toBeTruthy();
+    fireEvent.ended(second.container.querySelector('video')!);
+    expect(stored().f1).toBeUndefined();
+    expect(screen.queryByRole('button', { name: /Продолжить/ })).toBeNull();
+  });
+
+  it('does not remember short videos or positions near the start and end', () => {
+    const { container, unmount } = render(<VideoPlayer src="/a.webm" resume={resume} />);
+    const video = container.querySelector('video')!;
+
+    mockVideo(video, 30, 50);
+    fireEvent.pause(video);
+    mockVideo(video, 5, 3600);
+    fireEvent.pause(video);
+    expect(stored().f1).toBeUndefined();
+
+    mockVideo(video, 600, 3600);
+    fireEvent.pause(video);
+    expect(stored().f1.t).toBe(600);
+    mockVideo(video, 3590, 3600);
+    fireEvent.timeUpdate(video);
+    unmount();
+    expect(stored().f1).toBeUndefined();
+  });
+
+  it('keeps separate positions per user and does not save without a resume target', () => {
+    localStorage.setItem('bark_video_resume:8', JSON.stringify({ f1: { t: 900, at: 1 } }));
+    render(<VideoPlayer src="/a.webm" resume={resume} />);
+    expect(screen.queryByRole('button', { name: /Продолжить/ })).toBeNull();
+    cleanup();
+
+    const { container, unmount } = render(<VideoPlayer src="/a.webm" />);
+    const video = container.querySelector('video')!;
+    mockVideo(video, 600, 3600);
+    fireEvent.pause(video);
+    unmount();
+    expect(localStorage.getItem('bark_video_resume:7')).toBeNull();
+  });
+});
