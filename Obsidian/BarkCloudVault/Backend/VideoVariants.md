@@ -49,7 +49,7 @@ Dockerfile собирает приложение на SDK 10 и запускае
 
 `VideoQualityInfo` содержит ступень качества, ширину, размер, признак `is_original` и временный `url`. Контракт добавлен в ответы `GetTempDownloadUrl`, `GetSharedFileDownloadUrl`, `ResolveShare` и публичные `PublicFileEntry` (файлы в публичных папках, альбомах и общей директории). Files получает список вариантов пачкой и создаёт temp-ссылки одним batch-вызовом; blob-id вариантов остаются серверными.
 
-Web добавляет варианты в `/api/files/download`, `/api/shared/download`, `/api/shared/dir` и ответы публичных ссылок. `VideoPlayer` выбирает источник, сохраняет время и состояние паузы при переключении, помнит выбор в cookie `bc_video_quality` и предлагает AV1 только при поддержке браузером `video/webm; codecs="av01, opus"`. Если AV1 не поддерживается, доступен оригинал. Контракт клиента — [[Api/FilesClientGuide]], веб-поведение — [[Web/WebApp]].
+Web добавляет варианты в `/api/files/download`, `/api/shared/download`, `/api/shared/dir` и ответы публичных ссылок. `VideoPlayer` выбирает источник, сохраняет время и состояние паузы при переключении, помнит выбор в cookie `bc_video_quality` и предлагает AV1 только при поддержке браузером `video/webm; codecs="av01.0.08M.10, opus"` (голый `av01` браузеры отклоняют). Если AV1 не поддерживается, доступен оригинал. Контракт клиента — [[Api/FilesClientGuide]], веб-поведение — [[Web/WebApp]].
 
 ## Ограничения
 

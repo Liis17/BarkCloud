@@ -28,7 +28,8 @@ export interface VideoQuality {
 
 function supportsAv1Webm(): boolean {
   if (typeof document === 'undefined') return false;
-  return !!document.createElement('video').canPlayType('video/webm; codecs="av01, opus"');
+  // Голый "av01" браузеры отклоняют: нужен полный кодек. Main profile, 10 бит — как yuv420p10le у транскодера.
+  return !!document.createElement('video').canPlayType('video/webm; codecs="av01.0.08M.10, opus"');
 }
 
 function readVideoQualityCookie(): string | null {
