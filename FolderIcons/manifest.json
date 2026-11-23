@@ -38,6 +38,10 @@
       "label": "Личное и 18+"
     },
     {
+      "id": "status",
+      "label": "Метки и предупреждения"
+    },
+    {
       "id": "misc",
       "label": "Разное"
     }
@@ -193,6 +197,1097 @@
       "source": "lucide:aperture"
     },
     {
+      "key": "camcorder",
+      "label": "Видеосъёмка",
+      "category": "media",
+      "keywords": [
+        "камкордер",
+        "камера",
+        "ролики"
+      ],
+      "source": "lucide:file-video-camera"
+    },
+    {
+      "key": "file-video",
+      "label": "Видеофайл",
+      "category": "media",
+      "keywords": [
+        "видеофайл",
+        "file",
+        "video",
+        "медиа"
+      ],
+      "source": "lucide:file-video"
+    },
+    {
+      "key": "file-play",
+      "label": "Медиафайл",
+      "category": "media",
+      "keywords": [
+        "медиа",
+        "воспроизведение",
+        "файл"
+      ],
+      "source": "lucide:file-play"
+    },
+    {
+      "key": "sound-effects",
+      "label": "Звуковые эффекты",
+      "category": "media",
+      "keywords": [
+        "эффекты",
+        "foley",
+        "sfx"
+      ],
+      "source": "lucide:audio-waveform"
+    },
+    {
+      "key": "volume-2",
+      "label": "Громкий звук",
+      "category": "media",
+      "keywords": [
+        "звук",
+        "громкость",
+        "аудио"
+      ],
+      "source": "lucide:volume-2"
+    },
+    {
+      "key": "video-tape",
+      "label": "Видеокассеты",
+      "category": "media",
+      "keywords": [
+        "кассета",
+        "vhs",
+        "видеозапись"
+      ],
+      "source": "lucide:videotape"
+    },
+    {
+      "key": "video-library",
+      "label": "Видеотека",
+      "category": "media",
+      "keywords": [
+        "видеотека",
+        "фильмы",
+        "каталог"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "concerts",
+      "label": "Концерты",
+      "category": "media",
+      "keywords": [
+        "сцена",
+        "шоу",
+        "выступление"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "guitar-music",
+      "label": "Гитарная музыка",
+      "category": "media",
+      "keywords": [
+        "гитара",
+        "акустика",
+        "струны"
+      ],
+      "source": "lucide:guitar"
+    },
+    {
+      "key": "screen-recording",
+      "label": "Записи экрана",
+      "category": "media",
+      "keywords": [
+        "захват",
+        "скринкаст",
+        "видео"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "video-lectures",
+      "label": "Видеолекции",
+      "category": "media",
+      "keywords": [
+        "курс",
+        "урок",
+        "видео"
+      ],
+      "source": "lucide:monitor-play"
+    },
+    {
+      "key": "music-albums",
+      "label": "Музыкальные альбомы",
+      "category": "media",
+      "keywords": [
+        "альбом",
+        "диск",
+        "релиз"
+      ],
+      "source": "lucide:disc-album"
+    },
+    {
+      "key": "music-playlists",
+      "label": "Плейлисты",
+      "category": "media",
+      "keywords": [
+        "список",
+        "треки",
+        "подборка"
+      ],
+      "source": "lucide:list-music"
+    },
+    {
+      "key": "sheet-music",
+      "label": "Ноты",
+      "category": "media",
+      "keywords": [
+        "партитура",
+        "нотный",
+        "стан"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "music-4",
+      "label": "Сборник музыки",
+      "category": "media",
+      "keywords": [
+        "сборник",
+        "музыки",
+        "music",
+        "4",
+        "медиа"
+      ],
+      "source": "lucide:music-4"
+    },
+    {
+      "key": "music-tracks",
+      "label": "Музыкальные файлы",
+      "category": "media",
+      "keywords": [
+        "треки",
+        "песни",
+        "mp3"
+      ],
+      "source": "lucide:file-music"
+    },
+    {
+      "key": "audio-samples",
+      "label": "Сэмплы",
+      "category": "media",
+      "keywords": [
+        "сэмплы",
+        "лупы",
+        "бит"
+      ],
+      "source": "lucide:audio-lines"
+    },
+    {
+      "key": "image-files",
+      "label": "Файлы изображений",
+      "category": "media",
+      "keywords": [
+        "картинки",
+        "графика",
+        "jpeg"
+      ],
+      "source": "lucide:file-image"
+    },
+    {
+      "key": "tv-series",
+      "label": "Сериалы",
+      "category": "media",
+      "keywords": [
+        "эпизоды",
+        "сезоны",
+        "сериал"
+      ],
+      "source": "lucide:list-video"
+    },
+    {
+      "key": "vinyl-record",
+      "label": "Винил",
+      "category": "media",
+      "keywords": [
+        "пластинка",
+        "винил",
+        "проигрыватель"
+      ],
+      "source": "lucide:disc-3"
+    },
+    {
+      "key": "audio-cassette",
+      "label": "Аудиокассеты",
+      "category": "media",
+      "keywords": [
+        "магнитофон",
+        "лента",
+        "кассета"
+      ],
+      "source": "lucide:cassette-tape"
+    },
+    {
+      "key": "voice-memos",
+      "label": "Голосовые заметки",
+      "category": "media",
+      "keywords": [
+        "диктофон",
+        "голос",
+        "заметка"
+      ],
+      "source": "lucide:file-audio-2"
+    },
+    {
+      "key": "piano-music",
+      "label": "Фортепианная музыка",
+      "category": "media",
+      "keywords": [
+        "пианино",
+        "клавиши",
+        "фортепиано"
+      ],
+      "source": "lucide:piano"
+    },
+    {
+      "key": "drum-recordings",
+      "label": "Ударные",
+      "category": "media",
+      "keywords": [
+        "барабаны",
+        "перкуссия",
+        "ритм"
+      ],
+      "source": "lucide:drum"
+    },
+    {
+      "key": "animated-gifs",
+      "label": "Гифки",
+      "category": "media",
+      "keywords": [
+        "gif",
+        "анимация",
+        "цикл"
+      ],
+      "source": "lucide:image-play"
+    },
+    {
+      "key": "animation",
+      "label": "Анимации",
+      "category": "media",
+      "keywords": [
+        "анимация",
+        "кадры",
+        "движение"
+      ],
+      "source": "lucide:layers-2"
+    },
+    {
+      "key": "projector",
+      "label": "Проектор",
+      "category": "media",
+      "keywords": [
+        "проектор",
+        "projector",
+        "медиа"
+      ],
+      "source": "lucide:projector"
+    },
+    {
+      "key": "movie-night",
+      "label": "Кинотеатр",
+      "category": "media",
+      "keywords": [
+        "кино",
+        "фильмы",
+        "сеанс"
+      ],
+      "source": "lucide:popcorn"
+    },
+    {
+      "key": "video-clips",
+      "label": "Видеоклипы",
+      "category": "media",
+      "keywords": [
+        "клип",
+        "ролик",
+        "короткометражка"
+      ],
+      "source": "lucide:square-play"
+    },
+    {
+      "key": "screenshots",
+      "label": "Скриншоты",
+      "category": "media",
+      "keywords": [
+        "снимок",
+        "экран",
+        "screenshot"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "panoramas",
+      "label": "Панорамы",
+      "category": "media",
+      "keywords": [
+        "панорама",
+        "широкий",
+        "пейзаж"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "panorama-view",
+      "label": "Панорамный обзор",
+      "category": "media",
+      "keywords": [
+        "панорамы",
+        "обзор",
+        "кадр"
+      ],
+      "source": "lucide:view"
+    },
+    {
+      "key": "high-resolution-photos",
+      "label": "Фото высокого разрешения",
+      "category": "media",
+      "keywords": [
+        "hires",
+        "разрешение",
+        "детали"
+      ],
+      "source": "lucide:image-upscale"
+    },
+    {
+      "key": "portrait-photos",
+      "label": "Портреты",
+      "category": "media",
+      "keywords": [
+        "портрет",
+        "люди",
+        "фотосессия"
+      ],
+      "source": "lucide:scan-face"
+    },
+    {
+      "key": "landscape-photos",
+      "label": "Пейзажные фото",
+      "category": "media",
+      "keywords": [
+        "пейзаж",
+        "природа",
+        "горы"
+      ],
+      "source": "lucide:mountain-snow"
+    },
+    {
+      "key": "night-photography",
+      "label": "Ночная съёмка",
+      "category": "media",
+      "keywords": [
+        "ночь",
+        "луна",
+        "астрофото"
+      ],
+      "source": "lucide:moon-star"
+    },
+    {
+      "key": "macro-photos",
+      "label": "Макросъёмка",
+      "category": "media",
+      "keywords": [
+        "макро",
+        "цветы",
+        "крупноплан"
+      ],
+      "source": "lucide:flower-2"
+    },
+    {
+      "key": "panels-top-left",
+      "label": "Раскладка кадров",
+      "category": "media",
+      "keywords": [
+        "раскладка",
+        "кадров",
+        "panels",
+        "top",
+        "left",
+        "медиа"
+      ],
+      "source": "lucide:panels-top-left"
+    },
+    {
+      "key": "camera-off",
+      "label": "Камера выключена",
+      "category": "media",
+      "keywords": [
+        "камера",
+        "выключена",
+        "camera",
+        "off",
+        "медиа"
+      ],
+      "source": "lucide:camera-off"
+    },
+    {
+      "key": "mic-vocal",
+      "label": "Вокал",
+      "category": "media",
+      "keywords": [
+        "микрофон",
+        "голос",
+        "пение"
+      ],
+      "source": "lucide:mic-vocal"
+    },
+    {
+      "key": "live-stream",
+      "label": "Прямые эфиры",
+      "category": "media",
+      "keywords": [
+        "стрим",
+        "эфир",
+        "трансляция"
+      ],
+      "source": "lucide:radio-tower"
+    },
+    {
+      "key": "video-edits",
+      "label": "Видеомонтаж",
+      "category": "media",
+      "keywords": [
+        "монтаж",
+        "обрезка",
+        "таймлайн"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "video-editing",
+      "label": "Видеомонтаж",
+      "category": "media",
+      "keywords": [
+        "монтаж",
+        "видео",
+        "нарезка"
+      ],
+      "source": "lucide:scissors-line-dashed"
+    },
+    {
+      "key": "studio-recordings",
+      "label": "Студийные записи",
+      "category": "media",
+      "keywords": [
+        "студия",
+        "запись",
+        "микрофон"
+      ],
+      "source": "lucide:mic-audio-lines"
+    },
+    {
+      "key": "electric-guitar",
+      "label": "Электрогитара",
+      "category": "media",
+      "keywords": [
+        "гитара",
+        "электрогитара",
+        "рок"
+      ],
+      "source": "lucide:guitar-electric"
+    },
+    {
+      "key": "radio-shows",
+      "label": "Радиопередачи",
+      "category": "media",
+      "keywords": [
+        "радио",
+        "эфир",
+        "передачи"
+      ],
+      "source": "lucide:radio-receiver"
+    },
+    {
+      "key": "audio-mixes",
+      "label": "Аудиомиксы",
+      "category": "media",
+      "keywords": [
+        "сведение",
+        "микшер",
+        "звуковая"
+      ],
+      "source": "lucide:sliders-vertical"
+    },
+    {
+      "key": "audiobooks",
+      "label": "Аудиокниги",
+      "category": "media",
+      "keywords": [
+        "аудиокнига",
+        "чтение",
+        "диктор"
+      ],
+      "source": "lucide:book-headphones"
+    },
+    {
+      "key": "three-d-scenes",
+      "label": "3D-сцены",
+      "category": "media",
+      "keywords": [
+        "3d",
+        "сцена",
+        "объекты"
+      ],
+      "source": "lucide:boxes"
+    },
+    {
+      "key": "music-2",
+      "label": "Нота",
+      "category": "media",
+      "keywords": [
+        "нота",
+        "music",
+        "2",
+        "медиа"
+      ],
+      "source": "lucide:music-2"
+    },
+    {
+      "key": "circle-play",
+      "label": "Воспроизведение",
+      "category": "media",
+      "keywords": [
+        "воспроизведение",
+        "circle",
+        "play",
+        "медиа"
+      ],
+      "source": "lucide:circle-play"
+    },
+    {
+      "key": "film-reel",
+      "label": "Киноплёнка",
+      "category": "media",
+      "keywords": [
+        "киноплёнка",
+        "film",
+        "reel",
+        "медиа"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "image-plus",
+      "label": "Новое фото",
+      "category": "media",
+      "keywords": [
+        "новое",
+        "фото",
+        "image",
+        "plus",
+        "медиа"
+      ],
+      "source": "lucide:image-plus"
+    },
+    {
+      "key": "gallery-horizontal",
+      "label": "Горизонтальная галерея",
+      "category": "media",
+      "keywords": [
+        "горизонтальная",
+        "галерея",
+        "gallery",
+        "horizontal",
+        "медиа"
+      ],
+      "source": "lucide:gallery-horizontal"
+    },
+    {
+      "key": "captions",
+      "label": "Титры",
+      "category": "media",
+      "keywords": [
+        "надписи",
+        "титры",
+        "видео"
+      ],
+      "source": "lucide:captions"
+    },
+    {
+      "key": "speaker",
+      "label": "Акустика",
+      "category": "media",
+      "keywords": [
+        "звук",
+        "колонка",
+        "аудио"
+      ],
+      "source": "lucide:speaker"
+    },
+    {
+      "key": "image-up",
+      "label": "Загрузка изображений",
+      "category": "media",
+      "keywords": [
+        "фото",
+        "отправить",
+        "загрузка"
+      ],
+      "source": "lucide:image-up"
+    },
+    {
+      "key": "focus",
+      "label": "В фокусе",
+      "category": "media",
+      "keywords": [
+        "резкость",
+        "центр",
+        "фокус"
+      ],
+      "source": "lucide:focus"
+    },
+    {
+      "key": "stream-replays",
+      "label": "Записи эфиров",
+      "category": "media",
+      "keywords": [
+        "архив",
+        "стрим",
+        "повтор"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "movie-trailers",
+      "label": "Трейлеры",
+      "category": "media",
+      "keywords": [
+        "анонс",
+        "кино",
+        "превью"
+      ],
+      "source": "lucide:circle-fading-play"
+    },
+    {
+      "key": "tv-recordings",
+      "label": "Телезаписи",
+      "category": "media",
+      "keywords": [
+        "телевидение",
+        "эфир",
+        "передачи"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "home-videos",
+      "label": "Домашнее видео",
+      "category": "media",
+      "keywords": [
+        "семья",
+        "видео",
+        "архив"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "stop-motion",
+      "label": "Покадровая анимация",
+      "category": "media",
+      "keywords": [
+        "мультфильм",
+        "покадрово",
+        "анимация"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "music-genres",
+      "label": "Жанры музыки",
+      "category": "media",
+      "keywords": [
+        "жанры",
+        "стили",
+        "музыка"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "turntable",
+      "label": "Проигрыватель винила",
+      "category": "media",
+      "keywords": [
+        "вертушка",
+        "пластинки",
+        "винил"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "compact-disc",
+      "label": "Компакт-диски",
+      "category": "media",
+      "keywords": [
+        "компакт",
+        "диск",
+        "cd"
+      ],
+      "source": "lucide:disc-2"
+    },
+    {
+      "key": "mixtapes",
+      "label": "Микстейпы",
+      "category": "media",
+      "keywords": [
+        "сборник",
+        "микс",
+        "магнитола"
+      ],
+      "source": "lucide:boom-box"
+    },
+    {
+      "key": "photo-gallery",
+      "label": "Фотогалерея",
+      "category": "media",
+      "keywords": [
+        "галерея",
+        "фото",
+        "сетка"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "photo-albums",
+      "label": "Фотоальбомы",
+      "category": "media",
+      "keywords": [
+        "альбом",
+        "семейный",
+        "фотокнига"
+      ],
+      "source": "lucide:book-image"
+    },
+    {
+      "key": "selfies",
+      "label": "Селфи",
+      "category": "media",
+      "keywords": [
+        "автопортрет",
+        "камера",
+        "лицо"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "wallpapers",
+      "label": "Обои",
+      "category": "media",
+      "keywords": [
+        "фон",
+        "заставки",
+        "рабочий",
+        "стол"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "raw-photos",
+      "label": "Фотографии RAW",
+      "category": "media",
+      "keywords": [
+        "raw",
+        "негатив",
+        "исходники"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "photo-scans",
+      "label": "Сканы фотографий",
+      "category": "media",
+      "keywords": [
+        "фотографии",
+        "скан",
+        "оцифровка"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "burst-photos",
+      "label": "Серийная съёмка",
+      "category": "media",
+      "keywords": [
+        "серия",
+        "кадры",
+        "фото"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "photo-negatives",
+      "label": "Фотонегативы",
+      "category": "media",
+      "keywords": [
+        "негатив",
+        "плёнка",
+        "аналог"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "spoken-chapters",
+      "label": "Озвученные главы",
+      "category": "media",
+      "keywords": [
+        "чтение",
+        "главы",
+        "озвучка"
+      ],
+      "source": "lucide:book-audio"
+    },
+    {
+      "key": "audio-fiction",
+      "label": "Аудиоспектакли",
+      "category": "media",
+      "keywords": [
+        "спектакль",
+        "радиотеатр",
+        "озвучка"
+      ],
+      "source": "lucide:drama"
+    },
+    {
+      "key": "three-d-models",
+      "label": "3D-модели",
+      "category": "media",
+      "keywords": [
+        "3d",
+        "модель",
+        "меш"
+      ],
+      "source": "lucide:box-dashed"
+    },
+    {
+      "key": "three-d-renders",
+      "label": "3D-рендеры",
+      "category": "media",
+      "keywords": [
+        "рендер",
+        "3d",
+        "визуализация"
+      ],
+      "source": "lucide:scan-box"
+    },
+    {
+      "key": "virtual-reality",
+      "label": "Виртуальная реальность",
+      "category": "media",
+      "keywords": [
+        "vr",
+        "очки",
+        "гарнитура"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "immersive-video",
+      "label": "Видео 360°",
+      "category": "media",
+      "keywords": [
+        "360",
+        "видео",
+        "vr"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "file-volume",
+      "label": "Аудиофайл",
+      "category": "media",
+      "keywords": [
+        "аудиофайл",
+        "file",
+        "volume",
+        "медиа"
+      ],
+      "source": "lucide:file-volume"
+    },
+    {
+      "key": "music-3",
+      "label": "Нотная запись",
+      "category": "media",
+      "keywords": [
+        "нотная",
+        "запись",
+        "music",
+        "3",
+        "медиа"
+      ],
+      "source": "lucide:music-3"
+    },
+    {
+      "key": "circle-pause",
+      "label": "Пауза",
+      "category": "media",
+      "keywords": [
+        "пауза",
+        "circle",
+        "pause",
+        "медиа"
+      ],
+      "source": "lucide:circle-pause"
+    },
+    {
+      "key": "gallery-vertical",
+      "label": "Вертикальная галерея",
+      "category": "media",
+      "keywords": [
+        "вертикальная",
+        "галерея",
+        "gallery",
+        "vertical",
+        "медиа"
+      ],
+      "source": "lucide:gallery-vertical"
+    },
+    {
+      "key": "gallery-thumbnails",
+      "label": "Галерея миниатюр",
+      "category": "media",
+      "keywords": [
+        "галерея",
+        "миниатюр",
+        "gallery",
+        "thumbnails",
+        "медиа"
+      ],
+      "source": "lucide:gallery-thumbnails"
+    },
+    {
+      "key": "film-play",
+      "label": "Кино к просмотру",
+      "category": "media",
+      "keywords": [
+        "фильм",
+        "смотреть",
+        "видео"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "manga-panel",
+      "label": "Кадр манги",
+      "category": "media",
+      "keywords": [
+        "манга",
+        "комикс",
+        "аниме"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "meme-face",
+      "label": "Мемная ухмылка",
+      "category": "media",
+      "keywords": [
+        "мем",
+        "реакция",
+        "юмор"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "banana",
+      "label": "Банановый мем",
+      "category": "media",
+      "keywords": [
+        "банан",
+        "мем",
+        "юмор"
+      ],
+      "source": "lucide:banana"
+    },
+    {
+      "key": "mic-signal",
+      "label": "Эфир",
+      "category": "media",
+      "keywords": [
+        "эфир",
+        "вещание",
+        "микрофон"
+      ],
+      "source": "lucide:mic-signal"
+    },
+    {
+      "key": "earbuds",
+      "label": "Наушники-вкладыши",
+      "category": "media",
+      "keywords": [
+        "вкладыши",
+        "наушники",
+        "аудио"
+      ],
+      "source": "lucide:earbuds"
+    },
+    {
+      "key": "tv-minimal-play",
+      "label": "Видеоплеер",
+      "category": "media",
+      "keywords": [
+        "плеер",
+        "видео",
+        "просмотр"
+      ],
+      "source": "lucide:tv-minimal-play"
+    },
+    {
+      "key": "image-off",
+      "label": "Без изображения",
+      "category": "media",
+      "keywords": [
+        "изображение",
+        "отсутствует",
+        "скрыто"
+      ],
+      "source": "lucide:image-off"
+    },
+    {
+      "key": "light-effects",
+      "label": "Световые эффекты",
+      "category": "media",
+      "keywords": [
+        "свет",
+        "эффекты",
+        "радуга"
+      ],
+      "source": "lucide:rainbow"
+    },
+    {
+      "key": "crop",
+      "label": "Кадрирование",
+      "category": "media",
+      "keywords": [
+        "фото",
+        "обрезка",
+        "монтаж"
+      ],
+      "source": "lucide:crop"
+    },
+    {
+      "key": "blend",
+      "label": "Наложения",
+      "category": "media",
+      "keywords": [
+        "слои",
+        "композиция",
+        "графика"
+      ],
+      "source": "lucide:blend"
+    },
+    {
       "key": "document",
       "label": "Документ",
       "category": "documents",
@@ -315,6 +1410,161 @@
       "source": "lucide:scan-text"
     },
     {
+      "key": "file-badge",
+      "label": "Памятная грамота",
+      "category": "documents",
+      "keywords": [
+        "память",
+        "награда",
+        "сертификат"
+      ],
+      "source": "lucide:file-badge"
+    },
+    {
+      "key": "power-of-attorney",
+      "label": "Доверенности",
+      "category": "documents",
+      "keywords": [
+        "доверенность",
+        "печать",
+        "полномочия"
+      ],
+      "source": "lucide:stamp"
+    },
+    {
+      "key": "file-stack",
+      "label": "Стопка файлов",
+      "category": "documents",
+      "keywords": [
+        "стопка",
+        "документы",
+        "файлы"
+      ],
+      "source": "lucide:file-stack"
+    },
+    {
+      "key": "signed-document",
+      "label": "Подписанные документы",
+      "category": "documents",
+      "keywords": [
+        "подпись",
+        "согласование",
+        "документ"
+      ],
+      "source": "lucide:file-check-2"
+    },
+    {
+      "key": "document-draft",
+      "label": "Черновики документов",
+      "category": "documents",
+      "keywords": [
+        "черновик",
+        "правки",
+        "текст"
+      ],
+      "source": "lucide:file-pen"
+    },
+    {
+      "key": "passport",
+      "label": "Паспорта",
+      "category": "documents",
+      "keywords": [
+        "паспорт",
+        "удостоверение",
+        "личность"
+      ],
+      "source": "lucide:book-user"
+    },
+    {
+      "key": "id-card",
+      "label": "Удостоверения личности",
+      "category": "documents",
+      "keywords": [
+        "удостоверение",
+        "личность",
+        "ID"
+      ],
+      "source": "lucide:id-card"
+    },
+    {
+      "key": "scan-text",
+      "label": "Сканы документов",
+      "category": "documents",
+      "keywords": [
+        "сканы",
+        "текст",
+        "распознавание",
+        "OCR"
+      ],
+      "source": "lucide:scan-text"
+    },
+    {
+      "key": "taxes",
+      "label": "Налоги",
+      "category": "documents",
+      "keywords": [
+        "налоги",
+        "декларация",
+        "проценты"
+      ],
+      "source": "lucide:badge-percent"
+    },
+    {
+      "key": "invoices",
+      "label": "Счета на оплату",
+      "category": "documents",
+      "keywords": [
+        "счёт",
+        "оплата",
+        "квитанция"
+      ],
+      "source": "lucide:receipt-text"
+    },
+    {
+      "key": "bank-statements",
+      "label": "Банковские выписки",
+      "category": "documents",
+      "keywords": [
+        "банк",
+        "выписка",
+        "финансы"
+      ],
+      "source": "lucide:landmark"
+    },
+    {
+      "key": "expenses",
+      "label": "Расходы",
+      "category": "documents",
+      "keywords": [
+        "затраты",
+        "расходы",
+        "бюджет"
+      ],
+      "source": "lucide:file-minus-2"
+    },
+    {
+      "key": "insurance",
+      "label": "Страховые документы",
+      "category": "documents",
+      "keywords": [
+        "страховка",
+        "полис",
+        "защита"
+      ],
+      "source": "lucide:shield-plus"
+    },
+    {
+      "key": "legal",
+      "label": "Юридические материалы",
+      "category": "documents",
+      "keywords": [
+        "право",
+        "суд",
+        "законы"
+      ],
+      "source": "lucide:scale"
+    },
+    {
       "key": "archive",
       "label": "Архив",
       "category": "archives",
@@ -399,6 +1649,181 @@
         "дискета"
       ],
       "source": "lucide:save"
+    },
+    {
+      "key": "folder-bookmark",
+      "label": "Избранная папка",
+      "category": "archives",
+      "keywords": [
+        "избранная",
+        "папка",
+        "folder",
+        "bookmark"
+      ],
+      "source": "lucide:folder-bookmark"
+    },
+    {
+      "key": "folder-archive",
+      "label": "Архивная папка",
+      "category": "archives",
+      "keywords": [
+        "архивная",
+        "папка",
+        "folder",
+        "archive"
+      ],
+      "source": "lucide:folder-archive"
+    },
+    {
+      "key": "folder-clock",
+      "label": "Недавняя папка",
+      "category": "archives",
+      "keywords": [
+        "недавняя",
+        "папка",
+        "folder",
+        "clock"
+      ],
+      "source": "lucide:folder-clock"
+    },
+    {
+      "key": "folder-dot",
+      "label": "Отмеченная папка",
+      "category": "archives",
+      "keywords": [
+        "отмеченная",
+        "папка",
+        "folder",
+        "dot"
+      ],
+      "source": "lucide:folder-dot"
+    },
+    {
+      "key": "folder-tree",
+      "label": "Дерево папок",
+      "category": "archives",
+      "keywords": [
+        "дерево",
+        "папок",
+        "folder",
+        "tree",
+        "папка"
+      ],
+      "source": "lucide:folder-tree"
+    },
+    {
+      "key": "folder-search",
+      "label": "Поиск по папкам",
+      "category": "archives",
+      "keywords": [
+        "поиск",
+        "по",
+        "папкам",
+        "folder",
+        "search",
+        "папка"
+      ],
+      "source": "lucide:folder-search"
+    },
+    {
+      "key": "folders",
+      "label": "Группа папок",
+      "category": "archives",
+      "keywords": [
+        "группа",
+        "папок",
+        "folders",
+        "папка"
+      ],
+      "source": "lucide:folders"
+    },
+    {
+      "key": "file-box",
+      "label": "Файл с пакетом",
+      "category": "archives",
+      "keywords": [
+        "пакет",
+        "архив",
+        "файл"
+      ],
+      "source": "lucide:file-box"
+    },
+    {
+      "key": "file-database",
+      "label": "Файл базы данных",
+      "category": "archives",
+      "keywords": [
+        "база",
+        "данные",
+        "файл"
+      ],
+      "source": "lucide:file-database"
+    },
+    {
+      "key": "backup",
+      "label": "Резервные копии",
+      "category": "archives",
+      "keywords": [
+        "бэкап",
+        "восстановление",
+        "копия"
+      ],
+      "source": "lucide:database-backup"
+    },
+    {
+      "key": "cloud-backup",
+      "label": "Облачные копии",
+      "category": "archives",
+      "keywords": [
+        "облако",
+        "архив",
+        "загрузка"
+      ],
+      "source": "lucide:cloud-upload"
+    },
+    {
+      "key": "data-tables",
+      "label": "Табличные данные",
+      "category": "archives",
+      "keywords": [
+        "таблица",
+        "CSV",
+        "строки"
+      ],
+      "source": "lucide:table-2"
+    },
+    {
+      "key": "datasets",
+      "label": "Датасеты",
+      "category": "archives",
+      "keywords": [
+        "датасет",
+        "данные",
+        "выборка"
+      ],
+      "source": "lucide:database-zap"
+    },
+    {
+      "key": "data-transfer",
+      "label": "Обмен данными",
+      "category": "archives",
+      "keywords": [
+        "импорт",
+        "экспорт",
+        "обмен"
+      ],
+      "source": "lucide:arrow-right-left"
+    },
+    {
+      "key": "raw-data",
+      "label": "Необработанные данные",
+      "category": "archives",
+      "keywords": [
+        "сырые",
+        "данные",
+        "двоичные"
+      ],
+      "source": "lucide:binary"
     },
     {
       "key": "code",
@@ -503,6 +1928,127 @@
       "source": "lucide:puzzle"
     },
     {
+      "key": "logs",
+      "label": "Логи",
+      "category": "dev",
+      "keywords": [
+        "логи",
+        "журналы",
+        "события"
+      ],
+      "source": "lucide:scroll-text"
+    },
+    {
+      "key": "config",
+      "label": "Конфигурации",
+      "category": "dev",
+      "keywords": [
+        "конфиги",
+        "настройки",
+        "параметры"
+      ],
+      "source": "lucide:sliders-horizontal"
+    },
+    {
+      "key": "scripts",
+      "label": "Скрипты",
+      "category": "dev",
+      "keywords": [
+        "скрипт",
+        "консоль",
+        "shell"
+      ],
+      "source": "lucide:file-terminal"
+    },
+    {
+      "key": "source-files",
+      "label": "Исходники",
+      "category": "dev",
+      "keywords": [
+        "код",
+        "исходники",
+        "разработка"
+      ],
+      "source": "lucide:file-code-2"
+    },
+    {
+      "key": "builds",
+      "label": "Сборки",
+      "category": "dev",
+      "keywords": [
+        "сборка",
+        "артефакт",
+        "релиз"
+      ],
+      "source": "lucide:package-check"
+    },
+    {
+      "key": "installers",
+      "label": "Установщики",
+      "category": "dev",
+      "keywords": [
+        "инсталлятор",
+        "установка",
+        "setup"
+      ],
+      "source": "lucide:package-open"
+    },
+    {
+      "key": "tests",
+      "label": "Тесты",
+      "category": "dev",
+      "keywords": [
+        "тестирование",
+        "проверка",
+        "QA"
+      ],
+      "source": "lucide:test-tube-diagonal"
+    },
+    {
+      "key": "api",
+      "label": "Интеграции API",
+      "category": "dev",
+      "keywords": [
+        "API",
+        "интеграция",
+        "подключение"
+      ],
+      "source": "lucide:plug"
+    },
+    {
+      "key": "git-branches",
+      "label": "Ветки Git",
+      "category": "dev",
+      "keywords": [
+        "git",
+        "ветки",
+        "репозиторий"
+      ],
+      "source": "lucide:git-branch"
+    },
+    {
+      "key": "model-weights",
+      "label": "Веса моделей",
+      "category": "dev",
+      "keywords": [
+        "модели",
+        "веса",
+        "ИИ"
+      ],
+      "source": "lucide:brain-circuit"
+    },
+    {
+      "key": "ai-models",
+      "label": "Модели ИИ",
+      "category": "dev",
+      "keywords": [
+        "ИИ",
+        "модели",
+        "нейросеть"
+      ],
+      "source": "lucide:bot"
+    },
+    {
       "key": "shapes",
       "label": "Иконки",
       "category": "design",
@@ -587,6 +2133,72 @@
       "source": "lucide:layers"
     },
     {
+      "key": "cat-ear-headband",
+      "label": "Ободок с ушками",
+      "category": "design",
+      "keywords": [
+        "косплей",
+        "аниме",
+        "ушки"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "type-specimens",
+      "label": "Образцы шрифтов",
+      "category": "design",
+      "keywords": [
+        "шрифт",
+        "буквы",
+        "начертание"
+      ],
+      "source": "lucide:case-sensitive"
+    },
+    {
+      "key": "layout-templates",
+      "label": "Шаблоны",
+      "category": "design",
+      "keywords": [
+        "шаблон",
+        "макет",
+        "сетка"
+      ],
+      "source": "lucide:layout-template"
+    },
+    {
+      "key": "type-tools",
+      "label": "Типографика",
+      "category": "design",
+      "keywords": [
+        "типографика",
+        "текст",
+        "шрифт"
+      ],
+      "source": "lucide:baseline"
+    },
+    {
+      "key": "vector-assets",
+      "label": "Векторные материалы",
+      "category": "design",
+      "keywords": [
+        "вектор",
+        "кривые",
+        "SVG"
+      ],
+      "source": "lucide:vector-square"
+    },
+    {
+      "key": "spreadsheet-template",
+      "label": "Шаблоны таблиц",
+      "category": "design",
+      "keywords": [
+        "шаблон",
+        "таблица",
+        "ячейки"
+      ],
+      "source": "lucide:sheet"
+    },
+    {
       "key": "gamepad",
       "label": "Игры",
       "category": "games",
@@ -634,6 +2246,226 @@
         "ролевые"
       ],
       "source": "lucide:swords"
+    },
+    {
+      "key": "treasure-chest",
+      "label": "Сундук с сокровищами",
+      "category": "games",
+      "keywords": [
+        "сундук",
+        "лут",
+        "сокровище"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "potion-flask",
+      "label": "Зелье",
+      "category": "games",
+      "keywords": [
+        "зелье",
+        "алхимия",
+        "магия"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "portal-ring",
+      "label": "Портал",
+      "category": "games",
+      "keywords": [
+        "портал",
+        "измерение",
+        "телепорт"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "magic-rune",
+      "label": "Руна",
+      "category": "games",
+      "keywords": [
+        "руны",
+        "чары",
+        "символ"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "spellbook",
+      "label": "Книга заклинаний",
+      "category": "games",
+      "keywords": [
+        "гримуар",
+        "заклинания",
+        "магия"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "crystal-cluster",
+      "label": "Гроздь кристаллов",
+      "category": "games",
+      "keywords": [
+        "кристаллы",
+        "самоцвет",
+        "лут"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "ray-gun",
+      "label": "Лучемёт",
+      "category": "games",
+      "keywords": [
+        "фантастика",
+        "ретро",
+        "бластер"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "mana-orb",
+      "label": "Сфера маны",
+      "category": "games",
+      "keywords": [
+        "мана",
+        "энергия",
+        "чары"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "boss-door",
+      "label": "Врата босса",
+      "category": "games",
+      "keywords": [
+        "босс",
+        "подземелье",
+        "врата"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "quest-scroll",
+      "label": "Свиток задания",
+      "category": "games",
+      "keywords": [
+        "квест",
+        "свиток",
+        "задание"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "pirate-flag",
+      "label": "Пиратский флаг",
+      "category": "games",
+      "keywords": [
+        "пираты",
+        "сокровища",
+        "приключения"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "retro-cartridge",
+      "label": "Игровой картридж",
+      "category": "games",
+      "keywords": [
+        "картридж",
+        "ретро",
+        "консоль"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "pixel-invader",
+      "label": "Пиксельный пришелец",
+      "category": "games",
+      "keywords": [
+        "пиксели",
+        "аркада",
+        "ретро"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "pixel-heart",
+      "label": "Пиксельное сердце",
+      "category": "games",
+      "keywords": [
+        "ретро",
+        "жизни",
+        "пиксели"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "legend-badge",
+      "label": "Легендарная эмблема",
+      "category": "games",
+      "keywords": [
+        "легендарное",
+        "редкость",
+        "статус"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "shattered-crystal",
+      "label": "Расколотый кристалл",
+      "category": "games",
+      "keywords": [
+        "осколки",
+        "кристалл",
+        "лут"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "chess-queen",
+      "label": "Шахматный ферзь",
+      "category": "games",
+      "keywords": [
+        "шахматы",
+        "ферзь",
+        "стратегия"
+      ],
+      "source": "lucide:chess-queen"
+    },
+    {
+      "key": "chess-knight",
+      "label": "Шахматный конь",
+      "category": "games",
+      "keywords": [
+        "шахматы",
+        "конь",
+        "стратегия"
+      ],
+      "source": "lucide:chess-knight"
+    },
+    {
+      "key": "sword",
+      "label": "Меч",
+      "category": "games",
+      "keywords": [
+        "меч",
+        "рпг",
+        "лут"
+      ],
+      "source": "lucide:sword"
+    },
+    {
+      "key": "gamepad-directional",
+      "label": "Ретро-геймпад",
+      "category": "games",
+      "keywords": [
+        "геймпад",
+        "приставка",
+        "ретро"
+      ],
+      "source": "lucide:gamepad-directional"
     },
     {
       "key": "briefcase",
@@ -704,6 +2536,149 @@
         "платежи"
       ],
       "source": "lucide:banknote"
+    },
+    {
+      "key": "resume",
+      "label": "Резюме",
+      "category": "work",
+      "keywords": [
+        "резюме",
+        "карьера",
+        "CV"
+      ],
+      "source": "lucide:contact"
+    },
+    {
+      "key": "applications",
+      "label": "Заявки",
+      "category": "work",
+      "keywords": [
+        "заявка",
+        "отправка",
+        "отклик"
+      ],
+      "source": "lucide:send"
+    },
+    {
+      "key": "portfolio",
+      "label": "Портфолио",
+      "category": "work",
+      "keywords": [
+        "портфолио",
+        "проекты",
+        "работы"
+      ],
+      "source": "lucide:briefcase-business"
+    },
+    {
+      "key": "meeting-notes",
+      "label": "Заметки со встреч",
+      "category": "work",
+      "keywords": [
+        "встреча",
+        "протокол",
+        "заметки"
+      ],
+      "source": "lucide:notebook-pen"
+    },
+    {
+      "key": "timesheets",
+      "label": "Учёт времени",
+      "category": "work",
+      "keywords": [
+        "часы",
+        "табель",
+        "работа"
+      ],
+      "source": "lucide:clock-3"
+    },
+    {
+      "key": "project-plans",
+      "label": "Планы проектов",
+      "category": "work",
+      "keywords": [
+        "график",
+        "сроки",
+        "этапы"
+      ],
+      "source": "lucide:gantt-chart"
+    },
+    {
+      "key": "process-diagrams",
+      "label": "Схемы процессов",
+      "category": "work",
+      "keywords": [
+        "процесс",
+        "диаграмма",
+        "связи"
+      ],
+      "source": "lucide:workflow"
+    },
+    {
+      "key": "lecture-notes",
+      "label": "Конспекты лекций",
+      "category": "work",
+      "keywords": [
+        "лекции",
+        "записи",
+        "конспекты"
+      ],
+      "source": "lucide:book-text"
+    },
+    {
+      "key": "exercise",
+      "label": "Учебные задания",
+      "category": "work",
+      "keywords": [
+        "задания",
+        "упражнения",
+        "практика"
+      ],
+      "source": "lucide:square-pen"
+    },
+    {
+      "key": "research",
+      "label": "Исследования",
+      "category": "work",
+      "keywords": [
+        "исследования",
+        "лаборатория",
+        "анализ"
+      ],
+      "source": "lucide:microscope"
+    },
+    {
+      "key": "references",
+      "label": "Источники и цитаты",
+      "category": "work",
+      "keywords": [
+        "ссылки",
+        "цитаты",
+        "источники"
+      ],
+      "source": "lucide:quote"
+    },
+    {
+      "key": "statistics",
+      "label": "Статистика",
+      "category": "work",
+      "keywords": [
+        "статистика",
+        "аналитика",
+        "график"
+      ],
+      "source": "lucide:chart-no-axes-combined"
+    },
+    {
+      "key": "flashcards",
+      "label": "Карточки для учёбы",
+      "category": "work",
+      "keywords": [
+        "память",
+        "карточки",
+        "повторение"
+      ],
+      "source": "lucide:copy"
     },
     {
       "key": "home",
@@ -844,6 +2819,545 @@
       "source": "lucide:gift"
     },
     {
+      "key": "luggage",
+      "label": "Багаж",
+      "category": "life",
+      "keywords": [
+        "поездка",
+        "отпуск",
+        "вещи"
+      ],
+      "source": "lucide:luggage"
+    },
+    {
+      "key": "backpack",
+      "label": "Рюкзак",
+      "category": "life",
+      "keywords": [
+        "поход",
+        "снаряжение",
+        "дорога"
+      ],
+      "source": "lucide:backpack"
+    },
+    {
+      "key": "tent-tree",
+      "label": "Кемпинг",
+      "category": "life",
+      "keywords": [
+        "поход",
+        "лагерь",
+        "ночёвка"
+      ],
+      "source": "lucide:tent-tree"
+    },
+    {
+      "key": "caravan",
+      "label": "Автодом",
+      "category": "life",
+      "keywords": [
+        "кемпинг",
+        "путешествие",
+        "машина"
+      ],
+      "source": "lucide:caravan"
+    },
+    {
+      "key": "cable-car",
+      "label": "Канатная дорога",
+      "category": "life",
+      "keywords": [
+        "горы",
+        "подъёмник",
+        "поездка"
+      ],
+      "source": "lucide:cable-car"
+    },
+    {
+      "key": "sailboat",
+      "label": "Парусный спорт",
+      "category": "life",
+      "keywords": [
+        "яхта",
+        "море",
+        "регата"
+      ],
+      "source": "lucide:sailboat"
+    },
+    {
+      "key": "map-pinned",
+      "label": "Места поездок",
+      "category": "life",
+      "keywords": [
+        "маршрут",
+        "путешествие",
+        "география"
+      ],
+      "source": "lucide:map-pinned"
+    },
+    {
+      "key": "palmtree",
+      "label": "Тропики",
+      "category": "life",
+      "keywords": [
+        "пляж",
+        "море",
+        "отпуск"
+      ],
+      "source": "lucide:palmtree"
+    },
+    {
+      "key": "sunset",
+      "label": "Закаты",
+      "category": "life",
+      "keywords": [
+        "вечер",
+        "пейзаж",
+        "путешествие"
+      ],
+      "source": "lucide:sunset"
+    },
+    {
+      "key": "cake",
+      "label": "Дни рождения",
+      "category": "life",
+      "keywords": [
+        "праздник",
+        "поздравления",
+        "десерт"
+      ],
+      "source": "lucide:cake"
+    },
+    {
+      "key": "house-heart",
+      "label": "Семья",
+      "category": "life",
+      "keywords": [
+        "родные",
+        "близкие",
+        "семейное"
+      ],
+      "source": "lucide:house-heart"
+    },
+    {
+      "key": "contact-round",
+      "label": "Родные и друзья",
+      "category": "life",
+      "keywords": [
+        "друзья",
+        "люди",
+        "контакты"
+      ],
+      "source": "lucide:contact-round"
+    },
+    {
+      "key": "paw-print",
+      "label": "Питомцы",
+      "category": "life",
+      "keywords": [
+        "животные",
+        "кошки",
+        "собаки"
+      ],
+      "source": "lucide:paw-print"
+    },
+    {
+      "key": "bird",
+      "label": "Птицы",
+      "category": "life",
+      "keywords": [
+        "питомцы",
+        "наблюдение",
+        "орнитология"
+      ],
+      "source": "lucide:bird"
+    },
+    {
+      "key": "rabbit",
+      "label": "Кролики",
+      "category": "life",
+      "keywords": [
+        "питомцы",
+        "животные",
+        "уши"
+      ],
+      "source": "lucide:rabbit"
+    },
+    {
+      "key": "cooking-pot",
+      "label": "Рецепты",
+      "category": "life",
+      "keywords": [
+        "кухня",
+        "готовка",
+        "блюда"
+      ],
+      "source": "lucide:cooking-pot"
+    },
+    {
+      "key": "chef-hat",
+      "label": "Кулинария",
+      "category": "life",
+      "keywords": [
+        "повар",
+        "меню",
+        "готовка"
+      ],
+      "source": "lucide:chef-hat"
+    },
+    {
+      "key": "sandwich",
+      "label": "Перекусы",
+      "category": "life",
+      "keywords": [
+        "еда",
+        "бутерброд",
+        "обед"
+      ],
+      "source": "lucide:sandwich"
+    },
+    {
+      "key": "pizza",
+      "label": "Пицца",
+      "category": "life",
+      "keywords": [
+        "тесто",
+        "сыр",
+        "ужин"
+      ],
+      "source": "lucide:pizza"
+    },
+    {
+      "key": "ice-cream-cone",
+      "label": "Мороженое",
+      "category": "life",
+      "keywords": [
+        "десерт",
+        "сладкое",
+        "лето"
+      ],
+      "source": "lucide:ice-cream-cone"
+    },
+    {
+      "key": "coffee",
+      "label": "Кофе",
+      "category": "life",
+      "keywords": [
+        "напитки",
+        "кофейня",
+        "утро"
+      ],
+      "source": "lucide:coffee"
+    },
+    {
+      "key": "bike",
+      "label": "Велоспорт",
+      "category": "life",
+      "keywords": [
+        "тренировка",
+        "прогулка",
+        "педали"
+      ],
+      "source": "lucide:bike"
+    },
+    {
+      "key": "volleyball",
+      "label": "Волейбол",
+      "category": "life",
+      "keywords": [
+        "спорт",
+        "команда",
+        "сетка"
+      ],
+      "source": "lucide:volleyball"
+    },
+    {
+      "key": "goal",
+      "label": "Футбол",
+      "category": "life",
+      "keywords": [
+        "матч",
+        "поле",
+        "тренировка"
+      ],
+      "source": "lucide:goal"
+    },
+    {
+      "key": "footprints",
+      "label": "Ходьба",
+      "category": "life",
+      "keywords": [
+        "шаги",
+        "трек",
+        "прогулка"
+      ],
+      "source": "lucide:footprints"
+    },
+    {
+      "key": "heart-pulse",
+      "label": "Пульс",
+      "category": "life",
+      "keywords": [
+        "здоровье",
+        "тренировка",
+        "сердце"
+      ],
+      "source": "lucide:heart-pulse"
+    },
+    {
+      "key": "pill",
+      "label": "Лекарства",
+      "category": "life",
+      "keywords": [
+        "аптечка",
+        "здоровье",
+        "приём"
+      ],
+      "source": "lucide:pill"
+    },
+    {
+      "key": "stethoscope",
+      "label": "Приёмы у врача",
+      "category": "life",
+      "keywords": [
+        "медицина",
+        "осмотр",
+        "здоровье"
+      ],
+      "source": "lucide:stethoscope"
+    },
+    {
+      "key": "fuel",
+      "label": "Заправки",
+      "category": "life",
+      "keywords": [
+        "авто",
+        "бензин",
+        "расход"
+      ],
+      "source": "lucide:fuel"
+    },
+    {
+      "key": "car-battery",
+      "label": "Аккумулятор",
+      "category": "life",
+      "keywords": [
+        "авто",
+        "заряд",
+        "сервис"
+      ],
+      "source": "lucide:car-battery"
+    },
+    {
+      "key": "wrench",
+      "label": "Обслуживание авто",
+      "category": "life",
+      "keywords": [
+        "ремонт",
+        "механика",
+        "сервис"
+      ],
+      "source": "lucide:wrench"
+    },
+    {
+      "key": "hammer",
+      "label": "Ремонт",
+      "category": "life",
+      "keywords": [
+        "дом",
+        "мастерская",
+        "инструмент"
+      ],
+      "source": "lucide:hammer"
+    },
+    {
+      "key": "paint-roller",
+      "label": "Покраска",
+      "category": "life",
+      "keywords": [
+        "ремонт",
+        "стены",
+        "краска"
+      ],
+      "source": "lucide:paint-roller"
+    },
+    {
+      "key": "armchair",
+      "label": "Интерьер",
+      "category": "life",
+      "keywords": [
+        "мебель",
+        "дом",
+        "обстановка"
+      ],
+      "source": "lucide:armchair"
+    },
+    {
+      "key": "lamp",
+      "label": "Освещение",
+      "category": "life",
+      "keywords": [
+        "интерьер",
+        "свет",
+        "дом"
+      ],
+      "source": "lucide:lamp"
+    },
+    {
+      "key": "sprout",
+      "label": "Рассада",
+      "category": "life",
+      "keywords": [
+        "сад",
+        "посадка",
+        "семена"
+      ],
+      "source": "lucide:sprout"
+    },
+    {
+      "key": "shovel",
+      "label": "Садовые работы",
+      "category": "life",
+      "keywords": [
+        "земля",
+        "огород",
+        "посадка"
+      ],
+      "source": "lucide:shovel"
+    },
+    {
+      "key": "carrot",
+      "label": "Огород",
+      "category": "life",
+      "keywords": [
+        "овощи",
+        "грядка",
+        "урожай"
+      ],
+      "source": "lucide:carrot"
+    },
+    {
+      "key": "fishing-rod",
+      "label": "Рыбалка",
+      "category": "life",
+      "keywords": [
+        "улов",
+        "рыба",
+        "водоём"
+      ],
+      "source": "lucide:fishing-rod"
+    },
+    {
+      "key": "fish",
+      "label": "Улов",
+      "category": "life",
+      "keywords": [
+        "рыбалка",
+        "рыба",
+        "водоём"
+      ],
+      "source": "lucide:fish"
+    },
+    {
+      "key": "book-open-text",
+      "label": "Чтение",
+      "category": "life",
+      "keywords": [
+        "литература",
+        "книги",
+        "страницы"
+      ],
+      "source": "lucide:book-open-text"
+    },
+    {
+      "key": "pencil",
+      "label": "Эскизы",
+      "category": "life",
+      "keywords": [
+        "рисунок",
+        "набросок",
+        "графика"
+      ],
+      "source": "lucide:pencil"
+    },
+    {
+      "key": "paintbrush",
+      "label": "Живопись",
+      "category": "life",
+      "keywords": [
+        "краски",
+        "холст",
+        "рисунок"
+      ],
+      "source": "lucide:paintbrush"
+    },
+    {
+      "key": "scissors",
+      "label": "Выкройки",
+      "category": "life",
+      "keywords": [
+        "крой",
+        "шитьё",
+        "ткань"
+      ],
+      "source": "lucide:scissors"
+    },
+    {
+      "key": "spool",
+      "label": "Шитьё",
+      "category": "life",
+      "keywords": [
+        "нитки",
+        "ткань",
+        "рукоделие"
+      ],
+      "source": "lucide:spool"
+    },
+    {
+      "key": "coins",
+      "label": "Коллекция монет",
+      "category": "life",
+      "keywords": [
+        "нумизматика",
+        "коллекция",
+        "деньги"
+      ],
+      "source": "lucide:coins"
+    },
+    {
+      "key": "trees",
+      "label": "Лес",
+      "category": "life",
+      "keywords": [
+        "природа",
+        "прогулка",
+        "поход"
+      ],
+      "source": "lucide:trees"
+    },
+    {
+      "key": "cloud-sun-rain",
+      "label": "Переменчивая погода",
+      "category": "life",
+      "keywords": [
+        "прогноз",
+        "дождь",
+        "солнце"
+      ],
+      "source": "lucide:cloud-sun-rain"
+    },
+    {
+      "key": "snowflake",
+      "label": "Снег",
+      "category": "life",
+      "keywords": [
+        "зима",
+        "погода",
+        "мороз"
+      ],
+      "source": "lucide:snowflake"
+    },
+    {
       "key": "adult",
       "label": "Для взрослых",
       "category": "private",
@@ -933,6 +3447,1509 @@
       "source": "lucide:key-round"
     },
     {
+      "key": "door-closed-locked",
+      "label": "Запертая дверь",
+      "category": "private",
+      "keywords": [
+        "запертая",
+        "дверь",
+        "door",
+        "closed",
+        "locked",
+        "личное"
+      ],
+      "source": "lucide:door-closed-locked"
+    },
+    {
+      "key": "keyhole",
+      "label": "Под замком",
+      "category": "private",
+      "keywords": [
+        "замок",
+        "скважина",
+        "тайник"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "shield-ban",
+      "label": "Доступ закрыт",
+      "category": "private",
+      "keywords": [
+        "доступ",
+        "закрыт",
+        "shield",
+        "ban",
+        "личное"
+      ],
+      "source": "lucide:shield-ban"
+    },
+    {
+      "key": "hidden-folder",
+      "label": "Скрытая папка",
+      "category": "private",
+      "keywords": [
+        "скрыто",
+        "папка",
+        "тайник"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "private-folder",
+      "label": "Личная папка",
+      "category": "private",
+      "keywords": [
+        "приватное",
+        "папка",
+        "личное"
+      ],
+      "source": "lucide:folder-key"
+    },
+    {
+      "key": "folder-closed",
+      "label": "Закрытая папка",
+      "category": "private",
+      "keywords": [
+        "скрытые",
+        "папки",
+        "личное"
+      ],
+      "source": "lucide:folder-closed"
+    },
+    {
+      "key": "strawberry",
+      "label": "Клубничка",
+      "category": "private",
+      "keywords": [
+        "клубничка",
+        "пикантное",
+        "эротика"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "secret-identity",
+      "label": "Инкогнито",
+      "category": "private",
+      "keywords": [
+        "тайна",
+        "инкогнито",
+        "анонимно"
+      ],
+      "source": "lucide:hat-glasses"
+    },
+    {
+      "key": "kiss-lips",
+      "label": "Поцелуй",
+      "category": "private",
+      "keywords": [
+        "губы",
+        "поцелуй",
+        "эротика"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "file-lock",
+      "label": "Закрытый файл",
+      "category": "private",
+      "keywords": [
+        "закрытый",
+        "файл",
+        "file",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:file-lock"
+    },
+    {
+      "key": "eye-closed",
+      "label": "Скрытое",
+      "category": "private",
+      "keywords": [
+        "скрытое",
+        "eye",
+        "closed",
+        "личное"
+      ],
+      "source": "lucide:eye-closed"
+    },
+    {
+      "key": "eye-dashed",
+      "label": "Скрытая видимость",
+      "category": "private",
+      "keywords": [
+        "скрытая",
+        "видимость",
+        "eye",
+        "dashed",
+        "личное"
+      ],
+      "source": "lucide:eye-dashed"
+    },
+    {
+      "key": "safe-storage",
+      "label": "Сейф",
+      "category": "private",
+      "keywords": [
+        "сейф",
+        "защищено",
+        "личное"
+      ],
+      "source": "lucide:vault"
+    },
+    {
+      "key": "handcuffs",
+      "label": "Наручники",
+      "category": "private",
+      "keywords": [
+        "наручники",
+        "аксессуары",
+        "бдсм"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "flame-kindling",
+      "label": "Страсть",
+      "category": "private",
+      "keywords": [
+        "страсть",
+        "flame",
+        "kindling",
+        "личное"
+      ],
+      "source": "lucide:flame-kindling"
+    },
+    {
+      "key": "venetian-mask",
+      "label": "Маскарад",
+      "category": "private",
+      "keywords": [
+        "маскарад",
+        "venetian",
+        "mask",
+        "личное"
+      ],
+      "source": "lucide:venetian-mask"
+    },
+    {
+      "key": "shield-keyhole",
+      "label": "Шифрование",
+      "category": "private",
+      "keywords": [
+        "шифрование",
+        "shield",
+        "keyhole",
+        "личное"
+      ],
+      "source": "lucide:shield-keyhole"
+    },
+    {
+      "key": "shield-lock",
+      "label": "Защищённое хранилище",
+      "category": "private",
+      "keywords": [
+        "защищённое",
+        "хранилище",
+        "shield",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:shield-lock"
+    },
+    {
+      "key": "sealed-envelope",
+      "label": "Запечатанное письмо",
+      "category": "private",
+      "keywords": [
+        "печать",
+        "письмо",
+        "секрет"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "cherry",
+      "label": "Вишенки",
+      "category": "private",
+      "keywords": [
+        "вишенки",
+        "cherry",
+        "личное"
+      ],
+      "source": "lucide:cherry"
+    },
+    {
+      "key": "calendar-heart",
+      "label": "Свидание",
+      "category": "private",
+      "keywords": [
+        "свидание",
+        "calendar",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:calendar-heart"
+    },
+    {
+      "key": "book-heart",
+      "label": "Любовный роман",
+      "category": "private",
+      "keywords": [
+        "любовный",
+        "роман",
+        "book",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:book-heart"
+    },
+    {
+      "key": "book-lock",
+      "label": "Дневник под замком",
+      "category": "private",
+      "keywords": [
+        "дневник",
+        "под",
+        "замком",
+        "book",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:book-lock"
+    },
+    {
+      "key": "message-square-lock",
+      "label": "Приватный чат",
+      "category": "private",
+      "keywords": [
+        "приватный",
+        "чат",
+        "message",
+        "square",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:message-square-lock"
+    },
+    {
+      "key": "lock-keyhole-open",
+      "label": "Доступ открыт",
+      "category": "private",
+      "keywords": [
+        "доступ",
+        "открыт",
+        "lock",
+        "keyhole",
+        "open",
+        "личное"
+      ],
+      "source": "lucide:lock-keyhole-open"
+    },
+    {
+      "key": "scan-eye",
+      "label": "Проверка доступа",
+      "category": "private",
+      "keywords": [
+        "проверка",
+        "доступа",
+        "scan",
+        "eye",
+        "личное"
+      ],
+      "source": "lucide:scan-eye"
+    },
+    {
+      "key": "age-18-plus",
+      "label": "18+",
+      "category": "private",
+      "keywords": [
+        "возраст",
+        "ограничение",
+        "взрослое"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "flaming-heart",
+      "label": "Пламенное сердце",
+      "category": "private",
+      "keywords": [
+        "страсть",
+        "огонь",
+        "любовь"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "key-round",
+      "label": "Личный доступ",
+      "category": "private",
+      "keywords": [
+        "ключ",
+        "доступ",
+        "личное"
+      ],
+      "source": "lucide:key-round"
+    },
+    {
+      "key": "rose",
+      "label": "Роза",
+      "category": "private",
+      "keywords": [
+        "роза",
+        "rose",
+        "личное"
+      ],
+      "source": "lucide:rose"
+    },
+    {
+      "key": "bottle-wine",
+      "label": "Вечер вдвоём",
+      "category": "private",
+      "keywords": [
+        "вечер",
+        "вдвоём",
+        "bottle",
+        "wine",
+        "личное"
+      ],
+      "source": "lucide:bottle-wine"
+    },
+    {
+      "key": "candle-symbol",
+      "label": "При свечах",
+      "category": "private",
+      "keywords": [
+        "при",
+        "свечах",
+        "candle",
+        "symbol",
+        "личное"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "hand-heart",
+      "label": "Забота",
+      "category": "private",
+      "keywords": [
+        "забота",
+        "hand",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:hand-heart"
+    },
+    {
+      "key": "heart-crack",
+      "label": "Разбитое сердце",
+      "category": "private",
+      "keywords": [
+        "разбитое",
+        "сердце",
+        "heart",
+        "crack",
+        "личное"
+      ],
+      "source": "lucide:heart-crack"
+    },
+    {
+      "key": "message-circle-heart",
+      "label": "Флирт",
+      "category": "private",
+      "keywords": [
+        "флирт",
+        "message",
+        "circle",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:message-circle-heart"
+    },
+    {
+      "key": "message-square-heart",
+      "label": "Признание",
+      "category": "private",
+      "keywords": [
+        "признание",
+        "message",
+        "square",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:message-square-heart"
+    },
+    {
+      "key": "file-heart",
+      "label": "Любовное письмо",
+      "category": "private",
+      "keywords": [
+        "любовное",
+        "письмо",
+        "file",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:file-heart"
+    },
+    {
+      "key": "scan-heart",
+      "label": "Интим",
+      "category": "private",
+      "keywords": [
+        "интим",
+        "scan",
+        "heart",
+        "личное"
+      ],
+      "source": "lucide:scan-heart"
+    },
+    {
+      "key": "heart-off",
+      "label": "Без романтики",
+      "category": "private",
+      "keywords": [
+        "без",
+        "романтики",
+        "heart",
+        "off",
+        "личное"
+      ],
+      "source": "lucide:heart-off"
+    },
+    {
+      "key": "folder-user",
+      "label": "Только для меня",
+      "category": "private",
+      "keywords": [
+        "только",
+        "для",
+        "меня",
+        "folder",
+        "user",
+        "личное"
+      ],
+      "source": "lucide:folder-user"
+    },
+    {
+      "key": "file-key",
+      "label": "Файл с ключом",
+      "category": "private",
+      "keywords": [
+        "файл",
+        "с",
+        "ключом",
+        "file",
+        "key",
+        "личное"
+      ],
+      "source": "lucide:file-key"
+    },
+    {
+      "key": "book-key",
+      "label": "Личные записи",
+      "category": "private",
+      "keywords": [
+        "личные",
+        "записи",
+        "book",
+        "key",
+        "личное"
+      ],
+      "source": "lucide:book-key"
+    },
+    {
+      "key": "user-lock",
+      "label": "Закрытый профиль",
+      "category": "private",
+      "keywords": [
+        "закрытый",
+        "профиль",
+        "user",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:user-lock"
+    },
+    {
+      "key": "user-key",
+      "label": "Личный ключ",
+      "category": "private",
+      "keywords": [
+        "личный",
+        "ключ",
+        "user",
+        "key",
+        "личное"
+      ],
+      "source": "lucide:user-key"
+    },
+    {
+      "key": "user-shield",
+      "label": "Защита профиля",
+      "category": "private",
+      "keywords": [
+        "защита",
+        "профиля",
+        "user",
+        "shield",
+        "личное"
+      ],
+      "source": "lucide:user-shield"
+    },
+    {
+      "key": "fingerprint",
+      "label": "Отпечаток пальца",
+      "category": "private",
+      "keywords": [
+        "отпечаток",
+        "пальца",
+        "fingerprint",
+        "личное"
+      ],
+      "source": "lucide:fingerprint"
+    },
+    {
+      "key": "safe-keyhole",
+      "label": "Ключ от сейфа",
+      "category": "private",
+      "keywords": [
+        "ключ",
+        "от",
+        "сейфа",
+        "safe",
+        "keyhole",
+        "личное"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "key-round-private",
+      "label": "Ключ доступа",
+      "category": "private",
+      "keywords": [
+        "ключ",
+        "доступа",
+        "key",
+        "round",
+        "private",
+        "личное"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "key-square-private",
+      "label": "Запасной ключ",
+      "category": "private",
+      "keywords": [
+        "запасной",
+        "ключ",
+        "key",
+        "square",
+        "private",
+        "личное"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "globe-lock",
+      "label": "Закрытый сайт",
+      "category": "private",
+      "keywords": [
+        "закрытый",
+        "сайт",
+        "globe",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:globe-lock"
+    },
+    {
+      "key": "wifi-lock",
+      "label": "Защищённая сеть",
+      "category": "private",
+      "keywords": [
+        "защищённая",
+        "сеть",
+        "wifi",
+        "lock",
+        "личное"
+      ],
+      "source": "lucide:wifi-lock"
+    },
+    {
+      "key": "rectangle-ellipsis",
+      "label": "Пароль",
+      "category": "private",
+      "keywords": [
+        "пароль",
+        "rectangle",
+        "ellipsis",
+        "личное"
+      ],
+      "source": "lucide:rectangle-ellipsis"
+    },
+    {
+      "key": "user-round-key",
+      "label": "Доступ по ключу",
+      "category": "private",
+      "keywords": [
+        "доступ",
+        "по",
+        "ключу",
+        "user",
+        "round",
+        "key"
+      ],
+      "source": "lucide:user-round-key"
+    },
+    {
+      "key": "adult-21-plus",
+      "label": "21+",
+      "category": "private",
+      "keywords": [
+        "21+",
+        "взрослое",
+        "ограничение"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "xxx-rating",
+      "label": "XXX",
+      "category": "private",
+      "keywords": [
+        "XXX",
+        "порно",
+        "эротика"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "nsfw-stamp",
+      "label": "NSFW",
+      "category": "private",
+      "keywords": [
+        "NSFW",
+        "18+",
+        "эротика"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "riding-crop",
+      "label": "Стек",
+      "category": "private",
+      "keywords": [
+        "фетиш",
+        "BDSM",
+        "плётка"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "hidden-cache",
+      "label": "Тайник",
+      "category": "private",
+      "keywords": [
+        "тайник",
+        "спрятано",
+        "секрет"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "sealed-letter",
+      "label": "Секретное письмо",
+      "category": "private",
+      "keywords": [
+        "письмо",
+        "секрет",
+        "печать"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "private-keyhole",
+      "label": "Замочная скважина",
+      "category": "private",
+      "keywords": [
+        "скважина",
+        "ключ",
+        "замок"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "heart-flame",
+      "label": "Горячее",
+      "category": "private",
+      "keywords": [
+        "эротика",
+        "страсть",
+        "сердце"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "adults-only",
+      "label": "Только для взрослых",
+      "category": "private",
+      "keywords": [
+        "18+",
+        "взрослое",
+        "ограничение"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "censored",
+      "label": "Цензура",
+      "category": "private",
+      "keywords": [
+        "цензура",
+        "скрыто",
+        "взрослое"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "warning-octagon",
+      "label": "Стоп",
+      "category": "status",
+      "keywords": [
+        "стоп",
+        "запрет",
+        "опасность"
+      ],
+      "source": "lucide:octagon-alert"
+    },
+    {
+      "key": "do-not-open",
+      "label": "Не открывать",
+      "category": "status",
+      "keywords": [
+        "запрет",
+        "папка",
+        "доступ"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "prohibited",
+      "label": "Запрещено",
+      "category": "status",
+      "keywords": [
+        "запрет",
+        "нельзя",
+        "блок"
+      ],
+      "source": "lucide:ban"
+    },
+    {
+      "key": "folder-no-entry",
+      "label": "Не открывать",
+      "category": "status",
+      "keywords": [
+        "папка",
+        "доступ",
+        "запрет"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "octagon",
+      "label": "Стоп",
+      "category": "status",
+      "keywords": [
+        "остановка",
+        "запрет",
+        "знак"
+      ],
+      "source": "lucide:octagon"
+    },
+    {
+      "key": "circle-x",
+      "label": "Запрещено",
+      "category": "status",
+      "keywords": [
+        "запрет",
+        "стоп",
+        "закрыто"
+      ],
+      "source": "lucide:circle-x"
+    },
+    {
+      "key": "access-blocked",
+      "label": "Доступ закрыт",
+      "category": "status",
+      "keywords": [
+        "доступ",
+        "закрыто",
+        "приватное"
+      ],
+      "source": "lucide:lock-keyhole"
+    },
+    {
+      "key": "warning-triangle",
+      "label": "Осторожно",
+      "category": "status",
+      "keywords": [
+        "внимание",
+        "опасность",
+        "предупреждение"
+      ],
+      "source": "lucide:triangle-alert"
+    },
+    {
+      "key": "needs-attention",
+      "label": "Требует внимания",
+      "category": "status",
+      "keywords": [
+        "важно",
+        "внимание",
+        "проверка"
+      ],
+      "source": "lucide:circle-alert"
+    },
+    {
+      "key": "bell-ring",
+      "label": "Требует внимания",
+      "category": "status",
+      "keywords": [
+        "звонок",
+        "сигнал",
+        "уведомление"
+      ],
+      "source": "lucide:bell-ring"
+    },
+    {
+      "key": "unknown-folder",
+      "label": "Неизвестная папка",
+      "category": "status",
+      "keywords": [
+        "папка",
+        "неизвестно",
+        "вопрос"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "circle-question-mark",
+      "label": "Неизвестное",
+      "category": "status",
+      "keywords": [
+        "неизвестное",
+        "circle",
+        "question",
+        "mark",
+        "метка"
+      ],
+      "source": "lucide:circle-question-mark"
+    },
+    {
+      "key": "verified-content",
+      "label": "Проверено",
+      "category": "status",
+      "keywords": [
+        "верификация",
+        "проверено",
+        "подтверждено"
+      ],
+      "source": "lucide:badge-check"
+    },
+    {
+      "key": "shield-check",
+      "label": "Безопасно",
+      "category": "status",
+      "keywords": [
+        "защита",
+        "проверено",
+        "доверие"
+      ],
+      "source": "lucide:shield-check"
+    },
+    {
+      "key": "important-content",
+      "label": "Важное",
+      "category": "status",
+      "keywords": [
+        "важно",
+        "приоритет",
+        "метка"
+      ],
+      "source": "lucide:bookmark-check"
+    },
+    {
+      "key": "badge-alert",
+      "label": "Важное предупреждение",
+      "category": "status",
+      "keywords": [
+        "важное",
+        "предупреждение",
+        "badge",
+        "alert",
+        "метка"
+      ],
+      "source": "lucide:badge-alert"
+    },
+    {
+      "key": "under-review",
+      "label": "На проверке",
+      "category": "status",
+      "keywords": [
+        "ревью",
+        "проверить",
+        "очередь"
+      ],
+      "source": "lucide:clipboard-list"
+    },
+    {
+      "key": "in-progress",
+      "label": "В работе",
+      "category": "status",
+      "keywords": [
+        "процесс",
+        "загрузка",
+        "ожидание"
+      ],
+      "source": "lucide:loader-circle"
+    },
+    {
+      "key": "file-question-mark",
+      "label": "Неизвестный файл",
+      "category": "status",
+      "keywords": [
+        "неизвестный",
+        "файл",
+        "file",
+        "question",
+        "mark",
+        "метка"
+      ],
+      "source": "lucide:file-question-mark"
+    },
+    {
+      "key": "question-badge",
+      "label": "Есть вопросы",
+      "category": "status",
+      "keywords": [
+        "вопрос",
+        "сомнение",
+        "уточнить"
+      ],
+      "source": "lucide:badge-question-mark"
+    },
+    {
+      "key": "hazard-sign",
+      "label": "Опасные материалы",
+      "category": "status",
+      "keywords": [
+        "риск",
+        "знак",
+        "опасность"
+      ],
+      "source": "lucide:biohazard"
+    },
+    {
+      "key": "pending-content",
+      "label": "В ожидании",
+      "category": "status",
+      "keywords": [
+        "ожидание",
+        "очередь",
+        "отложено"
+      ],
+      "source": "lucide:hourglass"
+    },
+    {
+      "key": "removed-content",
+      "label": "Удалённое",
+      "category": "status",
+      "keywords": [
+        "корзина",
+        "удалено",
+        "мусор"
+      ],
+      "source": "lucide:trash-2"
+    },
+    {
+      "key": "skull",
+      "label": "Токсично",
+      "category": "status",
+      "keywords": [
+        "яд",
+        "химия",
+        "опасность"
+      ],
+      "source": "lucide:skull"
+    },
+    {
+      "key": "file-pen-line",
+      "label": "Черновик",
+      "category": "status",
+      "keywords": [
+        "запись",
+        "набросок",
+        "правки"
+      ],
+      "source": "lucide:file-pen-line"
+    },
+    {
+      "key": "octagon-x",
+      "label": "Отклонено",
+      "category": "status",
+      "keywords": [
+        "отказ",
+        "проверка",
+        "ошибка"
+      ],
+      "source": "lucide:octagon-x"
+    },
+    {
+      "key": "file-exclamation-point",
+      "label": "Файл с предупреждением",
+      "category": "status",
+      "keywords": [
+        "файл",
+        "ошибка",
+        "внимание"
+      ],
+      "source": "lucide:file-exclamation-point"
+    },
+    {
+      "key": "clipboard-check",
+      "label": "Проверка завершена",
+      "category": "status",
+      "keywords": [
+        "проверка",
+        "список",
+        "готово"
+      ],
+      "source": "lucide:clipboard-check"
+    },
+    {
+      "key": "file-clock",
+      "label": "Ожидает обработки",
+      "category": "status",
+      "keywords": [
+        "очередь",
+        "ожидание",
+        "файл"
+      ],
+      "source": "lucide:file-clock"
+    },
+    {
+      "key": "flag-triangle-right",
+      "label": "Помечено",
+      "category": "status",
+      "keywords": [
+        "флажок",
+        "метка",
+        "отметить"
+      ],
+      "source": "lucide:flag-triangle-right"
+    },
+    {
+      "key": "list-checks",
+      "label": "Выполнено по списку",
+      "category": "status",
+      "keywords": [
+        "контроль",
+        "готово",
+        "задачи"
+      ],
+      "source": "lucide:list-checks"
+    },
+    {
+      "key": "archive-restore",
+      "label": "Восстановить",
+      "category": "status",
+      "keywords": [
+        "архив",
+        "вернуть",
+        "восстановление"
+      ],
+      "source": "lucide:archive-restore"
+    },
+    {
+      "key": "fragile-content",
+      "label": "Хрупкое содержимое",
+      "category": "status",
+      "keywords": [
+        "хрупко",
+        "осторожно",
+        "разбить"
+      ],
+      "source": "lucide:glass-water"
+    },
+    {
+      "key": "unverified",
+      "label": "Не проверено",
+      "category": "status",
+      "keywords": [
+        "проверка",
+        "неизвестно",
+        "статус"
+      ],
+      "source": "lucide:shield-question-mark"
+    },
+    {
+      "key": "broken-content",
+      "label": "Повреждённые файлы",
+      "category": "status",
+      "keywords": [
+        "сломано",
+        "повреждено",
+        "ошибка"
+      ],
+      "source": "lucide:file-x"
+    },
+    {
+      "key": "radiation",
+      "label": "Радиация",
+      "category": "status",
+      "keywords": [
+        "излучение",
+        "атом",
+        "опасность"
+      ],
+      "source": "lucide:radiation"
+    },
+    {
+      "key": "message-circle-question-mark",
+      "label": "Есть вопрос",
+      "category": "status",
+      "keywords": [
+        "вопрос",
+        "обсуждение",
+        "уточнение"
+      ],
+      "source": "lucide:message-circle-question-mark"
+    },
+    {
+      "key": "question-mark",
+      "label": "Вопросительный знак",
+      "category": "status",
+      "keywords": [
+        "вопрос",
+        "сомнение",
+        "неизвестно"
+      ],
+      "source": "lucide:question-mark"
+    },
+    {
+      "key": "exclamation-mark",
+      "label": "Восклицательный знак",
+      "category": "status",
+      "keywords": [
+        "внимание",
+        "важно",
+        "знак"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "clock-alert",
+      "label": "Срочно",
+      "category": "status",
+      "keywords": [
+        "срок",
+        "время",
+        "приоритет"
+      ],
+      "source": "lucide:clock-alert"
+    },
+    {
+      "key": "circle-check",
+      "label": "Готово",
+      "category": "status",
+      "keywords": [
+        "завершено",
+        "сделано",
+        "статус"
+      ],
+      "source": "lucide:circle-check"
+    },
+    {
+      "key": "trash-clock",
+      "label": "Удалить позже",
+      "category": "status",
+      "keywords": [
+        "позже",
+        "удалить",
+        "корзина"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "package-lock",
+      "label": "Карантин",
+      "category": "status",
+      "keywords": [
+        "изоляция",
+        "блокировка",
+        "проверка"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "spoiler-cover",
+      "label": "Спойлер",
+      "category": "status",
+      "keywords": [
+        "сюжет",
+        "секрет",
+        "скрыто"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "hand",
+      "label": "Не трогать",
+      "category": "status",
+      "keywords": [
+        "рука",
+        "запрет",
+        "осторожно"
+      ],
+      "source": "lucide:hand"
+    },
+    {
+      "key": "octagon-pause",
+      "label": "Приостановлено",
+      "category": "status",
+      "keywords": [
+        "пауза",
+        "ожидание",
+        "стоп"
+      ],
+      "source": "lucide:octagon-pause"
+    },
+    {
+      "key": "circle-stop",
+      "label": "Остановлено",
+      "category": "status",
+      "keywords": [
+        "стоп",
+        "процесс",
+        "прервано"
+      ],
+      "source": "lucide:circle-stop"
+    },
+    {
+      "key": "circle-minus",
+      "label": "Исключено",
+      "category": "status",
+      "keywords": [
+        "минус",
+        "убрать",
+        "пропустить"
+      ],
+      "source": "lucide:circle-minus"
+    },
+    {
+      "key": "info",
+      "label": "Справка",
+      "category": "status",
+      "keywords": [
+        "информация",
+        "подсказка",
+        "сведения"
+      ],
+      "source": "lucide:info"
+    },
+    {
+      "key": "badge-x",
+      "label": "Помечено ошибкой",
+      "category": "status",
+      "keywords": [
+        "ошибка",
+        "дефект",
+        "отказ"
+      ],
+      "source": "lucide:badge-x"
+    },
+    {
+      "key": "clipboard-x",
+      "label": "Проверка не пройдена",
+      "category": "status",
+      "keywords": [
+        "проверка",
+        "отклонено",
+        "ошибка"
+      ],
+      "source": "lucide:clipboard-x"
+    },
+    {
+      "key": "timer",
+      "label": "Срок истекает",
+      "category": "status",
+      "keywords": [
+        "таймер",
+        "срок",
+        "отсчёт"
+      ],
+      "source": "lucide:timer"
+    },
+    {
+      "key": "alarm-clock",
+      "label": "Напомнить",
+      "category": "status",
+      "keywords": [
+        "будильник",
+        "срок",
+        "напоминание"
+      ],
+      "source": "lucide:alarm-clock"
+    },
+    {
+      "key": "bell-off",
+      "label": "Без уведомлений",
+      "category": "status",
+      "keywords": [
+        "тишина",
+        "звук",
+        "отключено"
+      ],
+      "source": "lucide:bell-off"
+    },
+    {
+      "key": "pin",
+      "label": "Закреплено",
+      "category": "status",
+      "keywords": [
+        "булавка",
+        "метка",
+        "приоритет"
+      ],
+      "source": "lucide:pin"
+    },
+    {
+      "key": "tags",
+      "label": "Несколько меток",
+      "category": "status",
+      "keywords": [
+        "бирки",
+        "метки",
+        "классификация"
+      ],
+      "source": "lucide:tags"
+    },
+    {
+      "key": "list-todo",
+      "label": "К выполнению",
+      "category": "status",
+      "keywords": [
+        "задачи",
+        "список",
+        "сделать"
+      ],
+      "source": "lucide:list-todo"
+    },
+    {
+      "key": "list-filter",
+      "label": "Требует сортировки",
+      "category": "status",
+      "keywords": [
+        "разобрать",
+        "список",
+        "фильтр"
+      ],
+      "source": "lucide:list-filter"
+    },
+    {
+      "key": "circle-dashed",
+      "label": "Запланировано",
+      "category": "status",
+      "keywords": [
+        "план",
+        "задача",
+        "ожидание"
+      ],
+      "source": "lucide:circle-dashed"
+    },
+    {
+      "key": "circle-dot",
+      "label": "Активно",
+      "category": "status",
+      "keywords": [
+        "статус",
+        "активно",
+        "сейчас"
+      ],
+      "source": "lucide:circle-dot"
+    },
+    {
+      "key": "circle-ellipsis",
+      "label": "Ожидает решения",
+      "category": "status",
+      "keywords": [
+        "очередь",
+        "обсуждение",
+        "статус"
+      ],
+      "source": "lucide:circle-ellipsis"
+    },
+    {
+      "key": "shield-off",
+      "label": "Защита выключена",
+      "category": "status",
+      "keywords": [
+        "защита",
+        "отключено",
+        "доступ"
+      ],
+      "source": "lucide:shield-off"
+    },
+    {
+      "key": "archive-x",
+      "label": "Архив исключён",
+      "category": "status",
+      "keywords": [
+        "архив",
+        "удалить",
+        "исключить"
+      ],
+      "source": "lucide:archive-x"
+    },
+    {
+      "key": "file-search-corner",
+      "label": "Проверить файл",
+      "category": "status",
+      "keywords": [
+        "файл",
+        "поиск",
+        "проверка"
+      ],
+      "source": "lucide:file-search-corner"
+    },
+    {
+      "key": "search-alert",
+      "label": "Нужна диагностика",
+      "category": "status",
+      "keywords": [
+        "поиск",
+        "ошибка",
+        "внимание"
+      ],
+      "source": "lucide:search-alert"
+    },
+    {
+      "key": "siren",
+      "label": "Тревога",
+      "category": "status",
+      "keywords": [
+        "сирена",
+        "сигнал",
+        "авария"
+      ],
+      "source": "lucide:siren"
+    },
+    {
       "key": "star",
       "label": "Избранное",
       "category": "misc",
@@ -1004,6 +5021,349 @@
         "защита"
       ],
       "source": "lucide:shield"
+    },
+    {
+      "key": "discoveries",
+      "label": "Находки",
+      "category": "misc",
+      "keywords": [
+        "интересное",
+        "находки",
+        "интерес"
+      ],
+      "source": "lucide:gem"
+    },
+    {
+      "key": "favorites-folder",
+      "label": "Избранная папка",
+      "category": "misc",
+      "keywords": [
+        "избранное",
+        "любимое",
+        "папка"
+      ],
+      "source": "lucide:folder-heart"
+    },
+    {
+      "key": "top-picks",
+      "label": "Лучшее",
+      "category": "misc",
+      "keywords": [
+        "топ",
+        "подборка",
+        "лучшее"
+      ],
+      "source": "lucide:medal"
+    },
+    {
+      "key": "crown",
+      "label": "Корона",
+      "category": "misc",
+      "keywords": [
+        "корона",
+        "король",
+        "избранное"
+      ],
+      "source": "lucide:crown"
+    },
+    {
+      "key": "cool-stuff",
+      "label": "Классное",
+      "category": "misc",
+      "keywords": [
+        "класс",
+        "круто",
+        "подборка"
+      ],
+      "source": "lucide:zap"
+    },
+    {
+      "key": "time-capsule",
+      "label": "Капсула времени",
+      "category": "misc",
+      "keywords": [
+        "прошлое",
+        "архив",
+        "память"
+      ],
+      "source": "lucide:history"
+    },
+    {
+      "key": "surprise-content",
+      "label": "Сюрпризы",
+      "category": "misc",
+      "keywords": [
+        "сюрприз",
+        "праздник",
+        "неожиданность"
+      ],
+      "source": "lucide:party-popper"
+    },
+    {
+      "key": "experimental-content",
+      "label": "Эксперименты",
+      "category": "misc",
+      "keywords": [
+        "опыт",
+        "проба",
+        "черновик"
+      ],
+      "source": "lucide:flask-conical"
+    },
+    {
+      "key": "circle-star",
+      "label": "Особенное",
+      "category": "misc",
+      "keywords": [
+        "особенное",
+        "circle",
+        "star",
+        "избранное"
+      ],
+      "source": "lucide:circle-star"
+    },
+    {
+      "key": "wand-sparkles",
+      "label": "Магия",
+      "category": "misc",
+      "keywords": [
+        "магия",
+        "wand",
+        "sparkles",
+        "избранное"
+      ],
+      "source": "lucide:wand-sparkles"
+    },
+    {
+      "key": "rocket",
+      "label": "Ракета",
+      "category": "misc",
+      "keywords": [
+        "ракета",
+        "полёт",
+        "космос"
+      ],
+      "source": "lucide:rocket"
+    },
+    {
+      "key": "random-content",
+      "label": "Вперемешку",
+      "category": "misc",
+      "keywords": [
+        "случайное",
+        "разное",
+        "подборка"
+      ],
+      "source": "lucide:shuffle"
+    },
+    {
+      "key": "inspiration",
+      "label": "Вдохновение",
+      "category": "misc",
+      "keywords": [
+        "идея",
+        "референс",
+        "творчество"
+      ],
+      "source": "lucide:lightbulb"
+    },
+    {
+      "key": "new-arrivals",
+      "label": "Новинки",
+      "category": "misc",
+      "keywords": [
+        "новое",
+        "свежие",
+        "поступления"
+      ],
+      "source": "lucide:badge-plus"
+    },
+    {
+      "key": "shared-finds",
+      "label": "Совместная подборка",
+      "category": "misc",
+      "keywords": [
+        "общее",
+        "подборка",
+        "друзья"
+      ],
+      "source": "lucide:folder-open"
+    },
+    {
+      "key": "ufo",
+      "label": "НЛО",
+      "category": "misc",
+      "keywords": [
+        "нло",
+        "пришельцы",
+        "космос"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "crystal-ball",
+      "label": "Хрустальный шар",
+      "category": "misc",
+      "keywords": [
+        "магия",
+        "гадание",
+        "пророчество"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "witch-hat",
+      "label": "Ведьмина шляпа",
+      "category": "misc",
+      "keywords": [
+        "ведьма",
+        "шабаш",
+        "магия"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "haunted-house",
+      "label": "Дом с привидениями",
+      "category": "misc",
+      "keywords": [
+        "призраки",
+        "особняк",
+        "мистика"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "alien-head",
+      "label": "Пришелец",
+      "category": "misc",
+      "keywords": [
+        "инопланетянин",
+        "нло",
+        "космос"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "ringed-planet",
+      "label": "Планета с кольцом",
+      "category": "misc",
+      "keywords": [
+        "сатурн",
+        "космос",
+        "планета"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "mystic-eye",
+      "label": "Всевидящее око",
+      "category": "misc",
+      "keywords": [
+        "око",
+        "мистика",
+        "тайна"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "meteor-trail",
+      "label": "Метеор",
+      "category": "misc",
+      "keywords": [
+        "метеор",
+        "комета",
+        "космос"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "eclipse-ring",
+      "label": "Затмение",
+      "category": "misc",
+      "keywords": [
+        "затмение",
+        "луна",
+        "солнце"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "moon-lander",
+      "label": "Лунный модуль",
+      "category": "misc",
+      "keywords": [
+        "луна",
+        "посадка",
+        "космос"
+      ],
+      "source": "barkcloud"
+    },
+    {
+      "key": "ghost",
+      "label": "Призрак",
+      "category": "misc",
+      "keywords": [
+        "призрак",
+        "хэллоуин",
+        "мистика"
+      ],
+      "source": "lucide:ghost"
+    },
+    {
+      "key": "orbit",
+      "label": "Орбита",
+      "category": "misc",
+      "keywords": [
+        "орбита",
+        "атом",
+        "космос"
+      ],
+      "source": "lucide:orbit"
+    },
+    {
+      "key": "telescope",
+      "label": "Телескоп",
+      "category": "misc",
+      "keywords": [
+        "телескоп",
+        "звёзды",
+        "астрономия"
+      ],
+      "source": "lucide:telescope"
+    },
+    {
+      "key": "stars",
+      "label": "Россыпь звёзд",
+      "category": "misc",
+      "keywords": [
+        "звёзды",
+        "космос",
+        "сияние"
+      ],
+      "source": "lucide:stars"
+    },
+    {
+      "key": "bone",
+      "label": "Кость",
+      "category": "misc",
+      "keywords": [
+        "кость",
+        "скелет",
+        "хоррор"
+      ],
+      "source": "lucide:bone"
+    },
+    {
+      "key": "earth",
+      "label": "Земля",
+      "category": "misc",
+      "keywords": [
+        "земля",
+        "планета",
+        "космос"
+      ],
+      "source": "lucide:earth"
     }
   ]
 }
