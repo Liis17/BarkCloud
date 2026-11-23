@@ -2,7 +2,6 @@ import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { Footbar } from './Footbar';
 import { ShellContext } from '../../hooks/useShell';
 import { PageHeaderContext, type PageHeader } from '../../hooks/usePageHeader';
 import { UploadManagerProvider } from '../../hooks/useUploadManager';
@@ -15,7 +14,7 @@ import { storagePending } from '../ui/StorageStatsStatus';
 import { PublicLinkDialogHost } from '../ui/PublicLinkModal';
 import type { Shell, SidebarStorage } from '../../lib/types';
 
-/** Каркас приложения: layout-route. Грузит /api/me один раз, держит Sidebar/Topbar/Footbar
+/** Каркас приложения: layout-route. Грузит /api/me один раз, держит Sidebar/Topbar
  *  смонтированными, меняется только <Outlet/> при переходах между вкладками. */
 export function AppShell() {
   const profile = useApiResource<Shell>('/api/me?includeStorage=false');
@@ -56,7 +55,6 @@ export function AppShell() {
                 <div className={'content' + (header.contentClass ? ' ' + header.contentClass : '')}>
                   <Outlet />
                 </div>
-                <Footbar />
               </div>
             </div>
             <MiniPlayer />
