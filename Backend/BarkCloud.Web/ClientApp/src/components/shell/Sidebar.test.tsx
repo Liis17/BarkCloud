@@ -11,7 +11,6 @@ function renderSidebar(storage: Shell['storage'], collapsed = false, onToggle = 
     storage,
     app: { version: '1', edition: 'self-host' },
     server: { host: 'cloud.example' },
-    sync: { status: 'Синхронизировано', lastAt: '12:00' },
   };
   return render(<MemoryRouter><ShellContext.Provider value={shell}><Sidebar collapsed={collapsed} onToggle={onToggle} /></ShellContext.Provider></MemoryRouter>);
 }
