@@ -942,8 +942,6 @@ tr.selected .row-actions { opacity: 1; }
 .app-settings .content { min-width: 0; min-height: 0; }
 .app-settings .tb-search { display: none; }
 .app-settings .tb-title { flex: 1; min-width: 0; }
-.app-settings .footbar { flex-wrap: wrap; gap: 8px; }
-.app-settings .footbar :is(.left, .right) { flex-wrap: wrap; gap: 12px; }
 .settings-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; width: 100%; }
 .settings-shell [hidden] { display: none !important; }
 .set-nav { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 0; align-self: start; min-width: 0; }
@@ -1153,8 +1151,7 @@ details[open] > .server-group-summary::before, .server-config-section[open] > su
   .settings-context-error { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
-  .app-settings :is(.topbar, .footbar) { padding-inline: 16px; }
-  .app-settings .footbar .right, .app-settings .footbar .left > span:nth-child(2) { display: none; }
+  .app-settings .topbar { padding-inline: 16px; }
   .app-settings .content { padding: 12px 16px 24px; }
 }
 @media (max-width: 599px) {

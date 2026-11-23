@@ -365,7 +365,7 @@ img.avatar { object-fit: cover; }
 /* ============ MAIN ============ */
 .main {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
   background: var(--md-surface);
 }
@@ -602,23 +602,6 @@ input[type=checkbox]:disabled { opacity: .38; cursor: default; }
   background: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
 }
-
-/* ============ FOOTER ============ */
-.footbar {
-  padding: 10px 28px;
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--md-surface-container-low);
-  font-size: 12px;
-  color: var(--md-on-surface-variant);
-}
-.footbar .left, .footbar .right { display: flex; gap: 18px; align-items: center; }
-.footbar .pulse { display: flex; align-items: center; gap: 8px; font-weight: 500; }
-.footbar .pulse .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--md-success);
-}
-.footbar a { color: var(--md-on-surface-variant); text-decoration: none; transition: color var(--d-short); font-weight: 500; }
-.footbar a:hover { color: var(--md-primary); }
 
 /* ============ CONTENT ============ */
 .content {

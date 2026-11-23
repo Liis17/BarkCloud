@@ -318,7 +318,6 @@ export interface Shell {
   app: { version: string; edition: string };
   server: { host: string };
   features?: { torrentEnabled: boolean };
-  sync: { status: string; lastAt: string };
   /** Перечитать /api/me, например после смены флагов в настройках. */
   reload?: () => Promise<void>;
 }
